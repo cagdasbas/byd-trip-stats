@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,8 @@ fun TripHistoryScreen(
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
     var showSortSheet           by remember { mutableStateOf(false) }
     var showFilterSheet         by remember { mutableStateOf(false) }
+    var showCompareSheet        by remember { mutableStateOf(false) }
+    val scope                    = rememberCoroutineScope()
 
     val activeFilters = filterState.activeFilterCount
 
@@ -91,6 +95,23 @@ fun TripHistoryScreen(
                 },
                 actions = {
                     if (selectionMode && selectedTrips.size >= 1) {
+                        // Compare — only for 2-3 completed trips
+                        val comparableSelected = selectedTrips.filter { id ->
+                            trips.firstOrNull { it.id == id }?.isActive == false
+                        }
+                        if (comparableSelected.size in 2..3) {
+                            IconButton(onClick = {
+                                viewModel.loadCompareData(comparableSelected)
+                                showCompareSheet = true
+                            }) {
+                                Icon(
+                                    Icons.Filled.CompareArrows,
+                                    contentDescription = "Compare trips",
+                                    tint = BydElectricAzure,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                         IconButton(onClick = { showDeleteSelectedDialog = true }) {
                             Icon(
                                 Icons.Filled.Delete,
@@ -215,6 +236,22 @@ fun TripHistoryScreen(
                 }
             }
         }
+    }
+
+    // ── Compare bottom sheet ─────────────────────────────────────────────────
+    if (showCompareSheet) {
+        val comparableSelected = selectedTrips.filter { id ->
+            trips.firstOrNull { it.id == id }?.isActive == false
+        }
+        val compareTrips = trips.filter { it.id in comparableSelected }
+        TripCompareSheet(
+            trips       = compareTrips,
+            viewModel   = viewModel,
+            onDismiss   = {
+                showCompareSheet = false
+                viewModel.clearCompareData()
+            }
+        )
     }
 
     // ── Delete selected dialog ────────────────────────────────────────────────

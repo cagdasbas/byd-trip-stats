@@ -526,7 +526,7 @@ class TripRepository private constructor(context: Context) {
                 battery12vVoltage      = t.battery12vVoltage,
                 batteryCellVoltageMax  = t.batteryCellVoltageMax,
                 batteryCellVoltageMin  = t.batteryCellVoltageMin,
-                rawJson                = t.toRawJson()
+                rawJson                = t.toRawJson(isPhev = false)  // BEV always — CarConfig has no PHEV models)
             )
         )
     }
@@ -776,38 +776,56 @@ class TripRepository private constructor(context: Context) {
     /**
      * Reduces storage for old trips by removing redundant data points.
      *
-     * For every completed trip that started more than [olderThanMonths] months ago,
-     * only one data point per [keepEverySeconds] seconds is retained. The first and
-     * last points of each trip are always kept so the route endpoints are preserved.
+     * Tiered thinning — keeps recent trips at full resolution, progressively
+     * decimates older trips to reduce storage. First and last points of each
+     * trip are always preserved so route endpoints and stats are unaffected.
      *
-     * This is a lossy but safe operation: trip-level stats (distance, energy,
-     * efficiency) come from TripEntity and TripStatsEntity and are NOT affected.
-     * Only the raw point density used by charts and heatmaps is reduced.
+     * Tier policy (trip age → keep one point per N seconds):
+     *   < 7 days   →  kept at full 1 s resolution (untouched)
+     *   7–30 days  →  1 point / 2 s  (~50% reduction)
+     *   30–90 days →  1 point / 10 s (~80% reduction)
+     *   > 90 days  →  1 point / 30 s (~95% reduction)
+     *
+     * Trip-level stats (distance, energy, efficiency) live in TripEntity /
+     * TripStatsEntity and are completely unaffected by thinning.
      *
      * Called by DatabaseMaintenanceWorker on a monthly schedule.
      */
     suspend fun thinOldDataPoints(olderThanMonths: Int = 3, keepEverySeconds: Int = 30) {
-        val cutoffMs = System.currentTimeMillis() -
-            olderThanMonths.toLong() * 30L * 24L * 3_600_000L
+        val nowMs = System.currentTimeMillis()
 
+        // Tier boundaries in milliseconds
+        val day7Ms  =  7L * 24L * 3_600_000L
+        val day30Ms = 30L * 24L * 3_600_000L
+        val day90Ms = 90L * 24L * 3_600_000L
+
+        // Trips older than 7 days are candidates — anything newer is untouched
+        val cutoffMs = nowMs - day7Ms
         val oldTrips = tripDao.getCompletedTripsBefore(cutoffMs)
+
         if (oldTrips.isEmpty()) {
-            Log.i(TAG, "thinOldDataPoints: no trips older than $olderThanMonths months")
+            Log.i(TAG, "thinOldDataPoints: no trips older than 7 days")
             return
         }
 
-        val keepIntervalMs = keepEverySeconds * 1000L
         var totalDeleted = 0
 
         oldTrips.forEach { trip ->
+            val ageMs = nowMs - trip.startTime
+
+            // Determine keep interval for this trip's age tier
+            val keepIntervalMs = when {
+                ageMs < day30Ms -> 2_000L    //  7–30 days:  1 point/2 s
+                ageMs < day90Ms -> 10_000L   // 30–90 days:  1 point/10 s
+                else            -> 30_000L   //   > 90 days: 1 point/30 s
+            }
+
             val points = dataPointDao.getDataPointsForTripSync(trip.id)
-            if (points.size < 3) return@forEach     // nothing meaningful to thin
+            if (points.size < 3) return@forEach
 
             val toDelete = mutableListOf<Long>()
             var lastKeptTimestamp = points.first().timestamp
 
-            // Always keep index 0 (trip start) and last index (trip end).
-            // For everything in between, keep only if far enough from last kept.
             for (i in 1 until points.lastIndex) {
                 val pt = points[i]
                 if (pt.timestamp - lastKeptTimestamp >= keepIntervalMs) {
@@ -820,6 +838,9 @@ class TripRepository private constructor(context: Context) {
             if (toDelete.isNotEmpty()) {
                 dataPointDao.deleteDataPointsByIds(toDelete)
                 totalDeleted += toDelete.size
+                Log.d(TAG, "Trip ${trip.id} (${ageMs/86_400_000}d old): " +
+                    "removed ${toDelete.size}/${points.size} points " +
+                    "(keep interval ${keepIntervalMs/1000}s)")
             }
         }
 

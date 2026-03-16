@@ -8,7 +8,7 @@ import com.byd.tripstats.data.repository.TripRepository
 import java.util.concurrent.TimeUnit
 
 /**
- * Runs once per month in the background to:
+ * Runs once per week in the background to:
  *
  *  1. Checkpoint the WAL file so the main .db is fully self-consistent
  *  2. VACUUM the database to reclaim space freed by deleted trips/points
@@ -32,7 +32,7 @@ class DatabaseMaintenanceWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        Log.i(TAG, "Starting monthly database maintenance")
+        Log.i(TAG, "Starting weekly database maintenance")
         return try {
             val db = BydStatsDatabase.getDatabase(applicationContext)
 
@@ -40,7 +40,9 @@ class DatabaseMaintenanceWorker(
             // Forces all WAL frames into the main database file so the subsequent
             // VACUUM operates on a fully consolidated file. Also ensures any backup
             // taken after maintenance is self-contained without the -wal sidecar.
-            db.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
+            // TRUNCATE resets the WAL file to zero bytes after checkpointing,
+            // reclaiming the disk space the WAL occupies between vacuums.
+            db.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(TRUNCATE)")
             Log.i(TAG, "WAL checkpoint complete")
 
             // ── Step 2: VACUUM ────────────────────────────────────────────────
@@ -54,9 +56,10 @@ class DatabaseMaintenanceWorker(
             // For trips older than 3 months, keep 1 point per 30 s instead of
             // the recorded 1-10 s density. Trip stats are unaffected.
             val repo = TripRepository.getInstance(applicationContext)
-            repo.thinOldDataPoints(olderThanMonths = 3, keepEverySeconds = 30)
+            // Tiered thinning: 7-30d → 2s, 30-90d → 10s, >90d → 30s
+            repo.thinOldDataPoints()
 
-            Log.i(TAG, "Monthly maintenance finished successfully")
+            Log.i(TAG, "Weekly maintenance finished successfully")
             Result.success()
         } catch (e: Exception) {
             Log.e(TAG, "Maintenance failed", e)
@@ -76,7 +79,7 @@ class DatabaseMaintenanceWorker(
          */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<DatabaseMaintenanceWorker>(
-                repeatInterval          = 30,
+                repeatInterval          = 7,
                 repeatIntervalTimeUnit  = TimeUnit.DAYS
             )
                 .setConstraints(
@@ -96,7 +99,7 @@ class DatabaseMaintenanceWorker(
                 request
             )
 
-            Log.i(TAG, "Monthly maintenance job scheduled (KEEP policy)")
+            Log.i(TAG, "Weekly maintenance job scheduled (KEEP policy)")
         }
     }
 }

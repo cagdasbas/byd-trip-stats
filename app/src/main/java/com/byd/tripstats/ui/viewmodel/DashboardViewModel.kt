@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -835,4 +836,39 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     suspend fun getChargingSessionDataPoints(sessionId: Long): List<ChargingDataPointEntity> =
         chargingRepository.getDataPointsForSessionSync(sessionId)
+
+    // ── Trip comparison ───────────────────────────────────────────────────────
+
+    /**
+     * Keyed by tripId. Populated by [loadCompareData], cleared by [clearCompareData].
+     * Charts and route tab in TripCompareSheet read from this.
+     */
+    private val _compareDataPoints = MutableStateFlow<Map<Long, List<TripDataPointEntity>>>(emptyMap())
+    val compareDataPoints: StateFlow<Map<Long, List<TripDataPointEntity>>> =
+        _compareDataPoints.asStateFlow()
+
+    /**
+     * Pre-fetches data points for all trips in [tripIds] in parallel and stores
+     * them keyed by trip ID. Call before opening the compare sheet.
+     */
+    fun loadCompareData(tripIds: List<Long>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = tripIds.associateWith { id ->
+                // first() collects a single emission from the Flow and cancels;
+                // equivalent to a one-shot DB query without exposing a sync method.
+                tripRepository.getDataPointsForTrip(id).first()
+            }
+            _compareDataPoints.value = result
+        }
+    }
+
+    fun clearCompareData() {
+        _compareDataPoints.value = emptyMap()
+    }
+
+    /** Returns TripStatsEntity for each of the given tripIds from the cached allTripStats flow. */
+    fun getCompareStats(tripIds: List<Long>): List<TripStatsEntity> {
+        val statsById = allTripStats.value.associateBy { it.tripId }
+        return tripIds.mapNotNull { statsById[it] }
+    }
 }
