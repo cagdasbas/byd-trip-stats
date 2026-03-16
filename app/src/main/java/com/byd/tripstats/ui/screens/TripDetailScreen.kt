@@ -28,7 +28,13 @@ import com.byd.tripstats.ui.components.CondensedMotorRpmChart
 import com.byd.tripstats.ui.components.CondensedSocChart
 import com.byd.tripstats.ui.components.CondensedPowerChart
 import com.byd.tripstats.ui.components.CondensedSpeedChart
+import com.byd.tripstats.ui.components.BatteryVoltageChart
+import com.byd.tripstats.ui.components.CondensedBatteryVoltageChart
+import com.byd.tripstats.ui.components.CondensedInstantConsumptionChart
+import com.byd.tripstats.ui.components.CondensedTyrePressureChart
 import com.byd.tripstats.ui.components.EnergyConsumptionChart
+import com.byd.tripstats.ui.components.InstantConsumptionChart
+import com.byd.tripstats.ui.components.TyrePressureChart
 import com.byd.tripstats.ui.components.MotorRpmChart
 import com.byd.tripstats.ui.components.OsmRouteMap
 import com.byd.tripstats.ui.components.PowerChart
@@ -611,6 +617,42 @@ fun TripChartsTab(
             )
         }
 
+        // 7. Battery Voltage
+        ClickableChartCard(
+            title = "Battery Voltage",
+            subtitle = "HV bus + cell min/max over time",
+            onClick = { expandedChart = ChartType.BATTERY_VOLTAGE }
+        ) {
+            CondensedBatteryVoltageChart(
+                dataPoints = dataPoints,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // 8. Tyre Pressures
+        ClickableChartCard(
+            title = "Tyre Pressures",
+            subtitle = "All four wheels (bar) over time",
+            onClick = { expandedChart = ChartType.TYRE_PRESSURE }
+        ) {
+            CondensedTyrePressureChart(
+                dataPoints = dataPoints,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // 9. Instantaneous Consumption
+        ClickableChartCard(
+            title = "Instantaneous Consumption",
+            subtitle = "kWh/100 km — raw + rolling average",
+            onClick = { expandedChart = ChartType.INSTANT_CONSUMPTION }
+        ) {
+            CondensedInstantConsumptionChart(
+                dataPoints = dataPoints,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
     }
     
     // Fullscreen chart dialog
@@ -676,7 +718,8 @@ private fun ClickableChartCard(
 }
 
 enum class ChartType {
-    ENERGY, SPEED, MOTOR_RPM, ALTITUDE, SOC, POWER
+    ENERGY, SPEED, MOTOR_RPM, ALTITUDE, SOC, POWER,
+    BATTERY_VOLTAGE, TYRE_PRESSURE, INSTANT_CONSUMPTION
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -713,6 +756,9 @@ private fun FullscreenChartDialog(
                                     ChartType.MOTOR_RPM -> "Motor RPM (Detailed)"
                                     ChartType.ALTITUDE -> "Elevation Profile (Detailed)"
                                     ChartType.POWER -> "Power Profile (Detailed)"
+                                    ChartType.BATTERY_VOLTAGE -> "Battery Voltage (Detailed)"
+                                    ChartType.TYRE_PRESSURE -> "Tyre Pressures (Detailed)"
+                                    ChartType.INSTANT_CONSUMPTION -> "Instantaneous Consumption (Detailed)"
                                 },
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
@@ -726,6 +772,9 @@ private fun FullscreenChartDialog(
                                     ChartType.MOTOR_RPM -> "RPM over time"
                                     ChartType.ALTITUDE -> "Altitude over time"
                                     ChartType.POWER -> "kW over time"
+                                    ChartType.BATTERY_VOLTAGE -> "HV bus + cell min/max (V)"
+                                    ChartType.TYRE_PRESSURE -> "All four wheels (bar)"
+                                    ChartType.INSTANT_CONSUMPTION -> "kWh/100 km over distance"
                                 },
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.primary
@@ -771,6 +820,18 @@ private fun FullscreenChartDialog(
                         )
                         ChartType.POWER -> PowerChart(
                             dataPoints = condensedData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        ChartType.BATTERY_VOLTAGE -> BatteryVoltageChart(
+                            dataPoints = condensedData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        ChartType.TYRE_PRESSURE -> TyrePressureChart(
+                            dataPoints = condensedData,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        ChartType.INSTANT_CONSUMPTION -> InstantConsumptionChart(
+                            dataPoints = dataPoints,  // full data — chart filters internally
                             modifier = Modifier.fillMaxSize()
                         )
                     }

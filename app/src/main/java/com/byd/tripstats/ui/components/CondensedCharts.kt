@@ -83,3 +83,29 @@ fun condenseData(
     val step = (dataPoints.size + maxPoints - 1) / maxPoints  // Ceiling division
     return dataPoints.filterIndexed { index, _ -> index % step == 0 }.take(maxPoints)
 }
+@Composable
+fun CondensedBatteryVoltageChart(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    val condensed = remember(dataPoints) { condenseData(dataPoints) }
+    BatteryVoltageChart(dataPoints = condensed, modifier = modifier)
+}
+
+@Composable
+fun CondensedTyrePressureChart(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    val condensed = remember(dataPoints) { condenseData(dataPoints) }
+    TyrePressureChart(dataPoints = condensed, modifier = modifier)
+}
+
+@Composable
+fun CondensedInstantConsumptionChart(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    // No condensing needed — InstantConsumptionChart already filters to driving points
+    InstantConsumptionChart(dataPoints = dataPoints, modifier = modifier)
+}
