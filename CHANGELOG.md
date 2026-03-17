@@ -6,6 +6,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] - 2026-Mar-17
+
+### Added
+
+- **Charging session tracking** — automatic detection of AC and DC charging sessions via `chargingPower` field. Each session records SoC start/end, kWh added, peak and average kW, battery temperature rise, and HV voltage. Detection uses a time-based debounce (60 s for DC ≥ 20 kW, 12 min for AC) anchored to `lastChargingTelemetry` so `endTime` reflects actual charge completion rather than debounce fire time.
+- **Charging history screen** — dedicated screen (battery icon on dashboard) listing all sessions with duration, SoC arc, kWh added, and peak kW. Active sessions shown with a live badge.
+- **Charging detail screen** — four-tab detail view per session: Overview (summary metrics), Power (charge curve — DC taper shape), SoC (fill over time), Voltage (HV bus rise), Temperature (avg + cell min/max).
+- **Trip comparison** — select 2–3 completed trips in Trip History (long-press → checkboxes) and tap the compare icon. Opens a bottom sheet with:
+  - **Summary tab** — side-by-side metric table with winner highlighting per row.
+  - **Charts tab** — overlaid Speed, Power, Consumption, SoC, and Elevation lines normalised to 0–100% trip distance so trips of different lengths compare cleanly.
+  - **Routes tab** — all routes drawn on a shared OSM map in distinct colors. Per-trip eye toggle hides/shows individual trips across all three tabs.
+- **Battery voltage chart** (trip detail) — dual-axis: HV bus (left, V) and cell min/max band (right, V). Cell spread highlighted in crosshair — key early indicator of cell imbalance.
+- **Tyre pressure chart** (trip detail) — all four wheels over time, with inline bar/PSI/kPa unit switcher that shares state with the dashboard tyre icon preference. Dynamic Y-axis step and padding adapt per unit.
+- **Instantaneous consumption chart** (trip detail) — raw `power/speed×100` kWh/100 km with 5-point rolling average overlay. Filters to speed > 5 km/h; zero line marks the regen/drive boundary.
+- **Panel SoC line in SoC chart** — `soc_panel` rendered as a second line (violet) alongside BMS SoC (blue) with legend. Only shown when the trip has non-zero panel values (v2+ telemetry).
+- **Electro telemetry v2 fields** — `VehicleTelemetry` now maps: tyre temperatures (×4), `soc_panel`, `car_locked`, `any_door_opened`, `fuel_percentage`, `fuel_driving_range_km`. Tyre temps and `soc_panel` promoted to first-class `TripDataPointEntity` columns.
+- **Database migration 1 → 2** — adds 5 columns to `trip_data_points`, creates `charging_sessions` and `charging_data_points` tables with proper foreign keys and indices.
+
+### Changed
+
+- **`toRawJson()` writes only non-default values** — empty driving points now store `{}` (2 bytes) instead of the static 38-byte string, reducing the `rawJson` column by ~94% on BEV trips. PHEV fields gated by `isPhev` flag.
+- **Database maintenance worker** — schedule changed from monthly to weekly. Checkpoint changed from `FULL` to `TRUNCATE` (actually reclaims WAL disk space). Thinning policy replaced with a four-tier age-based policy: < 7 days untouched, 7–30 days → 1 point/2 s, 30–90 days → 1 point/10 s, > 90 days → 1 point/30 s.
+- **Range projection** now uses `selectedCarConfig.batteryKwh` instead of the hardcoded Seal Excellence constant, making projections accurate for Dolphin and Atto 3 owners.
+
+### Fixed
+
+- `MotorRpmChart` `LegendDot` visibility conflict with `OsmRouteMap` — each chart file now carries its own `private` definition.
+- `TripCompareSheet` routes tab map touch handling — replaced `pointerInteropFilter` (which consumed events before MapView received them) with `setOnTouchListener` + `requestDisallowInterceptTouchEvent`, allowing correct pan and pinch-to-zoom. OSM built-in zoom buttons removed (`Visibility.NEVER`) to free the bottom legend area.
+- `TripCompareSheet` routes tab height overflow during sheet drag animation — `Box(Modifier.weight(1f).clipToBounds())` applied at two levels prevents the map from escaping the sheet boundary.
+
+---
+
 ## [1.1.0] - 2025-Mar-13
 
 ### Added

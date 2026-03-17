@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v1.1.0-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v1.2.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 
@@ -54,7 +54,7 @@
 - Manual override with confirmation safeguards
 
 **Real-Time Telemetry**
-- Live motor RPM per driven axle and estimated power split (Seal AWD only: front 160 kW / rear 230 kW proportional to total output)
+- Live motor RPM per driven axle and estimated power split (AWD only: front 160 kW / rear 230 kW proportional to total output)
 - Battery SoH, cell voltage range, thermal min/max delta
 - HV and 12V bus voltage, tyre pressures per wheel (bar / PSI / kPa)
 - Gear state, speed, engine power, regen detection
@@ -343,22 +343,24 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 
 ## 🗺️ Roadmap
 
-### Planned Features (v1.2.0+)
+### Shipped
 
 - [x] Predefined vehicle configuration ✅ *(v1.1.0)*
-- [ ] Charging session tracking
-- [ ] Trip comparison view
-- [ ] Custom dashboard widgets
-- [ ] Multiple vehicle profiles
-- [ ] Web dashboard (companion)
+- [x] Charging session tracking ✅ *(v1.2.0)*
+- [x] Trip comparison view ✅ *(v1.2.0)*
 
-### Maybe Later
+### Planned (v1.3.0+)
 
-- [ ] Android Auto integration
-- [ ] Wear OS companion app
-- [ ] Home Assistant integration
-- [ ] Spotify / Tidal integration
-- [ ] Export to ABRP format
+- [ ] Battery degradation tracking — plot SoH over time across trips, trend line and projected future health
+- [ ] Cost tracking — input electricity price, calculate cost per trip and per month from recorded kWh
+- [ ] Recurring route detection — automatically group trips that share the same route (e.g. daily commute) and compare efficiency across instances
+- [ ] Trip goals & personal bests — set a consumption target, track streaks, flag personal best efficiency on a known route
+- [ ] Seasonal consumption analysis — automatic winter vs summer efficiency breakdown based on recorded trip history
+- [ ] Web dashboard companion — browse trip history and charts on a desktop browser offline-first: upload your backup file, charts render locally, nothing leaves your device
+- [ ] Heatmap: Tyre Pressure vs Consumption — correlates each wheel's pressure against instantaneous kWh/100 km; answers whether running slightly higher pressure measurably improves efficiency on your specific car and tyres
+- [ ] Heatmap: SOC vs Regen Efficiency — shows at which charge levels the BMS throttles regenerative braking (expected near 100% SoC); empirically maps the BYD Seal's regen behaviour
+- [ ] Heatmap: Speed vs Battery Temperature — sustained speed as X axis vs pack temperature rise; distinguishes motorway thermal load from stop-start urban load more cleanly than the existing Power vs Battery Temp map
+- [ ] Heatmap: Cell Voltage Spread vs SOC — (cellVoltageMax − cellVoltageMin) on Y, SoC on X; a healthy pack is flat, a pack with a weak cell shows a characteristic divergence spike at low SoC — the same diagnostic BYD service technicians use
 
 **Vote on features** by 👍 reacting to issues!
 
