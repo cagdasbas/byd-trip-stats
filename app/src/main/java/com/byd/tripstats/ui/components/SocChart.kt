@@ -26,7 +26,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
-import com.byd.tripstats.ui.theme.BydElectricAzure
 import com.byd.tripstats.ui.theme.BydElectricBlue
 import com.byd.tripstats.ui.theme.MotorViolet
 import kotlin.math.roundToInt

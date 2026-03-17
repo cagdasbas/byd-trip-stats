@@ -784,14 +784,14 @@ class TripRepository private constructor(context: Context) {
      *   < 7 days   →  kept at full 1 s resolution (untouched)
      *   7–30 days  →  1 point / 2 s  (~50% reduction)
      *   30–90 days →  1 point / 10 s (~80% reduction)
-     *   > 90 days  →  1 point / 30 s (~95% reduction)
+     *   > 90 days  →  1 point / 15 s (~90% reduction)
      *
      * Trip-level stats (distance, energy, efficiency) live in TripEntity /
      * TripStatsEntity and are completely unaffected by thinning.
      *
      * Called by DatabaseMaintenanceWorker on a monthly schedule.
      */
-    suspend fun thinOldDataPoints(olderThanMonths: Int = 3, keepEverySeconds: Int = 30) {
+    suspend fun thinOldDataPoints() {
         val nowMs = System.currentTimeMillis()
 
         // Tier boundaries in milliseconds
@@ -817,7 +817,7 @@ class TripRepository private constructor(context: Context) {
             val keepIntervalMs = when {
                 ageMs < day30Ms -> 2_000L    //  7–30 days:  1 point/2 s
                 ageMs < day90Ms -> 10_000L   // 30–90 days:  1 point/10 s
-                else            -> 30_000L   //   > 90 days: 1 point/30 s
+                else            -> 15_000L   //   > 90 days: 1 point/15 s
             }
 
             val points = dataPointDao.getDataPointsForTripSync(trip.id)

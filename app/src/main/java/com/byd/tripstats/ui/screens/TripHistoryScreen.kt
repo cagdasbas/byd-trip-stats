@@ -54,7 +54,6 @@ fun TripHistoryScreen(
     var showSortSheet           by remember { mutableStateOf(false) }
     var showFilterSheet         by remember { mutableStateOf(false) }
     var showCompareSheet        by remember { mutableStateOf(false) }
-    val scope                    = rememberCoroutineScope()
 
     val activeFilters = filterState.activeFilterCount
 
@@ -105,7 +104,7 @@ fun TripHistoryScreen(
                                 showCompareSheet = true
                             }) {
                                 Icon(
-                                    Icons.Filled.CompareArrows,
+                                    Icons.AutoMirrored.Filled.CompareArrows,
                                     contentDescription = "Compare trips",
                                     tint = BydElectricAzure,
                                     modifier = Modifier.size(24.dp)
