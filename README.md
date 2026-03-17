@@ -430,6 +430,7 @@ See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 ### Get Help
 - 🐛 [GitHub Issues](https://github.com/angoikon/byd-trip-stats/issues)
 - 💬 [Discussions](https://github.com/angoikon/byd-trip-stats/discussions)
+- 🎮 [Discord — BYD Trip Stats](https://discord.com/channels/1482792494239453412/1482792495007137964)
 
 ### Share Your Experience
 - ⭐ **Star this repo** if you find it useful!
@@ -480,6 +481,8 @@ This software is provided "as is" without warranty of any kind. Use at your own 
 📧 [bydtripstats@gmail.com](mailto:bydtripstats@gmail.com)
 
 🔗 [github.com/angoikon](https://github.com/angoikon)
+
+🎮  <a href="https://discord.com/channels/1482792494239453412/1482792495007137964"><img src="https://img.shields.io/badge/Discord-BYD_Trip_Stats-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"/></a>
 
 ---
 
