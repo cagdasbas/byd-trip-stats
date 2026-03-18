@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.2] - 2026-Mar-19
+
+### Fixed
+
+- **AC / DC charging bug** — fixed some cases where the charging session's tracking wouldn't stop.
+
+### Added
+
+- **Check and auto-update** - now the app automatically checks for new version and auto-updates if car is in parked and no trip/charging session is being recorded.
+- **Youtube video link and thumbnail** - in README.md, with presentation of the app and how to use it.
+
+---
+
 ## [1.2.1] - 2026-Mar-18
 
 ### Fixed
