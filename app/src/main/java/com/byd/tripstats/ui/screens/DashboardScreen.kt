@@ -52,6 +52,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -627,17 +629,29 @@ fun EnergyFlowDiagram(
     )
     val isRangeBack = rotation > 90f
 
-    // Animation for energy flow
-    val infiniteTransition = rememberInfiniteTransition(label = "energy_flow")
-    val flowOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "flow_offset"
-    )
+    // Flow animation — Animatable + LaunchedEffect so the coroutine is
+    // cancelled automatically when isResumed turns false, stopping the loop
+    // with zero CPU overhead. infiniteTransition.animateFloat can't be used
+    // here because its animationSpec is typed InfiniteRepeatableSpec<T> and
+    // won't accept snap() for the non-resumed branch.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+
+    val flowOffsetAnim = remember { Animatable(0f) }
+    LaunchedEffect(isResumed) {
+        if (isResumed) {
+            flowOffsetAnim.animateTo(
+                targetValue   = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation  = tween(1000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        }
+        // Coroutine cancelled when isResumed = false — freezes in place
+    }
+    val flowOffset = flowOffsetAnim.value
 
     Card(
         modifier = modifier

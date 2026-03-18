@@ -9,6 +9,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -55,39 +58,67 @@ fun LiquidFillBattery(
         label = "socAnimation"
     )
     
-    // Animate wave motion
-    val infiniteTransition = rememberInfiniteTransition(label = "waveTransition")
-    val waveOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "waveAnimation"
-    )
-    
-    // Charging glow animation
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = if (isCharging) 0.3f else 0f,
-        targetValue = if (isCharging) 0.8f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAnimation"
-    )
+    // Gate all animations on Lifecycle.State.RESUMED using Animatable +
+    // LaunchedEffect. When isResumed turns false the launched coroutine is
+    // cancelled automatically, stopping the animation in place with zero
+    // ongoing CPU/GPU cost. infiniteRepeatable inside animateTo loops until
+    // the coroutine is cancelled. snap() / InfiniteRepeatableSpec mismatch
+    // is avoided entirely.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
 
-    // Bolt pulse animation — only active when charging
-    val boltScale by infiniteTransition.animateFloat(
-        initialValue = if (isCharging) 0.85f else 1f,
-        targetValue  = if (isCharging) 1.15f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "boltPulse"
-    )
+    // Wave offset: 0 → 360, loops while RESUMED
+    val waveOffsetAnim = remember { Animatable(0f) }
+    LaunchedEffect(isResumed) {
+        if (isResumed) {
+            waveOffsetAnim.animateTo(
+                targetValue    = 360f,
+                animationSpec  = infiniteRepeatable(
+                    animation  = tween(durationMillis = 3000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        }
+        // Coroutine cancelled when isResumed = false — animation freezes in place
+    }
+    val waveOffset = waveOffsetAnim.value
+
+    // Charging glow: 0.3 ↔ 0.8, loops while charging AND RESUMED
+    val glowAnim = remember { Animatable(0f) }
+    LaunchedEffect(isCharging, isResumed) {
+        if (isCharging && isResumed) {
+            glowAnim.animateTo(
+                targetValue   = 0.8f,
+                animationSpec = infiniteRepeatable(
+                    animation  = tween(durationMillis = 1500, easing = EaseInOutSine),
+                    repeatMode = RepeatMode.Reverse,
+                    initialStartOffset = StartOffset(0)
+                )
+            )
+        } else {
+            glowAnim.snapTo(0f)
+        }
+    }
+    val glowAlpha = glowAnim.value
+
+    // Bolt pulse: 0.85 ↔ 1.15, loops while charging AND RESUMED
+    val boltAnim = remember { Animatable(1f) }
+    LaunchedEffect(isCharging, isResumed) {
+        if (isCharging && isResumed) {
+            boltAnim.animateTo(
+                targetValue   = 1.15f,
+                animationSpec = infiniteRepeatable(
+                    animation  = tween(durationMillis = 900, easing = EaseInOutSine),
+                    repeatMode = RepeatMode.Reverse,
+                    initialStartOffset = StartOffset(0)
+                )
+            )
+        } else {
+            boltAnim.snapTo(1f)
+        }
+    }
+    val boltScale = boltAnim.value
     
     Box(
         modifier = modifier
