@@ -52,6 +52,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -627,15 +629,21 @@ fun EnergyFlowDiagram(
     )
     val isRangeBack = rotation > 90f
 
-    // Animation for energy flow
+    // Animation for energy flow — only runs when the screen is actively
+    // visible (RESUMED). Stops automatically when the app goes to background
+    // or the car screen switches away, preventing the post-shutdown CPU spike.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+
     val infiniteTransition = rememberInfiniteTransition(label = "energy_flow")
     val flowOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
+        targetValue  = if (isResumed) 1f else 0f,
+        animationSpec = if (isResumed) infiniteRepeatable(
+            animation  = tween(1000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
-        ),
+        ) else snap(),
         label = "flow_offset"
     )
 

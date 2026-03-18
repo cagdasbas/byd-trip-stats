@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -424,7 +427,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
             combine(isInTrip, currentTelemetry) { inTrip, telemetry ->
                 inTrip to telemetry
-            }.collect { (inTrip, telemetry) ->
+            }
+            .debounce(500L)   // coalesce rapid emissions — recompose at most twice/second
+            .collect { (inTrip, telemetry) ->
                 if (telemetry == null) return@collect
 
                 // Parse telemetry timestamp — more accurate than system clock
@@ -570,6 +575,22 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 wasInTrip = inTrip
             }
+        }
+
+        // ── Car-off watcher ───────────────────────────────────────────────────
+        // When car_on = 0 holds for 10 s, stop the MQTT service so it stops
+        // hammering reconnect attempts against a dead broker.
+        viewModelScope.launch {
+            currentTelemetry
+                .filterNotNull()
+                .filter { !it.isCarOn }
+                .debounce(10_000L)
+                .collect {
+                    if (!isInTrip.value) {   // never kill service mid-trip
+                        Log.d(TAG, "Car off for 10s — stopping MQTT service")
+                        stopMqttService()
+                    }
+                }
         }
     }
 
