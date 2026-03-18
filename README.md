@@ -86,6 +86,20 @@
 
 ## 🖼️ Visual Showcase
 
+
+### 📹 Demo Video
+
+<div align="center">
+  <a href="https://youtu.be/qmkeVPG8pRo">
+    <img src="https://img.youtube.com/vi/qmkeVPG8pRo/maxresdefault.jpg" 
+         alt="BYD Trip Stats Demo" width="720" />
+  </a>
+  <br/>
+  <em>▶ Click to watch on YouTube</em>
+</div>
+
+---
+
 ### I. Real-Time Dashboard
 
 Adaptive layouts for both landscape and portrait orientations on the rotating infotainment screen, including full split-screen multi-app support. The UI palette mirrors the DiLink Ocean Series dark and light themes.
