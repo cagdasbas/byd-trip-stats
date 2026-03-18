@@ -39,6 +39,11 @@ class ChargingRepository private constructor(context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    init {
+        // Recover any session that was left open by a previous crash or force-kill
+        recoverOrphanedSession()
+    }
+
     // ── Public state ──────────────────────────────────────────────────────────
 
     private val _isCharging = MutableStateFlow(false)
@@ -58,7 +63,7 @@ class ChargingRepository private constructor(context: Context) {
      *     60 s — closes the session roughly one minute after unplugging.
      *
      *   AC home charging (car_on = 0, Electro publishes every 5–10 min):
-     *     3 min — safely beyond the 1-min maximum publish interval, so a brief
+     *     12 min — safely beyond the 10-min maximum publish interval, so a brief
      *     gap between packets never prematurely closes an ongoing overnight session.
      *     The session closes automatically once the charger is disconnected and the
      *     next slow packet (with chargingPower = 0) triggers a timer that fires
@@ -67,8 +72,12 @@ class ChargingRepository private constructor(context: Context) {
      * The timer is cancelled and restarted on every incoming charging packet,
      * so it only fires if the car genuinely stops sending charging data.
      */
-    private val DC_DEBOUNCE_MS  = 60_000L          // 1 min  — car on
-    private val AC_DEBOUNCE_MS  = 3 * 60_000L     // 3 min — car off
+    // Debounce windows for auto-close timer (when charging packets stop arriving):
+    //   CAR_ON_DEBOUNCE  — Electro publishes every 1 s → 60 s of silence = problem
+    //   CAR_OFF_DEBOUNCE — Electro publishes every 5 min → need > 5 min to survive gaps
+    //                      Also covers DC toilet-break stops (< 20 min typically)
+    private val CAR_ON_DEBOUNCE_MS  = 60_000L        //  1 min — car on (1 s publish interval)
+    private val CAR_OFF_DEBOUNCE_MS = 12 * 60_000L   // 12 min — car off (5 min publish interval)
 
     private var closeSessionJob: Job? = null
 
@@ -127,7 +136,11 @@ class ChargingRepository private constructor(context: Context) {
                 // is 0 whenever the car is in accessory/sleep mode during charging:
                 //   ≥ 20 kW → DC fast charge → 60 s debounce (car is nearby, quick closure)
                 //   <  20 kW → AC home charge → 12 min debounce (safe beyond 10-min interval)
-                val debounceMs = if (telemetry.chargingPower >= 20.0) DC_DEBOUNCE_MS else AC_DEBOUNCE_MS
+                // Use car_on to select debounce — same logic as the else branch.
+                // chargingPower >= 20 (DC) implies car_on = 1 in practice, but
+                // car_on is the more direct signal and handles tapering correctly
+                // (DC power can drop below 20 kW at end of charge while car stays on).
+                val debounceMs = if (telemetry.isCarOn) CAR_ON_DEBOUNCE_MS else CAR_OFF_DEBOUNCE_MS
                 closeSessionJob = scope.launch {
                     delay(debounceMs)
                     Log.i(TAG, "No charging packet for ${debounceMs / 1000}s — auto-closing session")
@@ -135,15 +148,24 @@ class ChargingRepository private constructor(context: Context) {
                 }
             } else {
                 if (activeSession != null) {
-                    // Non-charging packet — start/reset debounce timer.
-                    // Same DC/AC distinction applies: if the last known charging power
-                    // was DC, use the short timeout; if AC, use the long one.
+                    // Explicit non-charging packet received — `chargingPower = 0` is
+                    // definitive confirmation that charging stopped, regardless of whether
+                    // the car is on or off or whether this was AC or DC.
+                    //
+                    // Always use CAR_ON_DEBOUNCE_MS (60 s) here because:
+                    //   - DC, car on, manual stop → closes in 60 s ✅
+                    //   - DC, car off, manual stop (toilet break ended, unplugged) →
+                    //     closes in 60 s ✅ — we have an explicit signal
+                    //   - AC, car off, completed overnight → closes in 60 s ✅
+                    //     The next 5-min packet also shows 0 but session is already closed
+                    //
+                    // CAR_OFF_DEBOUNCE_MS (12 min) is only needed for the auto-close timer
+                    // above — where packets *stop arriving* and we don't know why. It is
+                    // wrong here because we already have explicit evidence charging ended.
                     closeSessionJob?.cancel()
-                    val lastKw = lastChargingTelemetry?.chargingPower ?: 0.0
-                    val debounceMs = if (lastKw >= 20.0) DC_DEBOUNCE_MS else AC_DEBOUNCE_MS
                     closeSessionJob = scope.launch {
-                        delay(debounceMs)
-                        Log.i(TAG, "Charging stopped confirmed after ${debounceMs / 1000}s — closing session")
+                        delay(CAR_ON_DEBOUNCE_MS)
+                        Log.i(TAG, "Charging stopped confirmed after ${CAR_ON_DEBOUNCE_MS / 1000}s — closing session")
                         closeSession(lastChargingTelemetry ?: telemetry, carConfig)
                     }
                 }
@@ -245,6 +267,48 @@ class ChargingRepository private constructor(context: Context) {
         pendingDataPoints.clear()
         _activeSessionId.value = null
         _isCharging.value = false
+    }
+
+    // ── Startup recovery ─────────────────────────────────────────────────────
+
+    /**
+     * Called once on construction. Finds any session left with isActive = true
+     * from a previous app run (crash, force-kill, or OOM) and closes it using
+     * the timestamp of its last recorded data point as endTime.
+     *
+     * Without this, orphaned sessions show as "ongoing" in charging history
+     * and a new charging session started after restart would create a duplicate
+     * instead of resuming the orphaned one.
+     */
+    private fun recoverOrphanedSession() {
+        scope.launch {
+            val orphan = sessionDao.getActiveSession() ?: return@launch
+
+            Log.w(TAG, "Found orphaned active session id=${orphan.id} — recovering")
+
+            // Use last recorded data point timestamp as the best available endTime
+            val dataPoints = sessionDao.getDataPointsForSessionSync(orphan.id)
+            val endMs = dataPoints.lastOrNull()?.timestamp ?: orphan.startTime
+
+            val avgKw = if (dataPoints.isNotEmpty())
+                dataPoints.map { it.chargingPower }.average() else 0.0
+
+            // SoC delta uses last data point's SoC, fallback to startSoc (0 kWh added)
+            val socEnd  = dataPoints.lastOrNull()?.soc ?: orphan.socStart
+            val socDelta = (socEnd - orphan.socStart).coerceAtLeast(0.0)
+            val kwhAdded = (socDelta / 100.0) * orphan.batteryKwh
+
+            sessionDao.updateSession(
+                orphan.copy(
+                    endTime  = endMs,
+                    socEnd   = socEnd,
+                    kwhAdded = kwhAdded,
+                    avgKw    = avgKw,
+                    isActive = false
+                )
+            )
+            Log.i(TAG, "Orphaned session id=${orphan.id} closed — endTime anchored to last data point")
+        }
     }
 
     // ── Singleton ─────────────────────────────────────────────────────────────

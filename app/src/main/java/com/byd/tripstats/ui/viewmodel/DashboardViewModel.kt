@@ -586,7 +586,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 .filter { !it.isCarOn }
                 .debounce(10_000L)
                 .collect {
-                    if (!isInTrip.value) {   // never kill service mid-trip
+                    if (!isInTrip.value && !isChargingSession.value) {   // never kill service mid-trip or mid-charge
                         Log.d(TAG, "Car off for 10s — stopping MQTT service")
                         stopMqttService()
                     }
