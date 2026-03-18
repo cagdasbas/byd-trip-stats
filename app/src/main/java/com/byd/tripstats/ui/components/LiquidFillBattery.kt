@@ -9,6 +9,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -23,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.ui.theme.*
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.sin
 
 /**
@@ -55,37 +58,45 @@ fun LiquidFillBattery(
         label = "socAnimation"
     )
     
-    // Animate wave motion
+    // Gate all infinite animations on lifecycle RESUMED — when the app goes
+    // to background or the car shuts down, snap to static values so the
+    // animation loop (and its associated GPU frames) stops entirely.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+
     val infiniteTransition = rememberInfiniteTransition(label = "waveTransition")
+
+    // Wave motion — stops when not foregrounded
     val waveOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
+        targetValue  = if (isResumed) 360f else 0f,
+        animationSpec = if (isResumed) infiniteRepeatable(
+            animation  = tween(durationMillis = 3000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
-        ),
+        ) else snap(),
         label = "waveAnimation"
     )
-    
-    // Charging glow animation
+
+    // Charging glow — only active when charging AND foregrounded
     val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = if (isCharging) 0.3f else 0f,
-        targetValue = if (isCharging) 0.8f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = EaseInOutSine),
+        initialValue = if (isCharging && isResumed) 0.3f else 0f,
+        targetValue  = if (isCharging && isResumed) 0.8f else 0f,
+        animationSpec = if (isCharging && isResumed) infiniteRepeatable(
+            animation  = tween(durationMillis = 1500, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
-        ),
+        ) else snap(),
         label = "glowAnimation"
     )
 
-    // Bolt pulse animation — only active when charging
+    // Bolt pulse — only active when charging AND foregrounded
     val boltScale by infiniteTransition.animateFloat(
-        initialValue = if (isCharging) 0.85f else 1f,
-        targetValue  = if (isCharging) 1.15f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900, easing = EaseInOutSine),
+        initialValue = if (isCharging && isResumed) 0.85f else 1f,
+        targetValue  = if (isCharging && isResumed) 1.15f else 1f,
+        animationSpec = if (isCharging && isResumed) infiniteRepeatable(
+            animation  = tween(durationMillis = 900, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
-        ),
+        ) else snap(),
         label = "boltPulse"
     )
     
