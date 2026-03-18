@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.1] - 2026-Mar-18
+
+### Fixed
+
+- **Post-shutdown CPU spike** — MQTT service now stops automatically after 10 s of `car_on = 0`, preventing the reconnection storm against a dead broker that caused ~71% CPU usage in the minutes following car shutdown. The watcher is guarded by `!isInTrip` so it never interrupts an active trip.
+- **Background animation overhead** — `LiquidFillBattery` wave, glow, and bolt-pulse infinite transitions now snap to static values when the lifecycle state is below `RESUMED`. `EnergyFlowCanvas` flow animation applies the same gate. Both were previously cycling at 60 fps regardless of whether the screen was visible.
+- **Compose recomposition rate** — added `debounce(500L)` to the `combine(isInTrip, currentTelemetry)` collector, capping dashboard redraws at twice per second instead of once per every 1 s MQTT packet.
+- **Unused parameters removed** from `TripRepository.thinOldDataPoints()` — `olderThanMonths` and `keepEverySeconds` were dead code after the tiered thinning policy was introduced in 1.2.0.
+
+---
+
 ## [1.2.0] - 2026-Mar-17
 
 ### Added
@@ -98,4 +109,4 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Embedded MQTT broker on port 1883 for local Electro integration.
 - Boot receiver and foreground service to keep MQTT alive without manual app restarts.
 - DatabaseMaintenanceWorker for automatic old-data pruning.
-- Dark-themed Material 3 UI optimised for the BYD DiLink 3 in-car infotainment display.
+- Dark-themed Material 3 UI optimised for the BYD DiLink 11 in-car infotainment display.
