@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
@@ -186,7 +187,14 @@ fun DashboardScreen(
                     BadgedBox(
                         badge = {
                             if (updateInfo != null) {
-                                Badge(containerColor = AccelerationOrange)
+                                Badge(containerColor = AccelerationOrange) {
+                                    Text(
+                                        text = "1",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     ) {

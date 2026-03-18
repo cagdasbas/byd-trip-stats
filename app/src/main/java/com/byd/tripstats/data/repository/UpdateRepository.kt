@@ -61,7 +61,7 @@ class UpdateRepository private constructor(private val context: Context) {
     @Serializable
     data class GitHubRelease(
         @SerialName("tag_name") val tagName: String,
-        @SerialName("body")     val body: String = "",
+        @SerialName("body")     val body: String? = "",
         @SerialName("assets")   val assets: List<GitHubAsset> = emptyList()
     )
 
@@ -112,7 +112,7 @@ class UpdateRepository private constructor(private val context: Context) {
                     _updateInfo.value = UpdateInfo(
                         latestVersion  = latestVersion,
                         currentVersion = currentVersion,
-                        releaseNotes   = release.body.take(500),  // trim for UI
+                        releaseNotes   = release.body?.take(500) ?: "",  // trim for UI
                         apkUrl         = apkAsset.downloadUrl,
                         apkName        = apkAsset.name,
                         apkSizeBytes   = apkAsset.size

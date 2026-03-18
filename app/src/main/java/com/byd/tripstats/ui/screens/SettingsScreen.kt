@@ -129,7 +129,21 @@ fun SettingsScreen(
                         onClick  = { selectedTab = index },
                         text = {
                             if (index == 2 && updateInfo != null) {
-                                BadgedBox(badge = { Badge(containerColor = AccelerationOrange) }) {
+                                BadgedBox(
+                                    badge = {
+                                        Badge(
+                                            containerColor = AccelerationOrange,
+                                            modifier = Modifier.offset(x = 18.dp, y = (-2).dp)
+                                        ) {
+                                            Text(
+                                                text = "1",
+                                                color = Color.White,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                ) {
                                     Text(
                                         title,
                                         fontSize   = 17.sp,
