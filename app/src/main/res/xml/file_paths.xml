@@ -6,4 +6,7 @@
     
     <!-- External cache directory (if needed) -->
     <external-cache-path name="external_shared_files" path="." />
+
+    <!-- External files path  -->
+    <external-files-path name="apk_downloads" path="Download/" />
 </paths>

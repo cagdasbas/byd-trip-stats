@@ -69,6 +69,7 @@ fun DashboardScreen(
 ) {
     val telemetry by viewModel.currentTelemetry.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
     val mqttConnected by viewModel.mqttConnected.collectAsState()
     val mqttConnectionError by viewModel.mqttConnectionError.collectAsState()
     val autoTripDetection by viewModel.autoTripDetection.collectAsState()
@@ -181,13 +182,21 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.width(24.dp))
 
-                    // Settings Button
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Settings",
-                            modifier = Modifier.size(28.dp)
-                        )
+                    // Settings Button — badged when update is available
+                    BadgedBox(
+                        badge = {
+                            if (updateInfo != null) {
+                                Badge(containerColor = AccelerationOrange)
+                            }
+                        }
+                    ) {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = "Settings",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

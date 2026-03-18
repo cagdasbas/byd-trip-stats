@@ -14,6 +14,8 @@ import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.TripRepository
+import com.byd.tripstats.data.repository.UpdateRepository
+import com.byd.tripstats.BuildConfig
 import com.byd.tripstats.service.MqttBrokerService
 import com.byd.tripstats.service.MqttService
 import com.byd.tripstats.ui.components.RangeDataPoint
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine as combineFlows
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
@@ -47,6 +50,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val tripRepository      = TripRepository.getInstance(application)
     private val chargingRepository  = ChargingRepository.getInstance(application)
     private val preferencesManager  = PreferencesManager(application)
+    val updateRepository            = UpdateRepository.getInstance(application)
 
     // ── MQTT state ────────────────────────────────────────────────────────────
 
@@ -75,6 +79,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // ── Charging session state ────────────────────────────────────────────────
 
     val isChargingSession: StateFlow<Boolean> = chargingRepository.isCharging
+
+    // ── Update ────────────────────────────────────────────────────────────────
+
+    val updateInfo:       StateFlow<UpdateRepository.UpdateInfo?> = updateRepository.updateInfo
+    val downloadedApk:    StateFlow<java.io.File?>                = updateRepository.downloadedApk
+
+    // Managed locally so we can push poll results into it cleanly
+    private val _updateDownloadProgress = MutableStateFlow<Int?>(null)
+    val downloadProgress: StateFlow<Int?> = _updateDownloadProgress.asStateFlow()
+
+    /**
+     * True only when it is safe to install an update:
+     *   - Car is parked (gear == P or no telemetry)
+     *   - No active trip
+     *   - No active charging session
+     */
+    val canInstallNow: StateFlow<Boolean> = combineFlows(
+        isInTrip, isChargingSession, currentTelemetry
+    ) { inTrip, charging, telemetry ->
+        !inTrip && !charging && (telemetry == null || telemetry.isParked)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val allChargingSessions: StateFlow<List<ChargingSessionEntity>> =
@@ -592,7 +617,39 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
         }
+
+        // ── Update check — runs once on startup ──────────────────────────────
+        viewModelScope.launch(Dispatchers.IO) {
+            updateRepository.checkForUpdate(BuildConfig.VERSION_NAME)
+        }
     }
+
+    // ── Update actions ────────────────────────────────────────────────────────
+
+    fun downloadUpdate() {
+        val info = updateInfo.value ?: return
+        updateRepository.downloadUpdate(info)
+        // Poll progress every second and push to our own StateFlow
+        viewModelScope.launch {
+            while (true) {
+                delay(1_000L)
+                val p = updateRepository.pollDownloadProgress() ?: break
+                _updateDownloadProgress.value = p
+                if (p >= 100 || p < 0) break
+            }
+        }
+    }
+
+    fun installUpdate() {
+        val apk = downloadedApk.value ?: return
+        if (!canInstallNow.value) {
+            Log.w(TAG, "installUpdate called but canInstallNow = false")
+            return
+        }
+        updateRepository.installUpdate(apk)
+    }
+
+    fun cancelDownload() = updateRepository.cancelDownload()
 
     // ── Trip controls ─────────────────────────────────────────────────────────
 

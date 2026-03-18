@@ -1,0 +1,284 @@
+package com.byd.tripstats.data.repository
+
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.net.URL
+
+/**
+ * Checks GitHub Releases for a newer version and manages APK download + install.
+ *
+ * Flow:
+ *   1. checkForUpdate() — calls GitHub API, compares tag against BuildConfig.VERSION_NAME
+ *   2. downloadUpdate() — uses DownloadManager, exposes progress via [downloadProgress]
+ *   3. installUpdate() — fires ACTION_INSTALL_PACKAGE via FileProvider URI
+ *
+ * The caller (DashboardViewModel) is responsible for gating install on:
+ *   - gear == "P" (parked)
+ *   - !isInTrip
+ *   - !isChargingSession
+ */
+class UpdateRepository private constructor(private val context: Context) {
+
+    private val TAG = "UpdateRepository"
+    private val GITHUB_OWNER = "angoikon"
+    private val GITHUB_REPO  = "byd-trip-stats"
+    private val PROVIDER_AUTHORITY = "${context.packageName}.fileprovider"
+
+    private val json = Json { ignoreUnknownKeys = true }
+    private val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+
+    // ── Public state ──────────────────────────────────────────────────────────
+
+    /** Non-null when a newer version is available. */
+    private val _updateInfo = MutableStateFlow<UpdateInfo?>(null)
+    val updateInfo: StateFlow<UpdateInfo?> = _updateInfo.asStateFlow()
+
+    /** null = idle, 0–100 = downloading, -1 = failed */
+    private val _downloadProgress = MutableStateFlow<Int?>(null)
+    val downloadProgress: StateFlow<Int?> = _downloadProgress.asStateFlow()
+
+    /** True once APK is downloaded and ready to install. */
+    private val _downloadedApk = MutableStateFlow<File?>(null)
+    val downloadedApk: StateFlow<File?> = _downloadedApk.asStateFlow()
+
+    private var activeDownloadId: Long? = null
+
+    // ── GitHub API model ──────────────────────────────────────────────────────
+
+    @Serializable
+    data class GitHubRelease(
+        @SerialName("tag_name") val tagName: String,
+        @SerialName("body")     val body: String = "",
+        @SerialName("assets")   val assets: List<GitHubAsset> = emptyList()
+    )
+
+    @Serializable
+    data class GitHubAsset(
+        @SerialName("name")                 val name: String,
+        @SerialName("browser_download_url") val downloadUrl: String,
+        @SerialName("size")                 val size: Long = 0L
+    )
+
+    data class UpdateInfo(
+        val latestVersion: String,  // e.g. "1.3.0"
+        val currentVersion: String, // BuildConfig.VERSION_NAME
+        val releaseNotes: String,
+        val apkUrl: String,
+        val apkName: String,
+        val apkSizeBytes: Long
+    )
+
+    // ── Version check ─────────────────────────────────────────────────────────
+
+    /**
+     * Fetches the latest GitHub release and compares against [currentVersion].
+     * Call this from a background coroutine (IO dispatcher).
+     * Updates [updateInfo] if a newer version is found.
+     */
+    suspend fun checkForUpdate(currentVersion: String) {
+        try {
+            val url = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+            val response = URL(url).openConnection().apply {
+                setRequestProperty("Accept", "application/vnd.github.v3+json")
+                connectTimeout = 10_000
+                readTimeout    = 10_000
+            }.getInputStream().bufferedReader().readText()
+
+            val release = json.decodeFromString<GitHubRelease>(response)
+            val latestVersion = release.tagName.trimStart('v')  // "v1.3.0" → "1.3.0"
+
+            Log.d(TAG, "Current: $currentVersion  Latest: $latestVersion")
+
+            if (isNewerVersion(latestVersion, currentVersion)) {
+                // Find the release APK asset — prefer the release APK over debug
+                val apkAsset = release.assets
+                    .firstOrNull { it.name.contains("release") && it.name.endsWith(".apk") }
+                    ?: release.assets.firstOrNull { it.name.endsWith(".apk") }
+
+                if (apkAsset != null) {
+                    _updateInfo.value = UpdateInfo(
+                        latestVersion  = latestVersion,
+                        currentVersion = currentVersion,
+                        releaseNotes   = release.body.take(500),  // trim for UI
+                        apkUrl         = apkAsset.downloadUrl,
+                        apkName        = apkAsset.name,
+                        apkSizeBytes   = apkAsset.size
+                    )
+                    Log.i(TAG, "Update available: v$latestVersion (${apkAsset.name})")
+                } else {
+                    Log.w(TAG, "Release v$latestVersion has no APK asset")
+                }
+            } else {
+                Log.d(TAG, "App is up to date")
+                _updateInfo.value = null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Update check failed: ${e.message}")
+            // Silent failure — don't bother the user if GitHub is unreachable
+        }
+    }
+
+    /**
+     * Compares semantic version strings.
+     * Returns true if [latest] is strictly greater than [current].
+     */
+    private fun isNewerVersion(latest: String, current: String): Boolean {
+        fun parse(v: String) = v.split(".").map { it.toIntOrNull() ?: 0 }
+        val l = parse(latest); val c = parse(current)
+        for (i in 0 until maxOf(l.size, c.size)) {
+            val diff = (l.getOrElse(i) { 0 }) - (c.getOrElse(i) { 0 })
+            if (diff != 0) return diff > 0
+        }
+        return false
+    }
+
+    // ── Download ──────────────────────────────────────────────────────────────
+
+    /**
+     * Downloads the update APK using DownloadManager.
+     * Progress is reported via [downloadProgress] (0–100, -1 on failure).
+     * On completion, [downloadedApk] is set and [downloadProgress] is set to 100.
+     *
+     * Safe to call from any coroutine — DownloadManager handles threading internally.
+     */
+    fun downloadUpdate(info: UpdateInfo) {
+        // Cancel any existing download
+        activeDownloadId?.let { downloadManager.remove(it) }
+
+        val destFile = File(
+            context.getExternalFilesDir(null),
+            "Download/${info.apkName}"   // DiLink uses "Download" not "Downloads"
+        )
+        destFile.delete()  // remove stale file if present
+
+        val request = DownloadManager.Request(Uri.parse(info.apkUrl)).apply {
+            setTitle("BYD Trip Stats ${info.latestVersion}")
+            setDescription("Downloading update…")
+            setDestinationUri(Uri.fromFile(destFile))
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            setMimeType("application/vnd.android.package-archive")
+        }
+
+        activeDownloadId = downloadManager.enqueue(request)
+        _downloadProgress.value = 0
+        Log.i(TAG, "Download enqueued: ${info.apkName}")
+
+        // Register completion receiver
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                if (id != activeDownloadId) return
+
+                val query = DownloadManager.Query().setFilterById(id)
+                val cursor = downloadManager.query(query)
+                if (cursor.moveToFirst()) {
+                    val statusCol = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                    when (cursor.getInt(statusCol)) {
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            _downloadProgress.value = 100
+                            _downloadedApk.value = destFile
+                            Log.i(TAG, "Download complete: ${destFile.absolutePath}")
+                        }
+                        DownloadManager.STATUS_FAILED -> {
+                            _downloadProgress.value = -1
+                            Log.e(TAG, "Download failed")
+                        }
+                    }
+                }
+                cursor.close()
+                ctx.unregisterReceiver(this)
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(
+                receiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(
+                receiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            )
+        }
+    }
+
+    /**
+     * Polls DownloadManager for current progress (0–100).
+     * Call this periodically (e.g. every 1s) while download is in progress.
+     * Returns null if no active download.
+     */
+    fun pollDownloadProgress(): Int? {
+        val id = activeDownloadId ?: return null
+        val cursor = downloadManager.query(DownloadManager.Query().setFilterById(id))
+        if (!cursor.moveToFirst()) { cursor.close(); return null }
+
+        val total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+        val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+        cursor.close()
+
+        return if (total > 0) ((downloaded * 100) / total).toInt() else 0
+    }
+
+    // ── Install ───────────────────────────────────────────────────────────────
+
+    /**
+     * Launches the system APK installer for [apkFile].
+     * The user sees the standard Android "Install this app?" dialog.
+     *
+     * Only call this when the car is parked, no trip is active, and no charging
+     * session is ongoing — enforced by DashboardViewModel.canInstallNow.
+     */
+    fun installUpdate(apkFile: File) {
+        try {
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                PROVIDER_AUTHORITY,
+                apkFile
+            )
+            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                data  = uri
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            }
+            context.startActivity(intent)
+            Log.i(TAG, "Install intent fired for ${apkFile.name}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Install failed: ${e.message}")
+        }
+    }
+
+    /** Cancels any in-progress download and resets state. */
+    fun cancelDownload() {
+        activeDownloadId?.let { downloadManager.remove(it) }
+        activeDownloadId   = null
+        _downloadProgress.value = null
+        _downloadedApk.value    = null
+    }
+
+    // ── Singleton ─────────────────────────────────────────────────────────────
+
+    companion object {
+        @Volatile private var INSTANCE: UpdateRepository? = null
+
+        fun getInstance(context: Context): UpdateRepository =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: UpdateRepository(context.applicationContext).also { INSTANCE = it }
+            }
+    }
+}

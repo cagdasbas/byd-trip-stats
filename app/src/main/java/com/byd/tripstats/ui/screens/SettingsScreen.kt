@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.PreferencesManager
@@ -97,6 +99,7 @@ fun SettingsScreen(
 
     val telemetry by viewModel.currentTelemetry.collectAsState()
     val mqttConnectionError by viewModel.mqttConnectionError.collectAsState()
+    val updateInfo by viewModel.updateInfo.collectAsState()
 
     Scaffold(
         topBar = {
@@ -125,11 +128,21 @@ fun SettingsScreen(
                         selected = selectedTab == index,
                         onClick  = { selectedTab = index },
                         text = {
-                            Text(
-                                title,
-                                fontSize   = 17.sp,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                            )
+                            if (index == 2 && updateInfo != null) {
+                                BadgedBox(badge = { Badge(containerColor = AccelerationOrange) }) {
+                                    Text(
+                                        title,
+                                        fontSize   = 17.sp,
+                                        fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    title,
+                                    fontSize   = 17.sp,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         }
                     )
                 }
@@ -186,7 +199,7 @@ fun SettingsScreen(
                         onNavigateToBackup = onNavigateToBackup,
                         scope             = scope
                     )
-                    2 -> AboutTab()
+                    2 -> AboutTab(viewModel = viewModel)
                 }
             }
         }
@@ -563,7 +576,12 @@ private fun BackupSummaryCard(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun AboutTab() {
+private fun AboutTab(viewModel: DashboardViewModel) {
+    val updateInfo       by viewModel.updateInfo.collectAsState()
+    val downloadProgress by viewModel.downloadProgress.collectAsState()
+    val downloadedApk    by viewModel.downloadedApk.collectAsState()
+    val canInstallNow    by viewModel.canInstallNow.collectAsState()
+
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -578,15 +596,26 @@ private fun AboutTab() {
             colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                SettingsDetailRow("App",         "BYD Trip Stats")
-                SettingsDetailRow("Version",     "1.2.1")
+                SettingsDetailRow("App",       "BYD Trip Stats")
+                SettingsDetailRow("Version",   com.byd.tripstats.BuildConfig.VERSION_NAME)
                 SettingsDetailRow("Changelog", "What's new", url = "https://github.com/angoikon/byd-trip-stats/blob/main/CHANGELOG.md")
-                SettingsDetailRow("Author",      "Angelos Oikonomou (angoikon)")
-                SettingsDetailRow("Platform",    "Android 10 · API 29")
-                SettingsDetailRow("License",     "BUSL 1.1")
-                SettingsDetailRow("Link",      "github.com/angoikon/byd-trip-stats", url = "https://github.com/angoikon/byd-trip-stats")
+                SettingsDetailRow("Author",    "Angelos Oikonomou (angoikon)")
+                SettingsDetailRow("Platform",  "Android 10 · API 29")
+                SettingsDetailRow("License",   "BUSL 1.1")
+                SettingsDetailRow("Link",      "github.com/angoikon/byd-trip-stats",
+                    url = "https://github.com/angoikon/byd-trip-stats")
             }
         }
+
+        UpdateCard(
+            updateInfo       = updateInfo,
+            downloadProgress = downloadProgress,
+            downloadedApk    = downloadedApk,
+            canInstallNow    = canInstallNow,
+            onDownload       = { viewModel.downloadUpdate() },
+            onInstall        = { viewModel.installUpdate() },
+            onCancel         = { viewModel.cancelDownload() }
+        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -608,6 +637,177 @@ private fun AboutTab() {
         buildFaqList().forEach { (q, a, u) -> FaqItem(question = q, answer = a, url = u) }
 
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+// ── Update card ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun UpdateCard(
+    updateInfo      : com.byd.tripstats.data.repository.UpdateRepository.UpdateInfo?,
+    downloadProgress: Int?,
+    downloadedApk   : java.io.File?,
+    canInstallNow   : Boolean,
+    onDownload      : () -> Unit,
+    onInstall       : () -> Unit,
+    onCancel        : () -> Unit
+) {
+    val isDownloading = downloadProgress != null && downloadProgress in 0..99
+    val isReady       = downloadedApk != null && downloadProgress == 100
+
+    if (updateInfo == null && !isDownloading && !isReady) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Row(
+                modifier              = Modifier.padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.CheckCircle, null, tint = RegenGreen, modifier = Modifier.size(20.dp))
+                Text("App is up to date", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        return
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors   = CardDefaults.cardColors(
+            containerColor = when {
+                isReady            -> RegenGreen.copy(alpha = 0.15f)
+                updateInfo != null -> AccelerationOrange.copy(alpha = 0.12f)
+                else               -> MaterialTheme.colorScheme.primaryContainer
+            }
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            when {
+                isReady            -> RegenGreen.copy(alpha = 0.5f)
+                updateInfo != null -> AccelerationOrange.copy(alpha = 0.4f)
+                else               -> MaterialTheme.colorScheme.outlineVariant
+            }
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = when {
+                        isReady       -> Icons.Filled.SystemUpdate
+                        isDownloading -> Icons.Filled.Downloading
+                        else          -> Icons.Filled.NewReleases
+                    },
+                    contentDescription = null,
+                    tint     = when {
+                        isReady       -> RegenGreen
+                        isDownloading -> BydElectricAzure
+                        else          -> AccelerationOrange
+                    },
+                    modifier = Modifier.size(22.dp)
+                )
+                Column {
+                    Text(
+                        when {
+                            isReady       -> "v${updateInfo?.latestVersion} ready to install"
+                            isDownloading -> "Downloading v${updateInfo?.latestVersion}…"
+                            else          -> "Update available: v${updateInfo?.latestVersion}"
+                        },
+                        style      = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (updateInfo != null && !isDownloading && !isReady) {
+                        Text(
+                            "Current: v${updateInfo.currentVersion}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (isDownloading) {
+                val animatedProgress by animateFloatAsState(
+                    targetValue   = (downloadProgress ?: 0) / 100f,
+                    animationSpec = tween(300),
+                    label         = "updateProgress"
+                )
+                LinearProgressIndicator(
+                    progress   = { animatedProgress },
+                    modifier   = Modifier.fillMaxWidth(),
+                    color      = BydElectricAzure,
+                    trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+                Text(
+                    "${downloadProgress}%  ·  ${updateInfo?.apkName ?: ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (updateInfo != null && !isDownloading && !isReady && updateInfo.releaseNotes.isNotBlank()) {
+                Text(
+                    updateInfo.releaseNotes,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 4,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+
+            if (isReady && !canInstallNow) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Info, null,
+                        tint     = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp))
+                    Text(
+                        "Will install automatically when parked with no active trip or charging",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                when {
+                    isReady -> {
+                        Button(
+                            onClick  = onInstall,
+                            enabled  = canInstallNow,
+                            colors   = ButtonDefaults.buttonColors(containerColor = RegenGreen),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.InstallMobile, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Install now")
+                        }
+                    }
+                    isDownloading -> {
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
+                            Text("Cancel")
+                        }
+                    }
+                    else -> {
+                        Button(
+                            onClick  = onDownload,
+                            colors   = ButtonDefaults.buttonColors(containerColor = BydElectricAzure),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Download, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Download update")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
