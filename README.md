@@ -91,7 +91,7 @@
 
 <div align="center">
   <a href="https://youtu.be/qmkeVPG8pRo">
-    <img src="https://img.youtube.com/vi/qmkeVPG8pRo/maxresdefault.jpg" 
+    <img src="https://img.youtube.com/vi/qmkeVPG8pRo/hqdefault.jpg" 
          alt="BYD Trip Stats Demo" width="720" />
   </a>
   <br/>
