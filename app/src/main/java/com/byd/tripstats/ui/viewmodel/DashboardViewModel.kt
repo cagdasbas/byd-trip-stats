@@ -462,8 +462,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     java.time.Instant.parse(telemetry.currentDatetime).toEpochMilli()
                 }.getOrNull() ?: System.currentTimeMillis()
 
-                // Feed every packet to the charging repository regardless of trip state
-                chargingRepository.onTelemetry(telemetry, selectedCarConfig.value)
+                // Charging telemetry is handled by MqttService (service-level),
+                // so it survives Activity death and car-off scenarios.
 
                 when {
                     inTrip && !wasInTrip -> {
@@ -602,21 +602,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        // ── Car-off watcher ───────────────────────────────────────────────────
-        // When car_on = 0 holds for 10 s, stop the MQTT service so it stops
-        // hammering reconnect attempts against a dead broker.
-        viewModelScope.launch {
-            currentTelemetry
-                .filterNotNull()
-                .filter { !it.isCarOn }
-                .debounce(10_000L)
-                .collect {
-                    if (!isInTrip.value && !isChargingSession.value) {   // never kill service mid-trip or mid-charge
-                        Log.d(TAG, "Car off for 10s — stopping MQTT service")
-                        stopMqttService()
-                    }
-                }
-        }
 
         // ── Update check — runs once on startup ──────────────────────────────
         viewModelScope.launch(Dispatchers.IO) {
@@ -908,6 +893,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteTrips(tripIds: List<Long>) {
         viewModelScope.launch { tripRepository.deleteTrips(tripIds) }
+    }
+
+    // --- Delete charging sessions
+    fun deleteChargingSession(sessionId: Long) {
+        viewModelScope.launch { chargingRepository.deleteSession(sessionId) }
+    }
+
+    fun deleteChargingSessions(sessionIds: List<Long>) {
+        viewModelScope.launch { chargingRepository.deleteSessions(sessionIds) }
     }
 
     // ── Charging session helpers ───────────────────────────────────────────────

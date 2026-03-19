@@ -398,9 +398,9 @@ private fun MqttTab(
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 Text(
                     "In Electro app, set the publish interval to 1 second while the car is ON " +
-                    "and 1 min when the car is off.\n\n" +
+                    "and 30 seconds when the car is OFF (for accurate charging tracking).\n\n" +
                     "For the internal broker use 127.0.0.1 · port 1883 · no SSL · no credentials. " +
-                    "Find the topic in Electro → Integrations → MQTT ",
+                    "Find the topic in Electro → Integrations → MQTT.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -912,9 +912,11 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     FaqEntry(
         "What should my Electro publish interval be?",
         "Set the interval to 1 second while the car is ON — this gives smooth " +
-        "charts and accurate statistics - you don't need faster intervals. " +
-        "While the car is OFF, 1 minute interval is fine; It is a sensibe default " +
-        "and reduces unnecessary load plus you can get nice charging charts when the car is off."
+        "charts and accurate statistics. You don't need faster intervals.\n\n" +
+        "While the car is OFF, set it to 30 seconds. This ensures accurate charging " +
+        "session detection (the app needs regular data to know charging is still active). " +
+        "30 seconds is a good balance between accuracy and database size — even an 8-hour " +
+        "overnight charge produces fewer data points than a single 30-minute drive."
     ),
 
     FaqEntry(

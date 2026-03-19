@@ -2,6 +2,7 @@ package com.byd.tripstats.data.repository
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import com.byd.tripstats.data.local.BydStatsDatabase
 import com.byd.tripstats.data.local.entity.LatLng
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
@@ -757,13 +758,24 @@ class TripRepository private constructor(context: Context) {
 
     fun getSegmentsForTrip(tripId: Long) = segmentDao.getSegmentsForTrip(tripId)
 
-    suspend fun deleteTrips(tripIds: List<Long>) = tripIds.forEach { deleteTrip(it) }
-
+    suspend fun deleteTrips(tripIds: List<Long>) {
+        database.withTransaction {
+            tripIds.forEach { tripId ->
+                tripDao.deleteTripById(tripId)
+                dataPointDao.deleteDataPointsForTrip(tripId)
+                statsDao.deleteStatsForTrip(tripId)
+                segmentDao.deleteSegmentsForTrip(tripId)
+            }
+        }
+    }
+ 
     suspend fun deleteTrip(tripId: Long) {
-        tripDao.deleteTripById(tripId)
-        dataPointDao.deleteDataPointsForTrip(tripId)
-        statsDao.deleteStatsForTrip(tripId)
-        segmentDao.deleteSegmentsForTrip(tripId)
+        database.withTransaction {
+            tripDao.deleteTripById(tripId)
+            dataPointDao.deleteDataPointsForTrip(tripId)
+            statsDao.deleteStatsForTrip(tripId)
+            segmentDao.deleteSegmentsForTrip(tripId)
+        }
     }
 
     fun setAutoTripDetection(enabled: Boolean) {

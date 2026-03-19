@@ -15,7 +15,10 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.byd.tripstats.MainActivity
 import com.byd.tripstats.R
+import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.mqtt.MqttClientManager
+import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.TripRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +72,8 @@ class MqttService : Service() {
     
     private var mqttClientManager: MqttClientManager? = null
     private var tripRepository: TripRepository? = null
+    private var chargingRepository: ChargingRepository? = null
+    private var carConfig: CarConfig? = null
     private var wakeLock: PowerManager.WakeLock? = null
     
     // Connection state - now properly tracked
@@ -158,6 +163,14 @@ class MqttService : Service() {
         )
 
         tripRepository = TripRepository.getInstance(applicationContext)
+        chargingRepository = ChargingRepository.getInstance(applicationContext)
+
+        // Load car config for charging kWh calculations.
+        // One-shot read cached for the service lifetime; if the user changes car
+        // mid-session the service restart will pick up the new config.
+        serviceScope.launch {
+            carConfig = PreferencesManager(applicationContext).getSelectedCarConfig()
+        }
 
         startMqttConnection()
 
@@ -217,8 +230,9 @@ class MqttService : Service() {
 
                     Log.d(TAG, "MQTT received: SOC=${telemetry.soc}, Speed=${telemetry.speed}, Gear=${telemetry.gear}")
 
-                    // Process telemetry through repository
+                    // Process telemetry through repositories
                     tripRepository?.processTelemetry(telemetry)
+                    chargingRepository?.onTelemetry(telemetry, carConfig)
                 }.onFailure { error ->
                     Log.e(TAG, "Telemetry error", error)
                 }

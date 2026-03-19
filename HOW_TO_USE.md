@@ -249,7 +249,7 @@ BYD DiLink has a built-in autostart manager that kills apps after a car restart 
 
 ## Tips
 
-- **Set Electro's publish interval to 1 second** while the car is on — this gives smooth charts and accurate consumption figures. While the car is off, 1 minutes is fine.
+- **Set Electro's publish interval to 1 second** while the car is on — this gives smooth charts and accurate consumption figures. While the car is off, 30 seconds is fine and recommended for correct charging sessions.
 - **The range projection needs about 2 km to calibrate** — it will show "Calibrating…" at the start of a trip. This is normal.
 - If the MQTT connection shows an error after changing settings, tap **Save & Restart MQTT connection** in Settings → Network.
 - The consumption chart thumbnail on the dashboard shows the last 7 days. Tap it to see 30-day and 12-month views.

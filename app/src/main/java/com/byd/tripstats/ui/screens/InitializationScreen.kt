@@ -176,6 +176,31 @@ fun InitializationScreen(
                 }
             }
 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Recommended Electro intervals: 1 second while the car is ON " +
+                            "(smooth charts) and 30 seconds while the car is OFF " +
+                            "(accurate charging sessions). You can change these in " +
+                            "Electro → Integrations → MQTT → Publish Interval.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(

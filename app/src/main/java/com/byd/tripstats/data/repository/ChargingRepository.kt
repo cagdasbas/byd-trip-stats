@@ -2,6 +2,7 @@ package com.byd.tripstats.data.repository
 
 import android.content.Context
 import android.util.Log
+import androidx.room.withTransaction
 import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.local.BydStatsDatabase
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
@@ -39,8 +40,9 @@ class ChargingRepository private constructor(context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    init {
-        // Recover any session that was left open by a previous crash or force-kill
+    // Recover any session that was left open by a previous crash or force-kill
+    // This runs before any telemetry is processed to prevent race conditions.
+    private val initJob = scope.launch {
         recoverOrphanedSession()
     }
 
@@ -55,31 +57,23 @@ class ChargingRepository private constructor(context: Context) {
     // ── Internal state ────────────────────────────────────────────────────────
 
     /**
-     * Job-based debounce timer — fires automatically, no incoming packet required.
-     *
-     * Two timeouts depending on whether the car is on or off:
-     *
-     *   DC fast charging (car_on = 1, Electro publishes every 1 s):
-     *     60 s — closes the session roughly one minute after unplugging.
-     *
-     *   AC home charging (car_on = 0, Electro publishes every 5–10 min):
-     *     12 min — safely beyond the 10-min maximum publish interval, so a brief
-     *     gap between packets never prematurely closes an ongoing overnight session.
-     *     The session closes automatically once the charger is disconnected and the
-     *     next slow packet (with chargingPower = 0) triggers a timer that fires
-     *     12 minutes later.
+     * Auto-close debounce — fires when no charging packet arrives within the window.
      *
      * The timer is cancelled and restarted on every incoming charging packet,
      * so it only fires if the car genuinely stops sending charging data.
+     *
+     * Both car-on and car-off use the same 60 s window because:
+     *   - Car ON:  Electro publishes every 1 s, so 60 s of silence is definitive.
+     *   - Car OFF: Electro publishes every ~30 s (recommended setting). MqttService
+     *     stays alive as a foreground service (START_STICKY + wake lock), so the app
+     *     continues receiving these packets. The 60 s debounce gives a comfortable
+     *     2× margin over the 30 s publish interval, avoiding false session closes
+     *     due to network jitter.
      */
-    // Debounce windows for auto-close timer (when charging packets stop arriving):
-    //   CAR_ON_DEBOUNCE  — Electro publishes every 1 s → 60 s of silence = problem
-    //   CAR_OFF_DEBOUNCE — Electro publishes every 5 min → need > 5 min to survive gaps
-    //                      Also covers DC toilet-break stops (< 20 min typically)
-    private val CAR_ON_DEBOUNCE_MS  = 60_000L        //  1 min — car on (1 s publish interval)
-    private val CAR_OFF_DEBOUNCE_MS = 12 * 60_000L   // 12 min — car off (5 min publish interval)
+    private val DEBOUNCE_MS = 60_000L  // 1 min — both car-on and car-off
 
     private var closeSessionJob: Job? = null
+    private var isStoppingExplicitly = false
 
     /**
      * The last telemetry packet where chargingPower > 0.
@@ -103,7 +97,7 @@ class ChargingRepository private constructor(context: Context) {
     suspend fun getSessionById(sessionId: Long): ChargingSessionEntity? =
         sessionDao.getSessionById(sessionId)
 
-    suspend fun getDataPointsForSessionSync(sessionId: Long): List<ChargingDataPointEntity> =
+    suspend fun getDataPointsForSessionSync(sessionId: Long): List <ChargingDataPointEntity> =
         sessionDao.getDataPointsForSessionSync(sessionId)
 
     /**
@@ -112,10 +106,13 @@ class ChargingRepository private constructor(context: Context) {
      */
     fun onTelemetry(telemetry: VehicleTelemetry, carConfig: CarConfig?) {
         scope.launch {
+            initJob.join()
+
             if (telemetry.isCharging) {
                 // Cancel any pending close — we are definitely still charging
                 closeSessionJob?.cancel()
                 closeSessionJob = null
+                isStoppingExplicitly = false
 
                 // Track the last packet where we confirmed charging was active.
                 // Used to set endTime accurately regardless of when the debounce fires.
@@ -128,45 +125,40 @@ class ChargingRepository private constructor(context: Context) {
                 }
 
                 // Schedule automatic close in case packets stop arriving
-                // (e.g. car goes to sleep mid-charge, Electro crashes, phone loses
-                // connection). The job is cancelled and rescheduled on every charging
-                // packet so it only fires if no charging packet arrives within the window.
-                //
-                // Distinguish DC vs AC by chargingPower magnitude — not car_on, which
-                // is 0 whenever the car is in accessory/sleep mode during charging:
-                //   ≥ 20 kW → DC fast charge → 60 s debounce (car is nearby, quick closure)
-                //   <  20 kW → AC home charge → 12 min debounce (safe beyond 10-min interval)
-                // Use car_on to select debounce — same logic as the else branch.
-                // chargingPower >= 20 (DC) implies car_on = 1 in practice, but
-                // car_on is the more direct signal and handles tapering correctly
-                // (DC power can drop below 20 kW at end of charge while car stays on).
-                val debounceMs = if (telemetry.isCarOn) CAR_ON_DEBOUNCE_MS else CAR_OFF_DEBOUNCE_MS
+                // (e.g. car turns off mid-charge, Electro stops, phone loses connection).
+                // Cancelled and rescheduled on every charging packet so it only fires
+                // if no charging packet arrives within DEBOUNCE_MS.
                 closeSessionJob = scope.launch {
-                    delay(debounceMs)
-                    Log.i(TAG, "No charging packet for ${debounceMs / 1000}s — auto-closing session")
-                    closeSession(lastChargingTelemetry ?: telemetry, carConfig)
+                    delay(DEBOUNCE_MS)
+                    Log.i(TAG, "No charging packet for ${DEBOUNCE_MS / 1000}s — auto-closing session")
+                    closeSession(
+                        telemetry = lastChargingTelemetry ?: telemetry,
+                        carConfig = carConfig,
+                        explicitStopPacket = false
+                    )
                 }
             } else {
                 if (activeSession != null) {
-                    // Explicit non-charging packet received — `chargingPower = 0` is
-                    // definitive confirmation that charging stopped, regardless of whether
-                    // the car is on or off or whether this was AC or DC.
-                    //
-                    // Always use CAR_ON_DEBOUNCE_MS (60 s) here because:
-                    //   - DC, car on, manual stop → closes in 60 s ✅
-                    //   - DC, car off, manual stop (toilet break ended, unplugged) →
-                    //     closes in 60 s ✅ — we have an explicit signal
-                    //   - AC, car off, completed overnight → closes in 60 s ✅
-                    //     The next 5-min packet also shows 0 but session is already closed
-                    //
-                    // CAR_OFF_DEBOUNCE_MS (12 min) is only needed for the auto-close timer
-                    // above — where packets *stop arriving* and we don't know why. It is
-                    // wrong here because we already have explicit evidence charging ended.
+                    // Explicit non-charging packet — definitive proof that charging
+                    // stopped. Wait DEBOUNCE_MS before closing to avoid reacting to
+                    // a single stray packet.
+                    
+                    if (isStoppingExplicitly) return@launch // Already winding down
+
+                    isStoppingExplicitly = true
                     closeSessionJob?.cancel()
                     closeSessionJob = scope.launch {
-                        delay(CAR_ON_DEBOUNCE_MS)
-                        Log.i(TAG, "Charging stopped confirmed after ${CAR_ON_DEBOUNCE_MS / 1000}s — closing session")
-                        closeSession(lastChargingTelemetry ?: telemetry, carConfig)
+                        try {
+                            delay(DEBOUNCE_MS)
+                            Log.i(TAG, "Charging stopped confirmed after ${DEBOUNCE_MS / 1000}s — closing session")
+                            closeSession(
+                                telemetry = telemetry,
+                                carConfig = carConfig,
+                                explicitStopPacket = true
+                            )
+                        } finally {
+                            isStoppingExplicitly = false
+                        }
                     }
                 }
             }
@@ -201,16 +193,16 @@ class ChargingRepository private constructor(context: Context) {
         val session = activeSession ?: return
 
         val point = ChargingDataPointEntity(
-            sessionId            = session.id,
-            timestamp            = System.currentTimeMillis(),
-            soc                  = telemetry.soc,
-            socPanel             = telemetry.socPanel,
-            chargingPower        = telemetry.chargingPower,
-            batteryTotalVoltage  = telemetry.batteryTotalVoltage,
-            battery12vVoltage    = telemetry.battery12vVoltage,
-            batteryTempAvg       = telemetry.batteryTempAvg,
-            batteryCellTempMin   = telemetry.batteryCellTempMin,
-            batteryCellTempMax   = telemetry.batteryCellTempMax,
+            sessionId             = session.id,
+            timestamp             = System.currentTimeMillis(),
+            soc                   = telemetry.soc,
+            socPanel              = telemetry.socPanel,
+            chargingPower         = telemetry.chargingPower,
+            batteryTotalVoltage   = telemetry.batteryTotalVoltage,
+            battery12vVoltage     = telemetry.battery12vVoltage,
+            batteryTempAvg        = telemetry.batteryTempAvg,
+            batteryCellTempMin    = telemetry.batteryCellTempMin,
+            batteryCellTempMax    = telemetry.batteryCellTempMax,
             batteryCellVoltageMin = telemetry.batteryCellVoltageMin,
             batteryCellVoltageMax = telemetry.batteryCellVoltageMax
         )
@@ -218,44 +210,65 @@ class ChargingRepository private constructor(context: Context) {
         sessionDao.insertDataPoint(point)
         pendingDataPoints.add(point)
 
-        // Keep peak kW up to date on the session row
-        if (telemetry.chargingPower > (activeSession?.peakKw ?: 0.0)) {
-            activeSession = activeSession!!.copy(peakKw = telemetry.chargingPower)
+        // Keep peak kW and real-time SOC up to date on the session row
+        val currentPeak = activeSession?.peakKw ?: 0.0
+        val needsPeakUpdate = telemetry.chargingPower > currentPeak
+        val needsSocUpdate = telemetry.soc != activeSession?.socEnd
+
+        if (needsPeakUpdate || needsSocUpdate) {
+            activeSession = activeSession!!.copy(
+                peakKw = if (needsPeakUpdate) telemetry.chargingPower else currentPeak,
+                socEnd = telemetry.soc
+            )
             sessionDao.updateSession(activeSession!!)
         }
     }
 
-    private suspend fun closeSession(telemetry: VehicleTelemetry, carConfig: CarConfig?) {
+    private suspend fun closeSession(
+        telemetry: VehicleTelemetry,
+        carConfig: CarConfig?,
+        explicitStopPacket: Boolean
+    ) {
         val session = activeSession ?: return
 
-        // Use lastChargingTelemetry as the source of truth for all closing metrics.
-        // This anchors endTime, socEnd, and temperature to the last confirmed charging
-        // packet rather than the debounce fire time or the first non-charging packet,
-        // either of which can be minutes later than actual charging stopped.
-        val last = lastChargingTelemetry ?: telemetry
+        val dataPoints = sessionDao.getDataPointsForSessionSync(session.id)
+        val lastDataPoint = dataPoints.lastOrNull()
+        val lastCharging = lastChargingTelemetry ?: telemetry
 
-        val endMs = runCatching {
-            java.time.Instant.parse(last.currentDatetime).toEpochMilli()
+        // When we receive an explicit non-charging packet, trust that packet for
+        // final SoC / temperature / voltage because the last SoC increment often
+        // becomes visible exactly when chargingPower drops to 0.
+        //
+        // For endTime, still anchor to the last confirmed charging sample rather
+        // than the debounce fire time or the first non-charging packet, either
+        // of which can be later than the actual end of energy transfer.
+        val finalStateTelemetry =
+            if (explicitStopPacket && !telemetry.isCharging) telemetry else lastCharging
+
+        val endMs = lastDataPoint?.timestamp ?: runCatching {
+            java.time.Instant.parse(lastCharging.currentDatetime).toEpochMilli()
         }.getOrDefault(System.currentTimeMillis())
 
-        Log.i(TAG, "Charging session closed — SoC: ${session.socStart}% → ${last.soc}%  endTime anchored to last charging packet")
+        Log.i(
+            TAG,
+            "Charging session closed — SoC: ${session.socStart}% → ${finalStateTelemetry.soc}%  endTime anchored to last charging sample"
+        )
 
-        val dataPoints = sessionDao.getDataPointsForSessionSync(session.id)
         val avgKw = if (dataPoints.isNotEmpty())
             dataPoints.map { it.chargingPower }.average()
         else 0.0
 
         val batteryKwh = carConfig?.batteryKwh ?: session.batteryKwh
-        val socDelta   = (last.soc - session.socStart).coerceAtLeast(0.0)
+        val socDelta   = (finalStateTelemetry.soc - session.socStart).coerceAtLeast(0.0)
         val kwhAdded   = (socDelta / 100.0) * batteryKwh
 
         val closed = session.copy(
             endTime        = endMs,
-            socEnd         = last.soc,
+            socEnd         = finalStateTelemetry.soc,
             kwhAdded       = kwhAdded,
             avgKw          = avgKw,
-            batteryTempEnd = last.batteryTempAvg,
-            voltageEnd     = last.batteryTotalVoltage,
+            batteryTempEnd = finalStateTelemetry.batteryTempAvg,
+            voltageEnd     = finalStateTelemetry.batteryTotalVoltage,
             isActive       = false
         )
 
@@ -280,34 +293,53 @@ class ChargingRepository private constructor(context: Context) {
      * and a new charging session started after restart would create a duplicate
      * instead of resuming the orphaned one.
      */
-    private fun recoverOrphanedSession() {
-        scope.launch {
-            val orphan = sessionDao.getActiveSession() ?: return@launch
+    private suspend fun recoverOrphanedSession() {
+        val orphan = sessionDao.getActiveSession() ?: return
 
-            Log.w(TAG, "Found orphaned active session id=${orphan.id} — recovering")
+        Log.w(TAG, "Found orphaned active session id=${orphan.id} — recovering")
 
-            // Use last recorded data point timestamp as the best available endTime
-            val dataPoints = sessionDao.getDataPointsForSessionSync(orphan.id)
-            val endMs = dataPoints.lastOrNull()?.timestamp ?: orphan.startTime
+        // Use last recorded data point timestamp as the best available endTime
+        val dataPoints = sessionDao.getDataPointsForSessionSync(orphan.id)
+        val lastDataPoint = dataPoints.lastOrNull()
+        val endMs = lastDataPoint?.timestamp ?: orphan.startTime
 
-            val avgKw = if (dataPoints.isNotEmpty())
-                dataPoints.map { it.chargingPower }.average() else 0.0
+        val avgKw = if (dataPoints.isNotEmpty())
+            dataPoints.map { it.chargingPower }.average() else 0.0
 
-            // SoC delta uses last data point's SoC, fallback to startSoc (0 kWh added)
-            val socEnd  = dataPoints.lastOrNull()?.soc ?: orphan.socStart
-            val socDelta = (socEnd - orphan.socStart).coerceAtLeast(0.0)
-            val kwhAdded = (socDelta / 100.0) * orphan.batteryKwh
+        // SoC delta uses last data point's SoC, fallback to startSoc (0 kWh added)
+        val socEnd   = lastDataPoint?.soc ?: orphan.socStart
+        val socDelta = (socEnd - orphan.socStart).coerceAtLeast(0.0)
+        val kwhAdded = (socDelta / 100.0) * orphan.batteryKwh
 
-            sessionDao.updateSession(
-                orphan.copy(
-                    endTime  = endMs,
-                    socEnd   = socEnd,
-                    kwhAdded = kwhAdded,
-                    avgKw    = avgKw,
-                    isActive = false
-                )
+        sessionDao.updateSession(
+            orphan.copy(
+                endTime        = endMs,
+                socEnd         = socEnd,
+                kwhAdded       = kwhAdded,
+                avgKw          = avgKw,
+                batteryTempEnd = lastDataPoint?.batteryTempAvg,
+                voltageEnd     = lastDataPoint?.batteryTotalVoltage,
+                isActive       = false
             )
-            Log.i(TAG, "Orphaned session id=${orphan.id} closed — endTime anchored to last data point")
+        )
+        Log.i(TAG, "Orphaned session id=${orphan.id} closed — endTime anchored to last data point")
+    }
+
+    // ── Deletion ──────────────────────────────────────────────────────────────
+
+    suspend fun deleteSession(sessionId: Long) {
+        database.withTransaction {
+            sessionDao.deleteDataPointsForSession(sessionId)
+            sessionDao.deleteSessionById(sessionId)
+        }
+    }
+ 
+    suspend fun deleteSessions(sessionIds: List<Long>) {
+        database.withTransaction {
+            sessionIds.forEach { sessionId ->
+                sessionDao.deleteDataPointsForSession(sessionId)
+                sessionDao.deleteSessionById(sessionId)
+            }
         }
     }
 

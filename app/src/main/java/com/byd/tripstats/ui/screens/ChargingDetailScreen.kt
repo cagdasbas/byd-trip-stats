@@ -146,8 +146,6 @@ private fun ChargingOverviewTab(
                 session.durationSeconds?.let {
                     OverviewRow("Duration", formatDurationLong(it))
                 }
-                OverviewRow("Car",      session.carConfigId.replace("_", " ").lowercase()
-                    .replaceFirstChar { it.uppercase() })
             }
         }
 
@@ -286,8 +284,8 @@ private fun ChargingChartTab(
             val rawMin  = values.minOrNull() ?: 0.0
             val rawMax  = values.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
             val yStep   = niceStep(rawMax - rawMin)
-            val yMin    = (rawMin / yStep).toInt() * yStep
-            val yMax    = (rawMax / yStep).toInt() * yStep + yStep
+            val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
+            val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
 
             val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
             val startMs  = dataPoints.first().timestamp
@@ -411,8 +409,8 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
             val rawMin  = allVals.minOrNull() ?: 0.0
             val rawMax  = allVals.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
             val yStep   = niceStep(rawMax - rawMin)
-            val yMin    = (rawMin / yStep).toInt() * yStep
-            val yMax    = (rawMax / yStep).toInt() * yStep + yStep
+            val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
+            val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
 
             val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
             val startMs  = dataPoints.first().timestamp

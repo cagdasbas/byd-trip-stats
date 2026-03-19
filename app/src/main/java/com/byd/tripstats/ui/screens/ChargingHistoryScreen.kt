@@ -1,14 +1,20 @@
 package com.byd.tripstats.ui.screens
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ElectricalServices
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,13 +41,46 @@ fun ChargingHistoryScreen(
     val completed = sessions.filter { !it.isActive }
     val active    = sessions.firstOrNull { it.isActive }
 
+    var selectedSessions         by remember { mutableStateOf(setOf<Long>()) }
+    var selectionMode            by remember { mutableStateOf(false) }
+    var showDeleteSelectedDialog by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Charging History", fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+                title = {
+                    if (selectionMode) {
+                        Text("${selectedSessions.size} selected", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    } else {
+                        Text("Charging History", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(28.dp))
+                    IconButton(onClick = {
+                        if (selectionMode) {
+                            selectionMode = false
+                            selectedSessions = setOf()
+                        } else {
+                            onNavigateBack()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (selectionMode) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = if (selectionMode) "Cancel" else "Back",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                },
+                actions = {
+                    if (selectionMode && selectedSessions.isNotEmpty()) {
+                        IconButton(onClick = { showDeleteSelectedDialog = true }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Delete selected",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -91,9 +130,19 @@ fun ChargingHistoryScreen(
                 active?.let { session ->
                     item {
                         ChargingSessionCard(
-                            session    = session,
-                            isActive   = true,
-                            onClick    = { onSessionClick(session.id) }
+                            session       = session,
+                            isActive      = true,
+                            isSelected    = selectedSessions.contains(session.id),
+                            selectionMode = selectionMode,
+                            onClick       = {
+                                if (selectionMode) {
+                                    // Ignore active sessions during selection mode
+                                } else {
+                                    onSessionClick(session.id)
+                                }
+                            },
+                            onLongClick   = { /* active sessions can't be selected */ },
+                            onDelete      = { viewModel.deleteChargingSession(session.id) }
                         )
                     }
                 }
@@ -107,15 +156,58 @@ fun ChargingHistoryScreen(
 
                 items(completed, key = { it.id }) { session ->
                     ChargingSessionCard(
-                        session  = session,
-                        isActive = false,
-                        onClick  = { onSessionClick(session.id) }
+                        session       = session,
+                        isActive      = false,
+                        isSelected    = selectedSessions.contains(session.id),
+                        selectionMode = selectionMode,
+                        onClick       = {
+                            if (selectionMode) {
+                                selectedSessions = if (selectedSessions.contains(session.id)) {
+                                    selectedSessions - session.id
+                                } else {
+                                    selectedSessions + session.id
+                                }
+                            } else {
+                                onSessionClick(session.id)
+                            }
+                        },
+                        onLongClick   = {
+                            if (!selectionMode) {
+                                selectionMode = true
+                                selectedSessions = setOf(session.id)
+                            }
+                        },
+                        onDelete      = { viewModel.deleteChargingSession(session.id) }
                     )
                 }
 
                 item { Spacer(Modifier.height(16.dp)) }
             }
         }
+    }
+
+    if (showDeleteSelectedDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteSelectedDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Delete ${selectedSessions.size} Session${if (selectedSessions.size > 1) "s" else ""}?") },
+            text = { Text("This will permanently delete the selected charging sessions and all their data. This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteChargingSessions(selectedSessions.toList())
+                        showDeleteSelectedDialog = false
+                        selectionMode = false
+                        selectedSessions = setOf()
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelectedDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -188,15 +280,25 @@ private fun SummaryMetric(label: String, value: String, unit: String) {
 
 // ── Session card ──────────────────────────────────────────────────────────────
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ChargingSessionCard(
     session : ChargingSessionEntity,
     isActive: Boolean,
-    onClick : () -> Unit
+    isSelected: Boolean = false,
+    selectionMode: Boolean = false,
+    onClick : () -> Unit,
+    onLongClick: () -> Unit = {},
+    onDelete: () -> Unit = {}
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
     val dateFmt     = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
     val startLabel  = dateFmt.format(Date(session.startTime))
-    val durationStr = session.durationSeconds?.let { formatDuration(it) } ?: "In progress…"
+    val durationStr = if (isActive) {
+        formatDuration((System.currentTimeMillis() - session.startTime) / 1000)
+    } else {
+        session.durationSeconds?.let { formatDuration(it) } ?: "—"
+    }
 
     val socText = when {
         session.socEnd != null ->
@@ -210,40 +312,89 @@ private fun ChargingSessionCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                enabled = !isActive || !selectionMode
+            )
             .border(
                 width = if (isActive) 1.5.dp else 1.dp,
                 color = if (isActive) RegenGreen
                         else MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(12.dp)
             ),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                isActive && selectionMode -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                else -> MaterialTheme.colorScheme.primaryContainer
+            }
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
-            // Header row: date + active badge
+            // Header row: checkbox + date + active badge + delete icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text  = startLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (isActive) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = RegenGreen.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text     = "● Charging",
-                            style    = MaterialTheme.typography.labelSmall,
-                            color    = RegenGreen,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                // Checkbox
+                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    if (selectionMode) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onClick() },
+                            enabled = !isActive,
+                            modifier = Modifier.size(24.dp)
                         )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text  = startLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (isActive) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = RegenGreen.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text     = "● Charging",
+                                style    = MaterialTheme.typography.labelSmall,
+                                color    = RegenGreen,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Delete icon
+                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    if (!selectionMode) {
+                        IconButton(
+                            onClick = { showDeleteDialog = true },
+                            enabled = !isActive,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = "Delete",
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isActive)
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                                else
+                                    MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
@@ -294,6 +445,28 @@ private fun ChargingSessionCard(
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Delete Charging Session?") },
+            text = { Text("This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete()
+                        showDeleteDialog = false
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 }
 

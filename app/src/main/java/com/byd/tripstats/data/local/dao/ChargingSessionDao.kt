@@ -13,6 +13,9 @@ interface ChargingSessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSession(session: ChargingSessionEntity): Long
 
+    @Query("DELETE FROM charging_sessions WHERE id = :sessionId")
+    suspend fun deleteSessionById(sessionId: Long)
+
     @Update
     suspend fun updateSession(session: ChargingSessionEntity)
 
