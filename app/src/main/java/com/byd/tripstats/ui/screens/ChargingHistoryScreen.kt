@@ -409,7 +409,7 @@ private fun ChargingSessionCard(
                 SessionMetricChip(
                     icon  = Icons.Filled.Timer,
                     label = durationStr,
-                    tint  = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint  = MaterialTheme.colorScheme.primary
                 )
                 SessionMetricChip(
                     icon  = Icons.Filled.BatteryChargingFull,

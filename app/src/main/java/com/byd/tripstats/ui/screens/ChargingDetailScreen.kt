@@ -1,12 +1,12 @@
 package com.byd.tripstats.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -307,102 +307,103 @@ private fun ChargingChartTab(
                     val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
                     val chartW = w - padL - padR; val chartH = h - padT - padB
 
-            val values  = dataPoints.map(valueSelector)
-            val rawMin  = values.minOrNull() ?: 0.0
-            val rawMax  = values.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
-            val yStep   = niceStep(rawMax - rawMin)
-            val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
-            val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
+                    val values  = dataPoints.map(valueSelector)
+                    val rawMin  = values.minOrNull() ?: 0.0
+                    val rawMax  = values.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
+                    val yStep   = niceStep(rawMax - rawMin)
+                    val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
+                    val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
 
-            val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
-            val startMs  = dataPoints.first().timestamp
+                    val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
+                    val startMs  = dataPoints.first().timestamp
 
-            fun xOf(ts: Long)  = padL + ((ts - startMs).toFloat() / totalMs.coerceAtLeast(1L)) * chartW
-            fun yOf(v: Double) = (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
+                    fun xOf(ts: Long)  = padL + ((ts - startMs).toFloat() / totalMs.coerceAtLeast(1L)) * chartW
+                    fun yOf(v: Double) = (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
 
-            val nc = drawContext.canvas.nativeCanvas
-            val labelPaint = android.graphics.Paint().apply {
-                color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
-            }
-            val xLabelPaint = android.graphics.Paint().apply {
-                color = textColor.copy(alpha = 0.6f).toArgb(); textSize = 20f
-                textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-            }
+                    val nc = drawContext.canvas.nativeCanvas
+                    val labelPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
+                    }
+                    val xLabelPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.6f).toArgb(); textSize = 20f
+                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
+                    }
 
-            // Y grid + labels
-            var yTick = yMin
-            while (yTick <= yMax + 0.01) {
-                val y = yOf(yTick)
-                drawLine(gridColor, Offset(padL, y), Offset(w - padR, y), 1f)
-                labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
-                nc.drawText("%.0f".format(yTick), padL - 6f, y + 8f, labelPaint)
-                yTick += yStep
-            }
+                    // Y grid + labels
+                    var yTick = yMin
+                    while (yTick <= yMax + 0.01) {
+                        val y = yOf(yTick)
+                        drawLine(gridColor, Offset(padL, y), Offset(w - padR, y), 1f)
+                        labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
+                        nc.drawText("%.0f".format(yTick), padL - 6f, y + 8f, labelPaint)
+                        yTick += yStep
+                    }
 
-            // Y axis label
-            val yAxisPaint = android.graphics.Paint().apply {
-                color = textColor.copy(alpha = 0.55f).toArgb(); textSize = 19f
-                textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-            }
-            nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
-            nc.drawText(yAxisLabel, 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
+                    // Y axis label
+                    val yAxisPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.55f).toArgb(); textSize = 19f
+                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
+                    }
+                    nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
+                    nc.drawText(yAxisLabel, 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
 
-            // X axis
-            drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
+                    // X axis
+                    drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
 
-            // X tick labels — 5 evenly spaced time markers
-            for (i in 0..4) {
-                val frac = i / 4.0
-                val ts   = startMs + (totalMs * frac).toLong()
-                val x    = xOf(ts)
-                val mins = ((ts - startMs) / 60_000.0).roundToInt()
-                nc.drawText("+${mins}m", x, h - 4f, xLabelPaint)
-            }
+                    // X tick labels — 5 evenly spaced time markers
+                    for (i in 0..4) {
+                        val frac = i / 4.0
+                        val ts   = startMs + (totalMs * frac).toLong()
+                        val x    = xOf(ts)
+                        val mins = ((ts - startMs) / 60_000.0).roundToInt()
+                        nc.drawText("+${mins}m", x, h - 4f, xLabelPaint)
+                    }
 
-            // Area fill
-            val areaPath = Path().apply {
-                moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
-                dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
-                lineTo(xOf(dataPoints.last().timestamp), padT + chartH)
-                lineTo(xOf(dataPoints.first().timestamp), padT + chartH)
-                close()
-            }
-            drawPath(areaPath, Brush.verticalGradient(
-                listOf(lineColor.copy(alpha = 0.30f), lineColor.copy(alpha = 0f)),
-                startY = yOf(values.max()), endY = padT + chartH
-            ))
+                    // Area fill
+                    val areaPath = Path().apply {
+                        moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
+                        dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
+                        lineTo(xOf(dataPoints.last().timestamp), padT + chartH)
+                        lineTo(xOf(dataPoints.first().timestamp), padT + chartH)
+                        close()
+                    }
+                    drawPath(areaPath, Brush.verticalGradient(
+                        listOf(lineColor.copy(alpha = 0.30f), lineColor.copy(alpha = 0f)),
+                        startY = yOf(values.max()), endY = padT + chartH
+                    ))
 
-            // Line
-            val linePath = Path().apply {
-                moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
-                dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
-            }
-            drawPath(linePath, lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            
-            // Crosshair overlay
-            touchPos?.let { tp ->
-                if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
-                    val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
-                    val targetTs = startMs + (fraction * totalMs).toLong()
-                    val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
-                    if (p != null) {
-                        val v = valueSelector(p)
-                        val secs = (p.timestamp - startMs) / 1000L
-                        val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
-                        val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
-                        
-                        drawCrosshair(
-                            cx = xOf(p.timestamp), cy = yOf(v), w = w,
-                            padL = padL, padR = padR, padT = padT, chartH = chartH,
-                            line1 = "%.1f %s".format(v, yAxisLabel),
-                            line2 = realTime,
-                            line3 = durationStr,
-                            accentColor = lineColor, textColor = textColor
-                        )
+                    // Line
+                    val linePath = Path().apply {
+                        moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
+                        dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
+                    }
+                    drawPath(linePath, lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    
+                    // Crosshair overlay
+                    touchPos?.let { tp ->
+                        if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
+                            val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
+                            val targetTs = startMs + (fraction * totalMs).toLong()
+                            val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
+                            if (p != null) {
+                                val v = valueSelector(p)
+                                val secs = (p.timestamp - startMs) / 1000L
+                                val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
+                                val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
+                                
+                                drawCrosshair(
+                                    cx = xOf(p.timestamp), cy = yOf(v), w = w,
+                                    padL = padL, padR = padR, padT = padT, chartH = chartH,
+                                    line1 = "%.1f %s".format(v, yAxisLabel),
+                                    line2 = realTime,
+                                    line3 = durationStr,
+                                    accentColor = lineColor, textColor = textColor
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
         }
     }
 }
@@ -476,96 +477,97 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
                     val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
                     val chartW = w - padL - padR; val chartH = h - padT - padB
 
-            val avgVals = dataPoints.map { it.batteryTempAvg }
-            val minVals = dataPoints.map { it.batteryCellTempMin.toDouble() }
-            val maxVals = dataPoints.map { it.batteryCellTempMax.toDouble() }
-            val allVals = avgVals + minVals + maxVals
-            val rawMin  = allVals.minOrNull() ?: 0.0
-            val rawMax  = allVals.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
-            val yStep   = niceStep(rawMax - rawMin)
-            val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
-            val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
+                    val avgVals = dataPoints.map { it.batteryTempAvg }
+                    val minVals = dataPoints.map { it.batteryCellTempMin.toDouble() }
+                    val maxVals = dataPoints.map { it.batteryCellTempMax.toDouble() }
+                    val allVals = avgVals + minVals + maxVals
+                    val rawMin  = allVals.minOrNull() ?: 0.0
+                    val rawMax  = allVals.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
+                    val yStep   = niceStep(rawMax - rawMin)
+                    val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
+                    val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
 
-            val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
-            val startMs  = dataPoints.first().timestamp
+                    val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
+                    val startMs  = dataPoints.first().timestamp
 
-            fun xOf(ts: Long)  = padL + ((ts - startMs).toFloat() / totalMs.coerceAtLeast(1L)) * chartW
-            fun yOf(v: Double) = (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
+                    fun xOf(ts: Long)  = padL + ((ts - startMs).toFloat() / totalMs.coerceAtLeast(1L)) * chartW
+                    fun yOf(v: Double) = (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
 
-            val nc = drawContext.canvas.nativeCanvas
-            val labelPaint = android.graphics.Paint().apply {
-                color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
-            }
-            val xLabelPaint = android.graphics.Paint().apply {
-                color = textColor.copy(alpha = 0.6f).toArgb(); textSize = 20f
-                textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-            }
+                    val nc = drawContext.canvas.nativeCanvas
+                    val labelPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
+                    }
+                    val xLabelPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.6f).toArgb(); textSize = 20f
+                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
+                    }
 
-            // Y grid + labels
-            var yTick = yMin
-            while (yTick <= yMax + 0.01) {
-                val y = yOf(yTick)
-                drawLine(gridColor, Offset(padL, y), Offset(w - padR, y), 1f)
-                labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
-                nc.drawText("%.0f".format(yTick), padL - 6f, y + 8f, labelPaint)
-                yTick += yStep
-            }
+                    // Y grid + labels
+                    var yTick = yMin
+                    while (yTick <= yMax + 0.01) {
+                        val y = yOf(yTick)
+                        drawLine(gridColor, Offset(padL, y), Offset(w - padR, y), 1f)
+                        labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
+                        nc.drawText("%.0f".format(yTick), padL - 6f, y + 8f, labelPaint)
+                        yTick += yStep
+                    }
 
-            // Y axis label
-            val yAxisPaint = android.graphics.Paint().apply {
-                color = textColor.copy(alpha = 0.55f).toArgb(); textSize = 19f
-                textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-            }
-            nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
-            nc.drawText("°C", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
+                    // Y axis label
+                    val yAxisPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.55f).toArgb(); textSize = 19f
+                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
+                    }
+                    nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
+                    nc.drawText("°C", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
 
-            // X axis
-            drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
-            for (i in 0..4) {
-                val frac = i / 4.0
-                val ts   = startMs + (totalMs * frac).toLong()
-                val mins = ((ts - startMs) / 60_000.0).roundToInt()
-                nc.drawText("+${mins}m", xOf(ts), h - 4f, xLabelPaint)
-            }
+                    // X axis
+                    drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
+                    for (i in 0..4) {
+                        val frac = i / 4.0
+                        val ts   = startMs + (totalMs * frac).toLong()
+                        val mins = ((ts - startMs) / 60_000.0).roundToInt()
+                        nc.drawText("+${mins}m", xOf(ts), h - 4f, xLabelPaint)
+                    }
 
-            // Draw three series
-            fun drawSeries(vals: List<Double>, color: androidx.compose.ui.graphics.Color, width: Float = 2.5f) {
-                if (vals.size < 2) return
-                val path = Path().apply {
-                    moveTo(xOf(dataPoints.first().timestamp), yOf(vals.first()))
-                    vals.drop(1).forEachIndexed { i, v -> lineTo(xOf(dataPoints[i + 1].timestamp), yOf(v)) }
-                }
-                drawPath(path, color, style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            }
+                    // Draw three series
+                    fun drawSeries(vals: List<Double>, color: androidx.compose.ui.graphics.Color, width: Float = 2.5f) {
+                        if (vals.size < 2) return
+                        val path = Path().apply {
+                            moveTo(xOf(dataPoints.first().timestamp), yOf(vals.first()))
+                            vals.drop(1).forEachIndexed { i, v -> lineTo(xOf(dataPoints[i + 1].timestamp), yOf(v)) }
+                        }
+                        drawPath(path, color, style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    }
 
-            drawSeries(minVals, minColor, 2f)
-            drawSeries(maxVals, maxColor, 2f)
-            drawSeries(avgVals, avgColor, 3f)  // avg on top
-            
-            // Crosshair overlay (tracking average temp)
-            touchPos?.let { tp ->
-                if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
-                    val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
-                    val targetTs = startMs + (fraction * totalMs).toLong()
-                    val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
-                    if (p != null) {
-                        val v = p.batteryTempAvg
-                        val secs = (p.timestamp - startMs) / 1000L
-                        val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
-                        val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
-                        
-                        drawCrosshair(
-                            cx = xOf(p.timestamp), cy = yOf(v.toDouble()), w = w,
-                            padL = padL, padR = padR, padT = padT, chartH = chartH,
-                            line1 = "%.1f °C".format(v),
-                            line2 = realTime,
-                            line3 = durationStr,
-                            accentColor = avgColor, textColor = textColor
-                        )
+                    drawSeries(minVals, minColor, 2f)
+                    drawSeries(maxVals, maxColor, 2f)
+                    drawSeries(avgVals, avgColor, 3f)  // avg on top
+                    
+                    // Crosshair overlay (tracking average temp)
+                    touchPos?.let { tp ->
+                        if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
+                            val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
+                            val targetTs = startMs + (fraction * totalMs).toLong()
+                            val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
+                            if (p != null) {
+                                val v = p.batteryTempAvg
+                                val secs = (p.timestamp - startMs) / 1000L
+                                val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
+                                val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
+                                
+                                drawCrosshair(
+                                    cx = xOf(p.timestamp), cy = yOf(v.toDouble()), w = w,
+                                    padL = padL, padR = padR, padT = padT, chartH = chartH,
+                                    line1 = "%.1f °C".format(v),
+                                    line2 = realTime,
+                                    line3 = durationStr,
+                                    accentColor = avgColor, textColor = textColor
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
         }
     }
 }
