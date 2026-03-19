@@ -25,6 +25,11 @@ import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.ui.input.pointer.pointerInput
+import com.byd.tripstats.ui.components.drawCrosshair
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
@@ -262,23 +267,45 @@ private fun ChargingChartTab(
     val gridColor  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     val areaColor  = lineColor.copy(alpha = 0.20f)
+    var touchPos by remember { mutableStateOf<Offset?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 8.dp, vertical = 8.dp)
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxSize()
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    shape = MaterialTheme.shapes.medium
+                ),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         ) {
-            val w = size.width; val h = size.height
-            val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
-            val chartW = w - padL - padR; val chartH = h - padT - padB
+            Column(modifier = Modifier.fillMaxSize().padding(top = 12.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                touchPos = down.position
+                                drag(down.id) { change -> touchPos = change.position }
+                                touchPos = null
+                            }
+                        }
+                ) {
+                    val w = size.width; val h = size.height
+                    val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
+                    val chartW = w - padL - padR; val chartH = h - padT - padB
 
             val values  = dataPoints.map(valueSelector)
             val rawMin  = values.minOrNull() ?: 0.0
@@ -351,6 +378,31 @@ private fun ChargingChartTab(
                 dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
             }
             drawPath(linePath, lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            
+            // Crosshair overlay
+            touchPos?.let { tp ->
+                if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
+                    val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
+                    val targetTs = startMs + (fraction * totalMs).toLong()
+                    val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
+                    if (p != null) {
+                        val v = valueSelector(p)
+                        val secs = (p.timestamp - startMs) / 1000L
+                        val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
+                        val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
+                        
+                        drawCrosshair(
+                            cx = xOf(p.timestamp), cy = yOf(v), w = w,
+                            padL = padL, padR = padR, padT = padT, chartH = chartH,
+                            line1 = "%.1f %s".format(v, yAxisLabel),
+                            line2 = realTime,
+                            line3 = durationStr,
+                            accentColor = lineColor, textColor = textColor
+                        )
+                    }
+                }
+            }
+        }
         }
     }
 }
@@ -373,34 +425,56 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
     val avgColor     = BydErrorRed
     val minColor     = BydElectricAzure
     val maxColor     = AccelerationOrange
+    var touchPos by remember { mutableStateOf<Offset?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
-        Text(
-            "Battery Temperature",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-
-        // Legend
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxSize()
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    shape = MaterialTheme.shapes.medium
+                ),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         ) {
-            ChartLegendItem(avgColor, "Avg")
-            ChartLegendItem(minColor, "Cell min")
-            ChartLegendItem(maxColor, "Cell max")
-        }
+            Column(modifier = Modifier.fillMaxSize().padding(top = 12.dp)) {
+                Text(
+                    "Battery Temperature",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
 
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-        ) {
-            val w = size.width; val h = size.height
-            val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
-            val chartW = w - padL - padR; val chartH = h - padT - padB
+                // Legend
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ChartLegendItem(avgColor, "Avg")
+                    ChartLegendItem(minColor, "Cell min")
+                    ChartLegendItem(maxColor, "Cell max")
+                }
+
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                touchPos = down.position
+                                drag(down.id) { change -> touchPos = change.position }
+                                touchPos = null
+                            }
+                        }
+                ) {
+                    val w = size.width; val h = size.height
+                    val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
+                    val chartW = w - padL - padR; val chartH = h - padT - padB
 
             val avgVals = dataPoints.map { it.batteryTempAvg }
             val minVals = dataPoints.map { it.batteryCellTempMin.toDouble() }
@@ -467,6 +541,31 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
             drawSeries(minVals, minColor, 2f)
             drawSeries(maxVals, maxColor, 2f)
             drawSeries(avgVals, avgColor, 3f)  // avg on top
+            
+            // Crosshair overlay (tracking average temp)
+            touchPos?.let { tp ->
+                if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
+                    val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
+                    val targetTs = startMs + (fraction * totalMs).toLong()
+                    val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
+                    if (p != null) {
+                        val v = p.batteryTempAvg
+                        val secs = (p.timestamp - startMs) / 1000L
+                        val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
+                        val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
+                        
+                        drawCrosshair(
+                            cx = xOf(p.timestamp), cy = yOf(v.toDouble()), w = w,
+                            padL = padL, padR = padR, padT = padT, chartH = chartH,
+                            line1 = "%.1f °C".format(v),
+                            line2 = realTime,
+                            line3 = durationStr,
+                            accentColor = avgColor, textColor = textColor
+                        )
+                    }
+                }
+            }
+        }
         }
     }
 }
