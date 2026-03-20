@@ -8,13 +8,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ElectricalServices
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -438,7 +438,7 @@ private fun ChargingSessionCard(
                 }
                 if (session.avgKw > 0) {
                     SessionMetricChip(
-                        icon  = Icons.Filled.TrendingUp,
+                        icon  = Icons.AutoMirrored.Filled.TrendingUp,
                         label = "Avg %.0f kW".format(session.avgKw),
                         tint  = MaterialTheme.colorScheme.onSurfaceVariant
                     )

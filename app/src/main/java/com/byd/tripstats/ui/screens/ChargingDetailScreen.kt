@@ -33,6 +33,8 @@ import com.byd.tripstats.ui.components.drawCrosshair
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
+private val timeFormatter = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChargingDetailScreen(
@@ -189,7 +191,7 @@ private fun ChargingOverviewTab(
                 // Average charge rate (kWh/h) from peak and duration
                 session.durationSeconds?.let { secs ->
                     if (session.kwhAdded != null && secs > 0) {
-                        val rate = session.kwhAdded!! / (secs / 3600.0)
+                        val rate = session.kwhAdded / (secs / 3600.0)
                         OverviewRow("Charge rate", "%.1f kW (avg)".format(rate))
                     }
                 }
@@ -266,7 +268,6 @@ private fun ChargingChartTab(
     val textColor  = MaterialTheme.colorScheme.onSurface
     val gridColor  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-    val areaColor  = lineColor.copy(alpha = 0.20f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -388,7 +389,9 @@ private fun ChargingChartTab(
                             if (p != null) {
                                 val v = valueSelector(p)
                                 val secs = (p.timestamp - startMs) / 1000L
-                                val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
+                                val realTime = java.time.Instant.ofEpochMilli(p.timestamp)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .format(timeFormatter)
                                 val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
                                 
                                 drawCrosshair(
@@ -552,7 +555,9 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
                             if (p != null) {
                                 val v = p.batteryTempAvg
                                 val secs = (p.timestamp - startMs) / 1000L
-                                val realTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(p.timestamp))
+                                val realTime = java.time.Instant.ofEpochMilli(p.timestamp)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .format(timeFormatter)
                                 val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
                                 
                                 drawCrosshair(

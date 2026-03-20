@@ -27,6 +27,8 @@ import java.util.Locale
 import com.byd.tripstats.ui.theme.ChargingYellow
 import kotlin.math.roundToInt
 
+private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
 @Composable
 fun EnergyConsumptionChart(
     dataPoints: List<TripDataPointEntity>,
@@ -143,7 +145,7 @@ fun EnergyConsumptionChart(
             if (tp.x in padL..(w - padR) && values.size > 1) {
                 val idx = ((tp.x - padL) / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
                 val secs = (idx / (values.size - 1).toFloat()) * totalDuration
-                val realTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(dataPoints[idx].timestamp))
+                val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
                 val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(values[idx]), w = w,

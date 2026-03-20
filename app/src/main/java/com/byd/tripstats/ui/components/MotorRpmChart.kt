@@ -35,6 +35,8 @@ import java.util.Locale
 import com.byd.tripstats.ui.theme.*
 import kotlin.math.roundToInt
 
+private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
 @Composable
 fun MotorRpmChart(
     dataPoints: List<TripDataPointEntity>,
@@ -272,8 +274,7 @@ fun MotorRpmChart(
                         .coerceIn(0, dataPoints.size - 1)
 
                     val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
-                    val realTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                        .format(Date(dataPoints[idx].timestamp))
+                    val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
                     val durationStr = "+%d:%02d into trip".format(
                         (secs / 60).toInt(),
                         (secs % 60).toInt()

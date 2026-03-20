@@ -28,6 +28,8 @@ import java.util.Locale
 import com.byd.tripstats.ui.theme.*
 import kotlin.math.roundToInt
 
+private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
 @Composable
 fun PowerChart(
     dataPoints: List<TripDataPointEntity>,
@@ -183,7 +185,7 @@ fun PowerChart(
                 val idx = ((tp.x - padL) / chartW * (dataPoints.size - 1)).roundToInt().coerceIn(0, dataPoints.size - 1)
                 val v = values[idx]
                 val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
-                val realTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(dataPoints[idx].timestamp))
+                val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
                 val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
                 val modeLabel = when { v > 5f -> "Accel"; v < -5f -> "Regen"; else -> "Cruise" }
                 val dotColor = when { v < -5f -> regenColor; else -> accelColor }
