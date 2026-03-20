@@ -363,7 +363,7 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Charging session tracking ✅ *(v1.2.0)*
 - [x] Trip comparison view ✅ *(v1.2.0)*
 
-### Planned (v1.3.0+)
+### Planned (v1.4.0+)
 
 - [ ] Battery degradation tracking — plot SoH over time across trips, trend line and projected future health
 - [ ] Cost tracking — input electricity price, calculate cost per trip and per month from recorded kWh

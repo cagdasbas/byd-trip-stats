@@ -6,16 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [1.2.2] - 2026-Mar-19
-
-### Fixed
-
-- **AC / DC charging bug** — fixed some cases where the charging session's tracking wouldn't stop.
+## [1.3.0] - 2026-Mar-20
 
 ### Added
 
-- **Check and auto-update** - now the app automatically checks for new version and auto-updates if car is in parked and no trip/charging session is being recorded.
-- **Youtube video link and thumbnail** - in README.md, with presentation of the app and how to use it.
+- **Charging Session Management** — implemented full support for deleting single and multiple charging sessions from the Charging History screen.
+- **Bulk Deletion** — long-press a completed session to enter selection mode, then tap the trash icon to delete multiple sessions at once.
+- **Electro Documentation** — added recommended MQTT intervals (1s Car On, 30s Car Off) to the Initialization screen, Network tab, and FAQ.
+- **Service Watchdog** — a periodic WorkManager job (every 15 minutes) checks that the embedded MQTT broker and MQTT client are alive and restarts them if the OS had killed the process. Ensures charging telemetry is received even when the car is off and the head unit is under memory pressure.
+- **Charging Chart Styling** — charging session charts (Power, SoC, Voltage, Temperature) now match the trip detail aesthetic: `primaryContainer` card background, styled borders, and an interactive crosshair showing precise value, clock time, and elapsed charge duration on drag.
+
+### Changed
+
+- **Atomic Transactions** — `ChargingRepository` and `TripRepository` now use `database.withTransaction` to ensure that mass deletions of sessions and data points are fully atomic and performant.
+- **Car-Off Charging Reliability** — removed the 10s car-off watcher shutdown. The MQTT background service now remains active during charging even when the car is turned off, ensuring continuous charging curve capture.
+- **Debounce Optimization** — standardized the charging detection debounce to 60 seconds (1 minute), allowing a generous margin for the new 30s recommended Electro car-off interval.
+
+---
+
+## [1.2.2] - 2026-Mar-19
+
+### Added
+
+- **Auto-Update Mechanism** — the app now automatically checks for newer versions and silently updates itself when the vehicle is parked and no tracking is active.
+- **Video Documentation** — added a YouTube presentation link and thumbnail to the README for onboarding new users.
+
+### Fixed
+
+- **Charging Session Tracking** — resolved an edge case where AC/DC charging sessions would fail to finalize and continue tracking indefinitely.
 
 ---
 
