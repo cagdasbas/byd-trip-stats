@@ -3,7 +3,6 @@ package com.byd.tripstats.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButtonDefaults.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,6 +22,26 @@ import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import androidx.compose.ui.draw.clipToBounds
 import kotlin.math.roundToInt
+
+/**
+ * Linearly interpolates the BMS range series at [targetDist] km.
+ * Extracted from the Canvas draw lambda so it is not re-allocated on every draw pass.
+ */
+private fun interpolateBmsAt(
+    targetDist: Double,
+    bmsPoints: List<Pair<Double, Double>>
+): Double {
+    if (bmsPoints.isEmpty()) return 0.0
+    if (targetDist <= bmsPoints.first().first) return bmsPoints.first().second
+    if (targetDist >= bmsPoints.last().first)  return bmsPoints.last().second
+    val hi = bmsPoints.indexOfFirst { it.first >= targetDist }
+    if (hi <= 0) return bmsPoints.first().second
+    val lo = hi - 1
+    val (d0, r0) = bmsPoints[lo]
+    val (d1, r1) = bmsPoints[hi]
+    val t = if (d1 > d0) (targetDist - d0) / (d1 - d0) else 0.0
+    return r0 + t * (r1 - r0)
+}
 
 /**
  * A single telemetry snapshot recorded during a trip.
@@ -80,10 +99,10 @@ fun RangeProjectionChart(
 
         // ── Derived values ────────────────────────────────────────────────────────
 
+        // ViewModel already gates emission to SAMPLE_INTERVAL_KM resolution,
+        // so distinctBy is redundant. Keep sortedBy as defensive safety only.
         val points = remember(dataPoints) {
-            dataPoints
-                .sortedBy { it.distanceKm }
-                .distinctBy { (it.distanceKm * 10).roundToInt() }
+            dataPoints.sortedBy { it.distanceKm }
         }
 
         // BMS range at trip start — used as Y-axis scale anchor
@@ -93,12 +112,16 @@ fun RangeProjectionChart(
 
         val maxDistanceKm = points.lastOrNull()?.distanceKm?.coerceAtLeast(1.0) ?: 1.0
 
-        // The projection is pre-computed in the ViewModel via power integration.
-        // Only points where isStabilised=true carry a valid projectedRangeKm.
+        // Only include points where isStabilised=true.
+        // projectedRangeKm is technically never null (the ViewModel fallback chain
+        // always produces a BASELINE value), so without this filter the chart would
+        // draw a flat 185 Wh/km extrapolation from point 1, misleading the user
+        // into thinking a real projection is available before calibration is done.
+        // Filtering to isStabilised keeps the canvas empty until the rolling window
+        // has at least STABILISATION_KM of real data behind it.
         val projectedPoints: List<Pair<Double, Double>> = remember(points) {
-            points.mapNotNull { p ->
-                p.projectedRangeKm?.let { p.distanceKm to it }
-            }
+            points.filter { it.isStabilised }
+                .mapNotNull { p -> p.projectedRangeKm?.let { p.distanceKm to it } }
         }
 
         // BMS series — secondary reference line
@@ -295,21 +318,6 @@ fun RangeProjectionChart(
                     // ── Projected line — only drawn once stabilised ───────────────
                     if (projectedPoints.size >= 2) {
 
-                        // BMS is linearly interpolated at each projected X so the fill
-                        // is correct even when the two series have slightly different sample positions.
-                        fun interpolateBmsAt(targetDist: Double): Double {
-                            if (bmsPoints.isEmpty()) return 0.0
-                            if (targetDist <= bmsPoints.first().first) return bmsPoints.first().second
-                            if (targetDist >= bmsPoints.last().first)  return bmsPoints.last().second
-                            val hi = bmsPoints.indexOfFirst { it.first >= targetDist }
-                            if (hi <= 0) return bmsPoints.first().second
-                            val lo = hi - 1
-                            val (d0, r0) = bmsPoints[lo]
-                            val (d1, r1) = bmsPoints[hi]
-                            val t = if (d1 > d0) (targetDist - d0) / (d1 - d0) else 0.0
-                            return r0 + t * (r1 - r0)
-                        }
-
                         // Clamp projected to WLTP_MAX for fill so it stays within chart bounds
                         val cappedForFill = projectedPoints.map { (d, r) ->
                             d to r.coerceAtMost(wltpKm.toDouble())
@@ -318,7 +326,7 @@ fun RangeProjectionChart(
                             moveTo(xOf(cappedForFill.first().first), yOf(cappedForFill.first().second))
                             cappedForFill.drop(1).forEach { (d, r) -> lineTo(xOf(d), yOf(r)) }
                             cappedForFill.reversed().forEach { (d, _) ->
-                                lineTo(xOf(d), yOf(interpolateBmsAt(d)))
+                                lineTo(xOf(d), yOf(interpolateBmsAt(d, bmsPoints)))
                             }
                             close()
                         }

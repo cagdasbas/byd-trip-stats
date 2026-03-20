@@ -402,14 +402,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     enum class RangeModel { LIVE_TRIP, HISTORICAL_BINS, LIFETIME_AVERAGE, BASELINE }
 
     companion object {
-        const val BATTERY_CAPACITY_KWH  = 82.56  // TODO: Import from config
-        const val STABILISATION_KM      = 2.0    // km before Level 1 is trusted
+        // BATTERY_CAPACITY_KWH and BASELINE_WH_PER_KM are no longer hardcoded here —
+        // both are derived from selectedCarConfig at runtime so all car models are correct.
+        // Fallback values (used only when selectedCarConfig is not yet loaded):
+        const val FALLBACK_BATTERY_KWH      = 82.56   // Seal AWD Excellence — worst case
+        const val FALLBACK_BASELINE_WH_PER_KM = 185.0 // Seal AWD Excellence reference
+
+        const val STABILISATION_KM      = 3.0    // km before Level 1 is trusted
+        // 2.0 was too short: parking-lot crawl at trip start (high power, near-zero speed)
+        // produces Wh/km of 500–1000+ that poisons the rolling window. 3km gives enough
+        // real driving samples to dilute that noise (~1–3 min of normal driving).
         const val SAMPLE_INTERVAL_KM    = 0.1    // record a chart point every 100 m
         const val ROLLING_WINDOW_KM     = 10.0   // Level 1: rolling window length
         const val EMA_ALPHA             = 0.15   // Level 1: EMA smoothing factor
         const val MAX_DELTA_SECONDS     = 10.0   // discard Δt > this (reconnect / wake)
         const val BIN_MIN_DIST_KM       = 0.5    // Level 2: min km in a bin before trusting it
-        const val BASELINE_WH_PER_KM    = 185.0  // Level 4: BYD Seal AWD Excellence static fallback // TODO: Import from config
         // TODO Phase 2:
         // const val LIFETIME_MIN_KM    = 50.0   // Level 3: min lifetime km before using average
     }
@@ -563,7 +570,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                         // ── 7. Fallback chain ─────────────────────────────────
                         val isStabilised = distKm >= STABILISATION_KM
-                        val batteryKwh = selectedCarConfig.value?.batteryKwh ?: BATTERY_CAPACITY_KWH
+
+                        // Use car-specific values from selectedCarConfig so all
+                        // models (Dolphin, Atto 3, etc.) get correct projections.
+                        // referenceConsumptionKwhPer100km × 10 = Wh/km.
+                        val car            = selectedCarConfig.value
+                        val batteryKwh     = car?.batteryKwh
+                                                ?: FALLBACK_BATTERY_KWH
+                        val baselineWhPerKm = car?.referenceConsumptionKwhPer100km
+                                                ?.times(10.0)
+                                                ?: FALLBACK_BASELINE_WH_PER_KM
                         val remainingEnergyWh = batteryKwh * 1000.0 * (telemetry.soc / 100.0)
 
                         val (projectedRange, model) = when {
@@ -581,9 +597,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             // Insert here: check allTrips for lifetime Wh/km
                             // and return X to RangeModel.LIFETIME_AVERAGE
 
-                            // Level 4: static baseline — always available
+                            // Level 4: car-specific reference consumption as baseline
                             else ->
-                                (remainingEnergyWh / BASELINE_WH_PER_KM).coerceAtLeast(0.0) to
+                                (remainingEnergyWh / baselineWhPerKm).coerceAtLeast(0.0) to
                                 RangeModel.BASELINE
                         }
 
