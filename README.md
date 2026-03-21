@@ -13,6 +13,8 @@
 [![Changelog](https://img.shields.io/badge/changelog-v1.2.2-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
+[![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
+[![Integration Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/integration-tests.yml?label=integration%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/integration-tests.yml)
 
 [🚀 Getting Started](#-getting-started) • [✨ Features](#-feature-overview) • [🖼️ Screenshots](#%EF%B8%8F-visual-showcase) • [🛠️ Technical Stack](#%EF%B8%8F-technical-stack) • [🗺️ Integration Roadmap](#%EF%B8%8F-integration-roadmap) • [🔒 Privacy](#-data-privacy--security) • [📞 Contact](#-contact--proposal)
 

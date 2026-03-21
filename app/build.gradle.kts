@@ -38,6 +38,10 @@ android {
         versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Run instrumented tests as a separate package with its own isolated data
+        // directory (/data/data/com.byd.tripstats.test/). Test code cannot touch
+        // the real app's DB at /data/data/com.byd.tripstats/ even if reflection fails.
+        testApplicationId = "com.byd.tripstats.test"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -92,6 +96,17 @@ android {
             excludes += "META-INF/DEPENDENCIES"
             excludes += "META-INF/io.netty.versions.properties"
         }
+    }
+
+    // Use `adb install -r` (replace, keep data) instead of uninstall+install.
+    // Must be a top-level android {} block — placing this inside defaultConfig {} is
+    // invalid DSL and silently ignored, which is why the DB was still getting wiped.
+    adbOptions {
+        installOptions("-r")
+    }
+
+    testOptions {
+        animationsDisabled = true
     }
 }
 
@@ -161,4 +176,27 @@ dependencies {
 
     // Window size classes for responsive design
     implementation("androidx.compose.material3:material3-window-size-class:1.3.1")
+
+    // ── Unit tests (src/test) ─────────────────────────────────────────────────
+    // JUnit 4 is already present via libs.junit — no change needed there.
+
+    // Coroutines test support — runTest, advanceUntilIdle, advanceTimeBy
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+
+    // Turbine — concise Flow assertion helper (optional but recommended)
+    testImplementation("app.cash.turbine:turbine:1.1.0")
+
+    // ── Instrumented tests (src/androidTest) ─────────────────────────────────
+    // Room in-memory database support — required for repository integration tests
+    androidTestImplementation("androidx.room:room-testing:2.6.1")
+
+    // Coroutines test support in androidTest
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+
+    // AndroidX test core — ApplicationProvider, etc.
+    androidTestImplementation("androidx.test:core-ktx:1.5.0")
+
+    // AndroidX test runner (if not already added via BOM)
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.test:rules:1.5.0")
 }

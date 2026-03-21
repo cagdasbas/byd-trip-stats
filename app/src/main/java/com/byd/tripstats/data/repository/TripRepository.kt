@@ -870,5 +870,27 @@ class TripRepository private constructor(context: Context) {
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TripRepository(context.applicationContext).also { INSTANCE = it }
             }
+
+        /**
+         * Creates a fresh TripRepository backed by [db] for integration testing.
+         * Bypasses the singleton so each test gets an isolated instance.
+         */
+        @androidx.annotation.VisibleForTesting
+        fun createForTesting(db: BydStatsDatabase, context: Context): TripRepository {
+            val repo = TripRepository(context)
+            // Inject the test database via reflection — avoids breaking the private constructor
+            listOf(
+                "database"     to db,
+                "tripDao"      to db.tripDao(),
+                "dataPointDao" to db.tripDataPointDao(),
+                "statsDao"     to db.tripStatsDao(),
+                "segmentDao"   to db.tripSegmentDao()
+            ).forEach { (name, value) ->
+                TripRepository::class.java.getDeclaredField(name)
+                    .also { it.isAccessible = true }
+                    .set(repo, value)
+            }
+            return repo
+        }
     }
 }

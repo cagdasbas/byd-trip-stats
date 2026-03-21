@@ -352,5 +352,23 @@ class ChargingRepository private constructor(context: Context) {
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: ChargingRepository(context.applicationContext).also { INSTANCE = it }
             }
+
+        /**
+         * Creates a fresh ChargingRepository backed by [db] for integration testing.
+         * Bypasses the singleton so each test gets an isolated instance.
+         */
+        @androidx.annotation.VisibleForTesting
+        fun createForTesting(db: BydStatsDatabase, context: Context): ChargingRepository {
+            val repo = ChargingRepository(context)
+            listOf(
+                "database"   to db,
+                "sessionDao" to db.chargingSessionDao()
+            ).forEach { (name, value) ->
+                ChargingRepository::class.java.getDeclaredField(name)
+                    .also { it.isAccessible = true }
+                    .set(repo, value)
+            }
+            return repo
+        }
     }
 }
