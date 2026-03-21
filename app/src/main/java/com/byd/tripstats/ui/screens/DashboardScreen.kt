@@ -1502,6 +1502,7 @@ fun VehicleStats(
             Drivetrain.FWD -> StatCard(
                 title    = "Front Motor",
                 value    = "${telemetry.engineSpeedFront} RPM",
+                subtitle = "${telemetry.enginePower.toInt()} kW",
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1510,6 +1511,7 @@ fun VehicleStats(
             Drivetrain.RWD -> StatCard(
                 title    = "Rear Motor",
                 value    = "${telemetry.engineSpeedRear} RPM",
+                subtitle = "${telemetry.enginePower.toInt()} kW",
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
