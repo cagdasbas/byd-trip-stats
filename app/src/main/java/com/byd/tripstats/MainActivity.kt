@@ -16,12 +16,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
+import com.byd.tripstats.BuildConfig
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.service.MqttService
 import com.byd.tripstats.ui.navigation.AppNavigation
@@ -32,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -40,6 +47,9 @@ class MainActivity : ComponentActivity() {
     private val viewModel: DashboardViewModel by viewModels()
     private var mqttService: MqttService? = null
     private var bound = false
+
+    // Shown once per app version update to remind the user to re-enable Autostart
+    private val showAutostartReminder = mutableStateOf(false)
 
     // ── Service binding ───────────────────────────────────────────────────────
 
@@ -76,6 +86,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestRequiredPermissions()
+        checkAndShowAutostartReminder()
 
         setContent {
             BydTripStatsTheme {
@@ -86,6 +97,28 @@ class MainActivity : ComponentActivity() {
                     val prefs = remember { PreferencesManager(applicationContext) }
                     val selectedCarId by prefs.selectedCarId.collectAsState(initial = null)
                     val mqttSettings by prefs.mqttSettings.collectAsState(initial = null)
+
+                    // Autostart reminder dialog — shown once after each version update
+                    if (showAutostartReminder.value) {
+                        AlertDialog(
+                            onDismissRequest = { dismissAutostartReminder() },
+                            title = { Text("⚠️ Action Required — Autostart") },
+                            text = {
+                                Text(
+                                    "A new version was installed. You need to toggle-off disable " +
+                                    "autostart for this app, which enables background data collection " +
+                                    "when the car is off (e.g. charging overnight).\n\n" +
+                                    "After that action, you need to reboot the car and re-open the app " +
+                                    "for changes to be in effect."
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { dismissAutostartReminder() }) {
+                                    Text("Got it")
+                                }
+                            }
+                        )
+                    }
 
                     // Wait for DataStore to emit before showing anything
                     if (selectedCarId == null && mqttSettings != null) {
@@ -110,6 +143,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun checkAndShowAutostartReminder() {
+        val prefs = PreferencesManager(applicationContext)
+        val currentVersion = BuildConfig.VERSION_CODE
+        lifecycleScope.launch {
+            val lastSeen = prefs.getLastSeenVersionCode()
+            // Show dialog on upgrade (not on first install — lastSeen == 0 means no version stored)
+            if (lastSeen > 0 && lastSeen < currentVersion) {
+                showAutostartReminder.value = true
+            }
+            // Always persist the current version so we only show once per upgrade
+            prefs.saveLastSeenVersionCode(currentVersion)
+        }
+    }
+
+    private fun dismissAutostartReminder() {
+        showAutostartReminder.value = false
     }
 
     override fun onDestroy() {

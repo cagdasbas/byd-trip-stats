@@ -155,6 +155,43 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
             }
+            Intent.ACTION_POWER_CONNECTED -> {
+                Log.i(TAG, "⚡ Power connected — ensuring MQTT stack is alive")
+                val pendingResult = goAsync()
+                @OptIn(DelicateCoroutinesApi::class)
+                GlobalScope.launch(Dispatchers.IO) {
+                    try {
+                        val preferencesManager = PreferencesManager(context.applicationContext)
+                        val settings = withTimeout(5000L) {
+                            preferencesManager.mqttSettings.first()
+                        }
+                        if (settings.brokerUrl.isBlank() || settings.topic.isBlank()) {
+                            Log.w(TAG, "MQTT not configured — skipping power-connected restart")
+                            return@launch
+                        }
+                        val isLocal = settings.brokerUrl.trim().let {
+                            it == "127.0.0.1" || it == "localhost" || it == "::1"
+                        }
+                        if (isLocal) {
+                            MqttBrokerService.start(context.applicationContext)
+                            delay(2000)
+                        }
+                        MqttService.start(
+                            context    = context.applicationContext,
+                            brokerUrl  = settings.brokerUrl,
+                            brokerPort = settings.brokerPort,
+                            username   = settings.username.ifBlank { null },
+                            password   = settings.password.ifBlank { null },
+                            topic      = settings.topic
+                        )
+                        Log.i(TAG, "✅ MQTT stack restarted on power-connected event")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Failed to restart MQTT on power-connected", e)
+                    } finally {
+                        try { pendingResult.finish() } catch (_: Exception) {}
+                    }
+                }
+            }
             else -> {
                 Log.d(TAG, "Unhandled boot action: ${intent.action}")
                 Log.d(TAG, "This receiver only handles BOOT_COMPLETED actions")

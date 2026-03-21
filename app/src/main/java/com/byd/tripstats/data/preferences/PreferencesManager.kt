@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "mqtt_settings")
 
-private val SELECTED_CAR_ID = stringPreferencesKey("selected_car_id")
+private val SELECTED_CAR_ID        = stringPreferencesKey("selected_car_id")
+private val LAST_SEEN_VERSION_CODE  = intPreferencesKey("last_seen_version_code")
 
 class PreferencesManager(private val context: Context) {
 
@@ -106,5 +107,13 @@ class PreferencesManager(private val context: Context) {
                 topic      = preferences[TOPIC]       ?: ""
             )
         }.first()
+    }
+
+    /** Returns 0 if never persisted (i.e. first install or fresh data). */
+    suspend fun getLastSeenVersionCode(): Int =
+        context.dataStore.data.map { it[LAST_SEEN_VERSION_CODE] ?: 0 }.first()
+
+    suspend fun saveLastSeenVersionCode(versionCode: Int) {
+        context.dataStore.edit { it[LAST_SEEN_VERSION_CODE] = versionCode }
     }
 }

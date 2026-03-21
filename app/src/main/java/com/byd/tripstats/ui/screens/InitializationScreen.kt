@@ -201,6 +201,32 @@ fun InitializationScreen(
                 }
             }
 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(
+                        text = "You need to toggle-off disable autostart for this app, which enables " +
+                            "background data collection when the car is off (e.g. charging overnight).\n\n" +
+                            "After that action, you need to reboot the car and re-open the app for " +
+                            "changes to be in effect.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
