@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.0] - 2026-Mar-22
+
+### Added
+
+- **Immediate Power-On Restart** — plugging in a charger now broadcasts `ACTION_POWER_CONNECTED`, which immediately revives the MQTT stack via the `BootReceiver` rather than waiting for the 15-minute watchdog.
+- **Autostart Reminder** — after each app update (which resets DiLink's autostart permission), the app now detects the version change and displays a one-time reminder dialog asking the user to re-enable Autostart in car settings. An explicit warning also appears on the initial setup screen.
+- **Battery Degradation Screen** — tap the Battery Health stat card on the dashboard to open a dedicated SoH-over-time view. Plots average SoH per trip, a least-squares trend line, a dashed projection line, and a "Projected @ 80%" year label. Four summary cards: current SoH, lowest recorded, decline rate (%/yr), and projected 80% year. Health interpretation legend with BYD Seal warranty note (70% / 8yr / 150 000 km).
+- **Seasonal Consumption Analysis** — new screen accessible from Trip History toolbar. Groups all completed trips by meteorological season and shows avg kWh/100km per season as a colour-coded bar chart (🌱☀️🍂❄️) with reference line from `CarConfig`. Each season card shows total distance, kWh consumed, avg battery temp, and delta vs reference. Auto-generated winter-penalty insight when both winter and summer data are present.
+- **Trip Goals & Personal Bests** — new screen accessible from Trip History toolbar. Personal bests: lowest ever efficiency, longest single trip, longest consecutive daily driving streak. Goals: set a consumption target (avg of last 5 trips) and/or a monthly distance target; animated progress bars update in real time. Goals persist via `SharedPreferences`.
+- **Cost Tracking** — enter electricity tariff (price/kWh + currency symbol) in Settings → Data. Trip cost appears as a `DetailRow` in Trip Detail and as an orange chip on Trip History cards when the price is configured. Monthly cost summary card in Trip History collapses/expands up to 12 months of history.
+- **Charging Session Reconstruction** — replaced real-time charging detection (which was unreliable when DiLink kills the app after car-off) with a SoC-delta approach. On every telemetry packet, last SoC + timestamp are persisted to `SharedPreferences`. On each car wake-up, if SoC increased by ≥ 1 % (≥ 0.3 kWh), a synthetic `ChargingSessionEntity` is created: `startTime` = last shutdown timestamp, `endTime` = first wake-up packet, `kwhAdded` = SoC delta × battery capacity. Works for timed charging, remote charging, and overnight sessions with zero background process requirement.
+- **Multi-model compatibility** — `VehicleTelemetry` fields that are absent on FWD-only models (Atto 3, Dolphin) now carry safe defaults so `kotlinx.serialization` never throws `MissingFieldException` on a missing key. The motor stat card on the dashboard now adapts its title and kW subtitle to `Drivetrain.FWD` / `RWD` / `AWD`.
+- **14 Heatmaps** — four new heatmaps added: Tyre Pressure vs Consumption, SoC vs Regen Efficiency, Speed vs Battery Temperature, Cell Voltage Spread vs SoC. The Cell Voltage Spread chart uses a widened y-tick column (70 dp) to prevent label overlap with the axis label.
+
+### Changed
+
+- **Charging History UI** — active session pinning removed (no more real-time sessions). Summary card replaces "Peak ever kW" with "Avg SoC gain %". Cards for reconstructed sessions show a "⚡ Reconstructed" badge and omit peak/avg kW chips (always 0 for synthetic sessions). Empty state text updated.
+- **MQTT — persistent session** — `MqttClientManager` now uses a fixed client ID (`"BydTripStats"`), `cleanSession(false)`, and QoS 1 subscription. Combined with "Retain published values" in Electro, this ensures the broker delivers the latest state immediately on reconnect rather than waiting for the next publish interval.
+- **Service watchdog** — removed `NetworkType.CONNECTED` constraint so the watchdog fires every 15 minutes regardless of network availability.
+- **`carConfig` load order** — `MqttService` now loads car config synchronously before starting the MQTT connection, eliminating a race condition where the first charging packet could arrive before `carConfig` was set.
+
+---
+
 ## [1.3.0] - 2026-Mar-20
 
 ### Added

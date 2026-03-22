@@ -364,6 +364,10 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Predefined vehicle configuration ✅ *(v1.1.0)*
 - [x] Charging session tracking ✅ *(v1.2.0)*
 - [x] Trip comparison view ✅ *(v1.2.0)*
+- [x] Heatmap: Tyre Pressure vs Consumption ✅ *(v1.4.0)*
+- [x] Heatmap: SOC vs Regen Efficiency ✅ *(v1.4.0)*
+- [x] Heatmap: Speed vs Battery Temperature ✅ *(v1.4.0)*
+- [x] Heatmap: Cell Voltage Spread vs SOC ✅ *(v1.4.0)*
 
 ### Planned (v1.4.0+)
 
@@ -373,10 +377,6 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [ ] Trip goals & personal bests — set a consumption target, track streaks, flag personal best efficiency on a known route
 - [ ] Seasonal consumption analysis — automatic winter vs summer efficiency breakdown based on recorded trip history
 - [ ] Web dashboard companion — browse trip history and charts on a desktop browser offline-first: upload your backup file, charts render locally, nothing leaves your device
-- [ ] Heatmap: Tyre Pressure vs Consumption — correlates each wheel's pressure against instantaneous kWh/100 km; answers whether running slightly higher pressure measurably improves efficiency on your specific car and tyres
-- [ ] Heatmap: SOC vs Regen Efficiency — shows at which charge levels the BMS throttles regenerative braking (expected near 100% SoC); empirically maps the BYD Seal's regen behaviour
-- [ ] Heatmap: Speed vs Battery Temperature — sustained speed as X axis vs pack temperature rise; distinguishes motorway thermal load from stop-start urban load more cleanly than the existing Power vs Battery Temp map
-- [ ] Heatmap: Cell Voltage Spread vs SOC — (cellVoltageMax − cellVoltageMin) on Y, SoC on X; a healthy pack is flat, a pack with a weak cell shows a characteristic divergence spike at low SoC — the same diagnostic BYD service technicians use
 
 **Vote on features** by 👍 reacting to issues!
 
@@ -394,7 +394,7 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 
 - **Route not showing:** Check that GPS coordinates in MQTT are non-zero
 - **Trip not auto-starting:** Verify auto-detection is ON, gear is D/R
-- **Service not auto-starting:** Check Autostart permission (disable toggle at disable Autostart)
+- **Service not auto-starting:** Check Autostart permission (disable toggle at disable Autostart), open the app, reboot the UI and re-open the app
 
 See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 
