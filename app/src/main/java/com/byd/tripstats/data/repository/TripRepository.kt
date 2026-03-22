@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
 import com.byd.tripstats.data.local.BydStatsDatabase
+import com.byd.tripstats.data.local.dao.TripSohSummary
 import com.byd.tripstats.data.local.entity.LatLng
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
@@ -756,6 +757,8 @@ class TripRepository private constructor(context: Context) {
 
     fun getAllTripStats(): Flow<List<TripStatsEntity>> = statsDao.getAllTripStats()
 
+    fun getAvgSohPerTrip(): Flow<List<TripSohSummary>> = dataPointDao.getAvgSohPerTrip()
+
     fun getSegmentsForTrip(tripId: Long) = segmentDao.getSegmentsForTrip(tripId)
 
     suspend fun deleteTrips(tripIds: List<Long>) {
@@ -768,13 +771,13 @@ class TripRepository private constructor(context: Context) {
             }
         }
     }
- 
+
     suspend fun deleteTrip(tripId: Long) {
         database.withTransaction {
-            tripDao.deleteTripById(tripId)
-            dataPointDao.deleteDataPointsForTrip(tripId)
-            statsDao.deleteStatsForTrip(tripId)
-            segmentDao.deleteSegmentsForTrip(tripId)
+        tripDao.deleteTripById(tripId)
+        dataPointDao.deleteDataPointsForTrip(tripId)
+        statsDao.deleteStatsForTrip(tripId)
+        segmentDao.deleteSegmentsForTrip(tripId)
         }
     }
 
@@ -820,7 +823,7 @@ class TripRepository private constructor(context: Context) {
             return
         }
 
-        var totalDeleted = 0
+                var totalDeleted = 0
 
         oldTrips.forEach { trip ->
             val ageMs = nowMs - trip.startTime
@@ -838,6 +841,8 @@ class TripRepository private constructor(context: Context) {
             val toDelete = mutableListOf<Long>()
             var lastKeptTimestamp = points.first().timestamp
 
+            // Always keep index 0 (trip start) and last index (trip end).
+            // For everything in between, keep only if far enough from last kept.
             for (i in 1 until points.lastIndex) {
                 val pt = points[i]
                 if (pt.timestamp - lastKeptTimestamp >= keepIntervalMs) {

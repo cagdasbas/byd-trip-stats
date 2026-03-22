@@ -165,14 +165,15 @@ class MqttService : Service() {
         tripRepository = TripRepository.getInstance(applicationContext)
         chargingRepository = ChargingRepository.getInstance(applicationContext)
 
-        // Load car config for charging kWh calculations.
-        // One-shot read cached for the service lifetime; if the user changes car
-        // mid-session the service restart will pick up the new config.
+        // Load car config synchronously before starting the connection so it is
+        // never null when the first telemetry packet arrives. Previously this was
+        // a fire-and-forget launch() that raced with the MQTT connect — if the
+        // first packet arrived before the coroutine completed, kwhAdded = 0.
         serviceScope.launch {
             carConfig = PreferencesManager(applicationContext).getSelectedCarConfig()
+            Log.d(TAG, "Car config loaded: ${carConfig?.displayName ?: "none"}")
+            startMqttConnection()
         }
-
-        startMqttConnection()
 
         return START_STICKY
     }

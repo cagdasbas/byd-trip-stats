@@ -66,7 +66,8 @@ fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToHistory: () -> Unit,
     onNavigateToCharging: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToBatteryDegradation: () -> Unit = {}
 ) {
     val telemetry by viewModel.currentTelemetry.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
@@ -320,6 +321,7 @@ fun DashboardScreen(
                 onEndTrip = { viewModel.endManualTrip() },
                 onToggleAutoDetection = { viewModel.toggleAutoTripDetection() },
                 onNavigateToCharging = onNavigateToCharging,
+                onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                 widthSizeClass = widthSizeClass,
                 modifier = Modifier.padding(paddingValues)
             )
@@ -420,6 +422,7 @@ fun DashboardContent(
     onEndTrip: () -> Unit,
     onToggleAutoDetection: () -> Unit,
     onNavigateToCharging: () -> Unit = {},
+    onNavigateToBatteryDegradation: () -> Unit = {},
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded
 ) {
     // ── Session distance — resets to 0 on every app start (= every engine start) ──────────────
@@ -447,7 +450,8 @@ fun DashboardContent(
                 // Stats row at top — condensed horizontal strip
                 VehicleStats(
                     telemetry = telemetry,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier  = Modifier.fillMaxWidth(),
+                    onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
                 )
 
                 // Energy flow / range card
@@ -535,7 +539,8 @@ fun DashboardContent(
                     VehicleStats(
                         telemetry  = telemetry,
                         modifier   = Modifier.fillMaxWidth(),
-                        fillHeight = true
+                        fillHeight = true,
+                        onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
                     )
                 }
             }
@@ -593,7 +598,8 @@ fun DashboardContent(
                     VehicleStats(
                         telemetry  = telemetry,
                         modifier   = Modifier.fillMaxWidth(),
-                        fillHeight = true
+                        fillHeight = true,
+                        onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
                     )
                 }
             }
@@ -1449,7 +1455,8 @@ fun VehicleStats(
     telemetry: VehicleTelemetry,
     modifier: Modifier = Modifier,
     /** true in side-by-side layouts: cards share available height via weight(1f), no scroll */
-    fillHeight: Boolean = false
+    fillHeight: Boolean = false,
+    onNavigateToBatteryDegradation: () -> Unit = {}
 ) {
     val context     = LocalContext.current
     val prefs       = remember { PreferencesManager(context.applicationContext) }
@@ -1470,7 +1477,8 @@ fun VehicleStats(
             icon    = Icons.Filled.BatteryChargingFull,
             color   = BatteryBlue,
             compact = fillHeight,
-            modifier = cardMod
+            modifier = cardMod,
+            onClick  = onNavigateToBatteryDegradation
         )
         StatCard(
             title    = "Battery temperature",
@@ -1562,6 +1570,7 @@ fun StatCard(
     subtitle: String? = null,
     /** true when cards share height via weight(1f) — reduces padding/text to avoid overflow */
     compact: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     val pad      = if (compact) 8.dp  else 12.dp
     val iconSize = if (compact) 22.dp else 32.dp
@@ -1575,9 +1584,13 @@ fun StatCard(
                 color = MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(12.dp)
             ),
+        onClick  = onClick ?: {},
+        enabled  = onClick != null,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     ) {
         Row(

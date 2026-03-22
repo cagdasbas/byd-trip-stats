@@ -61,6 +61,8 @@ fun TripDetailScreen(
     val stats by remember(tripId) { viewModel.getTripStats(tripId) }.collectAsState()
     val tripMetrics by viewModel.tripDisplayMetrics.collectAsState()
     val regenEfficiencyPct = tripMetrics[tripId]?.regenEfficiencyPct
+    val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
+    val currencySymbol   by viewModel.currencySymbol.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Overview", "Charts", "Heatmaps", "Route", "Analysis")
@@ -145,7 +147,13 @@ fun TripDetailScreen(
                         .weight(1f)
                 ) {
                     when (selectedTab) {
-                        0 -> TripOverviewTab(trip = trip!!, stats = stats, regenEfficiencyPct = regenEfficiencyPct)
+                        0 -> TripOverviewTab(
+                            trip = trip!!,
+                            stats = stats,
+                            regenEfficiencyPct = regenEfficiencyPct,
+                            electricityPrice = electricityPrice,
+                            currencySymbol = currencySymbol
+                        )
                         1 -> TripChartsTab(dataPoints = dataPoints)
                         2 -> TripHeatmapsTab(dataPoints = dataPoints)
                         3 -> TripRouteTab(dataPoints = dataPoints)
@@ -393,7 +401,9 @@ private fun saveToDownloads(
 fun TripOverviewTab(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
     stats: com.byd.tripstats.data.local.entity.TripStatsEntity?,
-    regenEfficiencyPct: Double?
+    regenEfficiencyPct: Double?,
+    electricityPrice: Double = 0.0,
+    currencySymbol: String = "€"
 ) {
     Column(
         modifier = Modifier
@@ -519,6 +529,10 @@ fun TripOverviewTab(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
                 DetailRow("Energy consumed", trip.energyConsumed?.let { String.format("%.2f kWh", it) } ?: "-")
+                if (electricityPrice > 0.0) {
+                    val cost = trip.energyConsumed?.let { it * electricityPrice }
+                    DetailRow("Trip cost", cost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-")
+                }
                 DetailRow("Energy regenerated", stats?.totalRegenEnergy?.let { String.format("%.2f kWh", it) } ?: "-")
                 DetailRow("Gross energy consumed", String.format("%.2f kWh", (trip.energyConsumed ?: 0.0) + (stats?.totalRegenEnergy ?: 0.0)))
                 DetailRow("Regeneration efficiency", regenEfficiencyPct?.let { String.format("%.2f%%", it) } ?: "-")

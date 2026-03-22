@@ -16,6 +16,9 @@ interface ChargingSessionDao {
     @Query("DELETE FROM charging_sessions WHERE id = :sessionId")
     suspend fun deleteSessionById(sessionId: Long)
 
+    @Delete
+    suspend fun deleteSession(session: ChargingSessionEntity)
+
     @Update
     suspend fun updateSession(session: ChargingSessionEntity)
 
@@ -27,6 +30,13 @@ interface ChargingSessionDao {
 
     @Query("SELECT * FROM charging_sessions WHERE isActive = 1 LIMIT 1")
     suspend fun getActiveSession(): ChargingSessionEntity?
+
+    @Query("SELECT * FROM charging_sessions WHERE isActive = 1")
+    suspend fun getAllActiveSessions(): List<ChargingSessionEntity>
+
+    /** Returns the single most recently started session, or null if none exist. */
+    @Query("SELECT * FROM charging_sessions ORDER BY startTime DESC LIMIT 1")
+    suspend fun getMostRecentSession(): ChargingSessionEntity?
 
     @Query("SELECT * FROM charging_sessions WHERE startTime >= :startDate AND startTime <= :endDate ORDER BY startTime DESC")
     fun getSessionsByDateRange(startDate: Long, endDate: Long): Flow<List<ChargingSessionEntity>>

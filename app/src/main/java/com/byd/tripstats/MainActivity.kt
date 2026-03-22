@@ -6,9 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -86,6 +89,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestRequiredPermissions()
+        requestBatteryOptimizationExemption()
         checkAndShowAutostartReminder()
 
         setContent {
@@ -150,8 +154,8 @@ class MainActivity : ComponentActivity() {
         val currentVersion = BuildConfig.VERSION_CODE
         lifecycleScope.launch {
             val lastSeen = prefs.getLastSeenVersionCode()
-            // Show dialog on upgrade (not on first install — lastSeen == 0 means no version stored)
-            if (lastSeen > 0 && lastSeen < currentVersion) {
+            // Show dialog on first install or upgrade
+            if (lastSeen < currentVersion) {
                 showAutostartReminder.value = true
             }
             // Always persist the current version so we only show once per upgrade
@@ -171,6 +175,22 @@ class MainActivity : ComponentActivity() {
         }
         // Do NOT stop the service — it must keep running in the background
         // for auto trip detection and MQTT telemetry collection.
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to launch battery optimization settings", e)
+                }
+            }
+        }
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────

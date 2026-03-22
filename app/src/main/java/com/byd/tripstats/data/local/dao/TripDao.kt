@@ -81,7 +81,18 @@ interface TripDataPointDao {
      *  Used by thinOldDataPoints — first and last points of each trip are never passed here. */
     @Query("DELETE FROM trip_data_points WHERE id IN (:ids)")
     suspend fun deleteDataPointsByIds(ids: List<Long>)
+
+    /**
+     * Returns the average SoH recorded across all data points for each trip,
+     * filtering out zero values (default before first telemetry with soh field).
+     * Used by battery degradation tracking to plot SoH over time.
+     */
+    @Query("SELECT tripId, AVG(soh) as avgSoh FROM trip_data_points WHERE soh > 0 GROUP BY tripId")
+    fun getAvgSohPerTrip(): Flow<List<TripSohSummary>>
 }
+
+/** Lightweight projection returned by [TripDataPointDao.getAvgSohPerTrip]. */
+data class TripSohSummary(val tripId: Long, val avgSoh: Double)
 
 @Dao
 interface TripStatsDao {

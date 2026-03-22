@@ -243,7 +243,8 @@ BYD DiLink has a built-in autostart manager that kills apps after a car restart 
 1. Find the **Disable Autostart** app on your DiLink (it's a native BYD app, usually near the file manager)
 2. Find **BYD Trip Stats** in the list and set its toggle to **OFF** (disabled = allowed to autostart)
 3. Do the same for **Electro** if you haven't already
-4. You need to repeat this step after every app update, because the permission resets on reinstall
+4. Open the app. Reboot the UI. Then re-open the app
+You need to repeat the above steps after every app update, because the permission resets on reinstall
 
 ---
 

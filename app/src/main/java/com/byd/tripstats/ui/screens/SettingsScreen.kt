@@ -92,6 +92,23 @@ fun SettingsScreen(
         }
     }
 
+    val savedSettings by preferencesManager.mqttSettings.collectAsState(
+        initial = PreferencesManager.MqttSettings()
+    )
+    var brokerUrl  by remember { mutableStateOf("") }
+    var brokerPort by remember { mutableStateOf("") }
+    var username   by remember { mutableStateOf("") }
+    var password   by remember { mutableStateOf("") }
+    var topic      by remember { mutableStateOf("") }
+
+    LaunchedEffect(savedSettings) {
+        brokerUrl  = savedSettings.brokerUrl
+        brokerPort = savedSettings.brokerPort.toString()
+        username   = savedSettings.username
+        password   = savedSettings.password
+        topic      = savedSettings.topic
+    }
+
     val mqttConnected     by viewModel.mqttConnected.collectAsState()
     val snackbarHostState  = remember { SnackbarHostState() }
     var selectedTab       by remember { mutableStateOf(0) }
@@ -397,9 +414,9 @@ private fun MqttTab(
                 Icon(Icons.Filled.Info, null,
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                 Text(
-                    "In Electro app, set the publish interval to 1 second while the car is ON " +
-                    "and 30 seconds when the car is OFF (for accurate charging tracking).\n\n" +
+                    "In Electro app, set the publish interval to 1 second while the car is ON.\n\n" +
                     "For the internal broker use 127.0.0.1 · port 1883 · no SSL · no credentials. " +
+                    "For an external broker (e.g. HiveMQ) enter its URL, port 8883, and credentials. " +
                     "Find the topic in Electro → Integrations → MQTT.",
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -469,6 +486,14 @@ private fun DataManagementTab(
 
     var showResetConfirm by remember { mutableStateOf(false) }
 
+    // ── Cost tracking state ───────────────────────────────────────────────────
+    val electricityPrice  by viewModel.electricityPricePerKwh.collectAsState()
+    val currencySymbol    by viewModel.currencySymbol.collectAsState()
+    var priceInput  by remember(electricityPrice) {
+        mutableStateOf(if (electricityPrice > 0.0) "%.4f".format(electricityPrice) else "")
+    }
+    var symbolInput by remember(currencySymbol) { mutableStateOf(currencySymbol) }
+
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -476,6 +501,72 @@ private fun DataManagementTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── Cost Tracking ─────────────────────────────────────────────────────
+        SectionHeader(icon = Icons.Filled.AttachMoney, title = "Cost Tracking")
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Enter your electricity tariff to automatically calculate the cost of each trip " +
+                    "from its recorded kWh. Leave blank to disable cost tracking.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = priceInput,
+                        onValueChange = { priceInput = it },
+                        label = { Text("Price per kWh") },
+                        placeholder = { Text("0.14") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        suffix = { Text("/kWh") }
+                    )
+                    OutlinedTextField(
+                        value = symbolInput,
+                        onValueChange = { if (it.length <= 3) symbolInput = it },
+                        label = { Text("Symbol") },
+                        placeholder = { Text("€") },
+                        singleLine = true,
+                        modifier = Modifier.width(80.dp)
+                    )
+                }
+                Button(
+                    onClick = {
+                        val price = priceInput.trim().replace(',', '.').toDoubleOrNull() ?: 0.0
+                        val symbol = symbolInput.trim().ifBlank { "€" }
+                        viewModel.saveElectricityPrice(price, symbol)
+                        scope.launch {
+                            android.widget.Toast.makeText(
+                                context, "Cost settings saved", android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.Save, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save price")
+                }
+                if (electricityPrice > 0.0) {
+                    Text(
+                        "Active: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider()
         SectionHeader(icon = Icons.Filled.Backup, title = "Backup & Restore")
 
         // Two-column summary row

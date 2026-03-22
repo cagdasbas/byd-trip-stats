@@ -7,9 +7,12 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.byd.tripstats.ui.screens.ChargingDetailScreen
-import com.byd.tripstats.ui.screens.ChargingHistoryScreen
 import com.byd.tripstats.ui.screens.DashboardScreen
+import com.byd.tripstats.ui.screens.BatteryDegradationScreen
+import com.byd.tripstats.ui.screens.ChargingHistoryScreen
+import com.byd.tripstats.ui.screens.ChargingDetailScreen
+import com.byd.tripstats.ui.screens.SeasonalAnalysisScreen
+import com.byd.tripstats.ui.screens.TripGoalsScreen
 import com.byd.tripstats.ui.screens.LocalBackupScreen
 import com.byd.tripstats.ui.screens.SettingsScreen
 import com.byd.tripstats.ui.screens.TripDetailScreen
@@ -28,6 +31,9 @@ sealed class Screen(val route: String) {
     object ChargingDetail : Screen("charging_detail/{sessionId}") {
         fun createRoute(sessionId: Long) = "charging_detail/$sessionId"
     }
+    object BatteryDegradation : Screen("battery_degradation")
+    object SeasonalAnalysis : Screen("seasonal_analysis")
+    object TripGoals : Screen("trip_goals")
 }
 
 @Composable
@@ -52,6 +58,9 @@ fun AppNavigation(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToBatteryDegradation = {
+                    navController.navigate(Screen.BatteryDegradation.route)
                 }
             )
         }
@@ -64,6 +73,12 @@ fun AppNavigation(
                 },
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToSeasonalAnalysis = {
+                    navController.navigate(Screen.SeasonalAnalysis.route)
+                },
+                onNavigateToTripGoals = {
+                    navController.navigate(Screen.TripGoals.route)
                 }
             )
         }
@@ -122,6 +137,27 @@ fun AppNavigation(
             val sessionId = backStackEntry.arguments?.getLong("sessionId") ?: return@composable
             ChargingDetailScreen(
                 sessionId = sessionId,
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.BatteryDegradation.route) {
+            BatteryDegradationScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.SeasonalAnalysis.route) {
+            SeasonalAnalysisScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.TripGoals.route) {
+            TripGoalsScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() }
             )

@@ -153,6 +153,38 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
                 FrontVsRearRpmHeatmap(dataPoints, Modifier.fillMaxSize())
             }
         }
+
+        // 11. Tyre Pressure vs Consumption
+        HeatmapCard(
+            title    = "Tyre Pressure vs Consumption",
+            subtitle = "Whether higher pressure measurably improves efficiency on your car"
+        ) {
+            TyrePressureVsConsumptionHeatmap(dataPoints, Modifier.fillMaxSize())
+        }
+
+        // 12. SOC vs Regen Efficiency
+        HeatmapCard(
+            title    = "SOC vs Regen Efficiency",
+            subtitle = "Where BMS throttles regenerative braking — expected near 100% SoC"
+        ) {
+            SocVsRegenHeatmap(dataPoints, Modifier.fillMaxSize())
+        }
+
+        // 13. Speed vs Battery Temperature
+        HeatmapCard(
+            title    = "Speed vs Battery Temperature",
+            subtitle = "Motorway thermal load vs stop-start urban — cleaner than Power vs Temp"
+        ) {
+            SpeedVsBatteryTempHeatmap(dataPoints, Modifier.fillMaxSize())
+        }
+
+        // 14. Cell Voltage Spread vs SOC — pack health diagnostic
+        HeatmapCard(
+            title    = "Cell Voltage Spread vs SOC",
+            subtitle = "Flat = healthy pack · Divergence spike at low SoC = weak cell"
+        ) {
+            CellVoltageSpreadVsSocHeatmap(dataPoints, Modifier.fillMaxSize())
+        }
     }
 }
 
@@ -392,6 +424,7 @@ private fun Heatmap2D(
     yMax       : Float,
     xValueFmt  : (Float) -> String = { "%.1f".format(it) },
     yValueFmt  : (Float) -> String = { "%.1f".format(it) },
+    yTickWidth : Float = 50f,   // widen for longer tick labels (e.g. "0.100" needs ~70f)
     modifier   : Modifier = Modifier
 ) {
     val labelArgb    = MaterialTheme.colorScheme.onSurface.toArgb()
@@ -414,8 +447,8 @@ private fun Heatmap2D(
         if (yBins == 0) return@Canvas
 
         // ── Layout margins (px) ───────────────────────────────────────────────
-        val yAxisLabelStrip = 22f   // rotated y-axis label
-        val yTickStrip      = 50f   // y tick label column
+        val yAxisLabelStrip = 22f       // rotated y-axis label
+        val yTickStrip      = yTickWidth // y tick label column
         val xTickStrip      = 30f   // x tick label row
         val xAxisLabelStrip = 26f   // x axis label row
         val topPad          = 8f
@@ -770,6 +803,192 @@ private fun FrontVsRearRpmHeatmap(
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         xValueFmt  = ::fmtRpm,
         yValueFmt  = ::fmtRpm,
+        modifier   = modifier
+    )
+}
+
+// ── Heatmap 11: Tyre Pressure vs Consumption ─────────────────────────────────
+
+@Composable
+private fun TyrePressureVsConsumptionHeatmap(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    val xBins = 16; val yBins = 14
+    val xMin  = 28f; val xMax = 46f   // PSI — typical EV range incl. cold/warm
+    val yMin  =  0f; val yMax = 60f   // kWh/100 km (traction only)
+
+    // Average all 4 wheel pressures per point for a single representative value.
+    // Only keep traction samples (speed > 10, positive power) to avoid regen noise.
+    val points = remember(dataPoints) {
+        dataPoints.mapNotNull { p ->
+            val spd  = p.speed.toFloat().takeIf { it > 10f } ?: return@mapNotNull null
+            val pwr  = p.power.toFloat().takeIf { it > 0f }  ?: return@mapNotNull null
+            val cons = pwr / spd * 100f
+            if (cons > yMax) return@mapNotNull null
+            // Average the 4 wheels; skip if all are 0 (not yet recorded)
+            val lf = p.tyrePressureLF.toFloat()
+            val rf = p.tyrePressureRF.toFloat()
+            val lr = p.tyrePressureLR.toFloat()
+            val rr = p.tyrePressureRR.toFloat()
+            if (lf == 0f && rf == 0f && lr == 0f && rr == 0f) return@mapNotNull null
+            val avgPsi = (lf + rf + lr + rr) / 4f
+            avgPsi to cons
+        }
+    }
+
+    if (points.size < 10) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(
+                "No tyre pressure data recorded on this trip.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    val cells = remember(points) { buildGrid(points, xMin, xMax, xBins, yMin, yMax, yBins) }
+
+    Heatmap2D(
+        cells      = cells,
+        xLabels    = axisLabels(xMin, xMax, xBins, "%.0f"),
+        yLabels    = axisLabels(yMin, yMax, yBins),
+        xAxisLabel = "Avg Tyre Pressure (PSI)",
+        yAxisLabel = "kWh / 100 km",
+        xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
+        modifier   = modifier
+    )
+}
+
+// ── Heatmap 12: SOC vs Regen Efficiency ──────────────────────────────────────
+
+@Composable
+private fun SocVsRegenHeatmap(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    val xBins = 20; val yBins = 14
+    val xMin  =  0f; val xMax = 100f  // SoC %
+    val yMin  =  0f; val yMax = 100f  // kW regen magnitude
+
+    // Only regen samples (negative enginePower below -1 kW threshold)
+    val points = remember(dataPoints) {
+        dataPoints.mapNotNull { p ->
+            val pwr = p.power.toFloat().takeIf { it < -1f } ?: return@mapNotNull null
+            p.soc.toFloat() to kotlin.math.abs(pwr)
+        }
+    }
+
+    if (points.size < 10) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(
+                "No regenerative braking data recorded on this trip.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    val cells = remember(points) { buildGrid(points, xMin, xMax, xBins, yMin, yMax, yBins) }
+
+    Heatmap2D(
+        cells      = cells,
+        xLabels    = axisLabels(xMin, xMax, xBins),
+        yLabels    = axisLabels(yMin, yMax, yBins),
+        xAxisLabel = "SOC (%)",
+        yAxisLabel = "Regen Power (kW)",
+        xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
+        modifier   = modifier
+    )
+}
+
+// ── Heatmap 13: Speed vs Battery Temperature ──────────────────────────────────
+
+@Composable
+private fun SpeedVsBatteryTempHeatmap(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    val xBins = 16; val yBins = 14
+    val xMin  =  0f; val xMax = 160f  // km/h
+    val yMin  = 10f; val yMax =  50f  // °C
+
+    val points = remember(dataPoints) {
+        dataPoints.mapNotNull { p ->
+            val temp = p.batteryTemp.toFloat().takeIf { it > 0f } ?: return@mapNotNull null
+            p.speed.toFloat() to temp
+        }
+    }
+
+    if (points.size < 10) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(
+                "No battery temperature data recorded on this trip.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    val cells = remember(points) { buildGrid(points, xMin, xMax, xBins, yMin, yMax, yBins) }
+
+    Heatmap2D(
+        cells      = cells,
+        xLabels    = axisLabels(xMin, xMax, xBins),
+        yLabels    = axisLabels(yMin, yMax, yBins),
+        xAxisLabel = "Speed (km/h)",
+        yAxisLabel = "Battery Temp (°C)",
+        xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
+        modifier   = modifier
+    )
+}
+
+// ── Heatmap 14: Cell Voltage Spread vs SOC ───────────────────────────────────
+
+@Composable
+private fun CellVoltageSpreadVsSocHeatmap(
+    dataPoints: List<TripDataPointEntity>,
+    modifier: Modifier = Modifier
+) {
+    val xBins = 20; val yBins = 16
+    val xMin  =  0f;    val xMax = 100f   // SoC %
+    val yMin  =  0f;    val yMax =   0.1f // V spread — healthy pack < 20 mV, weak cell up to ~100 mV
+
+    val points = remember(dataPoints) {
+        dataPoints.mapNotNull { p ->
+            val vMax = p.batteryCellVoltageMax.toFloat()
+            val vMin = p.batteryCellVoltageMin.toFloat()
+            if (vMax == 0f && vMin == 0f) return@mapNotNull null
+            val spread = (vMax - vMin).coerceAtLeast(0f)
+            p.soc.toFloat() to spread
+        }
+    }
+
+    if (points.size < 10) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(
+                "No cell voltage data recorded on this trip.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    val cells = remember(points) { buildGrid(points, xMin, xMax, xBins, yMin, yMax, yBins) }
+
+    Heatmap2D(
+        cells      = cells,
+        xLabels    = axisLabels(xMin, xMax, xBins),
+        yLabels    = axisLabels(yMin, yMax, yBins, "%.3f"),
+        xAxisLabel = "SOC (%)",
+        yAxisLabel = "Cell Spread (V)",
+        xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
+        yValueFmt  = { "%.3f".format(it) },
+        yTickWidth = 70f,   // "0.100" labels are wider than the 50f default
         modifier   = modifier
     )
 }

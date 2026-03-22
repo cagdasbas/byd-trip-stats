@@ -39,10 +39,9 @@ fun ChargingHistoryScreen(
 ) {
     val sessions by viewModel.allChargingSessions.collectAsState()
     val completed = sessions.filter { !it.isActive }
-    val active    = sessions.firstOrNull { it.isActive }
 
-    var selectedSessions         by remember { mutableStateOf(setOf<Long>()) }
-    var selectionMode            by remember { mutableStateOf(false) }
+    var selectedSessions by remember { mutableStateOf(setOf<Long>()) }
+    var selectionMode by remember { mutableStateOf(false) }
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -50,25 +49,38 @@ fun ChargingHistoryScreen(
             TopAppBar(
                 title = {
                     if (selectionMode) {
-                        Text("${selectedSessions.size} selected", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "${selectedSessions.size} selected",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     } else {
-                        Text("Charging History", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Charging History",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (selectionMode) {
-                            selectionMode = false
-                            selectedSessions = setOf()
-                        } else {
-                            onNavigateBack()
+                    IconButton(
+                        onClick = {
+                            if (selectionMode) {
+                                selectionMode = false
+                                selectedSessions = setOf()
+                            } else {
+                                onNavigateBack()
+                            }
                         }
-                    }) {
-                        Icon(
-                            imageVector = if (selectionMode) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = if (selectionMode) "Cancel" else "Back",
-                            modifier = Modifier.size(28.dp)
-                        )
+                    ) {
+                    Icon(
+                        imageVector =
+                            if (selectionMode) Icons.Filled.Close
+                            else Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription =
+                            if (selectionMode) "Cancel" else "Back",
+                        modifier = Modifier.size(28.dp)
+                    )
                     }
                 },
                 actions = {
@@ -83,17 +95,16 @@ fun ChargingHistoryScreen(
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
+                colors =
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
             )
         }
     ) { paddingValues ->
         if (sessions.isEmpty()) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -111,7 +122,7 @@ fun ChargingHistoryScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Sessions are recorded automatically\nwhen the car is plugged in",
+                        "Sessions are reconstructed automatically\nfrom SoC changes on each car wake-up",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -126,58 +137,36 @@ fun ChargingHistoryScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Active session pinned at top
-                active?.let { session ->
-                    item {
-                        ChargingSessionCard(
-                            session       = session,
-                            isActive      = true,
-                            isSelected    = selectedSessions.contains(session.id),
-                            selectionMode = selectionMode,
-                            onClick       = {
-                                if (selectionMode) {
-                                    // Ignore active sessions during selection mode
-                                } else {
-                                    onSessionClick(session.id)
-                                }
-                            },
-                            onLongClick   = { /* active sessions can't be selected */ },
-                            onDelete      = { viewModel.deleteChargingSession(session.id) }
-                        )
-                    }
-                }
-
                 // Summary header
                 if (completed.isNotEmpty()) {
-                    item {
-                        ChargingStatsSummary(completed)
-                    }
+                    item { ChargingStatsSummary(completed) }
                 }
 
                 items(completed, key = { it.id }) { session ->
                     ChargingSessionCard(
-                        session       = session,
-                        isActive      = false,
-                        isSelected    = selectedSessions.contains(session.id),
+                        session = session,
+                        isActive = false,
+                        isSelected = selectedSessions.contains(session.id),
                         selectionMode = selectionMode,
-                        onClick       = {
+                        onClick = {
                             if (selectionMode) {
-                                selectedSessions = if (selectedSessions.contains(session.id)) {
-                                    selectedSessions - session.id
-                                } else {
-                                    selectedSessions + session.id
-                                }
+                                selectedSessions =
+                                    if (selectedSessions.contains(session.id)) {
+                                        selectedSessions - session.id
+                                    } else {
+                                        selectedSessions + session.id
+                                    }
                             } else {
                                 onSessionClick(session.id)
                             }
                         },
-                        onLongClick   = {
+                        onLongClick = {
                             if (!selectionMode) {
                                 selectionMode = true
                                 selectedSessions = setOf(session.id)
                             }
                         },
-                        onDelete      = { viewModel.deleteChargingSession(session.id) }
+                        onDelete = { viewModel.deleteChargingSession(session.id) }
                     )
                 }
 
@@ -190,8 +179,16 @@ fun ChargingHistoryScreen(
         AlertDialog(
             onDismissRequest = { showDeleteSelectedDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete ${selectedSessions.size} Session${if (selectedSessions.size > 1) "s" else ""}?") },
-            text = { Text("This will permanently delete the selected charging sessions and all their data. This action cannot be undone.") },
+            title = {
+                Text(
+                    "Delete ${selectedSessions.size} Session${if (selectedSessions.size > 1) "s" else ""}?"
+                )
+            },
+            text = {
+                Text(
+                    "This will permanently delete the selected charging sessions and all their data. This action cannot be undone."
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -200,9 +197,7 @@ fun ChargingHistoryScreen(
                         selectionMode = false
                         selectedSessions = setOf()
                     }
-                ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
+                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteSelectedDialog = false }) { Text("Cancel") }
@@ -215,37 +210,30 @@ fun ChargingHistoryScreen(
 
 @Composable
 private fun ChargingStatsSummary(sessions: List<ChargingSessionEntity>) {
-    val totalKwh    = sessions.sumOf { it.kwhAdded ?: 0.0 }
+    val totalKwh     = sessions.sumOf { it.kwhAdded ?: 0.0 }
     val totalSessions = sessions.size
-    val peakEver    = sessions.maxOfOrNull { it.peakKw } ?: 0.0
+    val avgSocDelta  = sessions.mapNotNull { it.socDelta }.takeIf { it.isNotEmpty() }?.average() ?: 0.0
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        modifier =
+            Modifier.fillMaxWidth()
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant,
+                    RoundedCornerShape(12.dp)
+                ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            SummaryMetric(
-                label = "Sessions",
-                value = totalSessions.toString(),
-                unit  = ""
-            )
-            SummaryMetric(
-                label = "Total added",
-                value = "%.1f".format(totalKwh),
-                unit  = "kWh"
-            )
-            SummaryMetric(
-                label = "Peak ever",
-                value = "%.0f".format(peakEver),
-                unit  = "kW"
-            )
+            SummaryMetric(label = "Sessions", value = totalSessions.toString(), unit = "")
+            SummaryMetric(label = "Total added", value = "%.1f".format(totalKwh), unit = "kWh")
+            SummaryMetric(label = "Avg SoC gain", value = "%.0f".format(avgSocDelta), unit = "%")
         }
     }
 }
@@ -254,21 +242,21 @@ private fun ChargingStatsSummary(sessions: List<ChargingSessionEntity>) {
 private fun SummaryMetric(label: String, value: String, unit: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text  = label,
+            text = label,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                text       = value,
-                style      = MaterialTheme.typography.titleLarge,
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color      = RegenGreen
+                color = RegenGreen
             )
             if (unit.isNotEmpty()) {
                 Spacer(Modifier.width(3.dp))
                 Text(
-                    text  = unit,
+                    text = unit,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 3.dp)
@@ -283,29 +271,30 @@ private fun SummaryMetric(label: String, value: String, unit: String) {
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ChargingSessionCard(
-    session : ChargingSessionEntity,
+    session: ChargingSessionEntity,
     isActive: Boolean,
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
-    onClick : () -> Unit,
+    onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onDelete: () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    val dateFmt     = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
-    val startLabel  = dateFmt.format(Date(session.startTime))
-    val durationStr = if (isActive) {
-        formatDuration((System.currentTimeMillis() - session.startTime) / 1000)
-    } else {
-        session.durationSeconds?.let { formatDuration(it) } ?: "—"
-    }
+    val dateFmt = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
+    val startLabel = dateFmt.format(Date(session.startTime))
+    val durationStr =
+        if (isActive) {
+            formatDuration((System.currentTimeMillis() - session.startTime) / 1000)
+        } else {
+            session.durationSeconds?.let { formatDuration(it) } ?: "—"
+        }
 
-    val socText = when {
-        session.socEnd != null ->
-            "%.0f%%  →  %.0f%%".format(session.socStart, session.socEnd)
-        else ->
-            "%.0f%%  →  …".format(session.socStart)
-    }
+    val socText =
+        when {
+            session.socEnd != null ->
+                "%.0f%%  →  %.0f%%".format(session.socStart, session.socEnd)
+            else -> "%.0f%%  →  …".format(session.socStart)
+        }
 
     val kwhText = session.kwhAdded?.let { "%.2f kWh".format(it) } ?: "—"
 
@@ -389,10 +378,12 @@ private fun ChargingSessionCard(
                                 Icons.Filled.Delete,
                                 contentDescription = "Delete",
                                 modifier = Modifier.size(18.dp),
-                                tint = if (isActive)
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                else
-                                    MaterialTheme.colorScheme.error
+                                tint =
+                                    if (isActive)
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                            alpha = 0.38f
+                                        )
+                                    else MaterialTheme.colorScheme.error
                             )
                         }
                     }
@@ -442,6 +433,20 @@ private fun ChargingSessionCard(
                         label = "Avg %.0f kW".format(session.avgKw),
                         tint  = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                // Synthetic session badge — shown when no real-time data was captured
+                if (session.peakKw == 0.0 && session.avgKw == 0.0 && !isActive) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = "⚡ Reconstructed",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = androidx.compose.ui.Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
                 }
             }
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -61,6 +62,9 @@ class PreferencesManager(private val context: Context) {
         private val USERNAME = stringPreferencesKey("username")
         private val PASSWORD = stringPreferencesKey("password")
         private val TOPIC = stringPreferencesKey("topic")
+        private val ELECTRICITY_PRICE = doublePreferencesKey("electricity_price_per_kwh")
+        private val CURRENCY_SYMBOL = stringPreferencesKey("currency_symbol")
+
     }
     
     data class MqttSettings(
@@ -109,11 +113,30 @@ class PreferencesManager(private val context: Context) {
         }.first()
     }
 
-    /** Returns 0 if never persisted (i.e. first install or fresh data). */
+        /** Returns 0 if never persisted (i.e. first install or fresh data). */
     suspend fun getLastSeenVersionCode(): Int =
         context.dataStore.data.map { it[LAST_SEEN_VERSION_CODE] ?: 0 }.first()
 
     suspend fun saveLastSeenVersionCode(versionCode: Int) {
         context.dataStore.edit { it[LAST_SEEN_VERSION_CODE] = versionCode }
+    }
+
+    // ── Electricity cost ──────────────────────────────────────────────────────
+
+    /** Price the user pays per kWh (in their chosen currency). 0.0 = not configured. */
+    val electricityPricePerKwh: Flow<Double> = context.dataStore.data.map {
+        it[ELECTRICITY_PRICE] ?: 0.0
+    }
+
+    /** Currency symbol shown alongside costs (e.g. "€", "$", "£"). Default "€". */
+    val currencySymbol: Flow<String> = context.dataStore.data.map {
+        it[CURRENCY_SYMBOL] ?: "€"
+    }
+
+    suspend fun saveElectricityPrice(price: Double, symbol: String) {
+        context.dataStore.edit {
+            it[ELECTRICITY_PRICE] = price
+            it[CURRENCY_SYMBOL]   = symbol
+        }
     }
 }

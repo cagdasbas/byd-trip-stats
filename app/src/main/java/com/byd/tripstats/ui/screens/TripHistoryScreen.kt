@@ -3,6 +3,7 @@ package com.byd.tripstats.ui.screens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,10 +41,14 @@ import kotlin.math.abs
 fun TripHistoryScreen(
     viewModel: DashboardViewModel,
     onTripClick: (Long) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToSeasonalAnalysis: () -> Unit = {},
+    onNavigateToTripGoals: () -> Unit = {}
 ) {
     val trips         by viewModel.sortedFilteredTrips.collectAsState()
     val displayMetrics by viewModel.tripDisplayMetrics.collectAsState()
+    val monthlyCosts   by viewModel.monthlyCosts.collectAsState()
+    val currencySymbol by viewModel.currencySymbol.collectAsState()
     val sortField     by viewModel.sortField.collectAsState()
     val sortOrder     by viewModel.sortOrder.collectAsState()
     val filterState   by viewModel.filterState.collectAsState()
@@ -155,6 +160,16 @@ fun TripHistoryScreen(
                                 )
                             }
                         }
+                        // Seasonal analysis
+                        IconButton(onClick = onNavigateToSeasonalAnalysis) {
+                            Icon(Icons.Filled.WbSunny, "Seasonal analysis",
+                                modifier = Modifier.size(22.dp))
+                        }
+                        // Goals & bests
+                        IconButton(onClick = onNavigateToTripGoals) {
+                            Icon(Icons.Filled.EmojiEvents, "Goals & personal bests",
+                                modifier = Modifier.size(22.dp))
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -201,6 +216,16 @@ fun TripHistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
+                // Monthly cost summary — only shown when price is configured
+                if (monthlyCosts.isNotEmpty()) {
+                    item(key = "monthly_cost_summary") {
+                        MonthlyCostSummaryCard(
+                            months         = monthlyCosts,
+                            currencySymbol = currencySymbol
+                        )
+                    }
+                }
+
                 items(trips, key = { it.id }) { trip ->
                     val metrics = displayMetrics[trip.id]
                     TripItem(
@@ -208,6 +233,8 @@ fun TripHistoryScreen(
                         avgSpeedKmh = metrics?.avgSpeedKmh,
                         tripScore = metrics?.tripScore,
                         regenEfficiencyPct = metrics?.regenEfficiencyPct,
+                        tripCost = metrics?.tripCost,
+                        currencySymbol = currencySymbol,
                         isSelected = selectedTrips.contains(trip.id),
                         selectionMode = selectionMode,
                         isActive = trip.isActive,
@@ -499,6 +526,8 @@ fun TripItem(
     avgSpeedKmh: Int?,
     tripScore: Int?,
     regenEfficiencyPct: Double?,
+    tripCost: Double? = null,
+    currencySymbol: String = "€",
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
     isActive: Boolean = false,
@@ -669,6 +698,29 @@ fun TripItem(
                 )
             }
 
+            // ── Cost row — only when price configured ──────────────────────
+            if (tripCost != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Filled.AttachMoney,
+                        contentDescription = null,
+                        tint = AccelerationOrange,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        "Trip cost: $currencySymbol${"%.2f".format(tripCost)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AccelerationOrange,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // ── Row 3: Avg Speed | Max Speed | SoC
@@ -775,6 +827,76 @@ fun ScoreChip(
                 Text("—", style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthlyCostSummaryCard(
+    months         : List<DashboardViewModel.MonthlyCost>,
+    currencySymbol : String
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val shown = if (expanded) months else months.take(3)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+            .clickable { expanded = !expanded },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.AttachMoney, null,
+                        tint = AccelerationOrange, modifier = Modifier.size(20.dp))
+                    Text("Monthly Cost", style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold)
+                }
+                Icon(
+                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            shown.forEach { month ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(month.label, style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            "${"%.1f".format(month.kwhTotal)} kWh",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "$currencySymbol${"%.2f".format(month.costAmount)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AccelerationOrange
+                        )
+                    }
+                }
+            }
+            if (months.size > 3) {
+                Text(
+                    if (expanded) "Show less" else "Show ${months.size - 3} more months…",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.byd.tripstats.data.local.BydStatsDatabase
+import com.byd.tripstats.data.local.dao.TripSohSummary
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
@@ -64,6 +65,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     val selectedCarConfig = preferencesManager.selectedCarConfig
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    // ── Electricity cost ──────────────────────────────────────────────────────
+
+    val electricityPricePerKwh: StateFlow<Double> = preferencesManager.electricityPricePerKwh
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
+
+    val currencySymbol: StateFlow<String> = preferencesManager.currencySymbol
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "€")
+
+    fun saveElectricityPrice(price: Double, symbol: String) {
+        viewModelScope.launch { preferencesManager.saveElectricityPrice(price, symbol) }
+    }
 
     // ── Telemetry & trip state (from repository) ──────────────────────────────
 
@@ -267,11 +280,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     data class TripDisplayMetrics(
         val avgSpeedKmh:       Int?,
         val tripScore:         Int?,
-        val regenEfficiencyPct: Double?
+        val regenEfficiencyPct: Double?,
+        val tripCost:          Double?   // null when price not configured
     )
 
     val tripDisplayMetrics: StateFlow<Map<Long, TripDisplayMetrics>> =
-        combine(allTrips, allTripStats) { trips, stats ->
+        combine(allTrips, allTripStats, electricityPricePerKwh) { trips, stats, pricePerKwh ->
             val statsById = stats.associateBy { it.tripId }
             trips.associate { trip ->
                 val dist = trip.distance
@@ -338,7 +352,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     (regen / (trip.energyConsumed!! + regen)) * 100.0
                 } else null
 
-                trip.id to TripDisplayMetrics(avgSpeed, score, regenPct)
+                val tripCost = if (pricePerKwh > 0.0 && trip.energyConsumed != null)
+                    trip.energyConsumed!! * pricePerKwh else null
+
+                trip.id to TripDisplayMetrics(avgSpeed, score, regenPct, tripCost)
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
@@ -737,19 +754,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 if (isLocal) {
                     try {
                         MqttBrokerService.start(getApplication())
-                        delay(6_000)   // wait for embedded broker init
+                        delay(6_000)
                     } catch (e: Exception) {
                         Log.e(TAG, "Error starting embedded broker", e)
                     }
                 }
 
                 MqttService.start(
-                    context   = getApplication(),
-                    brokerUrl = brokerUrl,
+                    context    = getApplication(),
+                    brokerUrl  = brokerUrl,
                     brokerPort = brokerPort,
-                    username  = username,
-                    password  = password,
-                    topic     = topic
+                    username   = username,
+                    password   = password,
+                    topic      = topic
                 )
 
                 delay(2_000)
@@ -759,6 +776,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+
 
     // ── Database management ───────────────────────────────────────────────────
 
@@ -959,4 +977,221 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val statsById = allTripStats.value.associateBy { it.tripId }
         return tripIds.mapNotNull { statsById[it] }
     }
+
+    // ── Monthly cost summary ─────────────────────────────────────────────────
+
+    data class MonthlyCost(
+        val label     : String,  // e.g. "Mar 2026"
+        val costAmount: Double,  // total cost for the month
+        val kwhTotal  : Double,  // total kWh for the month
+        val tripCount : Int
+    )
+
+    val monthlyCosts: StateFlow<List<MonthlyCost>> =
+        combine(allTrips, electricityPricePerKwh) { trips, pricePerKwh ->
+            if (pricePerKwh <= 0.0) return@combine emptyList()
+            val fmt = java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault())
+            val cal = java.util.Calendar.getInstance()
+            trips
+                .filter { !it.isActive && it.energyConsumed != null && it.energyConsumed!! > 0 }
+                .groupBy { trip ->
+                    cal.timeInMillis = trip.startTime
+                    cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    cal.set(java.util.Calendar.MINUTE, 0)
+                    cal.set(java.util.Calendar.SECOND, 0)
+                    cal.set(java.util.Calendar.MILLISECOND, 0)
+                    cal.timeInMillis
+                }
+                .entries
+                .sortedByDescending { it.key }
+                .take(12)
+                .map { (epochMs, monthTrips) ->
+                    val kwhTotal = monthTrips.sumOf { it.energyConsumed ?: 0.0 }
+                    MonthlyCost(
+                        label      = fmt.format(java.util.Date(epochMs)),
+                        costAmount = kwhTotal * pricePerKwh,
+                        kwhTotal   = kwhTotal,
+                        tripCount  = monthTrips.size
+                    )
+                }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Seasonal analysis ────────────────────────────────────────────────────
+
+    enum class Season(val label: String, val emoji: String) {
+        SPRING("Spring", "🌱"),
+        SUMMER("Summer", "☀️"),
+        AUTUMN("Autumn", "🍂"),
+        WINTER("Winter", "❄️")
+    }
+
+    data class SeasonStats(
+        val season          : Season,
+        val avgConsumption  : Double,   // kWh/100km
+        val avgTempC        : Double,   // avg battery temp as proxy for ambient
+        val tripCount       : Int,
+        val totalDistanceKm : Double,
+        val totalKwh        : Double
+    )
+
+    /** Groups completed trips by meteorological season across all recorded years. */
+    val seasonalStats: StateFlow<List<SeasonStats>> = allTrips
+        .map { trips ->
+            val cal = Calendar.getInstance()
+            val completed = trips.filter {
+                !it.isActive &&
+                it.efficiency != null &&
+                (it.distance ?: 0.0) >= 1.0
+            }
+            Season.entries.mapNotNull { season ->
+                val seasonTrips = completed.filter { trip ->
+                    cal.timeInMillis = trip.startTime
+                    val month = cal.get(Calendar.MONTH) + 1  // 1-based
+                    when (season) {
+                        Season.SPRING -> month in 3..5
+                        Season.SUMMER -> month in 6..8
+                        Season.AUTUMN -> month in 9..11
+                        Season.WINTER -> month == 12 || month <= 2
+                    }
+                }
+                if (seasonTrips.isEmpty()) return@mapNotNull null
+                SeasonStats(
+                    season         = season,
+                    avgConsumption = seasonTrips.mapNotNull { it.efficiency }.average(),
+                    avgTempC       = seasonTrips.map { it.avgBatteryTemp }.average(),
+                    tripCount      = seasonTrips.size,
+                    totalDistanceKm = seasonTrips.sumOf { it.distance ?: 0.0 },
+                    totalKwh       = seasonTrips.sumOf { it.energyConsumed ?: 0.0 }
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Trip goals ────────────────────────────────────────────────────────────
+
+    data class TripGoals(
+        val targetConsumptionKwhPer100km: Double? = null,  // null = not set
+        val targetDistanceKmPerMonth     : Double? = null
+    )
+
+    data class PersonalBests(
+        val bestConsumption : Double?,  // lowest kWh/100km, min 1 km distance
+        val bestDistance    : Double?,  // longest single trip
+        val longestStreak   : Int       // consecutive days with ≥1 trip
+    )
+
+    private val GOAL_CONSUMPTION_KEY = "goal_consumption"
+    private val GOAL_DISTANCE_KEY    = "goal_distance_monthly"
+    private val goalPrefs by lazy {
+        getApplication<android.app.Application>()
+            .getSharedPreferences("trip_goals", 0)
+    }
+
+    private val _tripGoals = MutableStateFlow(
+        TripGoals(
+            targetConsumptionKwhPer100km = goalPrefs.getFloat(GOAL_CONSUMPTION_KEY, 0f)
+                .takeIf { it > 0f }?.toDouble(),
+            targetDistanceKmPerMonth     = goalPrefs.getFloat(GOAL_DISTANCE_KEY, 0f)
+                .takeIf { it > 0f }?.toDouble()
+        )
+    )
+    val tripGoals: StateFlow<TripGoals> = _tripGoals.asStateFlow()
+
+    fun saveTripGoals(consumption: Double?, distancePerMonth: Double?) {
+        _tripGoals.value = TripGoals(consumption, distancePerMonth)
+        goalPrefs.edit().apply {
+            if (consumption != null) putFloat(GOAL_CONSUMPTION_KEY, consumption.toFloat())
+            else remove(GOAL_CONSUMPTION_KEY)
+            if (distancePerMonth != null) putFloat(GOAL_DISTANCE_KEY, distancePerMonth.toFloat())
+            else remove(GOAL_DISTANCE_KEY)
+        }.apply()
+    }
+
+    val personalBests: StateFlow<PersonalBests> = allTrips
+        .map { trips ->
+            val completed = trips.filter { !it.isActive }
+            val bestCons = completed
+                .filter { (it.distance ?: 0.0) >= 1.0 && it.efficiency != null && it.efficiency!! >= 10.0 }
+                .minOfOrNull { it.efficiency!! }
+            val bestDist = completed.maxOfOrNull { it.distance ?: 0.0 }
+
+            // Longest streak: consecutive calendar days with at least one trip
+            val cal = Calendar.getInstance()
+            val tripDays = completed.map { trip ->
+                cal.timeInMillis = trip.startTime
+                cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0);       cal.set(Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }.toSortedSet()
+            val dayMs = 86_400_000L
+            var longestStreak = if (tripDays.isEmpty()) 0 else 1
+            var currentStreak = 1
+            tripDays.zipWithNext { a, b ->
+                if (b - a == dayMs) {
+                    currentStreak++
+                    if (currentStreak > longestStreak) longestStreak = currentStreak
+                } else {
+                    currentStreak = 1
+                }
+            }
+
+            PersonalBests(bestCons, bestDist, longestStreak)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000),
+            PersonalBests(null, null, 0))
+
+    /**
+     * Distance driven this calendar month (completed trips only).
+     * Used to track progress against monthly distance goal.
+     */
+    val distanceThisMonth: StateFlow<Double> = allTrips
+        .map { trips ->
+            val cal = Calendar.getInstance()
+            val monthStart = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0);       set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            trips.filter { !it.isActive && it.startTime >= monthStart }
+                 .sumOf { it.distance ?: 0.0 }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
+
+    // ── Battery degradation ──────────────────────────────────────────────────
+
+    /**
+     * One entry per completed trip that has SoH data recorded.
+     * Sorted chronologically — ready for the degradation chart to consume directly.
+     */
+    data class SohDataPoint(
+        val tripId     : Long,
+        val timestamp  : Long,   // trip start time — used as X axis
+        val odometer   : Double, // trip start odometer — alternative X axis
+        val avgSoh     : Double  // average SoH across all data points in the trip
+    )
+
+    val batteryDegradationData: StateFlow<List<SohDataPoint>> =
+        combine(
+            tripRepository.getAllTrips(),
+            tripRepository.getAvgSohPerTrip()
+        ) { trips, sohSummaries ->
+            val sohById    = sohSummaries.associateBy { it.tripId }
+            val tripById   = trips.associateBy { it.id }
+            sohSummaries
+                .mapNotNull { summary ->
+                    val trip = tripById[summary.tripId] ?: return@mapNotNull null
+                    if (trip.isActive) return@mapNotNull null          // skip live trip
+                    if (summary.avgSoh < 50.0) return@mapNotNull null  // sanity filter
+                    SohDataPoint(
+                        tripId    = trip.id,
+                        timestamp = trip.startTime,
+                        odometer  = trip.startOdometer,
+                        avgSoh    = summary.avgSoh
+                    )
+                }
+                .sortedBy { it.timestamp }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }

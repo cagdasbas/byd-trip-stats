@@ -3,6 +3,7 @@ package com.byd.tripstats.data.mqtt
 import android.util.Log
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.hivemq.client.mqtt.MqttClient
+import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish
 import kotlinx.coroutines.channels.awaitClose
@@ -15,7 +16,8 @@ class MqttClientManager(
     private val brokerPort: Int,
     private val username: String?,
     private val password: String?,
-    private val topic: String
+    private val topic: String,
+    private val clientId: String = "BydTripStats"  // fixed ID for persistent session
 ) {
     private val TAG = "MqttClientManager"
     private val json = Json { ignoreUnknownKeys = true }
@@ -35,7 +37,7 @@ class MqttClientManager(
 
             val clientBuilder = MqttClient.builder()
                 .useMqttVersion3()
-                .identifier("BydTripStats_${System.currentTimeMillis()}")
+                .identifier(clientId)  // Fixed ID — required for persistent session resume
                 .serverHost(brokerUrl)
                 .serverPort(brokerPort)
                 .automaticReconnect()
@@ -65,6 +67,13 @@ class MqttClientManager(
             Log.d(TAG, "Client built, attempting connection...")
 
             mqttClient?.connectWith()
+                // cleanSession = false: broker preserves the session and queues
+                // QoS ≥ 1 messages while we are offline. Combined with the fixed
+                // client ID above, HiveMQ will deliver missed packets on reconnect.
+                // For the internal Moquette broker this has no effect when TripStats
+                // is frozen (the broker is in-process and dies with the app), but it
+                // prevents phantom session accumulation in moquette_store.db.
+                ?.cleanSession(false)
                 ?.send()
                 ?.whenComplete { _, throwable ->
                     Log.d(TAG, "=== Connection completed callback ===")
@@ -117,6 +126,12 @@ class MqttClientManager(
         
         client.subscribeWith()
             .topicFilter(topic)
+            // QoS 1 (AT_LEAST_ONCE): broker stores undelivered messages for our
+            // persistent session and re-delivers them when we reconnect.
+            // NOTE: Electro must also PUBLISH at QoS 1 for the broker to store
+            // messages. QoS 0 publishes are fire-and-forget and never queued —
+            // check Electro → Integrations → MQTT → Publish QoS setting.
+            .qos(MqttQos.AT_LEAST_ONCE)
             .callback { publish: Mqtt3Publish ->  // ← CHANGED FROM Mqtt5Publish
                 try {
                     val payload = String(publish.payloadAsBytes)

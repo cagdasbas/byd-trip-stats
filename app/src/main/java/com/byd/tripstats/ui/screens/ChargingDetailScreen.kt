@@ -2,6 +2,9 @@ package com.byd.tripstats.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -15,21 +18,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
+import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
-import androidx.compose.ui.input.pointer.pointerInput
-import com.byd.tripstats.ui.components.drawCrosshair
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
@@ -259,23 +259,30 @@ private fun ChargingChartTab(
 ) {
     if (dataPoints.size < 2) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Not enough data", style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Not enough data",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         return
     }
 
-    val textColor  = MaterialTheme.colorScheme.onSurface
-    val gridColor  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
-    val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+    val textColor = MaterialTheme.colorScheme.onSurface
+    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+    val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Card(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
                 .border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                    color =
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = 0.2f
+                        ),
                     shape = MaterialTheme.shapes.medium
                 ),
             colors = CardDefaults.cardColors(
@@ -299,36 +306,51 @@ private fun ChargingChartTab(
                             awaitEachGesture {
                                 val down = awaitFirstDown()
                                 touchPos = down.position
-                                drag(down.id) { change -> touchPos = change.position }
+                                drag(down.id) { change ->
+                                    touchPos = change.position
+                                }
                                 touchPos = null
                             }
                         }
                 ) {
-                    val w = size.width; val h = size.height
-                    val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
-                    val chartW = w - padL - padR; val chartH = h - padT - padB
+                    val w = size.width
+                    val h = size.height
+                    val padL = 80f
+                    val padR = 16f
+                    val padT = 16f
+                    val padB = 40f
+                    val chartW = w - padL - padR
+                    val chartH = h - padT - padB
 
-                    val values  = dataPoints.map(valueSelector)
-                    val rawMin  = values.minOrNull() ?: 0.0
-                    val rawMax  = values.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
-                    val yStep   = niceStep(rawMax - rawMin)
-                    val yMin    = kotlin.math.floor(rawMin / yStep) * yStep
-                    val yMax    = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
+                    val values = dataPoints.map(valueSelector)
+                    val rawMin = values.minOrNull() ?: 0.0
+                    val rawMax = values.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
+                    val yStep = niceStep(rawMax - rawMin)
+                    val yMin = kotlin.math.floor(rawMin / yStep) * yStep
+                    val yMax = kotlin.math.ceil(rawMax / yStep) * yStep + yStep
 
-                    val totalMs  = dataPoints.last().timestamp - dataPoints.first().timestamp
-                    val startMs  = dataPoints.first().timestamp
+                    val totalMs = dataPoints.last().timestamp - dataPoints.first().timestamp
+                    val startMs = dataPoints.first().timestamp
 
-                    fun xOf(ts: Long)  = padL + ((ts - startMs).toFloat() / totalMs.coerceAtLeast(1L)) * chartW
-                    fun yOf(v: Double) = (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
+                    fun xOf(ts: Long) =
+                        padL + ((ts - startMs).toFloat() / totalMs.coerceAtLeast(1L)) * chartW
+                    fun yOf(v: Double) =
+                        (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
 
                     val nc = drawContext.canvas.nativeCanvas
-                    val labelPaint = android.graphics.Paint().apply {
-                        color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
-                    }
-                    val xLabelPaint = android.graphics.Paint().apply {
-                        color = textColor.copy(alpha = 0.6f).toArgb(); textSize = 20f
-                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-                    }
+                    val labelPaint =
+                        android.graphics.Paint().apply {
+                            color = textColor.copy(alpha = 0.7f).toArgb()
+                            textSize = 22f
+                            isAntiAlias = true
+                        }
+                    val xLabelPaint =
+                        android.graphics.Paint().apply {
+                            color = textColor.copy(alpha = 0.6f).toArgb()
+                            textSize = 20f
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
 
                     // Y grid + labels
                     var yTick = yMin
@@ -341,45 +363,77 @@ private fun ChargingChartTab(
                     }
 
                     // Y axis label
-                    val yAxisPaint = android.graphics.Paint().apply {
-                        color = textColor.copy(alpha = 0.55f).toArgb(); textSize = 19f
-                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-                    }
-                    nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
-                    nc.drawText(yAxisLabel, 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
+                    val yAxisPaint =
+                        android.graphics.Paint().apply {
+                            color = textColor.copy(alpha = 0.55f).toArgb()
+                            textSize = 19f
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
+                    nc.save()
+                    nc.rotate(-90f, 18f, padT + chartH / 2f)
+                    nc.drawText(yAxisLabel, 18f, padT + chartH / 2f, yAxisPaint)
+                    nc.restore()
 
                     // X axis
-                    drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
+                    drawLine(
+                        axisColor,
+                        Offset(padL, padT + chartH),
+                        Offset(w - padR, padT + chartH),
+                        1.5f
+                    )
 
                     // X tick labels — 5 evenly spaced time markers
                     for (i in 0..4) {
                         val frac = i / 4.0
-                        val ts   = startMs + (totalMs * frac).toLong()
-                        val x    = xOf(ts)
+                        val ts = startMs + (totalMs * frac).toLong()
+                        val x = xOf(ts)
                         val mins = ((ts - startMs) / 60_000.0).roundToInt()
                         nc.drawText("+${mins}m", x, h - 4f, xLabelPaint)
                     }
 
                     // Area fill
-                    val areaPath = Path().apply {
-                        moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
-                        dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
-                        lineTo(xOf(dataPoints.last().timestamp), padT + chartH)
-                        lineTo(xOf(dataPoints.first().timestamp), padT + chartH)
-                        close()
-                    }
-                    drawPath(areaPath, Brush.verticalGradient(
-                        listOf(lineColor.copy(alpha = 0.30f), lineColor.copy(alpha = 0f)),
-                        startY = yOf(values.max()), endY = padT + chartH
-                    ))
+                    val areaPath =
+                        Path().apply {
+                            moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
+                            dataPoints.drop(1).forEachIndexed { i, p ->
+                                lineTo(xOf(p.timestamp), yOf(values[i + 1]))
+                            }
+                            lineTo(xOf(dataPoints.last().timestamp), padT + chartH)
+                            lineTo(xOf(dataPoints.first().timestamp), padT + chartH)
+                            close()
+                        }
+                    drawPath(
+                        areaPath,
+                        Brush.verticalGradient(
+                            listOf(
+                                lineColor.copy(alpha = 0.30f),
+                                lineColor.copy(alpha = 0f)
+                            ),
+                            startY = yOf(values.max()),
+                            endY = padT + chartH
+                        )
+                    )
 
                     // Line
-                    val linePath = Path().apply {
-                        moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
-                        dataPoints.drop(1).forEachIndexed { i, p -> lineTo(xOf(p.timestamp), yOf(values[i + 1])) }
-                    }
-                    drawPath(linePath, lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                    
+                    val linePath =
+                        Path().apply {
+                            moveTo(xOf(dataPoints.first().timestamp), yOf(values.first()))
+                            dataPoints.drop(1).forEachIndexed { i, p ->
+                                lineTo(xOf(p.timestamp), yOf(values[i + 1]))
+                            }
+                        }
+                    drawPath(
+                        linePath,
+                        lineColor,
+                        style =
+                            Stroke(
+                                width = 3f,
+                                cap = StrokeCap.Round,
+                                join = StrokeJoin.Round
+                            )
+                    )
+
                     // Crosshair overlay
                     touchPos?.let { tp ->
                         if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
@@ -393,14 +447,20 @@ private fun ChargingChartTab(
                                     .atZone(java.time.ZoneId.systemDefault())
                                     .format(timeFormatter)
                                 val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
-                                
+
                                 drawCrosshair(
-                                    cx = xOf(p.timestamp), cy = yOf(v), w = w,
-                                    padL = padL, padR = padR, padT = padT, chartH = chartH,
+                                    cx = xOf(p.timestamp),
+                                    cy = yOf(v),
+                                    w = w,
+                                    padL = padL,
+                                    padR = padR,
+                                    padT = padT,
+                                    chartH = chartH,
                                     line1 = "%.1f %s".format(v, yAxisLabel),
                                     line2 = realTime,
                                     line3 = durationStr,
-                                    accentColor = lineColor, textColor = textColor
+                                    accentColor = lineColor,
+                                    textColor = textColor
                                 )
                             }
                         }
@@ -417,8 +477,11 @@ private fun ChargingChartTab(
 private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
     if (dataPoints.size < 2) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Not enough data", style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Not enough data",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
         return
     }
@@ -471,14 +534,21 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
                             awaitEachGesture {
                                 val down = awaitFirstDown()
                                 touchPos = down.position
-                                drag(down.id) { change -> touchPos = change.position }
+                                drag(down.id) { change ->
+                                    touchPos = change.position
+                                }
                                 touchPos = null
                             }
                         }
                 ) {
-                    val w = size.width; val h = size.height
-                    val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
-                    val chartW = w - padL - padR; val chartH = h - padT - padB
+                    val w = size.width
+                    val h = size.height
+                    val padL = 80f
+                    val padR = 16f
+                    val padT = 16f
+                    val padB = 40f
+                    val chartW = w - padL - padR
+                    val chartH = h - padT - padB
 
                     val avgVals = dataPoints.map { it.batteryTempAvg }
                     val minVals = dataPoints.map { it.batteryCellTempMin.toDouble() }
@@ -497,13 +567,19 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
                     fun yOf(v: Double) = (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
 
                     val nc = drawContext.canvas.nativeCanvas
-                    val labelPaint = android.graphics.Paint().apply {
-                        color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
-                    }
-                    val xLabelPaint = android.graphics.Paint().apply {
-                        color = textColor.copy(alpha = 0.6f).toArgb(); textSize = 20f
-                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-                    }
+                    val labelPaint =
+                        android.graphics.Paint().apply {
+                            color = textColor.copy(alpha = 0.7f).toArgb()
+                            textSize = 22f
+                            isAntiAlias = true
+                        }
+                    val xLabelPaint =
+                        android.graphics.Paint().apply {
+                            color = textColor.copy(alpha = 0.6f).toArgb()
+                            textSize = 20f
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
 
                     // Y grid + labels
                     var yTick = yMin
@@ -516,57 +592,93 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
                     }
 
                     // Y axis label
-                    val yAxisPaint = android.graphics.Paint().apply {
-                        color = textColor.copy(alpha = 0.55f).toArgb(); textSize = 19f
-                        textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-                    }
-                    nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
-                    nc.drawText("°C", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
+                    val yAxisPaint =
+                        android.graphics.Paint().apply {
+                            color = textColor.copy(alpha = 0.55f).toArgb()
+                            textSize = 19f
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isAntiAlias = true
+                        }
+                    nc.save()
+                    nc.rotate(-90f, 18f, padT + chartH / 2f)
+                    nc.drawText("°C", 18f, padT + chartH / 2f, yAxisPaint)
+                    nc.restore()
 
                     // X axis
-                    drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
+                    drawLine(
+                        axisColor,
+                        Offset(padL, padT + chartH),
+                        Offset(w - padR, padT + chartH),
+                        1.5f
+                    )
                     for (i in 0..4) {
                         val frac = i / 4.0
-                        val ts   = startMs + (totalMs * frac).toLong()
+                        val ts = startMs + (totalMs * frac).toLong()
                         val mins = ((ts - startMs) / 60_000.0).roundToInt()
                         nc.drawText("+${mins}m", xOf(ts), h - 4f, xLabelPaint)
                     }
 
                     // Draw three series
-                    fun drawSeries(vals: List<Double>, color: androidx.compose.ui.graphics.Color, width: Float = 2.5f) {
+                    fun drawSeries(
+                        vals: List<Double>,
+                        color: androidx.compose.ui.graphics.Color,
+                        width: Float = 2.5f
+                    ) {
                         if (vals.size < 2) return
-                        val path = Path().apply {
-                            moveTo(xOf(dataPoints.first().timestamp), yOf(vals.first()))
-                            vals.drop(1).forEachIndexed { i, v -> lineTo(xOf(dataPoints[i + 1].timestamp), yOf(v)) }
-                        }
-                        drawPath(path, color, style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        val path =
+                            Path().apply {
+                                moveTo(xOf(dataPoints.first().timestamp), yOf(vals.first()))
+                                vals.drop(1).forEachIndexed { i, v ->
+                                    lineTo(xOf(dataPoints[i + 1].timestamp), yOf(v))
+                                }
+                            }
+                        drawPath(
+                            path,
+                            color,
+                            style =
+                                Stroke(
+                                    width = width,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round
+                                )
+                        )
                     }
 
                     drawSeries(minVals, minColor, 2f)
                     drawSeries(maxVals, maxColor, 2f)
-                    drawSeries(avgVals, avgColor, 3f)  // avg on top
-                    
+                    drawSeries(avgVals, avgColor, 3f) // avg on top
+
                     // Crosshair overlay (tracking average temp)
                     touchPos?.let { tp ->
                         if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
                             val fraction = ((tp.x - padL) / chartW).coerceIn(0f, 1f)
                             val targetTs = startMs + (fraction * totalMs).toLong()
-                            val p = dataPoints.minByOrNull { kotlin.math.abs(it.timestamp - targetTs) }
+                            val p =
+                                dataPoints.minByOrNull {
+                                    kotlin.math.abs(it.timestamp - targetTs)
+                                }
                             if (p != null) {
                                 val v = p.batteryTempAvg
                                 val secs = (p.timestamp - startMs) / 1000L
-                                val realTime = java.time.Instant.ofEpochMilli(p.timestamp)
-                                    .atZone(java.time.ZoneId.systemDefault())
-                                    .format(timeFormatter)
+                                val realTime =
+                                    java.time.Instant.ofEpochMilli(p.timestamp)
+                                        .atZone(java.time.ZoneId.systemDefault())
+                                        .format(timeFormatter)
                                 val durationStr = "+%d:%02d".format(secs / 60, secs % 60)
-                                
+
                                 drawCrosshair(
-                                    cx = xOf(p.timestamp), cy = yOf(v.toDouble()), w = w,
-                                    padL = padL, padR = padR, padT = padT, chartH = chartH,
+                                    cx = xOf(p.timestamp),
+                                    cy = yOf(v.toDouble()),
+                                    w = w,
+                                    padL = padL,
+                                    padR = padR,
+                                    padT = padT,
+                                    chartH = chartH,
                                     line1 = "%.1f °C".format(v),
                                     line2 = realTime,
                                     line3 = durationStr,
-                                    accentColor = avgColor, textColor = textColor
+                                    accentColor = avgColor,
+                                    textColor = textColor
                                 )
                             }
                         }
@@ -583,11 +695,19 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
 private fun ChartLegendItem(color: androidx.compose.ui.graphics.Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Canvas(modifier = Modifier.size(20.dp, 3.dp)) {
-            drawLine(color, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), strokeWidth = 3f)
+            drawLine(
+                color,
+                Offset(0f, size.height / 2),
+                Offset(size.width, size.height / 2),
+                strokeWidth = 3f
+            )
         }
         Spacer(Modifier.width(5.dp))
-        Text(label, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

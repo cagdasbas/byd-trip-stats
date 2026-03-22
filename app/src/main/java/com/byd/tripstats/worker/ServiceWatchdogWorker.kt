@@ -75,11 +75,12 @@ class ServiceWatchdogWorker(
                 repeatInterval         = INTERVAL_MINUTES,
                 repeatIntervalTimeUnit = TimeUnit.MINUTES
             )
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
-                )
+                // No network constraint — the MQTT stack must restart regardless of
+                // connectivity. Moquette needs no internet, and HiveMQ reconnects
+                // automatically when the network returns.
+                // The previous NetworkType.CONNECTED constraint prevented the watchdog
+                // from firing when the car was parked with no SIM signal — causing
+                // charging sessions to be missed entirely.
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5, TimeUnit.MINUTES)
                 .build()
 
