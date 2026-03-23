@@ -58,6 +58,13 @@ fun TripHistoryScreen(
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
     var showSortSheet           by remember { mutableStateOf(false) }
     var showFilterSheet         by remember { mutableStateOf(false) }
+    var showCostDialog          by remember { mutableStateOf(false) }
+
+    val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
+    var priceInput  by remember(electricityPrice) {
+        mutableStateOf(if (electricityPrice > 0.0) "%.4f".format(electricityPrice) else "")
+    }
+    var symbolInput by remember(currencySymbol) { mutableStateOf(currencySymbol) }
     var showCompareSheet        by remember { mutableStateOf(false) }
 
     val activeFilters = filterState.activeFilterCount
@@ -168,6 +175,13 @@ fun TripHistoryScreen(
                         // Goals & bests
                         IconButton(onClick = onNavigateToTripGoals) {
                             Icon(Icons.Filled.EmojiEvents, "Goals & personal bests",
+                                modifier = Modifier.size(22.dp))
+                        }
+                        // Electricity cost tariff
+                        IconButton(onClick = { showCostDialog = true }) {
+                            Icon(Icons.Filled.Euro, "Set electricity tariff",
+                                tint = if (electricityPrice > 0.0) AccelerationOrange
+                                       else LocalContentColor.current,
                                 modifier = Modifier.size(22.dp))
                         }
                     }
@@ -281,6 +295,68 @@ fun TripHistoryScreen(
     }
 
     // ── Delete selected dialog ────────────────────────────────────────────────
+    if (showCostDialog) {
+        AlertDialog(
+            onDismissRequest = { showCostDialog = false },
+            containerColor   = MaterialTheme.colorScheme.surfaceVariant,
+            icon = { Icon(Icons.Filled.Euro, null,
+                tint = AccelerationOrange, modifier = Modifier.size(28.dp)) },
+            title = { Text("Electricity Tariff", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Enter your electricity price to see trip costs calculated " +
+                        "automatically from recorded kWh. Leave blank to disable.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = priceInput,
+                            onValueChange = { priceInput = it },
+                            label = { Text("Price per kWh") },
+                            placeholder = { Text("0.18") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            suffix = { Text("/kWh") }
+                        )
+                        OutlinedTextField(
+                            value = symbolInput,
+                            onValueChange = { if (it.length <= 3) symbolInput = it },
+                            label = { Text("Symbol") },
+                            placeholder = { Text("€") },
+                            singleLine = true,
+                            modifier = Modifier.width(80.dp)
+                        )
+                    }
+                    if (electricityPrice > 0.0) {
+                        Text(
+                            "Active: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val price = priceInput.trim().replace(',', '.').toDoubleOrNull() ?: 0.0
+                    val symbol = symbolInput.trim().ifBlank { "€" }
+                    viewModel.saveElectricityPrice(price, symbol)
+                    showCostDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCostDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (showDeleteSelectedDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteSelectedDialog = false },
@@ -677,8 +753,12 @@ fun TripItem(
                 TripMetricChip(
                     icon = Icons.Filled.BatteryChargingFull,
                     label = "Energy consumed",
-                    value = trip.energyConsumed
-                        ?.let { "${String.format("%.2f", it)} kWh" } ?: "—",
+                    value = trip.energyConsumed?.let {
+                        val kwh = "${String.format("%.2f", it)} kWh"
+                        if (tripCost != null)
+                            "$kwh ($currencySymbol${String.format("%.2f", tripCost)})"
+                        else kwh
+                    } ?: "—",
                     iconTint = AccelerationOrange,
                     modifier = Modifier.weight(1f)
                 )
@@ -698,28 +778,6 @@ fun TripItem(
                 )
             }
 
-            // ── Cost row — only when price configured ──────────────────────
-            if (tripCost != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.AttachMoney,
-                        contentDescription = null,
-                        tint = AccelerationOrange,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        "Trip cost: $currencySymbol${"%.2f".format(tripCost)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = AccelerationOrange,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
