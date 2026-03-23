@@ -89,7 +89,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         requestRequiredPermissions()
-        requestBatteryOptimizationExemption()
         checkAndShowAutostartReminder()
 
         setContent {
@@ -175,22 +174,6 @@ class MainActivity : ComponentActivity() {
         }
         // Do NOT stop the service — it must keep running in the background
         // for auto trip detection and MQTT telemetry collection.
-    }
-
-    private fun requestBatteryOptimizationExemption() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                try {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to launch battery optimization settings", e)
-                }
-            }
-        }
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v1.2.2-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v1.4.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
@@ -76,7 +76,7 @@
 **Analytics & History**
 - Full per-trip storage: route, telemetry timeseries, computed statistics
 - Daily / weekly / monthly / annual energy consumption views
-- Up to 10 heatmap dimensions with crosshair bin-range interaction (9 universal + 1 AWD-exclusive torque-split map)
+- Up to 14 heatmap dimensions with crosshair bin-range interaction (13 universal + 1 AWD-exclusive torque-split map)
 - OpenStreetMap route overlay with energy event markers, fully offline
 
 **Reliability & Data**
@@ -203,7 +203,7 @@ Every technical metric the vehicle exposes is charted — front and rear motor R
 
 ### VI. Heatmap Analysis
 
-10 heatmap dimensions correlating any two telemetry axes — speed vs. power, SoC vs. regen, altitude vs. consumption, and more. Crosshair interaction shows exact bin ranges on tap. AWD cars gain an additional front vs. rear RPM torque-split heatmap.
+14 heatmap dimensions correlating any two telemetry axes — speed vs. power, SoC vs. regen, tyre pressure vs. consumption, cell voltage spread vs. SoC, altitude vs. consumption, and more. Crosshair interaction shows exact bin ranges on tap. AWD cars gain an additional front vs. rear RPM torque-split heatmap.
 
 <div align="center">
 <table>
@@ -239,6 +239,35 @@ Full MQTT broker configuration (internal or external), local database backup and
   </tr>
 </table>
 </div>
+
+---
+
+### VIII. Battery Degradation Tracking *(v1.4.0)*
+
+Tap the Battery Health card on the dashboard to open a dedicated SoH-over-time view. A least-squares trend line projects future health and estimates the year the pack will reach 80% — the typical EV warranty threshold.
+
+---
+
+### IX. Seasonal Analysis & Trip Goals *(v1.4.0)*
+
+**Seasonal Analysis** (☀️ in Trip History toolbar) groups all trips by meteorological season and visualises average consumption per season with a reference line from your car's WLTP figures. Automatically generates a winter-penalty insight when both winter and summer data are present.
+
+**Trip Goals & Personal Bests** (🏆 in Trip History toolbar) tracks lowest ever efficiency, longest single trip, and longest consecutive daily driving streak. Set a consumption target and/or monthly distance goal — animated progress bars update in real time.
+
+---
+
+### X. Cost Tracking *(v1.4.0)*
+
+Tap the € icon in Trip History to set your electricity tariff. Trip cost appears inline in the energy consumed field (`4.40 kWh (€0.62)`) and in a collapsible monthly summary card showing up to 12 months of history.
+
+---
+
+### XI. Hybrid Charging Session Recording *(v1.4.0)*
+
+Two complementary mechanisms cover all charging scenarios with no user interaction required:
+
+- **Car ON** — real-time session with full Power / SoC / Voltage / Temperature charts in the Charging Detail view
+- **Car OFF** — SoC delta reconstruction on next wake-up covers overnight, timed, and remote charging sessions with no background process dependency
 
 ---
 
@@ -368,16 +397,19 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Heatmap: SOC vs Regen Efficiency ✅ *(v1.4.0)*
 - [x] Heatmap: Speed vs Battery Temperature ✅ *(v1.4.0)*
 - [x] Heatmap: Cell Voltage Spread vs SOC ✅ *(v1.4.0)*
+- [x] Battery degradation tracking ✅ *(v1.4.0)*
+- [x] Cost tracking ✅ *(v1.4.0)*
+- [x] Seasonal consumption analysis ✅ *(v1.4.0)*
+- [x] Trip goals & personal bests ✅ *(v1.4.0)*
 
 ### Planned (v1.4.0+)
 
-- [ ] Battery degradation tracking — plot SoH over time across trips, trend line and projected future health
-- [ ] Cost tracking — input electricity price, calculate cost per trip and per month from recorded kWh
 - [ ] Recurring route detection — automatically group trips that share the same route (e.g. daily commute) and compare efficiency across instances
-- [ ] Trip goals & personal bests — set a consumption target, track streaks, flag personal best efficiency on a known route
-- [ ] Seasonal consumption analysis — automatic winter vs summer efficiency breakdown based on recorded trip history
+- [ ] Trip merging — combine two auto-split trips that were the same journey, separated by a brief stop (e.g. petrol station, red light timeout)
+- [ ] Trip tagging — label trips with a custom tag (e.g. "commute", "motorway", "errand") and filter history and analytics by tag
+- [ ] Battery cell imbalance alert — threshold-based notification when cell voltage spread exceeds a configurable limit (e.g. 0.05 V), surfacing the diagnostic the Cell Voltage Spread heatmap already visualises
+- [ ] DiLink home screen widget — quick-glance tile showing current SoC, last trip distance, and range projection without opening the app
 - [ ] Web dashboard companion — browse trip history and charts on a desktop browser offline-first: upload your backup file, charts render locally, nothing leaves your device
-
 **Vote on features** by 👍 reacting to issues!
 
 ---
@@ -394,7 +426,7 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 
 - **Route not showing:** Check that GPS coordinates in MQTT are non-zero
 - **Trip not auto-starting:** Verify auto-detection is ON, gear is D/R
-- **Service not auto-starting:** Check Autostart permission (disable toggle at disable Autostart), open the app, reboot the UI and re-open the app
+- **Service not auto-starting:** Check Autostart permission (disable toggle at disable Autostart), reboot the UI and re-open the app
 
 See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 
