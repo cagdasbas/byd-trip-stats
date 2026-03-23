@@ -62,6 +62,10 @@ android {
         }
     }
 
+    lint {
+        disable += "ExpiredTargetSdkVersion"
+    }
+
     // Custom APK naming: byd-trip-stats-VERSION.apk
     applicationVariants.all {
         outputs.all {

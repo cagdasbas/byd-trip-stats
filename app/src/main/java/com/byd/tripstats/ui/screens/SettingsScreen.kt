@@ -92,23 +92,6 @@ fun SettingsScreen(
         }
     }
 
-    val savedSettings by preferencesManager.mqttSettings.collectAsState(
-        initial = PreferencesManager.MqttSettings()
-    )
-    var brokerUrl  by remember { mutableStateOf("") }
-    var brokerPort by remember { mutableStateOf("") }
-    var username   by remember { mutableStateOf("") }
-    var password   by remember { mutableStateOf("") }
-    var topic      by remember { mutableStateOf("") }
-
-    LaunchedEffect(savedSettings) {
-        brokerUrl  = savedSettings.brokerUrl
-        brokerPort = savedSettings.brokerPort.toString()
-        username   = savedSettings.username
-        password   = savedSettings.password
-        topic      = savedSettings.topic
-    }
-
     val mqttConnected     by viewModel.mqttConnected.collectAsState()
     val snackbarHostState  = remember { SnackbarHostState() }
     var selectedTab       by remember { mutableStateOf(0) }
