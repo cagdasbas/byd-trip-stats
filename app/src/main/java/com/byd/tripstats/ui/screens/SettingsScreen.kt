@@ -911,12 +911,10 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
 
     FaqEntry(
         "What should my Electro publish interval be?",
-        "Set the interval to 1 second while the car is ON — this gives smooth " +
+        "Set the interval to 1 second for 127.0.0.1 while the car is ON — this gives smooth " +
         "charts and accurate statistics. You don't need faster intervals.\n\n" +
-        "While the car is OFF, set it to 30 seconds. This ensures accurate charging " +
-        "session detection (the app needs regular data to know charging is still active). " +
-        "30 seconds is a good balance between accuracy and database size — even an 8-hour " +
-        "overnight charge produces fewer data points than a single 30-minute drive."
+        "Optionally, while the car is OFF, create another MQTT integration via external subscriber (e.g. hivemq) " +
+        "and set it to 30 seconds. This ensures accurate reconstructed charging session detection."
     ),
 
     FaqEntry(

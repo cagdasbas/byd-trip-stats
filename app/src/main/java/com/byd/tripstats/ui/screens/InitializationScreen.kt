@@ -192,9 +192,9 @@ fun InitializationScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Recommended Electro intervals: 1 second while the car is ON " +
-                            "(smooth charts) and 30 seconds while the car is OFF " +
-                            "(accurate charging sessions). You can change these in " +
+                        text = "Set ONLY at Electro:\nRecommended Electro intervals: 1 second while the car is ON via 127.0.0.1 " +
+                            "(smooth charts). Optionally, another MQTT integration via external broker while the car is OFF at 30 s interval " +
+                            "(reconstructed charging sessions). You can change these in " +
                             "Electro → Integrations → MQTT → Publish Interval.",
                         style = MaterialTheme.typography.bodyMedium
                     )

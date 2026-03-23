@@ -56,7 +56,7 @@ class DatabaseMaintenanceWorker(
             // For trips older than 3 months, keep 1 point per 30 s instead of
             // the recorded 1-10 s density. Trip stats are unaffected.
             val repo = TripRepository.getInstance(applicationContext)
-            // Tiered thinning: 7-30d → 2s, 30-90d → 10s, >90d → 30s
+            // Tiered thinning: 7-30d → 2s, 30-90d → 10s, >90d → 15s
             repo.thinOldDataPoints()
 
             Log.i(TAG, "Weekly maintenance finished successfully")
