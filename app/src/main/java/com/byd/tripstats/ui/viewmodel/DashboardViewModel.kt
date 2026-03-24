@@ -491,24 +491,32 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 when {
                     inTrip && !wasInTrip -> {
-                        // ── Trip start ────────────────────────────────────────
-                        tripStartOdometer    = telemetry.odometer
-                        lastTelemetryTimeMs  = telemetryMs
-                        lastBinOdo           = telemetry.odometer
-                        accumulatedEnergyWh  = 0.0
-                        smoothedWhPerKm      = null
-                        energySamples.clear()
-                        liveSpeedBins.clear()
-                        _activeRangeModel.value = RangeModel.BASELINE
-                        _tripDataPoints.value = listOf(
-                            RangeDataPoint(
-                                distanceKm             = 0.0,
-                                soc                    = telemetry.soc,
-                                electricDrivingRangeKm = telemetry.electricDrivingRangeKm,
-                                projectedRangeKm       = null,
-                                isStabilised           = false
+                        // ── Trip start or resume ──────────────────────────────
+                        val existingTripId = currentTripId.value
+                        if (existingTripId != null) {
+                            // Case: App process was killed mid-trip and is now resuming.
+                            // We must reconstruct the graph and counters from DB history.
+                            restoreTripState(existingTripId, telemetry, telemetryMs)
+                        } else {
+                            // Case: Fresh trip starting right now.
+                            tripStartOdometer    = telemetry.odometer
+                            lastTelemetryTimeMs  = telemetryMs
+                            lastBinOdo           = telemetry.odometer
+                            accumulatedEnergyWh  = 0.0
+                            smoothedWhPerKm      = null
+                            energySamples.clear()
+                            liveSpeedBins.clear()
+                            _activeRangeModel.value = RangeModel.BASELINE
+                            _tripDataPoints.value = listOf(
+                                RangeDataPoint(
+                                    distanceKm             = 0.0,
+                                    soc                    = telemetry.soc,
+                                    electricDrivingRangeKm = telemetry.electricDrivingRangeKm,
+                                    projectedRangeKm       = null,
+                                    isStabilised           = false
+                                )
                             )
-                        )
+                        }
                     }
 
                     !inTrip && wasInTrip -> {
@@ -688,6 +696,69 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val newValue = !_autoTripDetection.value
         tripRepository.setAutoTripDetection(newValue)
         _autoTripDetection.value = newValue
+    }
+
+    // ── Trip state restoration ───────────────────────────────────────────────
+
+    private fun restoreTripState(tripId: Long, telemetry: VehicleTelemetry, telemetryMs: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val trip = tripRepository.getTripById(tripId).first() ?: return@launch
+            val dataPoints = tripRepository.getDataPointsForTrip(tripId).first()
+
+            withContext(Dispatchers.Main) {
+                tripStartOdometer   = trip.startOdometer
+                lastTelemetryTimeMs = telemetryMs
+                lastBinOdo          = telemetry.odometer
+
+                // Reconstruct accumulated energy from the last data point if possible
+                val lastPoint = dataPoints.lastOrNull()
+                accumulatedEnergyWh = if (lastPoint != null) {
+                    (lastPoint.totalDischarge - trip.startTotalDischarge).coerceAtLeast(0.0)
+                } else 0.0
+
+                // Reconstruct energy samples for the rolling window
+                energySamples.clear()
+                dataPoints.forEach { dp ->
+                    val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
+                    val eWh = (dp.totalDischarge - trip.startTotalDischarge).coerceAtLeast(0.0)
+                    energySamples.add(EnergySample(dKm, eWh))
+                }
+
+                // Reconstruct speed bins from all points
+                liveSpeedBins.clear()
+                if (dataPoints.size >= 2) {
+                    dataPoints.zipWithNext { a, b ->
+                        val bin = speedBin(a.speed)
+                        val dist = (b.odometer - a.odometer).coerceAtLeast(0.0)
+                        val energy = (b.totalDischarge - a.totalDischarge).coerceAtLeast(0.0)
+                        val acc = liveSpeedBins.getOrPut(bin) { BinAccumulator() }
+                        acc.distanceKm += dist
+                        acc.energyWh   += energy
+                    }
+                }
+
+                // Initial EMA state
+                smoothedWhPerKm = if (energySamples.size >= 2) {
+                    val wEnergy = energySamples.last().cumulativeEnergyWh - energySamples.first().cumulativeEnergyWh
+                    val wDist   = energySamples.last().distanceKm - energySamples.first().distanceKm
+                    if (wDist > 1.0) wEnergy / wDist else null
+                } else null
+
+                // Reconstruct graph points
+                _tripDataPoints.value = dataPoints.map { dp ->
+                    RangeDataPoint(
+                        distanceKm             = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0),
+                        soc                    = dp.soc,
+                        electricDrivingRangeKm = dp.electricDrivingRangeKm,
+                        projectedRangeKm       = null, // will be re-calculated on next telemetry
+                        isStabilised           = (dp.odometer - trip.startOdometer) >= STABILISATION_KM
+                    )
+                }
+
+                _activeRangeModel.value = RangeModel.BASELINE // will update on next tick
+                Log.i(TAG, "Restored trip state for id=$tripId with ${dataPoints.size} points")
+            }
+        }
     }
 
     // ── Mock drive ────────────────────────────────────────────────────────────

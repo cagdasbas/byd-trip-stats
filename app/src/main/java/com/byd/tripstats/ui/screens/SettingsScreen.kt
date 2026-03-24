@@ -12,6 +12,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -596,6 +597,10 @@ private fun AboutTab(viewModel: DashboardViewModel) {
     val downloadedApk    by viewModel.downloadedApk.collectAsState()
     val canInstallNow    by viewModel.canInstallNow.collectAsState()
 
+    var easterEggClicks by remember { mutableStateOf(0) }
+    var licenseClicks by remember { mutableStateOf(0) }
+    val context = LocalContext.current
+
     Column(
         modifier            = Modifier
             .fillMaxSize()
@@ -614,8 +619,52 @@ private fun AboutTab(viewModel: DashboardViewModel) {
                 SettingsDetailRow("Version",   com.byd.tripstats.BuildConfig.VERSION_NAME)
                 SettingsDetailRow("Changelog", "What's new", url = "https://github.com/angoikon/byd-trip-stats/blob/main/CHANGELOG.md")
                 SettingsDetailRow("Author",    "Angelos Oikonomou (angoikon)")
-                SettingsDetailRow("Platform",  "Android 10 · API 29")
-                SettingsDetailRow("License",   "BUSL 1.1")
+                SettingsDetailRow(
+                    label = "Platform",
+                    value = "Android 10 · API 29",
+                    onClick = {
+                        easterEggClicks++
+                        if (easterEggClicks >= 5) {
+                            easterEggClicks = 0
+                            try {
+                                val intent = Intent().apply {
+                                    setClassName("com.byd.countrycodetool", "com.byd.countrycodetool.MainActivity")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                try {
+                                    Runtime.getRuntime().exec(arrayOf("am", "start", "-n", "com.byd.countrycodetool/com.byd.countrycodetool.MainActivity"))
+                                } catch (e2: Exception) {
+                                    android.widget.Toast.makeText(context, "Could not open tool", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
+                )
+                SettingsDetailRow(
+                    label = "License",
+                    value = "BUSL 1.1",
+                    onClick = {
+                        licenseClicks++
+                        if (licenseClicks >= 5) {
+                            licenseClicks = 0
+                            try {
+                                val intent = Intent().apply {
+                                    setClassName("com.byd.byddevelopmenttools", "com.byd.byddevelopmenttools.VerificationActivity")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                try {
+                                    Runtime.getRuntime().exec(arrayOf("am", "start", "-n", "com.byd.byddevelopmenttools/com.byd.byddevelopmenttools.VerificationActivity"))
+                                } catch (e2: Exception) {
+                                    android.widget.Toast.makeText(context, "Could not open tool", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
+                )
                 SettingsDetailRow("Link",      "github.com/angoikon/byd-trip-stats",
                     url = "https://github.com/angoikon/byd-trip-stats")
             }
@@ -1163,8 +1212,14 @@ private fun SectionHeader(
 }
 
 @Composable
-private fun SettingsDetailRow(label: String, value: String, url: String? = null) {
+private fun SettingsDetailRow(
+    label: String, 
+    value: String, 
+    url: String? = null,
+    onClick: (() -> Unit)? = null
+) {
     val context = LocalContext.current
+    val hiddenClickInteractionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1172,6 +1227,11 @@ private fun SettingsDetailRow(label: String, value: String, url: String? = null)
             .then(
                 if (url != null) Modifier.clickable {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } else if (onClick != null) Modifier.clickable(
+                    interactionSource = hiddenClickInteractionSource,
+                    indication = null
+                ) {
+                    onClick()
                 } else Modifier
             ),
         horizontalArrangement = Arrangement.SpaceBetween,
