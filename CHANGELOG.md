@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.1] - 2026-Mar-24
+
+### Added
+
+- **Background Trip State Restoration** — the `DashboardViewModel` now reconstructs its live graph and efficiency counters from the database upon app resume, preventing data loss when the system kills the process in the background.
+
+### Fixed
+
+- **Unsupported Battery Optimization** — resolved issues with background service termination on certain DiLink firmware versions.
+
+---
+
 ## [1.4.0] - 2026-Mar-23
 
 ### Added

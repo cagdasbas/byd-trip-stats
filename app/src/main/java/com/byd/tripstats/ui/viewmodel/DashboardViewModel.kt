@@ -452,6 +452,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var tripStartOdometer:   Double?  = null
     private var lastTelemetryTimeMs: Long?    = null
+    private var lastBinOdo:          Double?  = null
     private var accumulatedEnergyWh: Double   = 0.0
     private var smoothedWhPerKm:     Double?  = null  // Level 1 EMA state
     private val energySamples      = mutableListOf<EnergySample>()
@@ -472,7 +473,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         viewModelScope.launch {
             var wasInTrip       = false
-            var lastBinOdo:     Double? = null
 
             combine(isInTrip, currentTelemetry) { inTrip, telemetry ->
                 inTrip to telemetry
