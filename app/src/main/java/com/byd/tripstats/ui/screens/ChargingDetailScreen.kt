@@ -95,30 +95,36 @@ fun ChargingDetailScreen(
                 }
             }
 
+            // Synthetic = reconstructed from SoC delta while car was off (no live data points)
+            val isSynthetic = session!!.peakKw == 0.0 && session!!.avgKw == 0.0
+
             when (selectedTab) {
                 0 -> ChargingOverviewTab(session!!, dataPoints)
                 1 -> ChargingChartTab(
-                    dataPoints   = dataPoints,
-                    title        = "Charge Power",
-                    yAxisLabel   = "kW",
-                    lineColor    = AccelerationOrange,
+                    dataPoints    = dataPoints,
+                    isSynthetic   = isSynthetic,
+                    title         = "Charge Power",
+                    yAxisLabel    = "kW",
+                    lineColor     = AccelerationOrange,
                     valueSelector = { it.chargingPower }
                 )
                 2 -> ChargingChartTab(
-                    dataPoints   = dataPoints,
-                    title        = "State of Charge",
-                    yAxisLabel   = "%",
-                    lineColor    = BatteryBlue,
+                    dataPoints    = dataPoints,
+                    isSynthetic   = isSynthetic,
+                    title         = "State of Charge",
+                    yAxisLabel    = "%",
+                    lineColor     = BatteryBlue,
                     valueSelector = { it.soc }
                 )
                 3 -> ChargingChartTab(
-                    dataPoints   = dataPoints,
-                    title        = "HV Battery Voltage",
-                    yAxisLabel   = "V",
-                    lineColor    = BydEcoTealDim,
+                    dataPoints    = dataPoints,
+                    isSynthetic   = isSynthetic,
+                    title         = "HV Battery Voltage",
+                    yAxisLabel    = "V",
+                    lineColor     = BydEcoTealDim,
                     valueSelector = { it.batteryTotalVoltage.toDouble() }
                 )
-                4 -> ChargingTempTab(dataPoints)
+                4 -> ChargingTempTab(dataPoints, isSynthetic)
             }
         }
     }
@@ -251,20 +257,15 @@ private fun OverviewRow(
 
 @Composable
 private fun ChargingChartTab(
-    dataPoints   : List<ChargingDataPointEntity>,
-    title        : String,
-    yAxisLabel   : String,
-    lineColor    : androidx.compose.ui.graphics.Color,
-    valueSelector: (ChargingDataPointEntity) -> Double
+    dataPoints    : List<ChargingDataPointEntity>,
+    isSynthetic   : Boolean = false,
+    title         : String,
+    yAxisLabel    : String,
+    lineColor     : androidx.compose.ui.graphics.Color,
+    valueSelector : (ChargingDataPointEntity) -> Double
 ) {
     if (dataPoints.size < 2) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Not enough data",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        ChartEmptyState(isSynthetic)
         return
     }
 
@@ -474,15 +475,12 @@ private fun ChargingChartTab(
 // ── Tab: Temperature (multi-series) ──────────────────────────────────────────
 
 @Composable
-private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
+private fun ChargingTempTab(
+    dataPoints  : List<ChargingDataPointEntity>,
+    isSynthetic : Boolean = false
+) {
     if (dataPoints.size < 2) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                "Not enough data",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        ChartEmptyState(isSynthetic)
         return
     }
 
@@ -684,6 +682,42 @@ private fun ChargingTempTab(dataPoints: List<ChargingDataPointEntity>) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── Empty state ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun ChartEmptyState(isSynthetic: Boolean) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            if (isSynthetic) {
+                Text("⚡", fontSize = 40.sp)
+                Text(
+                    "Reconstructed session",
+                    style      = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "This session was recorded while the car was off — " +
+                    "live telemetry charts are only available for sessions " +
+                    "started while you are in the car with it powered on.",
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            } else {
+                Text(
+                    "Not enough data",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

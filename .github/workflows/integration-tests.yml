@@ -25,6 +25,10 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+
       # Enable KVM for hardware acceleration — dramatically speeds up the emulator
       - name: Enable KVM
         run: |
@@ -34,6 +38,11 @@ jobs:
 
       - name: Run integration tests on emulator (API 29)
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          KEYSTORE_PATH: release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         with:
           api-level: 29
           arch: x86_64

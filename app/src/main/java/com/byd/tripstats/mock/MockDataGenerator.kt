@@ -102,22 +102,24 @@ class MockDataGenerator {
     /** Generates a charging telemetry packet (AC, ~7 kW). */
     fun generateAcChargingTelemetry(
         chargingPower: Double = 7.2,
-        soc: Double = currentSoc
+        soc: Double = currentSoc,
+        carOn: Int = 0
     ): VehicleTelemetry = generateParkedTelemetry().copy(
         chargingPower = chargingPower,
         soc           = soc,
-        carOn         = 0,
+        carOn         = carOn,
         gear          = "P"
     )
 
     /** Generates a DC fast-charging packet (50 kW). */
     fun generateDcChargingTelemetry(
         chargingPower: Double = 50.0,
-        soc: Double = currentSoc
+        soc: Double = currentSoc,
+        carOn: Int = 1
     ): VehicleTelemetry = generateParkedTelemetry().copy(
         chargingPower = chargingPower,
         soc           = soc,
-        carOn         = 1,
+        carOn         = carOn,
         gear          = "P"
     )
 

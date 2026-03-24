@@ -9,7 +9,6 @@ import com.byd.tripstats.data.config.CarCatalog
 import com.byd.tripstats.data.local.BydStatsDatabase
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.mock.MockDataGenerator
-import com.byd.tripstats.test.telemetry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -19,32 +18,37 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Integration tests for ChargingRepository using an in-memory Room DB.
+ * Integration tests for ChargingRepository (hybrid approach).
  *
- * Safe to run via ./gradlew connectedAndroidTest because testApplicationId in
- * build.gradle.kts isolates these tests under com.byd.tripstats.test — a
- * completely separate package with its own data directory. The real app's
- * database at /data/data/com.byd.tripstats/ is never touched.
+ * Two recording modes:
+ *   REAL-TIME  — car is ON (carOn=1), chargingPower>0 → live session + data points
+ *   SYNTHETIC  — car was OFF during charge → SoC-delta reconstruction on next wake-up
  */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class ChargingRepositoryTest {
 
-    private lateinit var db: BydStatsDatabase
+    private lateinit var db  : BydStatsDatabase
     private lateinit var repo: ChargingRepository
     private val context: Context = ApplicationProvider.getApplicationContext()
-    private val car = CarCatalog.BYD_SEAL_EXCELLENCE
+    private val car = CarCatalog.BYD_SEAL_EXCELLENCE   // 82.5 kWh
     private val gen = MockDataGenerator()
     private val SETTLE = 400L
 
+    private val PREFS_NAME  = "charging_shutdown_state"
+    private val KEY_SOC     = "last_soc"
+    private val KEY_TS      = "last_timestamp"
+    private val KEY_TEMP    = "last_temp_avg"
+    private val KEY_VOLTAGE = "last_voltage"
+
     @Before fun setUp() {
         db = Room.inMemoryDatabaseBuilder(context, BydStatsDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+            .allowMainThreadQueries().build()
         BydStatsDatabase::class.java.getDeclaredField("INSTANCE")
             .also { it.isAccessible = true }.set(null, db)
         ChargingRepository::class.java.getDeclaredField("INSTANCE")
             .also { it.isAccessible = true }.set(null, null)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
         repo = ChargingRepository.getInstance(context)
         Thread.sleep(SETTLE)
         gen.reset()
@@ -55,111 +59,205 @@ class ChargingRepositoryTest {
             .also { it.isAccessible = true }.set(null, null)
         BydStatsDatabase::class.java.getDeclaredField("INSTANCE")
             .also { it.isAccessible = true }.set(null, null)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
         db.close()
     }
+
+    // ── Initial state ─────────────────────────────────────────────────────────
 
     @Test fun initiallyNotCharging() {
         assertFalse(repo.isCharging.value)
         assertNull(repo.activeSessionId.value)
     }
 
-    @Test fun initiallyNoSessionsInDatabase() = runBlocking {
+    @Test fun initiallyNoSessions() = runBlocking {
         assertTrue(repo.getAllSessions().first().isEmpty())
     }
 
-    @Test fun aCChargingPacketOpensASession() = runBlocking {
-        repo.onTelemetry(gen.generateAcChargingTelemetry(chargingPower = 7.2), car)
+    // ── Real-time: car ON ─────────────────────────────────────────────────────
+
+    @Test fun carOnChargingPacketOpensRealTimeSession() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, chargingPower = 7.2), car)
         Thread.sleep(SETTLE)
         assertTrue("Should be charging", repo.isCharging.value)
         assertNotNull("Active session ID should be set", repo.activeSessionId.value)
     }
 
-    @Test fun sessionStoresCorrectStartingSoC() = runBlocking {
-        repo.onTelemetry(gen.generateAcChargingTelemetry(soc = 45.0), car)
+    @Test fun realTimeSessionStoresCorrectStartSoC() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 45.0), car)
         Thread.sleep(SETTLE)
         val session = repo.getSessionById(repo.activeSessionId.value!!)
-        assertNotNull(session)
         assertEquals(45.0, session!!.socStart, 0.1)
     }
 
-    @Test fun sessionIsMarkedActiveWhileCharging() = runBlocking {
-        repo.onTelemetry(gen.generateAcChargingTelemetry(), car)
+    @Test fun realTimeSessionIsMarkedActive() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
         Thread.sleep(SETTLE)
-        val sessions = repo.getAllSessions().first()
-        assertEquals(1, sessions.size)
-        assertTrue("Session should be active", sessions.first().isActive)
+        assertTrue(repo.getAllSessions().first().first().isActive)
     }
 
-    @Test fun dCChargingPacketAlsoOpensASession() = runBlocking {
-        repo.onTelemetry(gen.generateDcChargingTelemetry(chargingPower = 50.0), car)
+    @Test fun realTimeSessionRecordsDataPoints() = runBlocking {
+        repeat(3) {
+            repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
+            Thread.sleep(50)
+        }
         Thread.sleep(SETTLE)
-        assertTrue("DC charging should open session", repo.isCharging.value)
+        val id = repo.activeSessionId.value!!
+        assertTrue(repo.getDataPointsForSessionSync(id).isNotEmpty())
     }
 
-    @Test fun peakKWUpdatedDuringDCSession() = runBlocking {
-        repo.onTelemetry(gen.generateDcChargingTelemetry(chargingPower = 50.0), car)
+    @Test fun peakKwUpdatedDuringRealTimeSession() = runBlocking {
+        repo.onTelemetry(gen.generateDcChargingTelemetry(carOn = 1, chargingPower = 50.0), car)
         Thread.sleep(SETTLE)
-        repo.onTelemetry(gen.generateDcChargingTelemetry(chargingPower = 80.0), car)
+        repo.onTelemetry(gen.generateDcChargingTelemetry(carOn = 1, chargingPower = 80.0), car)
         Thread.sleep(SETTLE)
         val session = repo.getSessionById(repo.activeSessionId.value!!)
-        assertNotNull(session)
         assertEquals(80.0, session!!.peakKw, 0.1)
     }
 
-    @Test fun multipleConsecutiveChargingPacketsResultInOneSession() = runBlocking {
+    @Test fun multipleConsecutivePacketsResultInOneSession() = runBlocking {
         repeat(5) {
-            repo.onTelemetry(gen.generateAcChargingTelemetry(), car)
+            repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
             Thread.sleep(50)
         }
         Thread.sleep(SETTLE)
         assertEquals(1, repo.getAllSessions().first().size)
     }
 
-    @Test fun orphanedActiveSessionIsClosedOnRepositoryCreation() = runBlocking {
-        val sessionId = db.chargingSessionDao().insertSession(
+    // ── Real-time: closing on non-charging packet ─────────────────────────────
+
+    @Test fun nonChargingPacketWithCarOnClosesSession() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
+        Thread.sleep(SETTLE)
+        assertNotNull(repo.activeSessionId.value)
+
+        // Non-charging packet while car still on
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+
+        assertNull("Session should be closed", repo.activeSessionId.value)
+        assertFalse(repo.isCharging.value)
+        assertFalse(repo.getAllSessions().first().first().isActive)
+    }
+
+    @Test fun carOffPacketClosesRealTimeSession() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
+        Thread.sleep(SETTLE)
+        assertNotNull(repo.activeSessionId.value)
+
+        // Car turns off
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 0), car)
+        Thread.sleep(SETTLE)
+
+        assertNull("Session should be closed on car-off", repo.activeSessionId.value)
+        assertFalse(repo.isCharging.value)
+    }
+
+    // ── SoC-delta reconstruction (car-off charging) ───────────────────────────
+
+    @Test fun socIncreaseOnCarWakeCreatessyntheticSession() = runBlocking {
+        writeShutdownState(soc = 50.0f, tsOffsetMs = -3_600_000L)
+
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 75.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+
+        val sessions = repo.getAllSessions().first()
+        assertEquals(1, sessions.size)
+        val session = sessions.first()
+        assertFalse(session.isActive)
+        assertEquals(0.0, session.peakKw, 0.0)   // synthetic — no live data
+        assertEquals(0.0, session.avgKw, 0.0)
+        assertEquals(50.0, session.socStart, 0.1)
+        assertEquals(75.0, session.socEnd!!, 0.1)
+    }
+
+    @Test fun syntheticSessionKwhIsCorrect() = runBlocking {
+        writeShutdownState(soc = 40.0f, tsOffsetMs = -7_200_000L)
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 80.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+        // 40% × 82.5 kWh = 33.0 kWh
+        assertEquals(33.0, repo.getAllSessions().first().first().kwhAdded!!, 0.5)
+    }
+
+    @Test fun socBelowThresholdOnWakeCreatesNoSyntheticSession() = runBlocking {
+        writeShutdownState(soc = 79.5f, tsOffsetMs = -600_000L)  // only 0.5% increase
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 80.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+        assertTrue(repo.getAllSessions().first().isEmpty())
+    }
+
+    @Test fun firstEverRunWithNoSavedStateCreatesNoSyntheticSession() = runBlocking {
+        // No SharedPreferences written
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 80.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+        assertTrue(repo.getAllSessions().first().isEmpty())
+    }
+
+    @Test fun reconstructionRunsOnlyOncePerServiceLifecycle() = runBlocking {
+        writeShutdownState(soc = 50.0f, tsOffsetMs = -3_600_000L)
+
+        // Two carOn packets — reconstruction only on the first
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 75.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 90.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+
+        assertEquals(1, repo.getAllSessions().first().filter { !it.isActive }.size)
+    }
+
+    @Test fun duplicateGuardPreventsDoubleReconstruction() = runBlocking {
+        val shutdownTs = System.currentTimeMillis() - 3_600_000L
+        writeShutdownState(soc = 50.0f, tsOffsetMs = -3_600_000L)
+
+        db.chargingSessionDao().insertSession(
             ChargingSessionEntity(
-                startTime        = System.currentTimeMillis() - 120_000,
-                socStart         = 40.0,
-                batteryTempStart = 22.0,
-                voltageStart     = 450,
-                batteryKwh       = 82.5,
-                carConfigId      = "BYD_SEAL_EXCELLENCE",
-                isActive         = true
+                startTime = shutdownTs + 60_000L,
+                socStart  = 50.0, batteryKwh = 82.5,
+                carConfigId = "BYD_SEAL_EXCELLENCE",
+                isActive = false, socEnd = 75.0, kwhAdded = 20.6
             )
         )
-        ChargingRepository::class.java.getDeclaredField("INSTANCE")
-            .also { it.isAccessible = true }.set(null, null)
-        val freshRepo = ChargingRepository.getInstance(context)
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 75.0, chargingPower = 0.0), car)
         Thread.sleep(SETTLE)
-        val session = db.chargingSessionDao().getSessionById(sessionId)
-        assertFalse("Orphaned session should be closed", session!!.isActive)
-        assertFalse("Fresh repo should not be charging", freshRepo.isCharging.value)
+        assertEquals(1, repo.getAllSessions().first().size)
     }
 
-    @Test fun isChargingFlipsTrueAfterChargingPacket() = runBlocking {
-        assertFalse(repo.isCharging.value)
-        repo.onTelemetry(gen.generateAcChargingTelemetry(), car)
+    // ── SoC persistence ───────────────────────────────────────────────────────
+
+    @Test fun shutdownStatePersistsOnCarOffPackets() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 0, soc = 65.0), car)
         Thread.sleep(SETTLE)
-        assertTrue(repo.isCharging.value)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        assertEquals(65.0f, prefs.getFloat(KEY_SOC, -1f), 0.1f)
     }
 
-    @Test fun completedSessionsVisibleInHistory() = runBlocking {
-        repeat(2) { i ->
-            db.chargingSessionDao().insertSession(
-                ChargingSessionEntity(
-                    startTime        = System.currentTimeMillis() - (i + 1) * 3_600_000L,
-                    socStart         = 30.0 + i * 20,
-                    batteryTempStart = 20.0,
-                    voltageStart     = 400,
-                    batteryKwh       = 82.5,
-                    carConfigId      = "BYD_SEAL_EXCELLENCE",
-                    isActive         = false,
-                    socEnd           = 60.0 + i * 20,
-                    kwhAdded         = 24.75
-                )
-            )
-        }
-        val sessions = repo.getAllSessions().first()
-        assertEquals(2, sessions.filter { !it.isActive }.size)
+    @Test fun shutdownStatePersistsOnCarOnPackets() = runBlocking {
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 72.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        assertEquals(72.0f, prefs.getFloat(KEY_SOC, -1f), 0.1f)
+    }
+
+    // ── Deletion ──────────────────────────────────────────────────────────────
+
+    @Test fun deleteSessionRemovesFromDatabase() = runBlocking {
+        writeShutdownState(soc = 50.0f, tsOffsetMs = -3_600_000L)
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 75.0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+        val id = repo.getAllSessions().first().first().id
+        repo.deleteSession(id)
+        Thread.sleep(SETTLE)
+        assertTrue(repo.getAllSessions().first().isEmpty())
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+
+    private fun writeShutdownState(soc: Float, tsOffsetMs: Long) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putFloat(KEY_SOC,     soc)
+            .putLong(KEY_TS,       System.currentTimeMillis() + tsOffsetMs)
+            .putFloat(KEY_TEMP,    22.0f)
+            .putInt(KEY_VOLTAGE,   450)
+            .commit()
     }
 }

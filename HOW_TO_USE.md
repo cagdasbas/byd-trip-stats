@@ -250,7 +250,7 @@ You need to repeat the above steps after every app update, because the permissio
 
 ## Tips
 
-- **Set Electro's publish interval to 1 second** while the car is on — this gives smooth charts and accurate consumption figures. While the car is off, 30 seconds is fine and recommended for correct charging sessions.
+- **Set Electro's publish interval to 1 second** for 127.0.0.1 while the car is on — this gives smooth charts and accurate consumption figures. While the car is off, you can set (only at Electro) 30 seconds via external broker (e.g. HiveMq) which is fine and recommended for correct charging sessions.
 - **The range projection needs about 2 km to calibrate** — it will show "Calibrating…" at the start of a trip. This is normal.
 - If the MQTT connection shows an error after changing settings, tap **Save & Restart MQTT connection** in Settings → Network.
 - The consumption chart thumbnail on the dashboard shows the last 7 days. Tap it to see 30-day and 12-month views.
