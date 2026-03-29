@@ -34,8 +34,8 @@ android {
         applicationId = "com.byd.tripstats"
         minSdk = 29
         targetSdk = 25
-        versionCode = 8
-        versionName = "1.4.1"
+        versionCode = 9
+        versionName = "1.4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Run instrumented tests as a separate package with its own isolated data

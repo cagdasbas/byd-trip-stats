@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.2] - 2026-Mar-29
+
+### Added
+
+- **Seal U** — support is added for Seal U Design and Seal U Comfort.
+
+### Fixed
+
+- **Live Charging Session Visibility** — resolved an issue in the Charging History screen where active/live charging sessions were filtered out and hidden; active sessions are now correctly displayed and pinned to the top of the list.
+- **Range projection spikes** — during sustained regen or heavy braking the projected range would spike to 500+ km then crash back down. Root cause: negative energy values (`enginePower < 0`) were being subtracted from the rolling consumption window, making the denominator collapse toward zero. Regen is already captured in the SoC-based numerator — the fix excludes negative samples from the rolling window so only forward driving energy contributes to the Wh/km estimate.
+- **App returns to "no trip" state after using CarPlay** — when DiLink killed and recreated the Activity while the user was in CarPlay, the new Activity instance bound to `MqttService` asynchronously and late, leaving a window where `observeMqttServiceState()` had not been called and the UI showed disconnected / not in trip. Fixed by moving bind to `onStart` and unbind to `onStop` (standard Android lifecycle pattern). The foreground service, trip recording, and MQTT connection were unaffected throughout.
+- **"IVI system does not support this operation" popup on update** — `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission triggered a system dialog that DiLink's IVI OS rejects with this error. Removed both the manifest permission declaration and the `requestBatteryOptimizationExemption()` call. The existing `PARTIAL_WAKE_LOCK` in `MqttService` provides equivalent keep-alive behaviour without requiring a system dialog.
+
+### Changed
+
+- **FAQ** — added note clarifying that trips recorded in areas without signal (e.g. underground garages) may take up to 3 minutes to appear in history. The watchdog closes the active trip after 3 minutes of telemetry silence, anchored to the last received packet before signal was lost.
+
+---
+
 ## [1.4.1] - 2026-Mar-24
 
 ### Added
