@@ -38,7 +38,8 @@ fun ChargingHistoryScreen(
     onNavigateBack: () -> Unit
 ) {
     val sessions by viewModel.allChargingSessions.collectAsState()
-    val completed = sessions.filter { !it.isActive }
+    val completed = sessions.filter { !it.isActive }.sortedByDescending { it.startTime }
+    val active = sessions.filter { it.isActive }.sortedByDescending { it.startTime }
 
     var selectedSessions by remember { mutableStateOf(setOf<Long>()) }
     var selectionMode by remember { mutableStateOf(false) }
@@ -137,6 +138,35 @@ fun ChargingHistoryScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                // Active sessions at the top
+                items(active, key = { it.id }) { session ->
+                    ChargingSessionCard(
+                        session = session,
+                        isActive = true,
+                        isSelected = selectedSessions.contains(session.id),
+                        selectionMode = selectionMode,
+                        onClick = {
+                            if (selectionMode) {
+                                selectedSessions =
+                                    if (selectedSessions.contains(session.id)) {
+                                        selectedSessions - session.id
+                                    } else {
+                                        selectedSessions + session.id
+                                    }
+                            } else {
+                                onSessionClick(session.id)
+                            }
+                        },
+                        onLongClick = {
+                            if (!selectionMode) {
+                                selectionMode = true
+                                selectedSessions = setOf(session.id)
+                            }
+                        },
+                        onDelete = { viewModel.deleteChargingSession(session.id) }
+                    )
+                }
+
                 // Summary header
                 if (completed.isNotEmpty()) {
                     item { ChargingStatsSummary(completed) }

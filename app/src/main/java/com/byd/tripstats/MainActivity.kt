@@ -166,8 +166,30 @@ class MainActivity : ComponentActivity() {
         showAutostartReminder.value = false
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Rebind every time the Activity becomes visible — covers the CarPlay
+        // scenario where DiLink kills and recreates the Activity while the
+        // MqttService foreground service keeps running uninterrupted.
+        if (!bound) bindToMqttService()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Unbind when going to background so the binding is clean on next onStart.
+        // The service itself keeps running (START_STICKY + foreground notification)
+        // so trip recording and MQTT connection are unaffected.
+        if (bound) {
+            unbindService(connection)
+            bound = false
+            mqttService = null
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        // Unbind safety net — normally handled by onStop, but covers edge cases
+        // where onStop was skipped (e.g. process death without lifecycle callbacks).
         if (bound) {
             unbindService(connection)
             bound = false
@@ -198,9 +220,9 @@ class MainActivity : ComponentActivity() {
 
         if (missing.isNotEmpty()) {
             permissionLauncher.launch(missing.toTypedArray())
-        } else {
-            bindToMqttService()
         }
+        // No else branch — onStart() handles binding when permissions are
+        // already granted. The permissionLauncher callback handles first-grant.
     }
 
     // ── Service binding ───────────────────────────────────────────────────────

@@ -538,7 +538,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             val deltaSeconds = (telemetryMs - prevMs) / 1000.0
                             if (deltaSeconds in 0.0..MAX_DELTA_SECONDS) {
                                 deltaEnergyWh        = telemetry.enginePower * 1000.0 * (deltaSeconds / 3600.0)
-                                accumulatedEnergyWh += deltaEnergyWh
+                                if (deltaEnergyWh > 0) accumulatedEnergyWh += deltaEnergyWh
                             }
                         }
                         lastTelemetryTimeMs = telemetryMs

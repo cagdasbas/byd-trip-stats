@@ -95,13 +95,15 @@ class CarCatalogTest {
         assertEquals(Drivetrain.RWD, CarCatalog.BYD_SEAL_PREMIUM_RWD.drivetrain)
     }
 
-    @Test fun `Dolphin and Atto 3 are FWD`() {
+    @Test fun `Dolphin,Atto 3 and Seal U are FWD`() {
         assertEquals(Drivetrain.FWD, CarCatalog.BYD_DOLPHIN_STANDARD.drivetrain)
         assertEquals(Drivetrain.FWD, CarCatalog.BYD_DOLPHIN_EXTENDED.drivetrain)
         assertEquals(Drivetrain.FWD, CarCatalog.BYD_ATTO_3.drivetrain)
+        assertEquals(Drivetrain.FWD, CarCatalog.BYD_SEAL_U_COMFORT.drivetrain)
+        assertEquals(Drivetrain.FWD, CarCatalog.BYD_SEAL_U_DESIGN.drivetrain)
     }
 
     @Test fun `catalog contains all 6 expected cars`() {
-        assertEquals(6, CarCatalog.allCars.size)
+        assertEquals(8, CarCatalog.allCars.size)
     }
 }

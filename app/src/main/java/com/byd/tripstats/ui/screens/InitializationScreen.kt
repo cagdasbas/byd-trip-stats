@@ -74,6 +74,10 @@ fun InitializationScreen(
             ),
             "BYD ATTO 3" to listOf(
                 CarCatalog.BYD_ATTO_3
+            ),
+            "BYD Seal U" to listOf(
+                CarCatalog.BYD_SEAL_U_COMFORT,
+                CarCatalog.BYD_SEAL_U_DESIGN
             )
         )
     }

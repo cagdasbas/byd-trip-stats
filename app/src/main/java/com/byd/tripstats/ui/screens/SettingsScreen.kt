@@ -989,6 +989,13 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     ),
 
     FaqEntry(
+        "No network connectivity means trip will be missing from the history?",
+        "Trips recorded in areas without signal (e.g. underground garages) may take up to 3 minutes " +
+        "to appear in history. The watchdog closes the active trip after 3 minutes of telemetry silence, " +
+        "anchored to the last received packet before signal was lost."
+    ),
+
+    FaqEntry(
         "The app stops working after a car restart",
         "You need to exclude BYD Trip Stats from the autostart-killer:\n\n" +
         "1. Open the Disable Autostart app (native BYD app, usually near the file explorer)\n" +

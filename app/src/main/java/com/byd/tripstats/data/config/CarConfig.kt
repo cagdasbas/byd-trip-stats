@@ -77,7 +77,7 @@ object CarCatalog {
 
     val BYD_ATTO_3 = CarConfig(
         id = "BYD_ATTO_3",
-        displayName = "BYD ATTO 3",
+        displayName = "BYD Atto 3",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 60.4,
         wltpKm = 420,
@@ -86,13 +86,37 @@ object CarCatalog {
         rearTyrePressureBar = 2.5
     )
 
+    val BYD_SEAL_U_COMFORT = CarConfig(
+        id = "BYD_SEAL_U_COMFORT",
+        displayName = "BYD Seal U Comfort",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 71.8,
+        wltpKm = 420,
+        referenceConsumptionKwhPer100km = 19.9,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.9
+    )
+
+    val BYD_SEAL_U_DESIGN = CarConfig(
+        id = "BYD_SEAL_U_DESIGN",
+        displayName = "BYD Seal U Design",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 87.0,
+        wltpKm = 500,
+        referenceConsumptionKwhPer100km = 20.5,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.9
+    )
+
     val allCars: List<CarConfig> = listOf(
         BYD_SEAL_DYNAMIC_RWD,
         BYD_SEAL_PREMIUM_RWD,
         BYD_SEAL_EXCELLENCE,
         BYD_DOLPHIN_STANDARD,
         BYD_DOLPHIN_EXTENDED,
-        BYD_ATTO_3
+        BYD_ATTO_3,
+        BYD_SEAL_U_COMFORT,
+        BYD_SEAL_U_DESIGN
     )
 
     fun fromId(id: String?): CarConfig? {
