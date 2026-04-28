@@ -6,6 +6,65 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.0.0] - 2026-Apr-28
+
+### Added
+
+- **Standalone telemetry runtime** — the app now reads vehicle data directly from the BYD DiLink SDK without requiring Electro or an MQTT broker. All dashboard, trip recording, and charging session features run from the built-in runtime path.
+- **Physics-based energy breakdown** — Trip Detail Analysis tab shows how trip energy splits across rolling resistance, aerodynamic drag, elevation gradient (climb / descent), and auxiliary losses (12 V system, HVAC, residual). The model uses Crr = 0.0074 (calibrated against real trips, consistent with ISO 28580 for LFP EV tyres), CdA and kerb mass from the car catalog, and drivetrain efficiency η = 0.88. Components are scaled proportionally so they always sum to the measured consumed energy.
+- **ABRP integration** — live telemetry can be forwarded to A Better Route Planner via the Link Generic API using a user-provided token. Includes a test-upload action and token visibility toggle. Opt-in only — disabled by default.
+- **Outbound MQTT integration** — live telemetry can be published to any external MQTT broker (e.g. HiveMQ or HomeAssistant) using an Electro-compatible JSON schema, a configurable interval, and a test-publish action. Opt-in only — disabled by default.
+- **Connections tab** — dedicated Settings screen for managing ABRP and MQTT integrations, each with a summary card and last-sync timestamp.
+- **Drive and regen mode analytics** — drive mode (Normal / Eco / Sport) and regen mode are recorded with every trip data point, shown as a colour-coded timeline chart in Trip Detail, and summarised in the Analysis tab.
+- **Combined Power + SoC charging chart** — Charging Detail now includes a dual-axis view with an X-axis toggle between elapsed time and SoC percentage, making DC taper shape easy to read.
+- **Per-trip custom DC charging cost** — Trip Detail can override the home-tariff cost estimate with the actual amount paid at a public charger.
+- **Environmentals card** — the dashboard temperature card now shows ambient temperature alongside PM2.5 indoor/outdoor readings where the car exposes them.
+- **App Diagnostics monitor** — a toggleable section in Settings → Data showing live CPU, RAM, thread count, and uptime with 60-second history charts and an integrated ADB shell runner for diagnostics.
+- **Pre-update database backup** — a local database snapshot is created automatically before any APK update is installed.
+- **Autostart management shortcut** — the post-update autostart reminder can deep-link directly into BYD’s native Disable Autostart screen where the firmware exposes it.
+- **CarCatalog physics fields** — all catalog entries now include `estimatedKerbMassKg`, `cdA`, and an `isPhev` flag. PHEV entries also carry `phevUsableBatteryKwh` for correct EV-range projection.
+- **PHEV range projection** — for PHEV models the range projection combines estimated EV range (from usable battery capacity) with the BMS fuel range, giving a combined EV+ICE projection. The chart ceiling adapts to the combined range rather than the EV-only WLTP figure.
+- **VehicleCompatibilityProbe** — runtime probe that records which SDK getter methods are available on the connected car, used for diagnostics and future compatibility reporting.
+
+### Changed
+
+- **Telemetry pipeline** — dashboard, trip recording, charging sessions, and all stat cards are now fed by the standalone runtime path. Electro/HiveMQ is no longer involved in normal operation.
+- **Charging data quality** — charging power, SoC, HV voltage, and cell min/max now come from verified live in-car signals rather than heuristic reconstruction. Peak and average power in Charging Detail derive from real recorded samples.
+- **Battery temperature** — shown as the midpoint of cell min/max when no confirmed pack-average source is available, rather than a potentially wrong single-sensor value.
+- **Odometer** — uses the verified decimal mileage source where available, eliminating the `.0` truncation visible on some firmware builds.
+- **Distance card** — during a trip that continues across a short engine-off break, the dashboard shows both the current engine-on segment distance and the cumulative trip distance separately.
+- **Automatic stop behaviour** — manually stopping an auto-detected trip now warns the user and switches tracking back to manual mode until re-enabled, preventing accidental re-arm.
+- **Consumption charts** — outlier buckets outside 9–35 kWh/100 km are filtered; legends show the live average; the selected-duration average is plotted alongside the car reference line.
+- **Consumption thumbnail** — the dashboard chart thumbnail previews the monthly consumption line instead of the noisier daily view.
+- **Trip timeline sampling** — long trips are sampled evenly across the full duration instead of showing only the earliest events.
+- **Tariff editor** — currency symbol entry uses a styled dropdown of common symbols instead of free-text input.
+- **Tyre dashboard** — temperature is now shown and tyre unit label text enlarged for readability on the DiLink display.
+- **Dashboard animation control** — motion-heavy effects (liquid battery, energy flow canvas) can be disabled from Preferences. Disabling animations reduces CPU usage by up to 80% on DiLink firmware.
+- **Foreground notification** — shows a counting-up elapsed timer ("1:23") anchored to service start instead of a wall-clock timestamp that reset to "0m" on every update. Status text now shows car name, SoC, and charging power only — gear, speed, and motor power removed.
+- **Range projection on late Activity open** — if the app is opened after a trip has already started, the range chart now reconstructs historical points from the database and shows both the BMS and projection lines from trip start, not from when the app was opened.
+- **Range projection stability on return from background** — switching to CarPlay or home and returning no longer resets the chart. `currentTripId` is now kept alive in the ViewModel scope regardless of Activity visibility, preventing the race where a transiently null trip ID caused the chart to restart from the current position.
+- **Update install flow** — silent PackageInstaller sessions are used where available so granted runtime permissions survive the update.
+- **Release build** — R8 minification and resource shrinking enabled; `dontwarn` rules added for optional HiveMQ/Netty classes.
+
+### Fixed
+
+- **Charging icon / `isCharging` detection** — charging-active state now follows real charging evidence rather than stale fallbacks, eliminating false pulse animations.
+- **Charging session flapping** — brief telemetry gaps no longer generate spurious `0 m` junk sessions.
+- **Trip auto-start after process recreation** — dashboard state and service binding now survive DiLink activity churn more reliably.
+- **Battery voltage and charging-power mapping** — HV pack voltage and charging-power signal paths corrected against verified car telemetry.
+- **Trip detail chart layout** — overlapping Y-axis labels and overly dense instantaneous-consumption ticks reduced.
+- **Settings back navigation** — returning from nested settings pages now restores the correct top-level tab.
+- **Trip metrics on active trips** — max speed, max power, and max regen update on every telemetry packet, not only when a throttled data point is written to the database.
+- **Engine-off trip continuation** — trips correctly continue across engine-off breaks shorter than the configured window without ending prematurely on the return to P.
+
+### Removed
+
+- **Electro/MQTT runtime dependency** — the app no longer requires an Electro topic, an embedded broker, or any MQTT connection for normal operation.
+- **Legacy bridge code** — the embedded MQTT broker, the Electro-era external MQTT client, and all compatibility-only broker/topic parameters have been removed.
+- **Obsolete Electro-era UI copy** — legacy MQTT-facing prompts and stale Electro-only wording removed throughout.
+
+---
+
 ## [1.4.2] - 2026-Mar-29
 
 ### Added

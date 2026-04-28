@@ -18,7 +18,7 @@ import java.util.Locale
  * user connects their private bot. Cancelled by TelegramManager.cancelWeeklyBackup()
  * when they disconnect.
  *
- * No dependency on MqttService or any foreground component — runs entirely
+ * No dependency on the foreground telemetry service or any other foreground component — runs entirely
  * in the background, survives reboots via WorkManager's persistence.
  */
 class TelegramBackupWorker(
@@ -35,12 +35,6 @@ class TelegramBackupWorker(
         Log.i(TAG, "Starting weekly Telegram backup…")
 
         val telegramManager = TelegramManager.getInstance(context)
-
-        val cfg = telegramManager.config
-        if (cfg == null) {
-            Log.w(TAG, "No Telegram config — skipping backup")
-            return Result.failure()
-        }
 
         return try {
             val dbFile = context.getDatabasePath(DATABASE_NAME)

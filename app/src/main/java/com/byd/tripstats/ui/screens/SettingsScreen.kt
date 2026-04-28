@@ -1,20 +1,31 @@
 package com.byd.tripstats.ui.screens
 
-import android.app.ActivityManager
+import android.Manifest
 import android.app.AlarmManager
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Debug
+import android.os.Process
+import android.os.SystemClock
+import android.view.Choreographer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,10 +33,20 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -38,68 +59,288 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.connections.AbrpConnectionManager
+import com.byd.tripstats.connections.AbrpConnectionStore
+import com.byd.tripstats.connections.MqttConnectionManager
+import com.byd.tripstats.connections.MqttConnectionStore
+import com.byd.tripstats.data.backup.TelegramManager
+import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.R
+import com.byd.tripstats.sdk.VehicleCompatibilityProbe
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
+import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.max
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
 
-private const val DEBUG_CONNECTIONS = false  // Set to true for connection debugging during development
+private data class AppDiagnosticsSnapshot(
+    val processCpuPercent: Double = 0.0,
+    val systemCpuPercent: Double? = null,
+    val rssMb: Int = 0,
+    val pssMb: Int = 0,
+    val javaHeapMb: Int = 0,
+    val nativeHeapMb: Int = 0,
+    val systemMemoryUsedPercent: Double = 0.0,
+    val systemMemoryUsedMb: Int = 0,
+    val systemMemoryTotalMb: Int = 0,
+    val threadCount: Int = 0,
+    val uptimeMinutes: Int = 0,
+    val frameP50Ms: Double? = null,
+    val frameP95Ms: Double? = null,
+    val jankPercent: Double? = null,
+    val history: List<DiagnosticsHistorySample> = emptyList(),
+)
+
+private data class DiagnosticsHistorySample(
+    val timestampMs: Long,
+    val appCpuPercent: Double,
+    val systemCpuPercent: Double?,
+    val appMemoryMb: Double,
+    val systemMemoryPercent: Double
+)
+
+private data class CpuStat(
+    val total: Long,
+    val idle: Long
+)
+
+private object AppDiagnosticsMonitor {
+    private const val PREFS_NAME = "app_diagnostics"
+    private const val KEY_ENABLED = "details_enabled"
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val _snapshot = MutableStateFlow(AppDiagnosticsSnapshot())
+    private val _enabled = MutableStateFlow(false)
+    private var initialized = false
+    private var samplingJob: Job? = null
+
+    val snapshot: StateFlow<AppDiagnosticsSnapshot> = _snapshot.asStateFlow()
+    val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
+
+    @Synchronized
+    fun initialize(context: Context) {
+        if (initialized) return
+        initialized = true
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val persisted = prefs.getBoolean(KEY_ENABLED, false)
+        _enabled.value = persisted
+        if (persisted) startSampling(context.applicationContext)
+    }
+
+    @Synchronized
+    fun setEnabled(context: Context, value: Boolean) {
+        initialize(context)
+        if (_enabled.value == value) return
+        _enabled.value = value
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ENABLED, value)
+            .apply()
+        if (value) {
+            startSampling(context.applicationContext)
+        } else {
+            stopSampling()
+        }
+    }
+
+    @Synchronized
+    private fun startSampling(context: Context) {
+        if (samplingJob?.isActive == true) return
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        samplingJob = scope.launch {
+            var lastCpuMs = Process.getElapsedCpuTime()
+            var lastWallMs = SystemClock.elapsedRealtime()
+            var lastSystemCpu = readCpuStat()
+            val history = ArrayDeque(_snapshot.value.history)
+
+            while (true) {
+                val nowCpuMs = Process.getElapsedCpuTime()
+                val nowWallMs = SystemClock.elapsedRealtime()
+                val cpuDelta = max(0L, nowCpuMs - lastCpuMs)
+                val wallDelta = max(1L, nowWallMs - lastWallMs)
+                val cpuPercent = ((cpuDelta.toDouble() / wallDelta.toDouble()) * 100.0).coerceAtLeast(0.0)
+                lastCpuMs = nowCpuMs
+                lastWallMs = nowWallMs
+
+                val currentSystemCpu = readCpuStat()
+                val systemCpuPercent = calculateSystemCpuPercent(lastSystemCpu, currentSystemCpu)
+                lastSystemCpu = currentSystemCpu
+
+                val memInfo = activityManager.getProcessMemoryInfo(intArrayOf(Process.myPid())).firstOrNull()
+                val systemMemInfo = ActivityManager.MemoryInfo().also { activityManager.getMemoryInfo(it) }
+                val runtime = Runtime.getRuntime()
+                val javaHeapMb = (((runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024))).toInt()
+                val nativeHeapMb = (Debug.getNativeHeapAllocatedSize() / (1024 * 1024)).toInt()
+                val pssMb = memInfo?.totalPss?.div(1024) ?: 0
+                val rssMb = memInfo?.totalPrivateDirty?.div(1024) ?: 0
+                val systemTotalMb = (systemMemInfo.totalMem / (1024 * 1024)).toInt()
+                val systemUsedMb = ((systemMemInfo.totalMem - systemMemInfo.availMem) / (1024 * 1024)).toInt()
+                val systemMemoryPercent = if (systemMemInfo.totalMem > 0L) {
+                    ((systemMemInfo.totalMem - systemMemInfo.availMem).toDouble() / systemMemInfo.totalMem.toDouble()) * 100.0
+                } else {
+                    0.0
+                }
+                val uptimeMinutes = (SystemClock.elapsedRealtime() / 60_000L).toInt()
+                val threadCount = Thread.getAllStackTraces().size
+                val cutoff = nowWallMs - 60_000L
+
+                history.addLast(
+                    DiagnosticsHistorySample(
+                        timestampMs = nowWallMs,
+                        appCpuPercent = cpuPercent,
+                        systemCpuPercent = systemCpuPercent,
+                        appMemoryMb = pssMb.toDouble(),
+                        systemMemoryPercent = systemMemoryPercent
+                    )
+                )
+                while (history.isNotEmpty() && history.first().timestampMs < cutoff) {
+                    history.removeFirst()
+                }
+
+                _snapshot.value = _snapshot.value.copy(
+                    processCpuPercent = cpuPercent,
+                    systemCpuPercent = systemCpuPercent,
+                    rssMb = rssMb,
+                    pssMb = pssMb,
+                    javaHeapMb = javaHeapMb,
+                    nativeHeapMb = nativeHeapMb,
+                    systemMemoryUsedPercent = systemMemoryPercent,
+                    systemMemoryUsedMb = systemUsedMb,
+                    systemMemoryTotalMb = systemTotalMb,
+                    threadCount = threadCount,
+                    uptimeMinutes = uptimeMinutes,
+                    history = history.toList()
+                )
+
+                delay(2000)
+            }
+        }
+    }
+
+    @Synchronized
+    private fun stopSampling() {
+        samplingJob?.cancel()
+        samplingJob = null
+    }
+}
+
+private class FrameTimeTracker : Choreographer.FrameCallback {
+    private val choreographer = Choreographer.getInstance()
+    private val frameDurationsMs = ArrayDeque<Double>()
+    private var started = false
+    private var lastFrameNanos = 0L
+
+    fun start() {
+        if (started) return
+        started = true
+        lastFrameNanos = 0L
+        choreographer.postFrameCallback(this)
+    }
+
+    fun stop() {
+        if (!started) return
+        started = false
+        choreographer.removeFrameCallback(this)
+    }
+
+    override fun doFrame(frameTimeNanos: Long) {
+        if (!started) return
+        if (lastFrameNanos != 0L) {
+            val durationMs = (frameTimeNanos - lastFrameNanos) / 1_000_000.0
+            if (durationMs.isFinite() && durationMs in 0.0..5000.0) {
+                frameDurationsMs.addLast(durationMs)
+                while (frameDurationsMs.size > 180) frameDurationsMs.removeFirst()
+            }
+        }
+        lastFrameNanos = frameTimeNanos
+        choreographer.postFrameCallback(this)
+    }
+
+    fun snapshot(): Triple<Double?, Double?, Double?> {
+        if (frameDurationsMs.isEmpty()) return Triple(null, null, null)
+        val sorted = frameDurationsMs.toList().sorted()
+        fun percentile(p: Double): Double {
+            val index = ((sorted.lastIndex) * p).toInt().coerceIn(0, sorted.lastIndex)
+            return sorted[index]
+        }
+        val p50 = percentile(0.50)
+        val p95 = percentile(0.95)
+        val janky = frameDurationsMs.count { it > 16.7 }
+        val jankPercent = (janky.toDouble() / frameDurationsMs.size.toDouble()) * 100.0
+        return Triple(p50, p95, jankPercent)
+    }
+}
+
+private fun readCpuStat(): CpuStat? = runCatching {
+    val parts = File("/proc/stat")
+        .readLines()
+        .firstOrNull { it.startsWith("cpu ") }
+        ?.trim()
+        ?.split(Regex("\\s+"))
+        ?: return@runCatching null
+    val values = parts.drop(1).mapNotNull { it.toLongOrNull() }
+    if (values.size < 5) return@runCatching null
+    val idle = values.getOrElse(3) { 0L } + values.getOrElse(4) { 0L }
+    CpuStat(total = values.sum(), idle = idle)
+}.getOrNull()
+
+// Android 10+ restricts /proc/stat reads. Fall back to /proc/loadavg (always
+// readable on Linux) and approximate system load as load1 / cores × 100. Less precise
+// than the stat-based delta but recognisable and updates over time.
+private fun readLoadAvgCpuPercent(): Double? = runCatching {
+    val line = File("/proc/loadavg").readText().trim()
+    if (line.isEmpty()) return@runCatching null
+    val load1 = line.split(Regex("\\s+")).firstOrNull()?.toDoubleOrNull() ?: return@runCatching null
+    if (!load1.isFinite() || load1 < 0.0) return@runCatching null
+    val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+    ((load1 / cores) * 100.0).coerceIn(0.0, 100.0)
+}.getOrNull()
+
+private fun calculateSystemCpuPercent(previous: CpuStat?, current: CpuStat?): Double? {
+    if (previous == null || current == null) return readLoadAvgCpuPercent()
+    val totalDelta = current.total - previous.total
+    val idleDelta = current.idle - previous.idle
+    if (totalDelta <= 0L) return readLoadAvgCpuPercent()
+    val result = ((totalDelta - idleDelta).toDouble() / totalDelta.toDouble() * 100.0).coerceIn(0.0, 100.0)
+    // If the stat-based calculation produces an unrealistic value, fall back to loadavg
+    return if (result.isFinite() && result >= 0.0) result else readLoadAvgCpuPercent()
+}
+
+private val diagnosticsTimeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel         : DashboardViewModel,
     onNavigateBack    : () -> Unit,
-    onNavigateToBackup: () -> Unit
+    onNavigateToBackup: () -> Unit,
+    onNavigateToTripGoals: () -> Unit = {}
 ) {
     val context           = LocalContext.current
     val preferencesManager = remember { PreferencesManager(context) }
     val scope             = rememberCoroutineScope()
 
-    // ── MQTT form ─────────────────────────────────────────────────────────────
-    val savedSettings by preferencesManager.mqttSettings.collectAsState(
-        initial = PreferencesManager.MqttSettings()
-    )
-    var brokerUrl  by remember { mutableStateOf("") }
-    var brokerPort by remember { mutableStateOf("") }
-    var username   by remember { mutableStateOf("") }
-    var password   by remember { mutableStateOf("") }
-    var topic      by remember { mutableStateOf("") }
-
-    LaunchedEffect(savedSettings) {
-        brokerUrl  = savedSettings.brokerUrl
-        brokerPort = savedSettings.brokerPort.toString()
-        username   = savedSettings.username
-        password   = savedSettings.password
-        topic      = savedSettings.topic
-    }
-
-    // ── Debug dialog ──────────────────────────────────────────────────────────
-    var showDebugDialog    by remember { mutableStateOf(false) }
-    var debugBrokerRunning by remember { mutableStateOf(false) }
-    var debugClientRunning by remember { mutableStateOf(false) }
-
-    LaunchedEffect(showDebugDialog) {
-        while (showDebugDialog) {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            @Suppress("DEPRECATION")
-            val services = am.getRunningServices(Int.MAX_VALUE)
-            debugBrokerRunning = services.any { it.service.className.contains("MqttBrokerService") }
-            debugClientRunning = services.any { it.service.className.contains("MqttService") }
-            delay(2000)
-        }
-    }
-
-    val mqttConnected     by viewModel.mqttConnected.collectAsState()
     val snackbarHostState  = remember { SnackbarHostState() }
-    var selectedTab       by remember { mutableStateOf(0) }
-    val tabs = listOf("Network", "Data", "About & FAQ")
+    var selectedTab       by rememberSaveable { mutableIntStateOf(0) }
+    val tabs = listOf("App", "Connections", "Preferences", "About & FAQ")
 
-    val telemetry by viewModel.currentTelemetry.collectAsState()
-    val mqttConnectionError by viewModel.mqttConnectionError.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
 
     Scaffold(
@@ -129,7 +370,7 @@ fun SettingsScreen(
                         selected = selectedTab == index,
                         onClick  = { selectedTab = index },
                         text = {
-                            if (index == 2 && updateInfo != null) {
+                            if (index == 3 && updateInfo != null) {
                                 BadgedBox(
                                     badge = {
                                         Badge(
@@ -165,295 +406,31 @@ fun SettingsScreen(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedTab) {
-                    0 -> MqttTab(
-                        brokerUrl     = brokerUrl,    onBrokerUrl  = { brokerUrl = it },
-                        brokerPort    = brokerPort,   onBrokerPort = { brokerPort = it },
-                        topic         = topic,        onTopic      = { topic = it },
-                        username      = username,     onUsername   = { username = it },
-                        password      = password,     onPassword   = { password = it },
-                        mqttConnected = mqttConnected,
-                        telemetryReceived = telemetry != null,
-                        mqttConnectionError = mqttConnectionError,
-                        showDebug     = DEBUG_CONNECTIONS,
-                        onShowDebug   = { showDebugDialog = true },
-                        onSave = {
-                            scope.launch {
-                                preferencesManager.saveMqttSettings(
-                                    brokerUrl  = brokerUrl,
-                                    brokerPort = brokerPort.toIntOrNull() ?: 1883,
-                                    username   = username,
-                                    password   = password,
-                                    topic      = topic
-                                )
-                                viewModel.restartMqttService(
-                                    brokerUrl  = brokerUrl,
-                                    brokerPort = brokerPort.toIntOrNull() ?: 1883,
-                                    username   = username.ifBlank { null },
-                                    password   = password.ifBlank { null },
-                                    topic      = topic
-                                )
-                                snackbarHostState.showSnackbar(
-                                    message  = "Settings saved and service restarted!",
-                                    duration = SnackbarDuration.Short
-                                )
-                            }
-                        },
-                        onDisconnect = {
-                            scope.launch {
-                                viewModel.stopMqttService()
-                                snackbarHostState.showSnackbar(
-                                    message  = "MQTT service stopped",
-                                    duration = SnackbarDuration.Short
-                                )
-                            }
-                        }
-                    )
-                    1 -> DataManagementTab(
+                    0 -> AppManagementTab(
                         viewModel         = viewModel,
                         context           = context,
                         onNavigateToBackup = onNavigateToBackup,
                         scope             = scope
                     )
-                    2 -> AboutTab(viewModel = viewModel)
+                    1 -> ConnectionsTab()
+                    2 -> AppPreferencesTab(
+                        viewModel = viewModel,
+                        preferencesManager = preferencesManager,
+                        onNavigateToTripGoals = onNavigateToTripGoals
+                    )
+                    3 -> AboutTab(viewModel = viewModel)
                 }
-            }
-        }
-
-        if (showDebugDialog) {
-            DebugDialog(
-                brokerRunning = debugBrokerRunning,
-                clientRunning = debugClientRunning,
-                savedSettings = savedSettings,
-                onDismiss     = { showDebugDialog = false }
-            )
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Tab 1 — MQTT Connection
-// ═══════════════════════════════════════════════════════════════════════════════
-
-@Composable
-private fun MqttTab(
-    brokerUrl    : String, onBrokerUrl  : (String) -> Unit,
-    brokerPort   : String, onBrokerPort : (String) -> Unit,
-    topic        : String, onTopic      : (String) -> Unit,
-    username     : String, onUsername   : (String) -> Unit,
-    password     : String, onPassword   : (String) -> Unit,
-    mqttConnected: Boolean,
-    telemetryReceived   : Boolean,
-    mqttConnectionError : String?,
-    showDebug    : Boolean,
-    onShowDebug  : () -> Unit,
-    onSave       : () -> Unit,
-    onDisconnect : () -> Unit
-) {
-    Column(
-        modifier            = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        SectionHeader(icon = Icons.Filled.Hub, title = "MQTT Connection")
-
-        // Unified broker + connection status card
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Broker card
-            Card(
-                modifier = Modifier.weight(1f),
-                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(
-                    modifier            = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        painter            = painterResource(R.drawable.ic_network_node),
-                        contentDescription = null,
-                        tint               = MaterialTheme.colorScheme.primary,
-                        modifier           = Modifier.size(24.dp)
-                    )
-                    Text("Embedded MQTT Broker",
-                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Running internally on port 1883",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Running",
-                        style      = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color      = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            // Connection card
-            Card(
-                modifier = Modifier.weight(1f),
-                colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(
-                    modifier            = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val usingInternalBroker = brokerUrl.trim().let {
-                        it == "127.0.0.1" || it == "localhost" || it == "::1"
-                    }
-
-                    val statusIcon = when {
-                        mqttConnectionError != null -> Icons.Filled.SyncProblem
-                        telemetryReceived -> Icons.Filled.Sync
-                        else -> Icons.Filled.SyncDisabled
-                    }
-
-                    val statusColor = when {
-                        mqttConnectionError != null -> MaterialTheme.colorScheme.error
-                        telemetryReceived -> RegenGreen
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-
-                    val statusText = when {
-                        mqttConnectionError != null -> "Connection error"
-                        telemetryReceived -> "Receiving telemetry ✓"
-                        mqttConnected -> "Connected, waiting for data"
-                        else -> "Disconnected"
-                    }
-
-                    Icon(
-                        imageVector = statusIcon,
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-
-                    Text(
-                        "Connection status",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        if (usingInternalBroker) "MQTT · Internal broker" else "MQTT · External broker",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Text(
-                        statusText,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = statusColor
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider()
-        Text("Broker Configuration",
-            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-        OutlinedTextField(
-            value = brokerUrl, onValueChange = onBrokerUrl,
-            label = { Text("Broker URL") }, placeholder = { Text("127.0.0.1") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
-        )
-        OutlinedTextField(
-            value = brokerPort, onValueChange = onBrokerPort,
-            label = { Text("Port") }, placeholder = { Text("1883") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-        )
-        OutlinedTextField(
-            value = topic, onValueChange = onTopic,
-            label = { Text("Topic") },
-            placeholder = { Text("electro/telemetry/byd-seal/data") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
-        )
-
-        HorizontalDivider()
-        Text("Authentication (Optional)",
-            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-
-        OutlinedTextField(
-            value = username, onValueChange = onUsername,
-            label = { Text("Username") }, placeholder = { Text("Optional") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true
-        )
-        OutlinedTextField(
-            value = password, onValueChange = onPassword,
-            label = { Text("Password") }, placeholder = { Text("Optional") },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            visualTransformation = PasswordVisualTransformation()
-        )
-
-        // Info card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Filled.Info, null,
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-                Text(
-                    "In Electro app, set the publish interval to 1 second while the car is ON.\n\n" +
-                    "For the internal broker use 127.0.0.1 · port 1883 · no SSL · no credentials. " +
-                    "For an external broker (e.g. HiveMQ) enter its URL, port 8883, and credentials. " +
-                    "Find the topic in Electro → Integrations → MQTT.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        // Action buttons
-        Button(
-            onClick  = onSave,
-            modifier = Modifier.fillMaxWidth(),
-            colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) {
-            Icon(Icons.Filled.Save, null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Save & Restart MQTT connection", fontSize = 16.sp)
-        }
-
-        OutlinedButton(
-            onClick  = onDisconnect,
-            modifier = Modifier.fillMaxWidth(),
-            enabled  = mqttConnected,
-            colors   = ButtonDefaults.outlinedButtonColors(
-                contentColor         = MaterialTheme.colorScheme.error,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-            )
-        ) {
-            Icon(Icons.Filled.CloudOff, null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (mqttConnected) "Disconnect & Stop MQTT connection" else "Service Not Running",
-                fontSize = 16.sp)
-        }
-
-        if (showDebug) {
-            HorizontalDivider()
-            OutlinedButton(
-                onClick  = onShowDebug,
-                modifier = Modifier.fillMaxWidth(),
-                colors   = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) {
-                Icon(Icons.Filled.BugReport, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Debug Connection Info", fontSize = 16.sp)
             }
         }
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Tab 2 — Data Management
+// Tab 1 — App Management
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun DataManagementTab(
+private fun AppManagementTab(
     viewModel         : DashboardViewModel,
     context           : Context,
     onNavigateToBackup: () -> Unit,
@@ -507,6 +484,14 @@ private fun DataManagementTab(
             Spacer(Modifier.width(8.dp))
             Text("Open Backup & Restore", fontSize = 16.sp)
         }
+
+        HorizontalDivider()
+
+        VehicleCompatibilitySection(context = context, scope = scope)
+
+        HorizontalDivider()
+
+        AppDiagnosticsCard()
     }
 
     if (showResetConfirm) {
@@ -554,6 +539,1803 @@ private fun DataManagementTab(
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tab 2 — Connections
+// ═══════════════════════════════════════════════════════════════════════════════
+
+@Composable
+private fun ConnectionsTab() {
+    val context = LocalContext.current
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<DashboardViewModel>()
+    val selectedCarConfig by viewModel.selectedCarConfig.collectAsState()
+    val liveSnapshot by viewModel.vehicleSnapshot.collectAsState()
+    val currentTelemetry by viewModel.currentTelemetry.collectAsState()
+    val liveTelemetry = remember(liveSnapshot, currentTelemetry, selectedCarConfig) {
+        liveSnapshot?.toTelemetry(selectedCarConfig) ?: currentTelemetry
+    }
+    val abrpManager = remember { AbrpConnectionManager(context) }
+    val mqttManager = remember { MqttConnectionManager(context) }
+    val screenScope = rememberCoroutineScope()
+    var settings by remember { mutableStateOf(AbrpConnectionStore.load(context)) }
+    var tokenInput by rememberSaveable { mutableStateOf(settings.userToken) }
+    var enabled by rememberSaveable { mutableStateOf(settings.enabled) }
+    var intervalInput by rememberSaveable { mutableStateOf(settings.uploadIntervalSeconds.toString()) }
+    var lastSavedAt by remember { mutableStateOf(settings.lastUploadAtMs) }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var mqttSettings by remember { mutableStateOf(MqttConnectionStore.load(context)) }
+    var mqttBrokerInput by rememberSaveable { mutableStateOf(mqttSettings.brokerUrl) }
+    var mqttPortInput by rememberSaveable { mutableStateOf(mqttSettings.brokerPort.toString()) }
+    var mqttUsernameInput by rememberSaveable { mutableStateOf(mqttSettings.username) }
+    var mqttPasswordInput by rememberSaveable { mutableStateOf(mqttSettings.password) }
+    var mqttFriendlyNameInput by rememberSaveable { mutableStateOf(mqttSettings.friendlyName) }
+    var mqttEnabled by rememberSaveable { mutableStateOf(mqttSettings.enabled) }
+    var mqttIntervalInput by rememberSaveable { mutableStateOf(mqttSettings.publishIntervalSeconds.toString()) }
+    var mqttResult by remember { mutableStateOf<String?>(null) }
+    var mqttTesting by remember { mutableStateOf(false) }
+    var showAbrpToken by rememberSaveable { mutableStateOf(false) }
+    var showConnectionDetails by rememberSaveable { mutableStateOf(false) }
+
+    fun reloadAbrpDraft() {
+        settings = AbrpConnectionStore.load(context)
+        tokenInput = settings.userToken
+        enabled = settings.enabled
+        intervalInput = settings.uploadIntervalSeconds.toString()
+        lastSavedAt = settings.lastUploadAtMs
+    }
+
+    fun reloadMqttDraft() {
+        mqttSettings = MqttConnectionStore.load(context)
+        mqttBrokerInput = mqttSettings.brokerUrl
+        mqttPortInput = mqttSettings.brokerPort.toString()
+        mqttUsernameInput = mqttSettings.username
+        mqttPasswordInput = mqttSettings.password
+        mqttFriendlyNameInput = mqttSettings.friendlyName
+        mqttEnabled = mqttSettings.enabled
+        mqttIntervalInput = mqttSettings.publishIntervalSeconds.toString()
+    }
+
+    fun reloadConnectionDrafts() {
+        reloadAbrpDraft()
+        reloadMqttDraft()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        SectionHeader(icon = Icons.Filled.Link, title = "Connections")
+
+        if (!showConnectionDetails) {
+            Text(
+                "Choose a connection to configure. The cards below show live status at a glance.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ConnectionSummaryCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Filled.Route,
+                    title = "ABRP",
+                    body = "A Better Routeplanner uploads live telemetry.",
+                    statusLine = "Status: ${if (settings.enabled) "Enabled" else "Disabled"} • ${settings.lastStatus}"
+                )
+                ConnectionSummaryCard(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Filled.Cloud,
+                    title = "MQTT",
+                    body = "Publish live telemetry to a broker such as HiveMQ or HomeAssistant.",
+                    statusLine = "Status: ${if (mqttSettings.enabled) "Enabled" else "Disabled"} • ${mqttSettings.lastStatus}"
+                )
+            }
+            Button(
+                onClick = {
+                    reloadConnectionDrafts()
+                    showConnectionDetails = true
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+            ) {
+                Text("Open Connections")
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = {
+                    reloadConnectionDrafts()
+                    showConnectionDetails = false
+                }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Back to overview")
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "ABRP",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Link Generic token uploads live telemetry to A Better Routeplanner.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Get your ABRP Link Generic token from ABRP web or app. \n" +
+                        "Go to Settings -> Vehicle -> Live data -> Edit connections -> " +
+                        "In-car live data -> Link Generic",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Enable ABRP",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (enabled) "Uploads every $intervalInput s."
+                                else "Turn on to configure ABRP uploads.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enabled,
+                            onCheckedChange = { next ->
+                                enabled = next
+                                if (!next) {
+                                    val interval = intervalInput.toIntOrNull()?.coerceIn(5, 120) ?: 5
+                                    settings = settings.copy(
+                                        enabled = false,
+                                        userToken = tokenInput,
+                                        apiKey = settings.apiKey.ifBlank { AbrpConnectionStore.DEFAULT_PUBLIC_API_KEY },
+                                        uploadIntervalSeconds = interval
+                                    )
+                                    AbrpConnectionStore.save(context, settings)
+                                    lastSavedAt = System.currentTimeMillis()
+                                }
+                            },
+                            thumbContent = if (!enabled) {
+                                {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(ToggleUncheckedTrack, CircleShape)
+                                    )
+                                }
+                            } else null,
+                            colors = SwitchDefaults.colors(
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = ToggleUncheckedTrack,
+                                uncheckedBorderColor = ToggleUncheckedTrack
+                            )
+                        )
+                    }
+                    AnimatedVisibility(visible = enabled, enter = expandVertically(), exit = shrinkVertically()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SettingsGroupLabel("Connection")
+                            OutlinedTextField(
+                                value = tokenInput,
+                                onValueChange = { tokenInput = it.trim() },
+                                label = { Text("ABRP user token") },
+                                placeholder = { Text("Paste your Link Generic token") },
+                                singleLine = true,
+                                visualTransformation = if (showAbrpToken) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
+                                    IconButton(onClick = { showAbrpToken = !showAbrpToken }) {
+                                        Icon(
+                                            imageVector = if (showAbrpToken) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                            contentDescription = if (showAbrpToken) "Hide token" else "Show token"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = intervalInput,
+                                onValueChange = { intervalInput = it.filter(Char::isDigit).take(3) },
+                                label = { Text("Upload interval (seconds)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = {
+                                        val interval = intervalInput.toIntOrNull()?.coerceIn(5, 120) ?: 5
+                                        settings = settings.copy(
+                                            enabled = enabled,
+                                            userToken = tokenInput,
+                                            apiKey = settings.apiKey.ifBlank { AbrpConnectionStore.DEFAULT_PUBLIC_API_KEY },
+                                            uploadIntervalSeconds = interval
+                                        )
+                                        AbrpConnectionStore.save(context, settings)
+                                        lastSavedAt = System.currentTimeMillis()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                                ) {
+                                    Text("Save")
+                                }
+                                Button(
+                                    onClick = {
+                                        val telemetry = liveTelemetry
+                                        if (telemetry == null) {
+                                            testResult = if (viewModel.serviceConnected.value) {
+                                                "Telemetry not ready yet - wait a second and try again"
+                                            } else {
+                                                "Telemetry service not connected yet"
+                                            }
+                                            return@Button
+                                        }
+                                        val current = AbrpConnectionStore.load(context).copy(
+                                            enabled = enabled,
+                                            userToken = tokenInput,
+                                            apiKey = settings.apiKey.ifBlank { AbrpConnectionStore.DEFAULT_PUBLIC_API_KEY },
+                                            uploadIntervalSeconds = intervalInput.toIntOrNull()?.coerceIn(5, 120) ?: 5
+                                        )
+                                        AbrpConnectionStore.save(context, current)
+                                        screenScope.launch(Dispatchers.IO) {
+                                            val (ok, status) = abrpManager.testUpload(telemetry, selectedCarConfig, current)
+                                            launch(Dispatchers.Main) {
+                                                testResult = if (ok) "Test upload succeeded" else status
+                                                settings = AbrpConnectionStore.load(context)
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                                ) {
+                                    Text("Test & Save")
+                                }
+                                OutlinedButton(onClick = {
+                                    reloadAbrpDraft()
+                                }) {
+                                    Text("Reload")
+                                }
+                            }
+                        }
+                    }
+                }
+                ConnectionStatusCard(
+                    title = "ABRP status",
+                    content = {
+                        SettingsDetailRow("Configured", if (settings.userToken.isBlank()) "No" else "Yes")
+                        SettingsDetailRow("Enabled", if (settings.enabled) "Yes" else "No")
+                        SettingsDetailRow("Last upload", if (settings.lastUploadAtMs > 0L) {
+                            formatFriendlyTimestamp(settings.lastUploadAtMs)
+                        } else {
+                            "n/a"
+                        })
+                        SettingsDetailRow("Last status", settings.lastStatus)
+                        if (!testResult.isNullOrBlank()) {
+                            Text(
+                                testResult!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (testResult!!.contains("succeeded", ignoreCase = true)) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "MQTT",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Publish live telemetry to an external broker such as HiveMQ.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Enable MQTT", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                            Text(
+                                if (mqttEnabled) "Publishes the live telemetry JSON every $mqttIntervalInput s."
+                                else "Turn on to configure MQTT publishing.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = mqttEnabled,
+                            onCheckedChange = { next ->
+                                mqttEnabled = next
+                                if (!next) {
+                                    val interval = mqttIntervalInput.toIntOrNull()?.coerceIn(1, 120) ?: 1
+                                    val port = mqttPortInput.toIntOrNull()?.coerceIn(1, 65535) ?: 1883
+                                    mqttSettings = mqttSettings.copy(
+                                        enabled = false,
+                                        brokerUrl = mqttBrokerInput,
+                                        brokerPort = port,
+                                        username = mqttUsernameInput,
+                                        password = mqttPasswordInput,
+                                        friendlyName = mqttFriendlyNameInput,
+                                        publishIntervalSeconds = interval
+                                    )
+                                    MqttConnectionStore.save(context, mqttSettings)
+                                    mqttResult = "MQTT disabled and saved"
+                                }
+                            },
+                            thumbContent = if (!mqttEnabled) {
+                                {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(ToggleUncheckedTrack, CircleShape)
+                                    )
+                                }
+                            } else null,
+                            colors = SwitchDefaults.colors(
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = ToggleUncheckedTrack,
+                                uncheckedBorderColor = ToggleUncheckedTrack
+                            )
+                        )
+                    }
+                    AnimatedVisibility(visible = mqttEnabled, enter = expandVertically(), exit = shrinkVertically()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SettingsGroupLabel("Connection")
+                            OutlinedTextField(
+                                value = mqttBrokerInput,
+                                onValueChange = { mqttBrokerInput = it.trim() },
+                                label = { Text("Broker URL") },
+                                placeholder = { Text("example.hivemq.cloud") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = mqttPortInput,
+                                onValueChange = { mqttPortInput = it.filter(Char::isDigit).take(5) },
+                                label = { Text("Port") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = mqttFriendlyNameInput,
+                                onValueChange = { mqttFriendlyNameInput = it.trim() },
+                                label = { Text("Device friendly name") },
+                                placeholder = { Text("my-byd-seal") },
+                                singleLine = true,
+                                supportingText = {
+                                    val preview = mqttFriendlyNameInput.replace("[^a-zA-Z0-9_-]".toRegex(), "_").ifBlank { "<android-id>" }
+                                    Text("Topic: byd-trip-stats/$preview/state", style = MaterialTheme.typography.bodySmall)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = mqttUsernameInput,
+                                onValueChange = { mqttUsernameInput = it },
+                                label = { Text("Username") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = mqttPasswordInput,
+                                onValueChange = { mqttPasswordInput = it },
+                                label = { Text("Password") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = mqttIntervalInput,
+                                onValueChange = { mqttIntervalInput = it.filter(Char::isDigit).take(3) },
+                                label = { Text("Publish interval (seconds)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                supportingText = { Text("While driving: every ${mqttIntervalInput.ifBlank { "1" }} s · Car off: every 30 s", style = MaterialTheme.typography.bodySmall) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = {
+                                        val interval = mqttIntervalInput.toIntOrNull()?.coerceIn(1, 120) ?: 1
+                                        val port = mqttPortInput.toIntOrNull()?.coerceIn(1, 65535) ?: 1883
+                                        mqttSettings = mqttSettings.copy(
+                                            enabled = mqttEnabled,
+                                            brokerUrl = mqttBrokerInput,
+                                            brokerPort = port,
+                                            username = mqttUsernameInput,
+                                            password = mqttPasswordInput,
+                                            friendlyName = mqttFriendlyNameInput,
+                                            publishIntervalSeconds = interval
+                                        )
+                                        MqttConnectionStore.save(context, mqttSettings)
+                                        mqttResult = "MQTT settings saved"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                                ) {
+                                    Text("Save")
+                                }
+                                Button(
+                                    enabled = !mqttTesting,
+                                    onClick = {
+                                        val telemetry = liveTelemetry
+                                        if (telemetry == null) {
+                                            mqttResult = "No live telemetry yet"
+                                            return@Button
+                                        }
+                                        val interval = mqttIntervalInput.toIntOrNull()?.coerceIn(1, 120) ?: 1
+                                        val port = mqttPortInput.toIntOrNull()?.coerceIn(1, 65535) ?: 1883
+                                        val current = MqttConnectionStore.load(context).copy(
+                                            enabled = mqttEnabled,
+                                            brokerUrl = mqttBrokerInput,
+                                            brokerPort = port,
+                                            username = mqttUsernameInput,
+                                            password = mqttPasswordInput,
+                                            friendlyName = mqttFriendlyNameInput,
+                                            publishIntervalSeconds = interval
+                                        )
+                                        MqttConnectionStore.save(context, current)
+                                        mqttTesting = true
+                                        mqttResult = null
+                                        screenScope.launch {
+                                            try {
+                                                val (ok, status) = withContext(Dispatchers.IO) {
+                                                    mqttManager.testPublish(telemetry)
+                                                }
+                                                mqttResult = if (ok) "MQTT test publish succeeded" else status
+                                                mqttSettings = MqttConnectionStore.load(context)
+                                            } catch (e: Exception) {
+                                                mqttResult = "MQTT test failed: ${e.message}"
+                                            } finally {
+                                                mqttTesting = false
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                                ) {
+                                    Text(if (mqttTesting) "Testing…" else "Test & Save")
+                                }
+                                OutlinedButton(onClick = {
+                                    reloadMqttDraft()
+                                }) {
+                                    Text("Reload")
+                                }
+                            }
+                        }
+                    }
+                }
+                ConnectionStatusCard(
+                    title = "MQTT status",
+                    content = {
+                        SettingsDetailRow("Configured", if (mqttSettings.brokerUrl.isBlank()) "No" else "Yes")
+                        SettingsDetailRow("Enabled", if (mqttSettings.enabled) "Yes" else "No")
+                        SettingsDetailRow("Last publish", if (mqttSettings.lastPublishAtMs > 0L) {
+                            formatFriendlyTimestamp(mqttSettings.lastPublishAtMs)
+                        } else {
+                            "n/a"
+                        })
+                        SettingsDetailRow("Last status", mqttSettings.lastStatus)
+                        if (!mqttResult.isNullOrBlank()) {
+                            Text(
+                                mqttResult!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (mqttResult!!.contains("succeeded", ignoreCase = true)) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionSummaryCard(
+    modifier: Modifier,
+    icon: ImageVector,
+    title: String,
+    body: String,
+    statusLine: String
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                statusLine,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConnectionStatusCard(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            content()
+        }
+    }
+}
+
+private fun formatFriendlyTimestamp(epochMs: Long): String {
+    val formatter = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+    return formatter.format(Date(epochMs))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tab 3 — Preferences
+// ═══════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun AppPreferencesTab(
+    viewModel: DashboardViewModel,
+    preferencesManager: PreferencesManager,
+    onNavigateToTripGoals: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val dashboardAnimationsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(initial = true)
+    val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
+    val currencySymbol by viewModel.currencySymbol.collectAsState()
+    val tripGoals by viewModel.tripGoals.collectAsState()
+    val personalBests by viewModel.personalBests.collectAsState()
+    var showTariffDialog by remember { mutableStateOf(false) }
+    var priceInput by remember(electricityPrice) {
+        mutableStateOf(if (electricityPrice > 0.0) "%.4f".format(electricityPrice) else "")
+    }
+    val currencyOptions = remember {
+        listOf(
+            "€" to "EUR",
+            "£" to "GBP",
+            "$" to "USD"
+        )
+    }
+    var currencyMenuExpanded by remember { mutableStateOf(false) }
+    var selectedCurrency by remember(currencySymbol) {
+        mutableStateOf(currencyOptions.firstOrNull { it.first == currencySymbol } ?: currencyOptions.first())
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        SectionHeader(icon = Icons.Filled.Tune, title = "Preferences")
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "Dashboard animations",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Toggle the animated energy flow, liquid battery effects, and other motion-heavy dashboard transitions.\n " +
+                            "When using those, expect CPU to reach 100% (up from 20%).",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = dashboardAnimationsEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                preferencesManager.saveDashboardAnimationsEnabled(enabled)
+                            }
+                        },
+                        thumbContent = if (!dashboardAnimationsEnabled) {
+                            {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .background(ToggleUncheckedTrack, CircleShape)
+                                )
+                            }
+                        } else null,
+                        colors = SwitchDefaults.colors(
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = ToggleUncheckedTrack,
+                            uncheckedBorderColor = ToggleUncheckedTrack
+                        )
+                    )
+                }
+
+                Text(
+                    if (dashboardAnimationsEnabled) {
+                        "Enabled: richer visuals, with a bit more rendering work on the dashboard."
+                    } else {
+                        "Disabled: static energy flow rendering and reduced animation overhead on the main dashboard."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Electricity tariff",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    if (electricityPrice > 0.0) {
+                        "Current rate: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh"
+                    } else {
+                        "Set your home charging tariff so trip costs can be estimated consistently."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = { showTariffDialog = true }) {
+                    Icon(Icons.Filled.Euro, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (electricityPrice > 0.0) "Edit tariff" else "Set tariff")
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "Goals & personal bests",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Consumption goal: ${
+                        tripGoals.targetConsumptionKwhPer100km?.let { "%.1f kWh/100km".format(it) } ?: "Not set"
+                    }",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Monthly distance goal: ${
+                        tripGoals.targetDistanceKmPerMonth?.let { "%.0f km".format(it) } ?: "Not set"
+                    }",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Best consumption: ${
+                        personalBests.bestConsumption?.let { "%.1f kWh/100km".format(it) } ?: "—"
+                    }",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Best distance: ${
+                        personalBests.bestDistance?.let { "%.1f km".format(it) } ?: "—"
+                    }",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = onNavigateToTripGoals) {
+                    Icon(Icons.Filled.EmojiEvents, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Open goals & personal bests")
+                }
+            }
+        }
+    }
+
+    if (showTariffDialog) {
+        AlertDialog(
+            onDismissRequest = { showTariffDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Electricity tariff", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Enter your home charging price so trip costs can use your fixed tariff as the baseline.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = priceInput,
+                        onValueChange = { priceInput = it },
+                        label = { Text("Price per kWh") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                    Box {
+                        OutlinedTextField(
+                            value = "${selectedCurrency.first} (${selectedCurrency.second})",
+                            onValueChange = { },
+                            label = { Text("Currency") },
+                            singleLine = true,
+                            readOnly = true,
+                            trailingIcon = {
+                                IconButton(onClick = { currencyMenuExpanded = !currencyMenuExpanded }) {
+                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select currency")
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        DropdownMenu(
+                            expanded = currencyMenuExpanded,
+                            onDismissRequest = { currencyMenuExpanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            tonalElevation = 0.dp
+                        ) {
+                            currencyOptions.forEach { (symbol, code) ->
+                                DropdownMenuItem(
+                                    text = { Text("$code ($symbol)") },
+                                    onClick = {
+                                        selectedCurrency = symbol to code
+                                        currencyMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    if (electricityPrice > 0.0) {
+                        Text(
+                            "Active: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val price = priceInput.replace(',', '.').toDoubleOrNull()
+                        viewModel.saveElectricityPrice(price ?: 0.0, selectedCurrency.first)
+                        showTariffDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTariffDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AppDiagnosticsCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var adbCommand by rememberSaveable { mutableStateOf("dumpsys package ${context.packageName}") }
+    var adbOutput by rememberSaveable { mutableStateOf("") }
+    var adbRunning by remember { mutableStateOf(false) }
+    val diagnostics by AppDiagnosticsMonitor.snapshot.collectAsState()
+    val diagnosticsEnabled by AppDiagnosticsMonitor.enabled.collectAsState()
+
+    LaunchedEffect(context) {
+        AppDiagnosticsMonitor.initialize(context)
+    }
+
+    SectionHeader(icon = Icons.Filled.Memory, title = "App Diagnostics")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Show diagnostic details",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        if (diagnosticsEnabled) {
+                            "Live process, memory, frame, permission, and ADB tools are visible."
+                        } else {
+                            "Off by default so this screen does not keep polling while you are just checking backups."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = diagnosticsEnabled,
+                    onCheckedChange = { AppDiagnosticsMonitor.setEnabled(context, it) },
+                    thumbContent = if (!diagnosticsEnabled) {
+                        {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(ToggleUncheckedTrack, CircleShape)
+                            )
+                        }
+                    } else null,
+                    colors = SwitchDefaults.colors(
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = ToggleUncheckedTrack,
+                        uncheckedBorderColor = ToggleUncheckedTrack
+                    )
+                )
+            }
+
+            if (!diagnosticsEnabled) {
+                Text(
+                    "Enable this only when troubleshooting; the history charts sample every 2 seconds while visible.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+
+                // ── Background readiness ────────────────────────────────────────
+                SettingsGroupLabel("Background Readiness")
+                val hasWriteSecureSettings = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, android.Manifest.permission.WRITE_SECURE_SETTINGS
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                val hasBackgroundLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                val hasReadLogs = androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, android.Manifest.permission.READ_LOGS
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                SettingsDetailRow(
+                    "Write settings",
+                    if (hasWriteSecureSettings) "✅ granted" else "⚠️ NOT granted — run install script"
+                )
+                SettingsDetailRow(
+                    "Background location",
+                    if (hasBackgroundLocation) "✅ granted" else "⚠️ NOT granted — run install script"
+                )
+                SettingsDetailRow(
+                    "Read logs",
+                    if (hasReadLogs) "✅ granted" else "⚠️ NOT granted"
+                )
+                SettingsDetailRow("Startup safeguards", "Applied automatically on app start")
+                if (!hasWriteSecureSettings || !hasBackgroundLocation) {
+                    androidx.compose.material3.Card(
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ Background permissions not granted. " +
+                                "Open the app fresh to trigger the ADB setup dialog",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
+                SettingsGroupLabel("Process")
+                SettingsDetailRow("CPU", "%.1f%%".format(diagnostics.processCpuPercent))
+                // System CPU hidden when unavailable (BYD DiLink restricts /proc/stat and /proc/loadavg)
+                diagnostics.systemCpuPercent?.let {
+                    SettingsDetailRow("System CPU", "%.1f%%".format(it))
+                }
+                SettingsDetailRow("PSS", "${diagnostics.pssMb} MB")
+                SettingsDetailRow("Private dirty", "${diagnostics.rssMb} MB")
+                SettingsDetailRow("Java heap", "${diagnostics.javaHeapMb} MB")
+                SettingsDetailRow("Native heap", "${diagnostics.nativeHeapMb} MB")
+                SettingsDetailRow(
+                    "System memory",
+                    "%.1f%% (%d / %d MB)".format(
+                        diagnostics.systemMemoryUsedPercent,
+                        diagnostics.systemMemoryUsedMb,
+                        diagnostics.systemMemoryTotalMb
+                    )
+                )
+                SettingsDetailRow("Threads", diagnostics.threadCount.toString())
+                SettingsDetailRow("App uptime", "${diagnostics.uptimeMinutes} min")
+
+                SettingsGroupLabel("60-second history")
+            DiagnosticsHistoryChart(
+                title = "CPU usage",
+                leftLabel = "App",
+                rightLabel = "System",
+                leftColor = BydElectricAzure,
+                rightColor = AccelerationOrange,
+                timestampsMs = diagnostics.history.map { it.timestampMs },
+                values = diagnostics.history.map { it.appCpuPercent },
+                secondaryValues = diagnostics.history.map { it.systemCpuPercent ?: 0.0 },
+                leftSuffix = "%",
+                rightSuffix = "%"
+            )
+                DiagnosticsHistoryChart(
+                    title = "Memory usage",
+                leftLabel = "App PSS",
+                rightLabel = "System",
+                leftColor = BatteryBlue,
+                rightColor = RegenGreen,
+                timestampsMs = diagnostics.history.map { it.timestampMs },
+                values = diagnostics.history.map { it.appMemoryMb },
+                secondaryValues = diagnostics.history.map { it.systemMemoryPercent },
+                leftSuffix = " MB",
+                rightSuffix = "%",
+                normalizeSeparately = true
+                )
+
+                SettingsGroupLabel("ADB shell")
+                Text(
+                    "Runs through the authorized local ADB daemon. Enter the command exactly as you would after `adb shell`.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = adbCommand,
+                    onValueChange = { adbCommand = it },
+                    label = { Text("Shell command") },
+                    singleLine = false,
+                    minLines = 1,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        adbRunning = true
+                        adbOutput = "Running..."
+                        scope.launch {
+                            val result = AdbPermissionManager.runShellCommand(context, adbCommand)
+                            adbOutput = "exit=${result.exitCode}\n${result.output.ifBlank { "(no output)" }}"
+                            adbRunning = false
+                        }
+                    },
+                    enabled = !adbRunning && adbCommand.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) {
+                    Icon(Icons.Filled.Terminal, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (adbRunning) "Running..." else "Run shell command")
+                }
+                if (adbOutput.isNotBlank()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                    ) {
+                        Text(
+                            adbOutput.take(4000),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Samples refresh every 2 seconds while this screen is open.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsHistoryChart(
+    title: String,
+    leftLabel: String,
+    rightLabel: String,
+    leftColor: Color,
+    rightColor: Color,
+    timestampsMs: List<Long>,
+    values: List<Double>,
+    secondaryValues: List<Double>,
+    leftSuffix: String,
+    rightSuffix: String,
+    normalizeSeparately: Boolean = false
+) {
+    val primaryLatest = values.lastOrNull()
+    val secondaryLatest = secondaryValues.lastOrNull()
+    val primaryMax = (values.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+    val secondaryMax = (secondaryValues.maxOrNull() ?: 0.0).coerceAtLeast(1.0)
+    val sharedMax = primaryMax.coerceAtLeast(secondaryMax)
+    val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+    var touchPos by remember { mutableStateOf<Offset?>(null) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "last 60s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                DiagnosticsLegendItem(
+                    color = leftColor,
+                    label = "$leftLabel ${primaryLatest?.let { "%.1f".format(it) + leftSuffix } ?: "n/a"}"
+                )
+                DiagnosticsLegendItem(
+                    color = rightColor,
+                    label = "$rightLabel ${secondaryLatest?.let { "%.1f".format(it) + rightSuffix } ?: "n/a"}"
+                )
+            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .pointerInput(timestampsMs, values, secondaryValues) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            touchPos = down.position
+                            drag(down.id) { change ->
+                                touchPos = change.position
+                            }
+                            touchPos = null
+                        }
+                    }
+            ) {
+                val padL = 48f
+                val padR = 48f
+                val padY = 8f
+                val chartW = size.width - padL - padR
+                val chartH = size.height - padY * 2
+                val gridColor = Color.White.copy(alpha = 0.16f)
+                val nc = drawContext.canvas.nativeCanvas
+                val labelPaint = android.graphics.Paint().apply {
+                    color = axisLabelColor.toArgb()
+                    textSize = 19f
+                    isAntiAlias = true
+                }
+                repeat(4) { index ->
+                    val y = padY + chartH * index / 3f
+                    drawLine(gridColor, Offset(padL, y), Offset(size.width - padR, y), 1f)
+                }
+                repeat(4) { index ->
+                    val ratio = 1.0 - index / 3.0
+                    val y = padY + chartH * index / 3f
+                    val leftValue = (if (normalizeSeparately) primaryMax else sharedMax) * ratio
+                    val rightValue = (if (normalizeSeparately) secondaryMax else sharedMax) * ratio
+                    labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
+                    nc.drawText(
+                        "%.0f".format(leftValue),
+                        padL - 8f,
+                        y + 7f,
+                        labelPaint
+                    )
+                    labelPaint.textAlign = android.graphics.Paint.Align.LEFT
+                    nc.drawText(
+                        "%.0f".format(rightValue),
+                        size.width - padR + 8f,
+                        y + 7f,
+                        labelPaint
+                    )
+                }
+
+                fun drawSeries(series: List<Double>, color: Color, strokeWidth: Float, maxForSeries: Double) {
+                    if (series.size < 2) return
+                    val lastIndex = (series.size - 1).coerceAtLeast(1)
+                    series.zipWithNext().forEachIndexed { index, (a, b) ->
+                        val x1 = padL + chartW * index / lastIndex.toFloat()
+                        val x2 = padL + chartW * (index + 1) / lastIndex.toFloat()
+                        val y1 = padY + chartH - ((a / maxForSeries).coerceIn(0.0, 1.0).toFloat() * chartH)
+                        val y2 = padY + chartH - ((b / maxForSeries).coerceIn(0.0, 1.0).toFloat() * chartH)
+                        drawLine(
+                            color = color,
+                            start = Offset(x1, y1),
+                            end = Offset(x2, y2),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round
+                        )
+                    }
+                }
+
+                drawRect(
+                    color = Color.White.copy(alpha = 0.08f),
+                    topLeft = Offset(padL, padY),
+                    size = androidx.compose.ui.geometry.Size(chartW, chartH),
+                    style = Stroke(width = 1f)
+                )
+                drawSeries(
+                    secondaryValues,
+                    rightColor.copy(alpha = 0.85f),
+                    3f,
+                    if (normalizeSeparately) secondaryMax else sharedMax
+                )
+                drawSeries(
+                    values,
+                    leftColor,
+                    4f,
+                    if (normalizeSeparately) primaryMax else sharedMax
+                )
+
+                touchPos?.let { tp ->
+                    if (tp.x in padL..(size.width - padR) && values.isNotEmpty()) {
+                        val idx = if (values.size == 1) {
+                            0
+                        } else {
+                            ((tp.x - padL) / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.lastIndex)
+                        }
+                        val x = if (values.size == 1) padL + chartW / 2f else padL + chartW * idx / values.lastIndex.toFloat()
+                        val y = padY + chartH - (
+                            (values[idx] / if (normalizeSeparately) primaryMax else sharedMax)
+                                .coerceIn(0.0, 1.0)
+                                .toFloat() * chartH
+                        )
+                        val timeLabel = timestampsMs.getOrNull(idx)?.let { diagnosticsTimeFmt.format(Date(it)) } ?: "n/a"
+                        drawDiagnosticsCrosshair(
+                            cx = x,
+                            cy = y,
+                            w = size.width,
+                            padL = padL,
+                            padR = padR,
+                            padT = padY,
+                            chartH = chartH,
+                            primaryLine = "$leftLabel ${"%.1f".format(values[idx])}$leftSuffix",
+                            secondaryLine = "$rightLabel ${"%.1f".format(secondaryValues.getOrElse(idx) { 0.0 })}$rightSuffix",
+                            timeLine = timeLabel,
+                            accentColor = leftColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsLegendItem(
+    color: Color,
+    label: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Canvas(modifier = Modifier.size(width = 22.dp, height = 4.dp)) {
+            drawLine(
+                color = color,
+                start = Offset(0f, size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = size.height,
+                cap = StrokeCap.Round
+            )
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun DrawScope.drawDiagnosticsCrosshair(
+    cx: Float,
+    cy: Float,
+    w: Float,
+    padL: Float,
+    padR: Float,
+    padT: Float,
+    chartH: Float,
+    primaryLine: String,
+    secondaryLine: String,
+    timeLine: String,
+    accentColor: Color
+) {
+    val nc = drawContext.canvas.nativeCanvas
+    val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 5f))
+
+    drawLine(
+        color = accentColor.copy(alpha = 0.7f),
+        start = Offset(cx, padT),
+        end = Offset(cx, padT + chartH),
+        strokeWidth = 1.5f,
+        pathEffect = dashEffect
+    )
+    drawLine(
+        color = accentColor.copy(alpha = 0.5f),
+        start = Offset(padL, cy),
+        end = Offset(w - padR, cy),
+        strokeWidth = 1.2f,
+        pathEffect = dashEffect
+    )
+
+    drawCircle(accentColor.copy(alpha = 0.25f), 10f, Offset(cx, cy))
+    drawCircle(accentColor, 5f, Offset(cx, cy))
+    drawCircle(Color.White, 2.5f, Offset(cx, cy))
+
+    val titlePaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        color = Color.White.toArgb()
+        textSize = 17f
+        isFakeBoldText = true
+    }
+    val bodyPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        color = Color.White.copy(alpha = 0.92f).toArgb()
+        textSize = 15f
+    }
+    val metaPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        color = Color.White.copy(alpha = 0.78f).toArgb()
+        textSize = 13f
+    }
+
+    val paddingH = 10f
+    val paddingV = 8f
+    val lineGap = 4f
+    val titleH = titlePaint.descent() - titlePaint.ascent()
+    val bodyH = bodyPaint.descent() - bodyPaint.ascent()
+    val metaH = metaPaint.descent() - metaPaint.ascent()
+    val boxW = maxOf(
+        titlePaint.measureText(primaryLine),
+        bodyPaint.measureText(secondaryLine),
+        metaPaint.measureText(timeLine)
+    ) + paddingH * 2
+    val boxH = titleH + bodyH + metaH + lineGap * 2 + paddingV * 2
+
+    val desiredX = if (cx + 12f + boxW < w - padR) cx + 12f else cx - 12f - boxW
+    val tooltipX = desiredX.coerceIn(padL, (w - padR - boxW).coerceAtLeast(padL))
+    val tooltipY = (padT + 6f).coerceAtLeast(0f)
+
+    val bgPaint = android.graphics.Paint().apply {
+        isAntiAlias = true
+        color = accentColor.copy(alpha = 0.94f).toArgb()
+        style = android.graphics.Paint.Style.FILL
+    }
+    nc.drawRoundRect(
+        tooltipX,
+        tooltipY,
+        tooltipX + boxW,
+        tooltipY + boxH,
+        10f,
+        10f,
+        bgPaint
+    )
+
+    var textY = tooltipY + paddingV - titlePaint.ascent()
+    nc.drawText(primaryLine, tooltipX + paddingH, textY, titlePaint)
+    textY += titleH + lineGap
+    nc.drawText(secondaryLine, tooltipX + paddingH, textY, bodyPaint)
+    textY += bodyH + lineGap
+    nc.drawText(timeLine, tooltipX + paddingH, textY, metaPaint)
+}
+
+@Composable
+private fun DirectBydTelemetryCard(
+    snapshot: VehicleTelemetrySnapshot?,
+    onRefresh: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Filled.SettingsRemote, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
+                Text("Direct BYD", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            if (snapshot == null) {
+                Text(
+                    "Waiting for direct BYD probes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                SettingsGroupLabel("Remote-only")
+                SettingsDetailRow(
+                    "Battery remain",
+                    snapshot.powerBatteryRemainPowerEV?.let { "%.1f kWh".format(it) } ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "Last 50 km",
+                    snapshot.instrumentLast50KmPowerConsume?.let { "%.1f kWh".format(it) } ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "Outside temp",
+                    snapshot.instrumentOutCarTemperature?.let { "$it°C" } ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "VIN",
+                    snapshot.bodyworkAutoVin ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "Seatbelt",
+                    "D=${directIntOrNA(snapshot.instrumentSafetyBeltDriverStatus)}, " +
+                        "P=${directIntOrNA(snapshot.instrumentSafetyBeltPassengerStatus)}"
+                )
+                HorizontalDivider()
+                SettingsGroupLabel("Minor-drive")
+                SettingsDetailRow("Speed", "%.1f km/h".format(snapshot.directSpeedKmh))
+                SettingsDetailRow(
+                    "Gear",
+                    snapshot.gear
+                )
+                SettingsDetailRow(
+                    "Pedals",
+                    "A=${directIntOrNA(snapshot.speedAccelerateDeepness)}, " +
+                        "B=${directIntOrNA(snapshot.speedBrakeDeepness)}, " +
+                        "brake=${directIntOrNA(snapshot.gearboxBrakePedalState)}"
+                )
+                SettingsDetailRow(
+                    "Signals",
+                    "flash=${directIntOrNA(snapshot.turnSignalFlashState)}, " +
+                        "L=${directBoolOrNA(snapshot.turnSignalLeft)}, " +
+                        "R=${directBoolOrNA(snapshot.turnSignalRight)}"
+                )
+                SettingsDetailRow(
+                    "Trip",
+                    "avg=${snapshot.instrumentAverageSpeed?.let { "%.1f km/h".format(it) } ?: "n/a"}, " +
+                        "journey=${snapshot.instrumentCurrentJourneyDriveMileage?.let { "%.1f km".format(it) } ?: "n/a"}, " +
+                        "time=${snapshot.instrumentCurrentJourneyDriveTime?.let { "%.1f".format(it) } ?: "n/a"}"
+                )
+                HorizontalDivider()
+                Text(
+                    "Debug",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                SettingsDetailRow(
+                    "Bodywork",
+                    "auto=${directIntOrNA(snapshot.bodyworkAutoSystemState)}, power=${directIntOrNA(snapshot.bodyworkPowerLevel)}"
+                )
+                SettingsDetailRow(
+                    "Battery dbg",
+                    "capacity=${directIntOrNA(snapshot.bodyworkBatteryCapacity)}, " +
+                        "hev=${snapshot.bodyworkBatteryPowerHEV ?: "n/a"}, " +
+                        "value=${directIntOrNA(snapshot.bodyworkBatteryPowerValue)}, " +
+                        "voltageLevel=${directIntOrNA(snapshot.bodyworkBatteryVoltageLevel)}"
+                )
+                SettingsDetailRow("Sensor", "temp=${snapshot.sensorTemperatureValue ?: "n/a"}")
+
+                if (snapshot.probeValues.isNotEmpty()) {
+                    HorizontalDivider()
+                    SettingsGroupLabel("Probe values")
+                    snapshot.probeValues.toSortedMap().forEach { (key, value) ->
+                        SettingsDetailRow(
+                            formatProbeLabel(key),
+                            directProbeValue(value, key)
+                        )
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = onRefresh,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Refresh direct snapshot", fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+private fun directIntOrNA(value: Int?): String {
+    return when (value) {
+        null -> "n/a"
+        65535, -2147482645 -> "n/a"
+        else -> {
+            if (value <= -10000) "n/a" else value.toString()
+        }
+    }
+}
+
+private fun directBoolOrNA(value: Boolean?): String {
+    return when (value) {
+        null -> "n/a"
+        true -> "on"
+        false -> "off"
+    }
+}
+
+private fun directProbeValue(value: Double, key: String): String {
+    val suffix = when {
+        key.endsWith("_kw") -> " kW"
+        key.endsWith("_pct") -> "%"
+        key.endsWith("_c") -> "°C"
+        else -> ""
+    }
+    return String.format("%.2f%s", value, suffix)
+}
+
+private fun formatProbeLabel(key: String): String {
+    return key.split('_')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { token ->
+            token.replaceFirstChar { ch -> ch.uppercase() }
+        }
+}
+
+@Composable
+private fun VehicleSnapshotCard(
+    telemetry: VehicleTelemetry?,
+    snapshot: VehicleTelemetrySnapshot?
+) {
+    val chargingLabel = if (snapshot == null) "Waiting for vehicle data" else {
+        val hrs = snapshot.remainHours
+        val mins = snapshot.remainMinutes
+        if (hrs > 0 || mins > 0) "${hrs}h ${mins}m"
+        else "n/a"
+    }
+    val chargingPowerKw = telemetry?.chargingPower ?: 0.0
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Filled.DirectionsCar, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
+                Text("Vehicle Snapshot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            if (snapshot == null) {
+                Text(
+                    "Vehicle data is not connected yet. Start the app or wake the car to populate this card.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                SettingsDetailRow("Gear", snapshot.gear)
+                SettingsDetailRow("Charging", "%.1f kW".format(chargingPowerKw))
+                SettingsDetailRow("Charging energy", "%.3f kWh".format(snapshot.chargingCapacity))
+                SettingsDetailRow("Charge active", if (snapshot.isChargingActive) "yes" else "no")
+                SettingsDetailRow(
+                    "Charge cap",
+                    "state ${snapshot.chargingCapState}, value ${snapshot.chargingCapValue}"
+                )
+                SettingsDetailRow("Charge time", chargingLabel)
+                SettingsDetailRow(
+                    "Tyres",
+                    "LF ${directTyrePsiOrNA(snapshot.tyrePressureLFPsi, snapshot.tyrePressureLFState)} | " +
+                        "RF ${directTyrePsiOrNA(snapshot.tyrePressureRFPsi, snapshot.tyrePressureRFState)} | " +
+                        "LR ${directTyrePsiOrNA(snapshot.tyrePressureLRPsi, snapshot.tyrePressureLRState)} | " +
+                        "RR ${directTyrePsiOrNA(snapshot.tyrePressureRRPsi, snapshot.tyrePressureRRState)}"
+                )
+                SettingsDetailRow(
+                    "States",
+                    "charger ${snapshot.chargerState}/${snapshot.chargerWorkState}, " +
+                        "gun ${snapshot.chargingGunState}, type ${snapshot.chargingType}, mode ${snapshot.chargingMode}, " +
+                        "cap ${snapshot.chargingCapacity}"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TelemetryComparisonCard(
+    telemetry: VehicleTelemetry?,
+    snapshot: VehicleTelemetrySnapshot?
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Filled.Timeline, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
+                Text("Telemetry Compare", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                "Auto-refreshes while the App tab is open.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (telemetry == null && snapshot == null) {
+                Text(
+                    "Waiting for live telemetry and vehicle snapshot.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                SettingsGroupLabel("Minor-drive")
+                SettingsDetailRow(
+                    "Gear",
+                    liveVsCar(
+                        telemetry?.gear,
+                        snapshot?.gear
+                    )
+                )
+                SettingsDetailRow(
+                    "Speed",
+                    liveVsCar(
+                        telemetry?.let { "%.1f km/h".format(it.speed) },
+                        snapshot?.let { "%.1f km/h".format(it.directSpeedKmh) }
+                    )
+                )
+                SettingsDetailRow(
+                    "Pedals",
+                    "Live: n/a   |   Car: A=${snapshot?.speedAccelerateDeepness?.toString() ?: "n/a"}, " +
+                        "B=${snapshot?.speedBrakeDeepness?.toString() ?: "n/a"}, " +
+                        "brake=${snapshot?.gearboxBrakePedalState?.toString() ?: "n/a"}"
+                )
+                SettingsDetailRow(
+                    "Trip",
+                    "Live: n/a   |   Car: avg=${snapshot?.instrumentAverageSpeed?.let { "%.1f".format(it) } ?: "n/a"}, " +
+                        "journey=${snapshot?.instrumentCurrentJourneyDriveMileage?.let { "%.1f".format(it) } ?: "n/a"}, " +
+                        "time=${snapshot?.instrumentCurrentJourneyDriveTime?.let { "%.1f".format(it) } ?: "n/a"}"
+                )
+                HorizontalDivider()
+                SettingsGroupLabel("Remote-only")
+                SettingsDetailRow(
+                    "Battery remain (kWh)",
+                    "Live: n/a   |   Car: ${snapshot?.powerBatteryRemainPowerEV?.let { "%.1f kWh".format(it) } ?: "n/a"}"
+                )
+                SettingsDetailRow(
+                    "Outside temp",
+                    "Live: n/a   |   Car: ${snapshot?.instrumentOutCarTemperature?.let { "${it}°C" } ?: "n/a"}"
+                )
+                SettingsDetailRow(
+                    "VIN",
+                    "Live: n/a   |   Car: ${snapshot?.bodyworkAutoVin ?: "n/a"}"
+                )
+                SettingsDetailRow(
+                    "Seatbelt",
+                    "Live: n/a   |   Car: D=${snapshot?.instrumentSafetyBeltDriverStatus?.toString() ?: "n/a"}, " +
+                        "P=${snapshot?.instrumentSafetyBeltPassengerStatus?.toString() ?: "n/a"}"
+                )
+                SettingsDetailRow(
+                    "Signals",
+                    "Live: n/a   |   Car: flash=${snapshot?.turnSignalFlashState?.toString() ?: "n/a"}, " +
+                        "L=${directBoolOrNA(snapshot?.turnSignalLeft)}, " +
+                        "R=${directBoolOrNA(snapshot?.turnSignalRight)}"
+                )
+                SettingsDetailRow(
+                    "Tyres",
+                    liveVsCar(
+                        telemetry?.let {
+                            "LF %.1f | RF %.1f | LR %.1f | RR %.1f psi".format(
+                                it.tyrePressureLF,
+                                it.tyrePressureRF,
+                                it.tyrePressureLR,
+                                it.tyrePressureRR
+                            )
+                        },
+                        snapshot?.let {
+                            "LF ${directTyrePsiOrNA(it.tyrePressureLFPsi, it.tyrePressureLFState)} | " +
+                                "RF ${directTyrePsiOrNA(it.tyrePressureRFPsi, it.tyrePressureRFState)} | " +
+                                "LR ${directTyrePsiOrNA(it.tyrePressureLRPsi, it.tyrePressureLRState)} | " +
+                                "RR ${directTyrePsiOrNA(it.tyrePressureRRPsi, it.tyrePressureRRState)}"
+                        }
+                    )
+                )
+            }
+        }
+    }
+}
+
+private fun directTyrePsiOrNA(psi: Double, state: Int?): String {
+    return if (state != null && state != 0) "n/a" else if (psi > 0.0) "%.1f psi".format(psi) else "n/a"
+}
+
+private fun liveVsCar(live: String?, car: String?): String {
+    val left = live?.takeIf { it.isNotBlank() } ?: "n/a"
+    val right = car?.takeIf { it.isNotBlank() } ?: "n/a"
+    return "Live: $left   |   Car: $right"
+}
+
+@Composable
+private fun CoreTelemetryCard(telemetry: VehicleTelemetry?) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Filled.Dashboard, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
+                Text("Core Telemetry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            if (telemetry == null) {
+                Text(
+                    "Waiting for live telemetry.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                SettingsGroupLabel("Core")
+                SettingsDetailRow("SoC", "%.1f%%".format(telemetry.soc))
+                SettingsDetailRow("SoC panel", "${telemetry.socPanel}%")
+                SettingsDetailRow("Car on", telemetry.isCarOn.toString())
+                SettingsDetailRow("Locked", telemetry.carLocked.toString())
+                SettingsDetailRow("Door open", telemetry.anyDoorOpened.toString())
+                SettingsDetailRow("Gear", telemetry.gear)
+                SettingsDetailRow("Speed", "%.1f km/h".format(telemetry.speed))
+                SettingsDetailRow("Odometer", "%.1f km".format(telemetry.odometer))
+                SettingsDetailRow("Engine power", "%.1f kW".format(telemetry.enginePower))
+                SettingsDetailRow("Total discharge", "%.1f".format(telemetry.totalDischarge))
+                SettingsDetailRow("Charging", "%.1f kW".format(telemetry.chargingPower))
+                SettingsDetailRow("Electric range", "${telemetry.electricDrivingRangeKm} km")
+                SettingsDetailRow("Fuel range", "${telemetry.fuelDrivingRangeKm} km")
+                SettingsDetailRow("Fuel level", "${telemetry.fuelPercentage}%")
+                SettingsDetailRow("Engine front", "${telemetry.engineSpeedFront} rpm")
+                SettingsDetailRow("Engine rear", "${telemetry.engineSpeedRear} rpm")
+                SettingsDetailRow("12V", "%.1f V".format(telemetry.battery12vVoltage))
+                SettingsDetailRow("Battery", "%.1f V".format(telemetry.batteryTotalVoltage.toDouble()))
+                SettingsDetailRow(
+                    if (telemetry.sohEstimated) "Estimated SoH" else "SOH",
+                    telemetry.soh.takeIf { it in 1..100 }?.let { "$it%" } ?: "—"
+                )
+                SettingsDetailRow(
+                    "Battery temp",
+                    "max=${telemetry.batteryCellTempMax}°C, min=${telemetry.batteryCellTempMin}°C, avg=${"%.1f".format(telemetry.batteryTempAvg)}°C"
+                )
+                SettingsDetailRow(
+                    "Battery cells",
+                    "Vmax ${"%.3f".format(telemetry.batteryCellVoltageMax)} / Vmin ${"%.3f".format(telemetry.batteryCellVoltageMin)}"
+                )
+                SettingsGroupLabel("Battery")
+                SettingsDetailRow("Cell V max", "%.3f V".format(telemetry.batteryCellVoltageMax))
+                SettingsDetailRow("Cell V min", "%.3f V".format(telemetry.batteryCellVoltageMin))
+                SettingsDetailRow("Current date", if (telemetry.currentDatetime.isBlank()) "n/a" else telemetry.currentDatetime)
+                SettingsDetailRow(
+                    "Date / location",
+                    if (telemetry.currentDatetime.isNotBlank()) {
+                        "${telemetry.currentDatetime}, %.5f, %.5f @ %.0f m".format(
+                            telemetry.locationLatitude,
+                            telemetry.locationLongitude,
+                            telemetry.locationAltitude
+                        )
+                    } else {
+                        "%.5f, %.5f @ %.0f m".format(
+                            telemetry.locationLatitude,
+                            telemetry.locationLongitude,
+                            telemetry.locationAltitude
+                        )
+                    }
+                )
+                SettingsDetailRow("Wi-Fi", if (telemetry.wifiSsid.isBlank()) "n/a" else telemetry.wifiSsid)
+
+                SettingsGroupLabel("Vehicle overlay")
+                SettingsDetailRow(
+                    "Battery remain (kWh)",
+                    telemetry.batteryRemainPowerEV?.let { "%.1f kWh".format(it) } ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "Avg speed",
+                    telemetry.averageSpeed?.let { "%.1f km/h".format(it) } ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "Outside temp",
+                    telemetry.instrumentOutCarTemperature?.let { "${it}°C" } ?: "n/a"
+                )
+                SettingsDetailRow(
+                    "Seatbelt",
+                    "D=${telemetry.instrumentSafetyBeltDriverStatus?.toString() ?: "n/a"}, " +
+                        "P=${telemetry.instrumentSafetyBeltPassengerStatus?.toString() ?: "n/a"}"
+                )
+                SettingsDetailRow(
+                    "Signals",
+                    "flash=${telemetry.turnSignalFlashState?.toString() ?: "n/a"}, " +
+                        "L=${telemetry.turnSignalLeft?.toString() ?: "n/a"}, " +
+                        "R=${telemetry.turnSignalRight?.toString() ?: "n/a"}"
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun BackupSummaryCard(
     modifier  : Modifier,
@@ -587,7 +2369,7 @@ private fun BackupSummaryCard(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Tab 3 — About & FAQ
+// Tab 4 — About & FAQ
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
@@ -600,6 +2382,10 @@ private fun AboutTab(viewModel: DashboardViewModel) {
     var easterEggClicks by remember { mutableStateOf(0) }
     var licenseClicks by remember { mutableStateOf(0) }
     val context = LocalContext.current
+
+    val hasBackgroundLocation = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
 
     Column(
         modifier            = Modifier
@@ -665,8 +2451,15 @@ private fun AboutTab(viewModel: DashboardViewModel) {
                         }
                     }
                 )
-                SettingsDetailRow("Link",      "github.com/angoikon/byd-trip-stats",
+                SettingsDetailRow("Github",      "github.com/angoikon/byd-trip-stats",
                     url = "https://github.com/angoikon/byd-trip-stats")
+                SettingsDetailRow("Discord", "Join now", url = "https://discord.gg/pf8TjjTce9")
+                if (!hasBackgroundLocation) {
+                    SettingsDetailRow(
+                        label = "Background operation",
+                        value = "⚠️ ADB setup required — open app to trigger setup dialog"
+                    )
+                }
             }
         }
 
@@ -679,20 +2472,6 @@ private fun AboutTab(viewModel: DashboardViewModel) {
             onInstall        = { viewModel.installUpdate() },
             onCancel         = { viewModel.cancelDownload() }
         )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Filled.Shield, null, tint = RegenGreen, modifier = Modifier.size(22.dp))
-                Text(
-                    "All data stays on your device — no analytics, no ads, no tracking. " +
-                    "BYD Trip Stats is a companion to Electro by Rory; it does not replace it.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
 
         HorizontalDivider()
         SectionHeader(icon = Icons.AutoMirrored.Filled.Help, title = "FAQ")
@@ -831,7 +2610,7 @@ private fun UpdateCard(
                         tint     = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp))
                     Text(
-                        "Will install automatically when parked with no active trip or charging",
+                        "Install button will become available when parked with no active trip or charging",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -951,48 +2730,46 @@ private data class FaqEntry(val question: String, val answer: String, val url: S
 private fun buildFaqList(): List<FaqEntry> = listOf(
 
     FaqEntry(
-        "Do I need the Electro app?",
-        "Yes — Electro is the bridge between your BYD and this app. It acquires telemetry " +
-        "data and publishes it over MQTT. BYD Trip Stats subscribes to that stream. Without " +
-        "Electro running and publishing, no telemetry arrives and no trips are recorded.\n\n" +
-        "Electro requires an active subscription (~€30/year)."
+        "Contrary to older version, I no longer need the Electro app?",
+        "Correct. BYD Trip Stats works as a standalone app on supported vehicles, so " +
+        "trip recording and charging sessions work without Electro.\n\n" +
+        "Electro is still a useful companion app for owners who want its own dashboards or " +
+        "features, but it is no longer required for BYD Trip Stats to function."
     ),
 
     FaqEntry(
-        "What should my Electro publish interval be?",
-        "Set the interval to 1 second for 127.0.0.1 while the car is ON — this gives smooth " +
-        "charts and accurate statistics. You don't need faster intervals.\n\n" +
-        "Optionally, while the car is OFF, create another MQTT integration via external subscriber (e.g. hivemq) " +
-        "and set it to 30 seconds. This ensures accurate reconstructed charging session detection."
+        "Do I need internet or mobile signal?",
+        "No for normal use. Trips, charging sessions, charts, and local history are recorded " +
+        "entirely on-device.\n\n" +
+        "Internet is only needed for optional features such as app update checks, opening web " +
+        "links, and Telegram backups if you enable them."
     ),
 
     FaqEntry(
-        "Why is the MQTT connection failing?",
+        "Why is no live data appearing?",
         "Work through this checklist:\n\n" +
-        "1. Electro is open and showing as connected\n" +
-        "2. Broker URL has no http:// or https:// prefix — bare hostname or IP only\n" +
-        "3. Port 1883 for plain connections, 8883 for TLS/SSL\n" +
-        "4. For the internal broker: URL = 127.0.0.1, Port = 1883, no username/password\n" +
-        "5. The topic matches Electro exactly — " +
-        "find your model's topic in Electro → Integrations → MQTT)\n" +
-        "6. Tap Save & Restart after every change"
+        "1. Open the app once after the car boots so Android can bind the telemetry service\n" +
+        "2. Make sure Location permission is granted if you want GPS points in trips\n" +
+        "3. Check that BYD's Disable Autostart app is not blocking BYD Trip Stats from autostarting\n" +
+        "4. Wait a few seconds after a head-unit restart for the car services to come up\n"
     ),
 
     FaqEntry(
         "Trips are not being detected automatically",
-        "Auto-detection watches the gear position in the MQTT stream:\n\n" +
+        "Auto-detection watches the gear position in the live telemetry stream:\n\n" +
         "• Trip starts when gear changes to D or R\n" +
         "• Trip ends when gear returns to P\n\n" +
-        "If trips are not starting, confirm the dashboard is receiving live values from MQTT. " +
+        "If trips are not starting, confirm the dashboard is receiving live vehicle telemetry. " +
         "Also verify that auto-detection is enabled. A manual start/stop override is available " +
         "on the dashboard for edge cases."
     ),
 
     FaqEntry(
         "No network connectivity means trip will be missing from the history?",
-        "Trips recorded in areas without signal (e.g. underground garages) may take up to 3 minutes " +
-        "to appear in history. The watchdog closes the active trip after 3 minutes of telemetry silence, " +
-        "anchored to the last received packet before signal was lost."
+        "No. Trip history is stored locally and does not depend on mobile signal or Wi-Fi.\n\n" +
+        "A trip may close a little later only if live telemetry itself stops for a while. In that " +
+        "case the watchdog closes the active trip after 3 minutes of telemetry silence, anchored " +
+        "to the last packet the app received."
     ),
 
     FaqEntry(
@@ -1000,7 +2777,7 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "You need to exclude BYD Trip Stats from the autostart-killer:\n\n" +
         "1. Open the Disable Autostart app (native BYD app, usually near the file explorer)\n" +
         "2. Find BYD Trip Stats and toggle its entry OFF — same as you have done for Electro\n" +
-        "3. Hold the volume button for ~10 seconds to restart the car UI\n" +
+        "3. Open the app and hold the volume button for ~10 seconds to restart the car UI\n" +
         "4. Reopen the app\n\n" +
         "Important: you must repeat this step after every app update, because the permission " +
         "resets on reinstall."
@@ -1062,16 +2839,15 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     FaqEntry(
         "Will this drain my 12V battery?",
         "No meaningful impact. In an EV the 12V battery is continuously trickle-charged from " +
-        "the high-voltage pack. The MQTT client is highly efficient — it sits idle between " +
-        "messages and wakes only when telemetry arrives."
+        "the high-voltage pack. BYD Trip Stats only keeps a lightweight foreground service alive " +
+        "to read telemetry and write local trip data."
     ),
 
     FaqEntry(
         "Does this work on BYD Dolphin or Atto 3?",
-        "Potentially yes — any model that publishes telemetry through Electro should work. " +
-        "The app has been tested on the Seal. Users of other models may need to adjust the " +
-        "MQTT topic in Settings to match their car. Check Electro → Integrations → MQTT for " +
-        "the correct topic string."
+        "Potentially yes. The app has been tested primarily on the Seal, and support on other " +
+        "BYD models depends on which car fields their firmware exposes.\n\n" +
+        "The core trip pipeline is model-agnostic, but some detail fields can vary by car and software version."
     ),
 
     FaqEntry(
@@ -1086,10 +2862,9 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     FaqEntry(
         "Is my data private?",
         "Completely. BYD Trip Stats collects zero information about you.\n\n" +
-        "Everything stays on your device: trip data, GPS coordinates, MQTT credentials, settings. " +
-        "The only external network traffic is to your own MQTT broker (127.0.0.1 for the " +
-        "internal broker) or whichever external broker you configured in Settings. The " +
-        "telegram private bot (if you decided to used it) is yours"
+        "Everything stays on your device: trip data, GPS coordinates, backups, and settings. " +
+        "The only optional external traffic is what you explicitly trigger, such as Telegram " +
+        "backup uploads, checking for a newer app release, enabling MQTT integration and sending debug probes."
     ),
 
     FaqEntry(
@@ -1102,105 +2877,207 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Debug dialog
+// Vehicle Compatibility Probe Section (App tab)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 @Composable
-private fun DebugDialog(
-    brokerRunning: Boolean,
-    clientRunning: Boolean,
-    savedSettings: PreferencesManager.MqttSettings,
-    onDismiss    : () -> Unit
-) {
-    val isLocal = savedSettings.brokerUrl.trim().let {
-        it == "127.0.0.1" || it == "localhost" || it == "::1"
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.BugReport, null, tint = MaterialTheme.colorScheme.error)
-                Spacer(Modifier.width(8.dp))
-                Text("Debug Info")
-            }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Services:", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Embedded Broker:")
-                            Text(if (brokerRunning) "✅ RUNNING" else "❌ STOPPED",
-                                color = if (brokerRunning) Color(0xFF00FF88) else BydErrorRed,
-                                fontWeight = FontWeight.Bold)
-                        }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("MQTT Client:")
-                            Text(if (clientRunning) "✅ RUNNING" else "❌ STOPPED",
-                                color = if (clientRunning) Color(0xFF00FF88) else BydErrorRed,
-                                fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Settings:", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text("Broker: ${savedSettings.brokerUrl}", fontSize = 14.sp)
-                        Text("Port: ${savedSettings.brokerPort}", fontSize = 14.sp)
-                        Text("Topic: ${savedSettings.topic}", fontSize = 14.sp)
-                    }
-                }
-                Card(colors = CardDefaults.cardColors(
-                    containerColor = if (isLocal) Color(0xFF00FF88).copy(alpha = 0.2f)
-                                     else BydElectricBlue.copy(alpha = 0.2f)
-                )) {
-                    Box(Modifier.padding(12.dp)) {
-                        Text(if (isLocal) "Mode: LOCAL BROKER" else "Mode: EXTERNAL BROKER",
-                            fontWeight = FontWeight.Bold, fontSize = 16.sp,
-                            color = if (isLocal) Color(0xFF00AA00) else Color(0xFF0099CC))
-                    }
-                }
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("What To Do:", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Spacer(Modifier.height(8.dp))
-                        if (isLocal && !brokerRunning) {
-                            Text("❌ Embedded broker not running!", color = BydErrorRed)
-                            Text("→ Restart app", fontWeight = FontWeight.Bold)
-                        } else if (isLocal && brokerRunning) {
-                            Text("✅ Embedded broker OK!", color = RegenGreen)
-                        }
-                        if (!clientRunning) {
-                            Text("❌ MQTT client not running!", color = BydErrorRed)
-                            Text("→ Tap Save & Restart above", fontWeight = FontWeight.Bold)
-                        } else {
-                            Text("✅ MQTT client OK!", color = RegenGreen)
-                        }
-                        if (isLocal && brokerRunning && clientRunning) {
-                            Spacer(Modifier.height(4.dp))
-                            Text("🎉 Both services running!", color = Color(0xFF00AA00), fontWeight = FontWeight.Bold)
-                            Text("If still no data → check Electro is publishing to 127.0.0.1:1883")
-                        }
-                    }
-                }
-                Text("Auto-refreshing every 2s…", fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
-    )
-}
+private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope) {
+    val isEnabled by VehicleCompatibilityProbe.isEnabled.collectAsState()
+    val entryCount by VehicleCompatibilityProbe.entryCount.collectAsState()
+    val lastCapture by VehicleCompatibilityProbe.lastCaptureAt.collectAsState()
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var privacyExpanded by rememberSaveable { mutableStateOf(false) }
+    val telegram = remember { TelegramManager.getInstance(context) }
+    val telegramConfig by telegram.config.collectAsState()
+    val telegramState by telegram.state.collectAsState()
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Shared private helpers
-// ═══════════════════════════════════════════════════════════════════════════════
+    SectionHeader(icon = Icons.Filled.BugReport, title = "Vehicle Compatibility")
+
+    Text(
+        "Help support for your BYD model by sharing a raw telemetry probe report. " +
+        "Enable probing, drive for a couple of minutes, then export and share the file.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    // Privacy banner
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { privacyExpanded = !privacyExpanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(
+                        Icons.Filled.PrivacyTip, null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        "Privacy notice",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Icon(
+                    if (privacyExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    null, modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+            }
+            AnimatedVisibility(visible = privacyExpanded, enter = expandVertically(), exit = shrinkVertically()) {
+                Text(
+                    "The report captures raw values from every data source on " +
+                    "your car's head unit — numeric values, strings, and arrays.\n\n" +
+                    "GPS latitude and longitude are NOT included.\n\n" +
+                    "Everything else is included: battery state, motor data, gear, speed, " +
+                    "drive modes, climate state, charging state, PHEV-specific values, etc.\n\n" +
+                    "The report stays on your device until you send it. Nothing is sent automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    }
+
+    // Enable toggle row
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Enable compatibility probing",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        if (isEnabled)
+                            "Active — $entryCount fields captured${lastCapture?.let { " · last: ${it.substringBefore('T')}" } ?: ""}"
+                        else
+                            "Off — enable, drive briefly, then export.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isEnabled,
+                    onCheckedChange = { next ->
+                        VehicleCompatibilityProbe.setEnabled(next)
+                    },
+                    thumbContent = if (!isEnabled) {
+                        {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(ToggleUncheckedTrack, CircleShape)
+                            )
+                        }
+                    } else null,
+                    colors = SwitchDefaults.colors(
+                        uncheckedThumbColor = Color.White,
+                        uncheckedTrackColor = ToggleUncheckedTrack,
+                        uncheckedBorderColor = ToggleUncheckedTrack
+                    )
+                )
+            }
+
+            // Action buttons
+            val isSending = telegramState is TelegramManager.TelegramState.InProgress
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = {
+                        if (telegramConfig == null) {
+                            statusMessage = "Telegram not configured — set it up under Backup & Restore first."
+                            return@Button
+                        }
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                val file = VehicleCompatibilityProbe.exportReportFile()
+                                telegram.sendFile(
+                                    file,
+                                    caption = "BYD Trip Stats — compatibility probe report\n" +
+                                        "Entries: $entryCount · ${lastCapture?.substringBefore('T') ?: "no date"}"
+                                )
+                                launch(Dispatchers.Main) {
+                                    statusMessage = "Sent via Telegram ✓"
+                                }
+                            } catch (e: Exception) {
+                                launch(Dispatchers.Main) {
+                                    statusMessage = "Telegram send failed: ${e.message}"
+                                }
+                            }
+                        }
+                    },
+                    enabled = entryCount > 0 && !isSending,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) {
+                    if (isSending) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                    } else {
+                        Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (isSending) "Sending…" else "Send via Telegram to your private bot")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        VehicleCompatibilityProbe.clear()
+                        statusMessage = "Probe data cleared."
+                    },
+                    enabled = entryCount > 0 && !isSending
+                ) {
+                    Text("Clear")
+                }
+            }
+
+            if (telegramConfig == null) {
+                Text(
+                    "Telegram not configured — set it up under Backup & Restore first.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Status line
+            statusMessage?.let { msg ->
+                Text(
+                    msg,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (msg.startsWith("Telegram send failed"))
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun SectionHeader(
+
     icon : ImageVector,
     title: String,
     color: Color = MaterialTheme.colorScheme.primary
@@ -1216,6 +3093,19 @@ private fun SectionHeader(
             fontWeight = FontWeight.Bold,
             color = color)
     }
+}
+
+@Composable
+private fun SettingsGroupLabel(
+    title: String
+) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
+    )
 }
 
 @Composable

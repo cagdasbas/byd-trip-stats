@@ -18,15 +18,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -44,43 +42,12 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InitializationScreen(
-    initialTopic: String = "",
-    onContinue: suspend (car: CarConfig, topic: String) -> Unit
+    onContinue: suspend (car: CarConfig) -> Unit
 ) {
     var selectedCar by remember { mutableStateOf<CarConfig?>(null) }
-    var topic by remember(initialTopic) { mutableStateOf(initialTopic) }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-
-    val TOPIC_PREFIX = "electro/telemetry/"
-
-    var topicSuffix by remember(initialTopic) {
-        mutableStateOf(initialTopic.removePrefix(TOPIC_PREFIX))
-    }
-
-    val topicTrimmed = TOPIC_PREFIX + topicSuffix.trim()
-    val canContinue = selectedCar != null && topicSuffix.trim().isNotEmpty()
-
-    val groupedCars = remember {
-        linkedMapOf(
-            "BYD Seal" to listOf(
-                CarCatalog.BYD_SEAL_DYNAMIC_RWD,
-                CarCatalog.BYD_SEAL_PREMIUM_RWD,
-                CarCatalog.BYD_SEAL_EXCELLENCE
-            ),
-            "BYD Dolphin" to listOf(
-                CarCatalog.BYD_DOLPHIN_STANDARD,
-                CarCatalog.BYD_DOLPHIN_EXTENDED
-            ),
-            "BYD ATTO 3" to listOf(
-                CarCatalog.BYD_ATTO_3
-            ),
-            "BYD Seal U" to listOf(
-                CarCatalog.BYD_SEAL_U_COMFORT,
-                CarCatalog.BYD_SEAL_U_DESIGN
-            )
-        )
-    }
+    val canContinue = selectedCar != null
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -114,122 +81,32 @@ fun InitializationScreen(
             )
 
             Text(
-                text = "This selection will be saved and used to load the correct car configuration",
+                text = "This selection will be saved and used to load the correct car configuration.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            Text(
+                text = "Only DiLink 3 vehicles are supported. DiLink 4 and 5 are not yet supported.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            groupedCars.forEach { (groupTitle, cars) ->
-                CarGroupSection(
-                    title = groupTitle,
-                    cars = cars,
-                    selectedCarId = selectedCar?.id,
-                    onCarClick = { selectedCar = it }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 2.dp),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+            CarCategorySection(
+                categoryTitle = "Battery Electric (BEV)",
+                groups = CarCatalog.groupedBev,
+                selectedCarId = selectedCar?.id,
+                onCarClick = { selectedCar = it }
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "2) Input the electro topic you use",
-                style = MaterialTheme.typography.titleMedium
+            CarCategorySection(
+                categoryTitle = "Plug-in Hybrid (PHEV / DM-i)",
+                groups = CarCatalog.groupedPhev,
+                selectedCarId = selectedCar?.id,
+                onCarClick = { selectedCar = it }
             )
-
-            OutlinedTextField(
-                value = topicSuffix,
-                onValueChange = { topicSuffix = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("MQTT Topic") },
-                prefix = { Text("electro/telemetry/", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                placeholder = { Text("byd-seal/data") },
-                supportingText = {
-                    Text("Required. Input the suffix from Electro → Integrations → MQTT")
-                }
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "The topic is custom, based on the name you gave at the MQTT integration. If you input it wrong, the broker may still connect, but no telemetry will arrive.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Set ONLY at Electro:\nRecommended Electro intervals: 1 second while the car is ON via 127.0.0.1 " +
-                            "(smooth charts). Optionally, another MQTT integration via external broker while the car is OFF at 30 s interval " +
-                            "(reconstructed charging sessions). You can change these in " +
-                            "Electro → Integrations → MQTT → Publish Interval.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Text(
-                        text = "You need to toggle-off disable autostart for this app, which enables " +
-                            "background data collection when the car is off (e.g. charging overnight).\n\n" +
-                            "After that action, you need to reboot the car and re-open the app for " +
-                            "changes to be in effect.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -237,7 +114,7 @@ fun InitializationScreen(
                 onClick = {
                     val car = selectedCar ?: return@Button
                     scope.launch {
-                        onContinue(car, topicTrimmed)
+                        onContinue(car)
                     }
                 },
                 enabled = canContinue,
@@ -247,6 +124,33 @@ fun InitializationScreen(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun CarCategorySection(
+    categoryTitle: String,
+    groups: Map<String, List<CarConfig>>,
+    selectedCarId: String?,
+    onCarClick: (CarConfig) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = categoryTitle,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        HorizontalDivider()
+
+        groups.forEach { (groupTitle, cars) ->
+            CarGroupSection(
+                title = groupTitle,
+                cars = cars,
+                selectedCarId = selectedCarId,
+                onCarClick = onCarClick
+            )
         }
     }
 }
@@ -315,8 +219,13 @@ private fun CarOptionCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                val subtitle = if (car.isPhev) {
+                    "EV range: ${car.wltpKm} km | ${car.phevUsableBatteryKwh ?: car.batteryKwh} kWh | ${car.drivetrain}"
+                } else {
+                    "WLTP: ${car.wltpKm} km | ${car.batteryKwh} kWh | ${car.drivetrain}"
+                }
                 Text(
-                    text = "WLTP: ${car.wltpKm} km | ${car.batteryKwh} kWh | ${car.drivetrain}",
+                    text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

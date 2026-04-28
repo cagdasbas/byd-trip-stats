@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,8 +43,7 @@ fun TripHistoryScreen(
     viewModel: DashboardViewModel,
     onTripClick: (Long) -> Unit,
     onNavigateBack: () -> Unit,
-    onNavigateToSeasonalAnalysis: () -> Unit = {},
-    onNavigateToTripGoals: () -> Unit = {}
+    onNavigateToSeasonalAnalysis: () -> Unit = {}
 ) {
     val trips         by viewModel.sortedFilteredTrips.collectAsState()
     val displayMetrics by viewModel.tripDisplayMetrics.collectAsState()
@@ -58,13 +58,6 @@ fun TripHistoryScreen(
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
     var showSortSheet           by remember { mutableStateOf(false) }
     var showFilterSheet         by remember { mutableStateOf(false) }
-    var showCostDialog          by remember { mutableStateOf(false) }
-
-    val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
-    var priceInput  by remember(electricityPrice) {
-        mutableStateOf(if (electricityPrice > 0.0) "%.4f".format(electricityPrice) else "")
-    }
-    var symbolInput by remember(currencySymbol) { mutableStateOf(currencySymbol) }
     var showCompareSheet        by remember { mutableStateOf(false) }
 
     val activeFilters = filterState.activeFilterCount
@@ -81,7 +74,7 @@ fun TripHistoryScreen(
                         if (!selectionMode) {
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                "(Touch trip for analytics, long-press to select for multiple deletion)",
+                                "(Touch trip for analytics, long-press for multiple selection)",
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -170,18 +163,6 @@ fun TripHistoryScreen(
                         // Seasonal analysis
                         IconButton(onClick = onNavigateToSeasonalAnalysis) {
                             Icon(Icons.Filled.WbSunny, "Seasonal analysis",
-                                modifier = Modifier.size(22.dp))
-                        }
-                        // Goals & bests
-                        IconButton(onClick = onNavigateToTripGoals) {
-                            Icon(Icons.Filled.EmojiEvents, "Goals & personal bests",
-                                modifier = Modifier.size(22.dp))
-                        }
-                        // Electricity cost tariff
-                        IconButton(onClick = { showCostDialog = true }) {
-                            Icon(Icons.Filled.Euro, "Set electricity tariff",
-                                tint = if (electricityPrice > 0.0) AccelerationOrange
-                                       else LocalContentColor.current,
                                 modifier = Modifier.size(22.dp))
                         }
                     }
@@ -295,68 +276,6 @@ fun TripHistoryScreen(
     }
 
     // ── Delete selected dialog ────────────────────────────────────────────────
-    if (showCostDialog) {
-        AlertDialog(
-            onDismissRequest = { showCostDialog = false },
-            containerColor   = MaterialTheme.colorScheme.surfaceVariant,
-            icon = { Icon(Icons.Filled.Euro, null,
-                tint = AccelerationOrange, modifier = Modifier.size(28.dp)) },
-            title = { Text("Electricity Tariff", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "Enter your electricity price to see trip costs calculated " +
-                        "automatically from recorded kWh. Leave blank to disable.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = priceInput,
-                            onValueChange = { priceInput = it },
-                            label = { Text("Price per kWh") },
-                            placeholder = { Text("0.18") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            suffix = { Text("/kWh") }
-                        )
-                        OutlinedTextField(
-                            value = symbolInput,
-                            onValueChange = { if (it.length <= 3) symbolInput = it },
-                            label = { Text("Symbol") },
-                            placeholder = { Text("€") },
-                            singleLine = true,
-                            modifier = Modifier.width(80.dp)
-                        )
-                    }
-                    if (electricityPrice > 0.0) {
-                        Text(
-                            "Active: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    val price = priceInput.trim().replace(',', '.').toDoubleOrNull() ?: 0.0
-                    val symbol = symbolInput.trim().ifBlank { "€" }
-                    viewModel.saveElectricityPrice(price, symbol)
-                    showCostDialog = false
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCostDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
-
     if (showDeleteSelectedDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteSelectedDialog = false },
@@ -895,14 +814,18 @@ private fun MonthlyCostSummaryCard(
     months         : List<DashboardViewModel.MonthlyCost>,
     currencySymbol : String
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val shown = if (expanded) months else months.take(3)
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val shown = if (expanded) months else months.take(1)
+    val hiddenCount = (months.size - 1).coerceAtLeast(0)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 4.dp)
-            .clickable { expanded = !expanded },
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(12.dp)
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
@@ -922,11 +845,18 @@ private fun MonthlyCostSummaryCard(
                     Text("Monthly Cost", style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold)
                 }
-                Icon(
-                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (months.size > 1) {
+                    TextButton(onClick = { expanded = !expanded }) {
+                        Text(if (expanded) "Show less" else "Show $hiddenCount more")
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
             shown.forEach { month ->
                 Row(
@@ -948,13 +878,6 @@ private fun MonthlyCostSummaryCard(
                         )
                     }
                 }
-            }
-            if (months.size > 3) {
-                Text(
-                    if (expanded) "Show less" else "Show ${months.size - 3} more months…",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
             }
         }
     }

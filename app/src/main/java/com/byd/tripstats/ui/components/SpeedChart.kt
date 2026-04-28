@@ -12,7 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -24,7 +24,6 @@ import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.byd.tripstats.ui.theme.BydEcoTealDim
 import kotlin.math.roundToInt
 
 private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -42,11 +41,15 @@ fun SpeedChart(
         return
     }
 
-    val lineColor = BydEcoTealDim
     val textColor = MaterialTheme.colorScheme.onSurface
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+
+    // Pre-extract modes once — avoids JSON parsing inside the draw loop
+    val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
 
     Canvas(modifier = modifier.fillMaxSize().pointerInput(Unit) {
         awaitEachGesture {
@@ -73,6 +76,31 @@ fun SpeedChart(
         }
         val totalDuration = if (dataPoints.size > 1)
             (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
+
+        // ── Drive mode background bands ──────────────────────────────────────
+        // Draw faint vertical bands behind the chart area, one per contiguous
+        // run of the same drive mode. Skip mode 0 (unknown) — leave blank.
+        if (hasModes && dataPoints.size >= 2) {
+            var bandStart = 0
+            var bandMode = modes[0].driveMode
+            for (i in 1..dataPoints.size) {
+                val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                if (curMode != bandMode || i == dataPoints.size) {
+                    if (bandMode != 0) {
+                        val x0 = xOf(bandStart)
+                        val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                        drawRect(
+                            color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                            topLeft = Offset(x0, padT),
+                            size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                        )
+                    }
+                    bandStart = i
+                    bandMode = curMode
+                }
+            }
+        }
+
         val labelPaint = android.graphics.Paint().apply {
             color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
         }
@@ -110,35 +138,73 @@ fun SpeedChart(
                 }
             }
         }
+
         if (dataPoints.size >= 2) {
-            val areaPath = Path().apply {
-                moveTo(xOf(0), yOf(values[0]))
-                values.drop(1).forEachIndexed { i, v -> lineTo(xOf(i + 1), yOf(v)) }
-                lineTo(xOf(dataPoints.size - 1), padT + chartH); lineTo(xOf(0), padT + chartH); close()
+            val stroke = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+
+            if (hasModes) {
+                // ── Colour line segment-by-segment by drive mode ─────────────
+                // When mode is unknown (0) fall back to the default teal.
+                val fallbackColor = com.byd.tripstats.ui.theme.BydEcoTealDim
+                var segPath = Path()
+                var segMode = modes[0].driveMode
+                segPath.moveTo(xOf(0), yOf(values[0]))
+
+                for (i in 1 until values.size) {
+                    val curMode = modes[i].driveMode
+                    segPath.lineTo(xOf(i), yOf(values[i]))
+                    if (curMode != segMode || i == values.size - 1) {
+                        val color = if (segMode != 0) driveModeColor(segMode) else fallbackColor
+                        drawPath(segPath, color.copy(alpha = 0.9f), style = stroke)
+                        segPath = Path()
+                        segPath.moveTo(xOf(i), yOf(values[i]))
+                        segMode = curMode
+                    }
+                }
+            } else {
+                // No mode data — draw uniform teal line with gradient fill
+                val lineColor = com.byd.tripstats.ui.theme.BydEcoTealDim
+                val areaPath = Path().apply {
+                    moveTo(xOf(0), yOf(values[0]))
+                    values.drop(1).forEachIndexed { i, v -> lineTo(xOf(i + 1), yOf(v)) }
+                    lineTo(xOf(dataPoints.size - 1), padT + chartH)
+                    lineTo(xOf(0), padT + chartH); close()
+                }
+                drawPath(areaPath, androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(lineColor.copy(alpha = 0.40f), lineColor.copy(alpha = 0f)),
+                    startY = yOf(values.max()), endY = padT + chartH
+                ))
+                val linePath = Path().apply {
+                    moveTo(xOf(0), yOf(values[0]))
+                    values.drop(1).forEachIndexed { i, v -> lineTo(xOf(i + 1), yOf(v)) }
+                }
+                drawPath(linePath, lineColor, style = stroke)
             }
-            drawPath(areaPath, Brush.verticalGradient(
-                colors = listOf(BydEcoTealDim.copy(alpha = 0.40f), BydEcoTealDim.copy(alpha = 0f)),
-                startY = yOf(values.max()), endY = padT + chartH
-            ))
-            val linePath = Path().apply {
-                moveTo(xOf(0), yOf(values[0]))
-                values.drop(1).forEachIndexed { i, v -> lineTo(xOf(i + 1), yOf(v)) }
-            }
-            drawPath(linePath, lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
+
+        drawDriveModeLabel(singleDriveMode, padR, padT)
+
         touchPos?.let { tp ->
             if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
                 val idx = ((tp.x - padL) / chartW * (dataPoints.size - 1)).roundToInt().coerceIn(0, dataPoints.size - 1)
                 val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
                 val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
                 val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
+                val mode = modes[idx]
+                val modeStr = buildString {
+                    if (mode.driveMode != 0) append(driveModeLabel(mode.driveMode))
+                    if (mode.driveMode != 0 && mode.regenMode != 0) append(" · ")
+                    if (mode.regenMode != 0) append("Regen ${regenModeLabel(mode.regenMode)}")
+                }
+                val dotColor = if (mode.driveMode != 0) driveModeColor(mode.driveMode)
+                               else com.byd.tripstats.ui.theme.BydEcoTealDim
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(values[idx]), w = w,
                     padL = padL, padR = padR, padT = padT, chartH = chartH,
                     line1 = "%.1f km/h".format(values[idx]),
-                    line2 = realTime,
-                    line3 = durationStr,
-                    accentColor = lineColor, textColor = textColor
+                    line2 = if (modeStr.isNotEmpty()) modeStr else realTime,
+                    line3 = if (modeStr.isNotEmpty()) "$realTime  $durationStr" else durationStr,
+                    accentColor = dotColor
                 )
             }
         }

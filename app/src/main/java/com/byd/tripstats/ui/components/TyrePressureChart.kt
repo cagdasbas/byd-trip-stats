@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -74,6 +75,10 @@ fun TyrePressureChart(
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos  by remember { mutableStateOf<Offset?>(null) }
+
+    val modes    = remember(validPoints) { validPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
 
     // Convert all pressures to the selected unit
     val lfVals = validPoints.map { it.tyrePressureLF.psiToUnit(unit).toFloat() }
@@ -178,6 +183,28 @@ fun TyrePressureChart(
             val totalDuration = if (validPoints.size > 1)
                 (validPoints.last().timestamp - validPoints.first().timestamp) / 1000.0 else 0.0
 
+            // ── Drive mode background bands ──────────────────────────────────────
+            if (hasModes && validPoints.size >= 2) {
+                var bandStart = 0
+                var bandMode = modes[0].driveMode
+                for (i in 1..validPoints.size) {
+                    val curMode = if (i < validPoints.size) modes[i].driveMode else -1
+                    if (curMode != bandMode || i == validPoints.size) {
+                        if (bandMode != 0) {
+                            val x0 = xOf(bandStart)
+                            val x1 = if (i < validPoints.size) xOf(i) else xOf(validPoints.size - 1)
+                            drawRect(
+                                color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                                topLeft = Offset(x0, padT),
+                                size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                            )
+                        }
+                        bandStart = i
+                        bandMode = curMode
+                    }
+                }
+            }
+
             val labelPaint = android.graphics.Paint().apply {
                 color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 20f; isAntiAlias = true
             }
@@ -244,6 +271,8 @@ fun TyrePressureChart(
                 drawLine(rfVals, rfColor, 3f)
             }
 
+            drawDriveModeLabel(singleDriveMode, padR, padT)
+
             touchPos?.let { tp ->
                 if (tp.x in padL..(w - padR) && validPoints.size > 1) {
                     val idx = ((tp.x - padL) / chartW * (validPoints.size - 1))
@@ -258,7 +287,7 @@ fun TyrePressureChart(
                         line1 = "LF ${unit.fmt(validPoints[idx].tyrePressureLF)}  RF ${unit.fmt(validPoints[idx].tyrePressureRF)}  ${unit.label()}",
                         line2 = "LR ${unit.fmt(validPoints[idx].tyrePressureLR)}  RR ${unit.fmt(validPoints[idx].tyrePressureRR)}",
                         line3 = "${(secs / 60).toInt()}m ${(secs % 60).toInt()}s  $clockTime",
-                        accentColor = lfColor, textColor = textColor
+                        accentColor = lfColor
                     )
                 }
             }

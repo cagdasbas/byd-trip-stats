@@ -6,41 +6,48 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
-import com.byd.tripstats.BuildConfig
+import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.PreferencesManager
-import com.byd.tripstats.service.MqttService
+import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.ui.navigation.AppNavigation
 import com.byd.tripstats.ui.screens.InitializationScreen
 import com.byd.tripstats.ui.theme.BydTripStatsTheme
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -48,27 +55,28 @@ class MainActivity : ComponentActivity() {
     private val TAG = "MainActivity"
 
     private val viewModel: DashboardViewModel by viewModels()
-    private var mqttService: MqttService? = null
+    private var telemetryService: VehicleTelemetryService? = null
     private var bound = false
 
     // Shown once per app version update to remind the user to re-enable Autostart
     private val showAutostartReminder = mutableStateOf(false)
+    private val showSetupRequired   = mutableStateOf(false)
 
     // ── Service binding ───────────────────────────────────────────────────────
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
-            val binder = service as MqttService.LocalBinder
-            mqttService = binder.getService()
+            val binder = service as VehicleTelemetryService.LocalBinder
+            telemetryService = binder.getService()
             bound = true
-            Log.i(TAG, "MqttService connected")
-            mqttService?.let { viewModel.observeMqttServiceState(it) }
+            Log.i(TAG, "Telemetry service connected")
+            telemetryService?.let { viewModel.observeTelemetryServiceState(it) }
         }
 
         override fun onServiceDisconnected(arg0: ComponentName) {
             bound = false
-            mqttService = null
-            Log.w(TAG, "MqttService disconnected unexpectedly")
+            telemetryService = null
+            Log.w(TAG, "Telemetry service disconnected unexpectedly")
         }
     }
 
@@ -77,10 +85,10 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        val allGranted = results.entries.all { it.value }
-        Log.d(TAG, "Permissions result — all granted: $allGranted")
-        if (allGranted) bindToMqttService()
-        else Log.w(TAG, "Some permissions were denied")
+        val denied = results.filterValues { granted -> !granted }.keys
+        Log.d(TAG, "Permissions result — denied: $denied")
+        if (denied.isNotEmpty()) Log.w(TAG, "Some optional permissions were denied: $denied")
+        bindToTelemetryService()
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -90,6 +98,7 @@ class MainActivity : ComponentActivity() {
 
         requestRequiredPermissions()
         checkAndShowAutostartReminder()
+        checkSetupRequired()
 
         setContent {
             BydTripStatsTheme {
@@ -98,9 +107,10 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val prefs = remember { PreferencesManager(applicationContext) }
-                    val selectedCarId by prefs.selectedCarId.collectAsState(initial = null)
-                    val mqttSettings by prefs.mqttSettings.collectAsState(initial = null)
-
+                    val cachedSelectedCarId = remember { prefs.getCachedSelectedCarId() }
+                    val selectedCarId by prefs.selectedCarId.collectAsState(
+                        initial = cachedSelectedCarId ?: "__loading__"
+                    )
                     // Autostart reminder dialog — shown once after each version update
                     if (showAutostartReminder.value) {
                         AlertDialog(
@@ -111,31 +121,106 @@ class MainActivity : ComponentActivity() {
                                     "A new version was installed. You need to toggle-off disable " +
                                     "autostart for this app, which enables background data collection " +
                                     "when the car is off (e.g. charging overnight).\n\n" +
-                                    "After that action, you need to reboot the car and re-open the app " +
-                                    "for changes to be in effect."
+                                    "For best reliability, reboot the car once after changing this " +
+                                    "setting, then open BYD Trip Stats again."
                                 )
                             },
                             confirmButton = {
-                                TextButton(onClick = { dismissAutostartReminder() }) {
+                                TextButton(onClick = { openAutostartManagementDialog() }) {
                                     Text("Got it")
                                 }
                             }
                         )
                     }
 
-                    // Wait for DataStore to emit before showing anything
-                    if (selectedCarId == null && mqttSettings != null) {
-                        InitializationScreen(
-                            initialTopic = mqttSettings!!.topic,
-                            onContinue = { car, topic ->
-                                prefs.saveInitialSetup(car.id, topic)
+                    // ADB permission setup — driven by AdbPermissionManager.state
+                    if (showSetupRequired.value) {
+                        val adbState by AdbPermissionManager.state.collectAsState()
+                        if (adbState is AdbPermissionManager.SetupState.Done) {
+                            showSetupRequired.value = false
+                        } else {
+                            val dialogTitle = when (adbState) {
+                                is AdbPermissionManager.SetupState.Connecting  -> "Connecting..."
+                                is AdbPermissionManager.SetupState.WaitingAuth -> "Waiting for authorization"
+                                is AdbPermissionManager.SetupState.Granting    -> "Granting permissions..."
+                                is AdbPermissionManager.SetupState.Failed      -> "Setup failed"
+                                else -> "Setup Required"
                             }
-                        )
-                    } else if (selectedCarId == null) {
-                        // DataStore hasn't emitted yet — show nothing or a spinner
+                            val dialogBody = when (val s = adbState) {
+                                is AdbPermissionManager.SetupState.Idle ->
+                                    "BYD Trip Stats needs one-time ADB authorization to run " +
+                                    "in the background.\n\nSteps:\n" +
+                                    "1. Settings → Developer Options\n" +
+                                    "2. Enable USB Debugging\n" +
+                                    "3. Return here and tap Authorize"
+                                is AdbPermissionManager.SetupState.Connecting ->
+                                    "Connecting to ADB daemon..."
+                                is AdbPermissionManager.SetupState.WaitingAuth ->
+                                    "A dialog should appear on screen asking to allow " +
+                                    "USB debugging. Tap Allow, then return here.\n\n" +
+                                    "This is a one-time action. Future updates are fully automatic."
+                                is AdbPermissionManager.SetupState.Granting ->
+                                    "Granting background permissions..."
+                                is AdbPermissionManager.SetupState.Failed ->
+                                    s.reason + "\n\nTap Retry to try again."
+                                else -> ""
+                            }
+                            val busy = adbState is AdbPermissionManager.SetupState.Connecting ||
+                                adbState is AdbPermissionManager.SetupState.WaitingAuth ||
+                                adbState is AdbPermissionManager.SetupState.Granting
+
+                            AlertDialog(
+                                onDismissRequest = { if (!busy) showSetupRequired.value = false },
+                                title = { Text(dialogTitle) },
+                                text = {
+                                    Column {
+                                        Text(dialogBody)
+                                        if (busy) {
+                                            Spacer(Modifier.height(12.dp))
+                                            LinearProgressIndicator(Modifier.padding(top = 4.dp))
+                                        }
+                                    }
+                                },
+                                confirmButton = {
+                                    if (adbState is AdbPermissionManager.SetupState.Idle) {
+                                        TextButton(onClick = {
+                                            runCatching {
+                                                startActivity(Intent(
+                                                    Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS
+                                                ))
+                                            }
+                                            lifecycleScope.launch {
+                                                AdbPermissionManager.runSetup(this@MainActivity)
+                                            }
+                                        }) { Text("Open Developer Settings") }
+                                    } else if (adbState is AdbPermissionManager.SetupState.Failed) {
+                                        TextButton(onClick = {
+                                            lifecycleScope.launch {
+                                                AdbPermissionManager.runSetup(this@MainActivity)
+                                            }
+                                        }) { Text("Retry") }
+                                    }
+                                },
+                                dismissButton = {
+                                    if (!busy) {
+                                        TextButton(onClick = {
+                                            showSetupRequired.value = false
+                                        }) { Text("Later") }
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    if (selectedCarId == "__loading__") {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
                         }
+                    } else if (selectedCarId == null) {
+                        InitializationScreen(
+                            onContinue = { car ->
+                                prefs.saveInitialSetup(car.id)
+                            }
+                        )
                     } else {
                         val navController = rememberNavController()
                         AppNavigation(
@@ -166,23 +251,42 @@ class MainActivity : ComponentActivity() {
         showAutostartReminder.value = false
     }
 
+    private fun openAutostartManagementDialog() {
+        dismissAutostartReminder()
+        val intent = Intent("android.intent.action.BYD_APPSTARTMANAGEMENT").apply {
+            addCategory(Intent.CATEGORY_DEFAULT)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure { error ->
+                Log.w(TAG, "Unable to launch BYD autostart management", error)
+            }
+    }
+
+    private fun checkSetupRequired() {
+        if (AdbPermissionManager.isSetupComplete(this)) return
+        showSetupRequired.value = true
+        lifecycleScope.launch {
+            AdbPermissionManager.runSetup(this@MainActivity)
+        }
+    }
+
     override fun onStart() {
         super.onStart()
         // Rebind every time the Activity becomes visible — covers the CarPlay
         // scenario where DiLink kills and recreates the Activity while the
-        // MqttService foreground service keeps running uninterrupted.
-        if (!bound) bindToMqttService()
+        // Vehicle telemetry foreground service keeps running uninterrupted.
+        if (!bound) bindToTelemetryService()
     }
 
     override fun onStop() {
         super.onStop()
         // Unbind when going to background so the binding is clean on next onStart.
         // The service itself keeps running (START_STICKY + foreground notification)
-        // so trip recording and MQTT connection are unaffected.
+        // so trip recording and vehicle telemetry collection are unaffected.
         if (bound) {
             unbindService(connection)
             bound = false
-            mqttService = null
+            telemetryService = null
         }
     }
 
@@ -195,7 +299,7 @@ class MainActivity : ComponentActivity() {
             bound = false
         }
         // Do NOT stop the service — it must keep running in the background
-        // for auto trip detection and MQTT telemetry collection.
+        // for auto trip detection and vehicle telemetry collection.
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
@@ -206,6 +310,8 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
+            add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
             // READ_EXTERNAL_STORAGE required on Android 10–12 to query MediaStore
             // entries not owned by the current app install (e.g. after a reinstall).
             // Superseded by READ_MEDIA_* on Android 13+ where it has no effect.
@@ -228,20 +334,23 @@ class MainActivity : ComponentActivity() {
     // ── Service binding ───────────────────────────────────────────────────────
 
     /**
-     * Binds to MqttService. The service is started by [BydStatsApplication] on
+     * Binds to the vehicle telemetry service. The service is started by [BydStatsApplication] on
      * every process start, so it should already be running by the time the
      * Activity reaches this point. [Context.BIND_AUTO_CREATE] ensures it is
      * started if somehow it is not yet running (e.g. during first-ever launch
-     * before Application.onCreate has finished the 6-second broker-init delay).
+     * before Application.onCreate has finished initial service startup).
      *
      * We no longer use the deprecated [android.app.ActivityManager.getRunningServices]
      * to detect whether the service is running — that API is unreliable on
      * modern Android and was removed from the call path entirely.
      */
-    private fun bindToMqttService() {
-        Log.d(TAG, "Binding to MqttService")
-        val intent = Intent(this, MqttService::class.java)
+    private fun bindToTelemetryService() {
+        Log.d(TAG, "Binding to telemetry service")
+        val intent = Intent(this, VehicleTelemetryService::class.java)
+        // Start the service explicitly before binding so it has an independent
+        // lifecycle. Without this, the service is bound-only and dies when the
+        // UI unbinds in onStop() — killing trip recording while driving.
+        ContextCompat.startForegroundService(this, intent)
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
     }
-
 }

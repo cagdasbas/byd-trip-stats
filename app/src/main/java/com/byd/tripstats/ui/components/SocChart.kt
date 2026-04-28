@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -58,6 +59,10 @@ fun SocChart(
     // Only show socPanel line if the data actually has non-zero panel values
     // (pre-v2 trips will have all zeros)
     val hasPanelData = remember(dataPoints) { dataPoints.any { it.socPanel > 0 } }
+
+    val modes   = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
 
     Column(modifier = modifier) {
 
@@ -104,6 +109,28 @@ fun SocChart(
 
             val totalDuration = if (dataPoints.size > 1)
                 (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
+
+            // ── Drive mode background bands ──────────────────────────────────────
+            if (hasModes && dataPoints.size >= 2) {
+                var bandStart = 0
+                var bandMode = modes[0].driveMode
+                for (i in 1..dataPoints.size) {
+                    val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                    if (curMode != bandMode || i == dataPoints.size) {
+                        if (bandMode != 0) {
+                            val x0 = xOf(bandStart)
+                            val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                            drawRect(
+                                color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                                topLeft = Offset(x0, padT),
+                                size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                            )
+                        }
+                        bandStart = i
+                        bandMode = curMode
+                    }
+                }
+            }
 
             val labelPaint = android.graphics.Paint().apply {
                 color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
@@ -181,6 +208,8 @@ fun SocChart(
                 }
             }
 
+            drawDriveModeLabel(singleDriveMode, padR, padT)
+
             // Crosshair
             touchPos?.let { tp ->
                 if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
@@ -202,7 +231,7 @@ fun SocChart(
                         line1 = line1,
                         line2 = "${(secs / 60).toInt()}m ${(secs % 60).toInt()}s",
                         line3 = clockTime,
-                        accentColor = bmsColor, textColor = textColor
+                        accentColor = bmsColor
                     )
                 }
             }

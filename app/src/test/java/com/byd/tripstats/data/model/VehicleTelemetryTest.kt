@@ -15,16 +15,19 @@ private fun telemetry(
     odometer      : Double = 1000.0,
     totalDischarge: Double = 500.0,
     socPanel      : Int    = 80,
+    carLocked     : Int    = 0,
+    anyDoorOpened : Int    = 0,
     tyrePressureLF: Double = 38.5,
     tyrePressureRF: Double = 38.5,
     tyrePressureLR: Double = 42.0,
     tyrePressureRR: Double = 42.0,
+    battery12vVoltage      : Double = 13.4,
     batteryTotalVoltage   : Int    = 570,
     batteryCellVoltageMax : Double = 3.333,
     batteryCellVoltageMin : Double = 3.326,
     electricDrivingRangeKm: Int    = 400
 ): VehicleTelemetry = VehicleTelemetry(
-    battery12vVoltage      = 13.4,
+    battery12vVoltage      = battery12vVoltage,
     batteryCellTempMax     = 25,
     batteryCellVoltageMax  = batteryCellVoltageMax,
     batteryCellTempMin     = 22,
@@ -51,7 +54,9 @@ private fun telemetry(
     tyrePressureRF         = tyrePressureRF,
     tyrePressureLR         = tyrePressureLR,
     tyrePressureRR         = tyrePressureRR,
-    socPanel               = socPanel
+    socPanel               = socPanel,
+    carLocked              = carLocked,
+    anyDoorOpened          = anyDoorOpened
 )
 
 
@@ -63,17 +68,50 @@ class VehicleTelemetryTest {
 
     // ── isCarOn ───────────────────────────────────────────────────────────────
 
-    @Test fun `isCarOn is true when carOn equals 1`() {
+    @Test fun `isCarOn is true when carOn equals 1 or 2`() {
         assertTrue(telemetry(carOn = 1).isCarOn)
+        assertTrue(telemetry(carOn = 2).isCarOn)
     }
 
     @Test fun `isCarOn is false when carOn equals 0`() {
-        assertFalse(telemetry(carOn = 0).isCarOn)
+        assertFalse(telemetry(carOn = 0, battery12vVoltage = 12.4).isCarOn)
     }
 
-    @Test fun `isCarOn is false for any value other than 1`() {
-        assertFalse(telemetry(carOn = 2).isCarOn)
-        assertFalse(telemetry(carOn = -1).isCarOn)
+    @Test fun `isCarOn is false for negative values`() {
+        assertFalse(telemetry(carOn = -1, battery12vVoltage = 12.4).isCarOn)
+    }
+
+    @Test fun `isCarOn is true when drivetrain signals imply the car is active`() {
+        assertTrue(telemetry(carOn = 0, gear = "D", speed = 1.0).isCarOn)
+        assertTrue(telemetry(carOn = 0, speed = 3.0).isCarOn)
+        assertTrue(telemetry(carOn = 0, enginePower = 6.0).isCarOn)
+    }
+
+    @Test fun `isCarOn is true for D or R gear regardless of speed`() {
+        // Car stopped at red light — segment must not reset
+        assertTrue(telemetry(carOn = 0, gear = "D", speed = 0.0, enginePower = 0.0).isCarOn)
+        assertTrue(telemetry(carOn = 0, gear = "R", speed = 0.0, enginePower = 0.0).isCarOn)
+    }
+
+    @Test fun `isCarOn is false when only twelve volt rail is alive`() {
+        assertFalse(telemetry(carOn = 0, gear = "P", battery12vVoltage = 13.7).isCarOn)
+        assertFalse(telemetry(carOn = 0, gear = "N", battery12vVoltage = 13.7).isCarOn)
+    }
+
+    @Test fun `isAwake is true only for carOn equals 1`() {
+        assertTrue(telemetry(carOn = 1).isAwake)
+        assertFalse(telemetry(carOn = 0).isAwake)
+        assertFalse(telemetry(carOn = 2).isAwake)
+    }
+
+    @Test fun `isReadyToDrive is true only for carOn equals 2`() {
+        assertTrue(telemetry(carOn = 2).isReadyToDrive)
+        assertFalse(telemetry(carOn = 0).isReadyToDrive)
+        assertFalse(telemetry(carOn = 1).isReadyToDrive)
+    }
+
+    @Test fun `unknown drive mode is displayed as unknown`() {
+        assertEquals("Unknown", telemetry().copy(driveMode = 0).driveModeName)
     }
 
     // ── isCharging ────────────────────────────────────────────────────────────

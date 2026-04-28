@@ -4,198 +4,127 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.byd.tripstats.service.MqttBrokerService  // ← ADD THIS IMPORT
-import com.byd.tripstats.service.MqttService
-import com.byd.tripstats.data.preferences.PreferencesManager
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
+import com.byd.tripstats.service.ServiceRestarterJobService
+import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.util.McuWakeHelper
+import com.byd.tripstats.util.RtDispatch
+import com.byd.tripstats.util.RtInProcessPatches
+import com.byd.tripstats.util.RtShellPatches
+import com.byd.tripstats.receiver.OffStateKeepaliveReceiver
+import kotlin.concurrent.thread
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 /**
- * CRITICAL: Receives BOOT_COMPLETED and starts MQTT service
- * This is what enables auto-start functionality
- * 
- * SUPPORTS BOTH:
- * - Local embedded broker (127.0.0.1) - starts MqttBrokerService
- * - External broker (HiveMQ, etc.) - skips MqttBrokerService
- * 
- * DEBUGGING: If this doesn't work, check:
- * 1. AndroidManifest has NO android:permission on <receiver>
- * 2. App has RECEIVE_BOOT_COMPLETED permission
- * 3. Battery optimization disabled for app
- * 4. Device allows app to auto-start (Settings → Apps → Autostart)
+ * Receives boot/package/ACC/car-off style events and kicks the telemetry service twice:
+ * immediately, then again after short delays in case BYD system services are
+ * not ready yet during early boot or right after the car transitions off.
  */
 class BootReceiver : BroadcastReceiver() {
-    private val TAG = "BootReceiver"
-    
-    override fun onReceive(context: Context, intent: Intent) {
-        Log.i(TAG, "=================================================================")
-        Log.i(TAG, "=== BOOT RECEIVER TRIGGERED ===")
-        Log.i(TAG, "Action: ${intent.action}")
-        Log.i(TAG, "Package: ${context.packageName}")
-        Log.i(TAG, "Time: ${System.currentTimeMillis()}")
-        Log.i(TAG, "=================================================================")
+    companion object {
+        private const val TAG = "BootReceiver"
 
-        when (intent.action) {
+        private val START_ACTIONS = setOf(
             Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_USER_UNLOCKED,
+            Intent.ACTION_SCREEN_ON,
+            Intent.ACTION_USER_PRESENT,
             Intent.ACTION_REBOOT,
+            Intent.ACTION_POWER_CONNECTED,
+            Intent.ACTION_POWER_DISCONNECTED,
             "android.intent.action.QUICKBOOT_POWERON",
-            "com.htc.intent.action.QUICKBOOT_POWERON" -> {
-                
-                Log.i(TAG, "✓ Boot action recognized, starting service...")
-                
-                // Use goAsync() to allow async work beyond receiver's lifecycle
-                val pendingResult = goAsync()
-                
-                // Use GlobalScope to ensure completion even if receiver dies
-                // This is acceptable here because we MUST complete the service start
-                @OptIn(DelicateCoroutinesApi::class)
-                GlobalScope.launch(Dispatchers.IO) {
+            "com.htc.intent.action.QUICKBOOT_POWERON",
+            "com.byd.action.ACC_ON",
+            "com.byd.action.ACC_OFF",
+            "com.byd.action.IGN_ON",
+            "com.byd.accmode.ACC_MODE_CHANGED",
+        )
+
+        private val WHITELIST_REFRESH_ACTIONS = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_USER_UNLOCKED,
+            "com.byd.action.ACC_OFF",
+            "com.byd.action.ACC_ON",
+            "com.byd.action.IGN_ON",
+            "com.byd.accmode.ACC_MODE_CHANGED",
+        )
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        if (action !in START_ACTIONS) {
+            Log.d(TAG, "Ignoring action=$action")
+            return
+        }
+
+        Log.i(TAG, "Boot/start trigger received: action=$action")
+        try {
+            val appContext = context.applicationContext
+
+            // Re-inject BYD whitelists on car-on / boot / package-replace events.
+            // BYD firmware can reset these on ACC cycles, so we re-apply each time.
+            if (action in WHITELIST_REFRESH_ACTIONS) {
+                val pending = goAsync()
+                CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        Log.i(TAG, "Loading MQTT settings from DataStore...")
-                        
-                        val preferencesManager = PreferencesManager(context.applicationContext)
-                        
-                        // Give DataStore 5 seconds max to load
-                        // BroadcastReceiver has 10s total, so this is safe
-                        val settings = withTimeout(5000L) {
-                            preferencesManager.mqttSettings.first()
+                        withTimeout(8_000L) {
+                            RtInProcessPatches.apply(appContext)
+                            RtShellPatches.apply(appContext)
+                            RtDispatch.launch(appContext)
                         }
-                        
-                        Log.i(TAG, "Settings loaded successfully:")
-                        Log.i(TAG, "  - Broker: ${settings.brokerUrl}")
-                        Log.i(TAG, "  - Port: ${settings.brokerPort}")
-                        Log.i(TAG, "  - Topic: ${settings.topic}")
-                        Log.i(TAG, "  - Has Username: ${settings.username.isNotBlank()}")
-                        Log.i(TAG, "  - Has Password: ${settings.password.isNotBlank()}")
-                        
-                        // Validate configuration
-                        if (settings.brokerUrl.isBlank()) {
-                            Log.w(TAG, "❌ MQTT broker URL is blank - cannot start service")
-                            Log.w(TAG, "   User needs to configure MQTT in Settings")
-                            return@launch
-                        }
-                        
-                        if (settings.topic.isBlank()) {
-                            Log.w(TAG, "❌ MQTT topic is blank - cannot start service")
-                            Log.w(TAG, "   User needs to configure MQTT in Settings")
-                            return@launch
-                        }
-
-                        // Check if user wants local embedded broker
-                        val isLocalBroker = settings.brokerUrl.trim().let {
-                            it == "127.0.0.1" || it == "localhost" || it == "::1"
-                        }
-
-                        if (isLocalBroker) {
-                            Log.i(TAG, "✓ Local broker detected (${settings.brokerUrl})")
-                            Log.i(TAG, "  Starting embedded MQTT broker first...")
-
-                            try {
-                                MqttBrokerService.start(context.applicationContext)
-                                Log.i(TAG, "✓ Embedded broker service started")
-
-                                // Wait for broker to initialize before starting client
-                                Log.i(TAG, "  Waiting 1s for broker initialization...")
-                                delay(1000)
-
-                            } catch (e: Exception) {
-                                Log.e(TAG, "❌ Failed to start embedded broker", e)
-                                Log.e(TAG, "   Continuing anyway - client will try to connect")
-                            }
-                        } else {
-                            Log.i(TAG, "✓ External broker detected (${settings.brokerUrl})")
-                            Log.i(TAG, "  Skipping embedded broker, will use external")
-                        }
-
-                        Log.i(TAG, "✓ Configuration valid, starting MqttService...")
-
-                        // Start the MQTT client service
-                        try {
-                            MqttService.start(
-                                context = context.applicationContext,
-                                brokerUrl = settings.brokerUrl,
-                                brokerPort = settings.brokerPort,
-                                username = settings.username.ifBlank { null },
-                                password = settings.password.ifBlank { null },
-                                topic = settings.topic
-                            )
-                            
-                            Log.i(TAG, "=================================================================")
-                            Log.i(TAG, "✓✓✓ MQTT SERVICE START COMMAND SENT ✓✓✓")
-                            Log.i(TAG, "=================================================================")
-                            
-                            // Small delay to ensure service actually starts
-                            delay(500)
-                            
-                            Log.i(TAG, "Service should now be running in background")
-                            
-                        } catch (e: Exception) {
-                            Log.e(TAG, "❌ FAILED TO START SERVICE", e)
-                            Log.e(TAG, "   Error: ${e.message}")
-                            e.printStackTrace()
-                        }
-                        
-                    } catch (e: TimeoutCancellationException) {
-                        Log.e(TAG, "❌ TIMEOUT loading MQTT settings (>5s)")
-                        Log.e(TAG, "   DataStore may be corrupted or slow")
-                        Log.e(TAG, "   Service NOT started")
                     } catch (e: Exception) {
-                        Log.e(TAG, "❌ EXCEPTION in BootReceiver", e)
-                        Log.e(TAG, "   Error type: ${e.javaClass.simpleName}")
-                        Log.e(TAG, "   Error message: ${e.message}")
-                        e.printStackTrace()
+                        Log.w(TAG, "Whitelist injection failed/timed out on $action: ${e.message}")
                     } finally {
-                        Log.i(TAG, "Finishing broadcast receiver")
-                        try {
-                            pendingResult.finish()
-                            Log.i(TAG, "✓ Broadcast result finished successfully")
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error finishing pendingResult", e)
-                        }
+                        pending.finish()
                     }
                 }
             }
-            Intent.ACTION_POWER_CONNECTED -> {
-                Log.i(TAG, "⚡ Power connected — ensuring MQTT stack is alive")
-                val pendingResult = goAsync()
-                @OptIn(DelicateCoroutinesApi::class)
-                GlobalScope.launch(Dispatchers.IO) {
+
+            // On ACC_OFF, run the best-effort off-state keepalive immediately.
+            // Done on a background thread — onReceive() must return quickly.
+            if (action == "com.byd.action.ACC_OFF" || action == "com.byd.accmode.ACC_MODE_CHANGED") {
+                // goAsync() keeps the process alive for the duration of keepAlive().
+                // A bare daemon thread has no process binding — Android can kill it
+                // before the helper finishes.
+                val pending = goAsync()
+                CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val preferencesManager = PreferencesManager(context.applicationContext)
-                        val settings = withTimeout(5000L) {
-                            preferencesManager.mqttSettings.first()
+                        withTimeout(10_000L) {
+                            McuWakeHelper.keepAlive(appContext)
                         }
-                        if (settings.brokerUrl.isBlank() || settings.topic.isBlank()) {
-                            Log.w(TAG, "MQTT not configured — skipping power-connected restart")
-                            return@launch
-                        }
-                        val isLocal = settings.brokerUrl.trim().let {
-                            it == "127.0.0.1" || it == "localhost" || it == "::1"
-                        }
-                        if (isLocal) {
-                            MqttBrokerService.start(context.applicationContext)
-                            delay(2000)
-                        }
-                        MqttService.start(
-                            context    = context.applicationContext,
-                            brokerUrl  = settings.brokerUrl,
-                            brokerPort = settings.brokerPort,
-                            username   = settings.username.ifBlank { null },
-                            password   = settings.password.ifBlank { null },
-                            topic      = settings.topic
-                        )
-                        Log.i(TAG, "✅ MQTT stack restarted on power-connected event")
+                        Log.i(TAG, "MCU keepalive sent on $action")
                     } catch (e: Exception) {
-                        Log.e(TAG, "❌ Failed to restart MQTT on power-connected", e)
+                        Log.w(TAG, "MCU keepalive failed/timed out on $action: ${e.message}")
                     } finally {
-                        try { pendingResult.finish() } catch (_: Exception) {}
+                        pending.finish()
                     }
                 }
+                // Start the 4-minute alarm chain — survives process death
+                OffStateKeepaliveReceiver.schedule(appContext, iteration = 0)
             }
-            else -> {
-                Log.d(TAG, "Unhandled boot action: ${intent.action}")
-                Log.d(TAG, "This receiver only handles BOOT_COMPLETED actions")
+            // Cancel the keepalive chain when ACC comes back on
+            if (action == "com.byd.action.ACC_ON" || action == "com.byd.action.IGN_ON") {
+                OffStateKeepaliveReceiver.cancel(appContext)
             }
+
+            VehicleTelemetryService.start(appContext)
+            // Kick at 15s and 45s for fast service readiness.
+            ServiceRestartReceiver.schedule(appContext, delayMs = 15_000L, reason = "boot:$action")
+            ServiceRestartReceiver.schedule(appContext, delayMs = 45_000L, reason = "boot-followup:$action")
+            // Kick at 2 min for cold boot, when platform services may still be settling.
+            ServiceRestartReceiver.schedule(appContext, delayMs = 120_000L, reason = "boot-platform-ready:$action")
+            ServiceRestarterJobService.schedulePeriodic(appContext, "boot:$action")
+            ServiceRestarterJobService.scheduleEarlyKick(appContext, delayMs = 15_000L, reason = "boot:$action")
+            ServiceRestarterJobService.scheduleLateKick(appContext, delayMs = 45_000L, reason = "boot-followup:$action")
+            Log.i(TAG, "✅ Vehicle telemetry start dispatched for action=$action")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to dispatch vehicle telemetry start for action=$action", e)
         }
     }
 }

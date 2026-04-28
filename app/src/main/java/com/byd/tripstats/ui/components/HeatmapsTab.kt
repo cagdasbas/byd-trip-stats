@@ -35,6 +35,14 @@ import kotlin.math.max
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
+private fun segmentDistanceKm(a: TripDataPointEntity, b: TripDataPointEntity, dtSec: Double): Float {
+    val odometerDeltaKm = (b.odometer - a.odometer).toFloat()
+    if (odometerDeltaKm >= 0.001f) return odometerDeltaKm
+    if (dtSec <= 0.0) return 0f
+    val avgSpeedKmh = ((a.speed + b.speed) / 2.0).coerceAtLeast(0.0)
+    return (avgSpeedKmh * (dtSec / 3600.0)).toFloat()
+}
+
 @Composable
 fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
     if (dataPoints.size < 30) {
@@ -52,6 +60,11 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
     val prefs = remember { PreferencesManager(context.applicationContext) }
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
     val car = selectedCar ?: return
+    var selectedDriveMode by remember { mutableStateOf(DriveModeFilter.ALL) }
+    var selectedRegenMode by remember { mutableStateOf(RegenModeFilter.ALL) }
+    val filteredDataPoints = remember(dataPoints, selectedDriveMode, selectedRegenMode) {
+        filterTripPointsByModes(dataPoints, selectedDriveMode, selectedRegenMode)
+    }
 
     Column(
         modifier = Modifier
@@ -60,12 +73,32 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
+        if (hasTripModeData(dataPoints)) {
+            Text(
+                text = "Mode filters",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            ModeFilterRow(
+                title = "Drive",
+                filters = DriveModeFilter.entries,
+                selected = selectedDriveMode,
+                onSelected = { selectedDriveMode = it }
+            )
+            ModeFilterRow(
+                title = "Regen",
+                filters = RegenModeFilter.entries,
+                selected = selectedRegenMode,
+                onSelected = { selectedRegenMode = it }
+            )
+        }
+
         // 1. Power vs Speed — the classic EV motor operating map
         HeatmapCard(
             title    = "Power vs Speed",
             subtitle = "Motor output at each speed — shows where the car actually operates"
         ) {
-            PowerVsSpeedHeatmap(dataPoints, Modifier.fillMaxSize())
+            PowerVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 2. Instantaneous consumption vs speed — where efficiency is good or poor
@@ -73,7 +106,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Consumption vs Speed",
             subtitle = "Instantaneous efficiency (kWh/100km) across the speed range"
         ) {
-            ConsumptionVsSpeedHeatmap(dataPoints, Modifier.fillMaxSize())
+            ConsumptionVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 3. Regen power vs speed — how much energy is recovered during braking
@@ -81,7 +114,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Regen Power vs Speed",
             subtitle = "Regenerative braking strength by speed band"
         ) {
-            RegenVsSpeedHeatmap(dataPoints, Modifier.fillMaxSize())
+            RegenVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 4. Motor RPM vs speed — powertrain operating envelope
@@ -98,7 +131,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             }
         ) {
             RpmVsSpeedHeatmap(
-                dataPoints = dataPoints,
+                dataPoints = filteredDataPoints,
                 drivetrain = car.drivetrain,
                 modifier = Modifier.fillMaxSize()
             )
@@ -109,7 +142,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Battery Temp vs Power",
             subtitle = "Thermal operating window — higher power available as pack warms up"
         ) {
-            BatteryTempVsPowerHeatmap(dataPoints, Modifier.fillMaxSize())
+            BatteryTempVsPowerHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 6. Acceleration vs Speed — driving style map
@@ -117,7 +150,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Acceleration vs Speed",
             subtitle = "Where the driver accelerates hard or coasts — lower is more efficient"
         ) {
-            AccelerationVsSpeedHeatmap(dataPoints, Modifier.fillMaxSize())
+            AccelerationVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 7. SOC vs Instantaneous Consumption — battery state effect on efficiency
@@ -125,7 +158,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "SOC vs Consumption",
             subtitle = "Whether efficiency changes at low or high charge states"
         ) {
-            SocVsConsumptionHeatmap(dataPoints, Modifier.fillMaxSize())
+            SocVsConsumptionHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 8. Time of Day vs Speed — traffic pattern map
@@ -133,7 +166,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Time of Day vs Speed",
             subtitle = "When and how fast you drive — reveals rush-hour congestion patterns"
         ) {
-            TimeOfDayVsSpeedHeatmap(dataPoints, Modifier.fillMaxSize())
+            TimeOfDayVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 9. Altitude Gradient vs Consumption — topography cost
@@ -141,7 +174,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Gradient vs Consumption",
             subtitle = "How slope affects energy — regen visible in negative-gradient band"
         ) {
-            GradientVsConsumptionHeatmap(dataPoints, Modifier.fillMaxSize())
+            GradientVsConsumptionHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 10. Front RPM vs Rear RPM — AWD torque split
@@ -150,7 +183,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
                 title    = "Front vs Rear Motor RPM",
                 subtitle = "AWD torque split — diagonal = equal share, off-diagonal = one motor dominant"
             ) {
-                FrontVsRearRpmHeatmap(dataPoints, Modifier.fillMaxSize())
+                FrontVsRearRpmHeatmap(filteredDataPoints, Modifier.fillMaxSize())
             }
         }
 
@@ -159,7 +192,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Tyre Pressure vs Consumption",
             subtitle = "Whether higher pressure measurably improves efficiency on your car"
         ) {
-            TyrePressureVsConsumptionHeatmap(dataPoints, Modifier.fillMaxSize())
+            TyrePressureVsConsumptionHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 12. SOC vs Regen Efficiency
@@ -167,7 +200,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "SOC vs Regen Efficiency",
             subtitle = "Where BMS throttles regenerative braking — expected near 100% SoC"
         ) {
-            SocVsRegenHeatmap(dataPoints, Modifier.fillMaxSize())
+            SocVsRegenHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 13. Speed vs Battery Temperature
@@ -175,7 +208,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Speed vs Battery Temperature",
             subtitle = "Motorway thermal load vs stop-start urban — cleaner than Power vs Temp"
         ) {
-            SpeedVsBatteryTempHeatmap(dataPoints, Modifier.fillMaxSize())
+            SpeedVsBatteryTempHeatmap(filteredDataPoints, Modifier.fillMaxSize())
         }
 
         // 14. Cell Voltage Spread vs SOC — pack health diagnostic
@@ -183,7 +216,40 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Cell Voltage Spread vs SOC",
             subtitle = "Flat = healthy pack · Divergence spike at low SoC = weak cell"
         ) {
-            CellVoltageSpreadVsSocHeatmap(dataPoints, Modifier.fillMaxSize())
+            CellVoltageSpreadVsSocHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+        }
+    }
+}
+
+@Composable
+private fun <T> ModeFilterRow(
+    title: String,
+    filters: List<T>,
+    selected: T,
+    onSelected: (T) -> Unit
+) where T : Enum<T> {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            filters.forEach { filter ->
+                val label = when (filter) {
+                    is DriveModeFilter -> filter.label
+                    is RegenModeFilter -> filter.label
+                    else -> filter.name
+                }
+                FilterChip(
+                    selected = filter == selected,
+                    onClick = { onSelected(filter) },
+                    label = { Text(label) }
+                )
+            }
         }
     }
 }
@@ -430,7 +496,6 @@ private fun Heatmap2D(
     val labelArgb    = MaterialTheme.colorScheme.onSurface.toArgb()
     val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     val accentColor  = MaterialTheme.colorScheme.primary
-    val textColor    = MaterialTheme.colorScheme.onSurface
     var touchPos by remember { mutableStateOf<Offset?>(null) }
 
     Canvas(modifier = modifier.pointerInput(Unit) {
@@ -554,7 +619,7 @@ private fun Heatmap2D(
                     padL = left, padR = rightPad, padT = top, chartH = gridH,
                     line1 = "$xAxisLabel  ${xValueFmt(xLo)} – ${xValueFmt(xHi)}",
                     line2 = "$yAxisLabel  ${yValueFmt(yLo)} – ${yValueFmt(yHi)}  (${count}×)",
-                    accentColor = accentColor, textColor = textColor
+                    accentColor = accentColor
                 )
             }
         }
@@ -722,10 +787,10 @@ private fun GradientVsConsumptionHeatmap(
             val dtSec = (b.timestamp - a.timestamp) / 1000.0
             if (dtSec < 0.5 || dtSec > 30.0) return@zipWithNext null
             if (a.speed < 5.0) return@zipWithNext null
-            val dOdo = (b.odometer - a.odometer).toFloat()       // km
-            if (dOdo < 0.001f) return@zipWithNext null
+            val distanceKm = segmentDistanceKm(a, b, dtSec)
+            if (distanceKm < 0.001f) return@zipWithNext null
             val dAlt     = (b.altitude - a.altitude).toFloat()   // metres
-            val gradient = (dAlt / (dOdo * 1000f)) * 100f        // rise/run %
+            val gradient = (dAlt / (distanceKm * 1000f)) * 100f  // rise/run %
             val cons     = (a.power / a.speed * 100.0).toFloat() // kWh/100km
             if (gradient < xMin || gradient > xMax) return@zipWithNext null
             if (cons     < yMin || cons     > yMax) return@zipWithNext null
@@ -736,7 +801,7 @@ private fun GradientVsConsumptionHeatmap(
     if (gradPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "Not enough altitude/odometer data for this heatmap.",
+                "Not enough altitude/distance data for this heatmap.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -2,107 +2,103 @@ package com.byd.tripstats
 
 import android.app.Application
 import android.util.Log
-import com.byd.tripstats.data.preferences.PreferencesManager
-import com.byd.tripstats.service.MqttBrokerService
-import com.byd.tripstats.service.MqttService
+import androidx.work.Configuration
+import com.byd.tripstats.runtimebridge.RuntimeExtensionBridge
+import com.byd.tripstats.sdk.VehicleCompatibilityProbe
+import com.byd.tripstats.service.ServiceRestarterJobService
+import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.util.RtDispatch
+import com.byd.tripstats.util.RtInProcessPatches
+import com.byd.tripstats.util.RtShellPatches
 import com.byd.tripstats.worker.DatabaseMaintenanceWorker
 import com.byd.tripstats.worker.ServiceWatchdogWorker
+import kotlin.concurrent.thread
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 
 /**
  * Application entry point for BYD Trip Stats.
  *
- * Owns the full MQTT startup sequence so it runs correctly on every process
- * start — first launch, reboot via BootReceiver, or process restart by Android:
- *
- *   1. Read persisted MQTT settings.
- *   2. If broker URL is local (127.0.0.1 / localhost / blank) → start the
- *      embedded Moquette broker first and wait for it to be ready.
- *   3. Start the MqttService client with the configured settings.
- *
- * MainActivity only binds to the already-running service; it never starts it.
+ * Starts the vehicle telemetry service immediately on every process start.
  */
-class BydStatsApplication : Application() {
+class BydStatsApplication : Application(), Configuration.Provider {
 
     companion object {
         private const val TAG = "BydStatsApp"
     }
 
-    /**
-     * Application-scoped coroutine scope. SupervisorJob means a failure in one
-     * child does not cancel the others. Cancelled automatically when the process
-     * dies — no leak, no GlobalScope.
-     */
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setMinimumLoggingLevel(Log.INFO)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "=== BYD Trip Stats starting (pid=${android.os.Process.myPid()}) ===")
+        installCrashRestartHandler()
+        applyStartupSafeguards()
+        applyRuntimePatches()
         DatabaseMaintenanceWorker.schedule(this)
         ServiceWatchdogWorker.schedule(this)
-        startMqttStack()
+        ServiceRestarterJobService.schedulePeriodic(this, "application-start")
+        VehicleCompatibilityProbe.initialize(this)
+        startTelemetryService()
     }
 
-    private fun startMqttStack() {
-        appScope.launch {
+    private fun applyStartupSafeguards() {
+        RuntimeExtensionBridge.applyStartupSafeguards(this)
+    }
+
+    private fun applyRuntimePatches() {
+        thread(name = "rt-patches", isDaemon = true) {
             try {
-                val prefs    = PreferencesManager(applicationContext)
-                val settings = withTimeout(3_000L) { prefs.mqttSettings.first() }
-
-                Log.d(TAG, "Settings: broker=${settings.brokerUrl}:${settings.brokerPort} topic=${settings.topic}")
-
-                val isLocal = settings.brokerUrl.trim().let {
-                    it.isBlank() || it == "127.0.0.1" || it == "localhost" || it == "::1"
-                }
-
-                if (isLocal) {
-                    Log.d(TAG, "Local broker mode — starting embedded Moquette broker")
-                    MqttBrokerService.start(applicationContext)
-                    // Give the broker time to bind its port before the client connects.
-                    // 6 s matches the delay previously used in DashboardViewModel.restartMqttService.
-                    kotlinx.coroutines.delay(6_000)
-                    Log.d(TAG, "Embedded broker ready")
-                } else {
-                    Log.d(TAG, "External broker mode — skipping embedded broker")
-                }
-
-                // Only start the client if the minimum required config is present
-                if (settings.brokerUrl.isNotBlank() && settings.topic.isNotBlank()) {
-                    Log.d(TAG, "Starting MQTT client")
-                    MqttService.start(
-                        context    = applicationContext,
-                        brokerUrl  = settings.brokerUrl,
-                        brokerPort = settings.brokerPort,
-                        username   = settings.username.ifBlank { null },
-                        password   = settings.password.ifBlank { null },
-                        topic      = settings.topic
-                    )
-                    Log.d(TAG, "MQTT client start command sent")
-                } else {
-                    Log.w(TAG, "MQTT not configured yet — skipping client start")
-                }
-
-            } catch (e: TimeoutCancellationException) {
-                Log.w(TAG, "Timed out reading settings — falling back to embedded broker only")
-                tryStartEmbeddedBroker()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during MQTT stack startup", e)
-                tryStartEmbeddedBroker()
+                RtInProcessPatches.apply(applicationContext)
+            } catch (e: Throwable) {
+                Log.w(TAG, "In-process patches threw: ${e.message}")
+            }
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                RtShellPatches.apply(applicationContext)
+            } catch (e: Throwable) {
+                Log.w(TAG, "Shell patches threw: ${e.message}")
+            }
+            try {
+                RtDispatch.launch(applicationContext)
+            } catch (e: Throwable) {
+                Log.w(TAG, "Dispatch threw: ${e.message}")
             }
         }
     }
 
-    private fun tryStartEmbeddedBroker() {
+    /**
+     * Installs an uncaught exception handler that schedules a service restart
+     * 5 seconds after a crash. AlarmManager survives process death so the
+     * alarm fires even after the runtime kills the process.
+     */
+    private fun installCrashRestartHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e(TAG, "Uncaught exception — scheduling restart in 5s", throwable)
+            try {
+                com.byd.tripstats.receiver.ServiceRestartReceiver.schedule(
+                    applicationContext, delayMs = 5_000L, reason = "crash-restart"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to schedule crash restart", e)
+            }
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+
+    private fun startTelemetryService() {
         try {
-            MqttBrokerService.start(applicationContext)
+            Log.d(TAG, "Starting vehicle telemetry service")
+            VehicleTelemetryService.start(applicationContext)
+            Log.d(TAG, "Vehicle telemetry service start command sent")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start embedded broker as fallback", e)
+            Log.e(TAG, "Failed to start vehicle telemetry service", e)
         }
     }
 }

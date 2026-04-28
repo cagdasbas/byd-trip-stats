@@ -27,6 +27,7 @@ import java.util.Date
 import java.util.Locale
 import com.byd.tripstats.ui.theme.*
 import kotlin.math.roundToInt
+import androidx.compose.ui.geometry.Size
 
 private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
@@ -50,6 +51,11 @@ fun PowerChart(
     val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     val zeroColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+
+    // Pre-extract modes once — avoids JSON parsing inside the draw loop
+    val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
 
     Canvas(modifier = modifier.fillMaxSize().pointerInput(Unit) {
         awaitEachGesture {
@@ -79,6 +85,29 @@ fun PowerChart(
         }
         val totalDuration = if (dataPoints.size > 1)
             (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
+
+        // ── Drive mode background bands ──────────────────────────────────────
+        if (hasModes && dataPoints.size >= 2) {
+            var bandStart = 0
+            var bandMode = modes[0].driveMode
+            for (i in 1..dataPoints.size) {
+                val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                if (curMode != bandMode || i == dataPoints.size) {
+                    if (bandMode != 0) {
+                        val x0 = xOf(bandStart)
+                        val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                        drawRect(
+                            color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                            topLeft = Offset(x0, padT),
+                            size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                        )
+                    }
+                    bandStart = i
+                    bandMode = curMode
+                }
+            }
+        }
+
         val labelPaint = android.graphics.Paint().apply {
             color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
         }
@@ -180,6 +209,7 @@ fun PowerChart(
             // Draw the final segment
             drawPath(segPath, segColor.copy(alpha = 0.9f), style = stroke)
         }
+        drawDriveModeLabel(singleDriveMode, padR, padT)
         touchPos?.let { tp ->
             if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
                 val idx = ((tp.x - padL) / chartW * (dataPoints.size - 1)).roundToInt().coerceIn(0, dataPoints.size - 1)
@@ -187,15 +217,21 @@ fun PowerChart(
                 val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
                 val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
                 val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
-                val modeLabel = when { v > 5f -> "Accel"; v < -5f -> "Regen"; else -> "Cruise" }
+                val powerState = when { v > 5f -> "Accel"; v < -5f -> "Regen"; else -> "Cruise" }
                 val dotColor = when { v < -5f -> regenColor; else -> accelColor }
+                val mode = modes[idx]
+                val modeStr = buildString {
+                    append(powerState)
+                    if (mode.driveMode != 0) append(" · ${driveModeLabel(mode.driveMode)}")
+                    if (mode.regenMode != 0) append(" · Regen ${regenModeLabel(mode.regenMode)}")
+                }
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(v), w = w,
                     padL = padL, padR = padR, padT = padT, chartH = chartH,
-                    line1 = "%.1f kW  ($modeLabel)".format(v),
+                    line1 = "%.1f kW  ($modeStr)".format(v),
                     line2 = realTime,
                     line3 = durationStr,
-                    accentColor = dotColor, textColor = textColor
+                    accentColor = dotColor
                 )
             }
         }

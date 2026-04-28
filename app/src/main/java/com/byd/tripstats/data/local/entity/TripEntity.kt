@@ -93,7 +93,7 @@ data class TripDataPointEntity(
     val tyreTempRF: Int = 0,
     val tyreTempLR: Int = 0,
     val tyreTempRR: Int = 0,
-    // Escape hatch for future MQTT keys that don't yet have a first-class column.
+    // Escape hatch for future telemetry keys that don't yet have a first-class column.
     // Store as JSON: {"hvacPower": 1.2, ...}
     // When a new key becomes stable/important, promote it to its own column
     // via a migration and remove it from this blob. This way new telemetry

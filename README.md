@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v1.4.2-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v2.0.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
@@ -22,7 +22,7 @@
 
 ---
 
-> **BYD Trip Stats** is a feature-complete Android analytics dashboard for BYD DiLink vehicles — built by a BYD Seal owner and running on production hardware. It currently operates via an MQTT telemetry bridge (Electro) and is architected so that a native DiLink integration would require minimal changes.
+> **BYD Trip Stats** is a feature-complete Android analytics dashboard for BYD DiLink vehicles — built by a BYD Seal owner and running on production hardware. It now operates as a standalone in-car analytics app without relying on an external companion bridge.
 
 ---
 
@@ -31,7 +31,6 @@
 ### Requirements
 
 - A BYD vehicle with **DiLink 3.0** (tested on BYD Seal; should be compatible with Atto 3, Dolphin, and other DiLink-equipped models)
-- An active **[Electro](https://electro.app.br)** subscription — this is the telemetry bridge that exposes vehicle data via MQTT
 - Android **10 or higher** on the DiLink head unit
 
 ### Installation
@@ -39,12 +38,14 @@
 1. Download the latest signed APK from the [**Releases**](https://github.com/angoikon/byd-trip-stats/releases) tab
 2. On your DiLink unit, run the app - enable installation from unknown sources and follow the on-screen prompt to install
 3. Launch BYD Trip Stats, grant permissions for saving data to your car's internal storage
-4. On first launch, the initialization screen will guide you through selecting your BYD model and entering your Electro MQTT topic (find it in Electro → Integrations → MQTT)
+4. On first launch, select your BYD model and allow the app to finish initial setup
+
+No Electro setup, MQTT broker, or topic configuration is required for normal operation.
 
 ### Known Limitations
 
-- **Electro is required.** BYD Trip Stats currently receives telemetry via an MQTT bridge provided by the Electro app. A future native implementation would remove this dependency entirely — see the [Integration Roadmap](#%EF%B8%8F-integration-roadmap) below.
-- The app runs exclusively while the DiLink unit is active. Background tracking outside the vehicle is not supported by design.
+- **Some fields are still inferred or unresolved.** SoH is currently shown as an estimate, cabin temperature is only shown when a trustworthy in-car source is present, and a few battery-temperature sources are still under active investigation.
+- **Background persistence depends on DiLink firmware behaviour.** The app uses a foreground service, wake lock, boot receiver, and watchdog, but some BYD firmware builds are still aggressive about killing third-party apps while the car is off.
 
 ---
 
@@ -53,13 +54,16 @@
 **Driving Intelligence**
 - Fully autonomous trip detection via gear position events (D/R → P) — zero driver input required
 - Session distance tracking independent of trip recording state
+- Short engine-off breaks can continue the same trip, with current segment and cumulative trip distance shown separately
+- Drive and regen modes are recorded for trip timelines and mode-efficiency analysis
 - Manual override with confirmation safeguards
 
 **Real-Time Telemetry**
 - Live motor RPM per driven axle and estimated power split (AWD only: front 160 kW / rear 230 kW proportional to total output)
 - Battery SoH, cell voltage range, thermal min/max delta
-- HV and 12V bus voltage, tyre pressures per wheel (bar / PSI / kPa)
+- HV and 12V bus voltage, tyre pressures per wheel (bar / PSI / kPa) and tyre temperatures (×4) where the car exposes them
 - Gear state, speed, engine power, regen detection
+- Environmentals card with ambient temperature and PM2.5 in/out readings where available
 
 **Range Projection Engine**
 - Power-integrated consumption model (Wh/km) computed over a rolling 10 km window
@@ -78,11 +82,21 @@
 - Daily / weekly / monthly / annual energy consumption views
 - Up to 14 heatmap dimensions with crosshair bin-range interaction (13 universal + 1 AWD-exclusive torque-split map)
 - OpenStreetMap route overlay with energy event markers, fully offline
+- Physics-based energy breakdown per trip: rolling resistance, aerodynamic drag, gradient (climb/descent), and auxiliary losses — scaled to always sum to actual consumed energy
+- Drive and regen mode visualisation woven into existing charts: faint colour-coded background bands on Speed and Power charts show active drive mode across the full trip timeline; the Speed chart line itself changes colour segment-by-segment as the mode changes; crosshair tooltips on both charts show the active drive mode and regen mode at the touched moment; the Analysis tab Mode Insights card shows a horizontal stacked-bar summarising time spent in each drive and regen mode as a share of total trip distance
 
 **Reliability & Data**
 - Room (SQLite) persistence with WAL, automated maintenance workers, and schema migrations
 - Scheduled encrypted backup via Telegram bot or local filesystem
 - Full database restore with integrity verification
+- Local safety backup before update installation
+- Direct vehicle polling with fallback listeners across charging, statistic, climate, instrument, speed, location, and energy devices
+- App Diagnostics monitor: live CPU, RAM, thread, and uptime stats with 60-second history charts and ADB shell runner, available in Settings → Data
+
+**Connections**
+- Optional ABRP Link Generic upload using your ABRP user token
+- Optional outbound MQTT publisher for external brokers, using an Electro-compatible telemetry JSON schema
+- Connection status, test upload/publish actions, and human-readable last-sync timestamps
 
 ---
 
@@ -222,12 +236,12 @@ Every technical metric the vehicle exposes is charted — front and rear motor R
 
 ### VII. Settings, Backup & Data Integrity
 
-Full MQTT broker configuration (internal or external), local database backup and restore, and Telegram-based encrypted backup. Settings are logically grouped and include an in-app FAQ covering all common integration questions.
+Direct vehicle configuration, local database backup and restore, Connections for ABRP/MQTT, and Telegram-based encrypted backup. Settings are logically grouped and include an in-app FAQ covering common DiLink behaviour, autostart survival, and charging-session caveats.
 
 <div align="center">
 <table>
   <tr>
-    <td align="center"><b>Network Settings</b><br><img width="450" src="https://github.com/user-attachments/assets/18b0de45-3cce-439c-8dbb-38c621ec0257" /></td>
+    <td align="center"><b>Preferences</b><br><img width="450" src="https://github.com/user-attachments/assets/18b0de45-3cce-439c-8dbb-38c621ec0257" /></td>
     <td align="center"><b>Data Settings</b><br><img width="450" src="https://github.com/user-attachments/assets/30b9691e-0eb6-4a4a-8a17-8ae4831b5c61" /></td>
   </tr>
   <tr>
@@ -262,12 +276,23 @@ Tap the € icon in Trip History to set your electricity tariff. Trip cost appea
 
 ---
 
-### XI. Hybrid Charging Session Recording *(v1.4.0)*
+### XI. Hybrid Charging Session Recording *(v1.4.0 → v2.0.0)*
 
 Two complementary mechanisms cover all charging scenarios with no user interaction required:
 
 - **Car ON** — real-time session with full Power / SoC / Voltage / Temperature charts in the Charging Detail view
-- **Car OFF** — SoC delta reconstruction on next wake-up covers overnight, timed, and remote charging sessions with no background process dependency
+- **Car OFF** — SoC delta reconstruction on next wake-up still covers overnight, timed, and remote charging sessions when DiLink kills the app mid-charge
+
+---
+
+### XII. Connections *(v2.0.0)*
+
+The app remains standalone for normal use, but can optionally forward live telemetry to external tools:
+
+- **ABRP** — upload live car telemetry to ABRP via Link Generic token
+- **MQTT** — publish Electro-compatible JSON to an external broker and topic, with drive/regen modes exported as readable names
+
+Both integrations are opt-in and can be disabled without affecting local trip recording, charts, backups, or dashboard telemetry.
 
 ---
 
@@ -282,6 +307,7 @@ Two complementary mechanisms cover all charging scenarios with no user interacti
 | Async | Kotlin Coroutines + Channels | Event-driven telemetry pipeline |
 | Charts | Custom Canvas rendering | No third-party chart libraries |
 | Maps | OpenStreetMap (OSMDroid) | Fully offline-capable |
+| Optional outbound connections | ABRP + HiveMQ MQTT client | Disabled by default; used only when configured |
 | Build | Gradle KTS | ProGuard release build, signed APK pipeline |
 | Min SDK | API 29 (Android 10) | Matches DiLink 3.0 platform |
 
@@ -289,20 +315,20 @@ Two complementary mechanisms cover all charging scenarios with no user interacti
 
 ## 🗺️ Integration Roadmap
 
-This application currently bridges to the vehicle via MQTT (using the Electro third-party service). That dependency exists because direct DiLink API access is not available externally. The architecture is designed as follows;
+The project now runs as a standalone in-car telemetry application. Remaining work is focused on improving persistence and polishing a few edge cases.
 
 ```
-Phase 1 — Current (External MQTT bridge)
+Phase 1 — Legacy (External bridge)
   Electro app → MQTT broker → BYD Trip Stats
 
-Phase 2 — Preferred (Native DiLink system app)
-  Vehicle CAN / Internal API → BYD Trip Stats (system-signed APK, no bridge)
+Phase 2 — Current (Standalone in-car operation)
+  BYD Trip Stats running independently on supported vehicles
 
 Phase 3 — Full OEM integration
   Logic absorbed into DiLink firmware; UI surfaced as a native DiLink panel
 ```
 
-**What changes between phases:** only the data source layer (`MqttClientManager` → `VehicleApiClient`). The ViewModel, Room persistence, all charts, range projection engine, and UI are source-compatible. The MVVM boundary was deliberately drawn to make this substitution a single-file change.
+**What changes between phases:** the runtime moved away from the legacy bridge setup and into a self-contained in-car architecture. The ViewModel, Room persistence, charts, range projection engine, charging-session model, and UI remained largely intact, which is exactly why the migration was feasible without rewriting the product.
 
 The competitive case for Phase 2/3 is straightforward:
 
@@ -322,9 +348,19 @@ The competitive case for Phase 2/3 is straightforward:
 ## 🔒 Data Privacy & Security
 
 - **Local-first:** 100% of telemetry and trip data stored on-device — no cloud, no third-party analytics
-- **Zero outbound calls:** No tracking, no crash reporting, no telemetry leaving the vehicle
-- **User-controlled backup:** Encrypted backups to a private Telegram bot or local storage, initiated manually or on a configurable schedule
-- **GDPR-aligned by design:** No personal data is collected or transmitted
+- **Zero default outbound telemetry:** No tracking, no crash reporting, and no data leaves the vehicle unless you explicitly opt in to one of the integrations below
+- **Release privacy:** Release builds strip debug log calls and keep sensitive probe/discovery paths out of normal user-facing behaviour
+- **GDPR-aligned by design:** No personal data is collected or transmitted by the app itself
+
+### Optional external data flows
+
+All three are **disabled by default** and require explicit configuration. You control the destination — the app sends nothing unless you set it up.
+
+| Integration | What is sent | Destination |
+|---|---|---|
+| **Telegram bot backup** | Encrypted database backup file | Your own private Telegram bot (bot token + chat ID you supply). Data goes to Telegram's servers as a file attachment to your bot. |
+| **MQTT broker** | Live telemetry JSON (speed, SoC, power, GPS, gear, etc.) at a configurable interval | An external MQTT broker you specify (e.g. HiveMQ Cloud, a self-hosted broker). You control the host, topic, and credentials. |
+| **ABRP (A Better Route Planner)** | Live telemetry snapshot (SoC, speed, power, GPS) | ABRP servers, via the Link Generic API using a user token you provide. Subject to ABRP's own privacy policy. |
 
 This architecture requires no modification to comply with EU data regulations.
 
@@ -346,7 +382,7 @@ I am an independent software engineer and BYD Seal owner based in Greece. I buil
 
 If you represent BYD's Smart Device or Product Strategy team, I am open to discussing:
 
-**1. Native System Integration** — Porting the application as a DiLink system-signed APK, replacing the MQTT bridge with direct vehicle API access. This would deliver the full feature set to all DiLink-equipped BYD vehicles via OTA.
+**1. Native System Integration** — Porting the application as a DiLink system-signed APK and turning the current standalone solution into a first-class OEM experience. This would deliver the full feature set to all DiLink-equipped BYD vehicles via OTA.
 
 **2. Analytics Algorithm Licensing** — The range projection engine, trip intelligence logic, and consumption modelling are available for licensing into official BYD firmware or companion applications.
 
@@ -401,13 +437,21 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Cost tracking ✅ *(v1.4.0)*
 - [x] Seasonal consumption analysis ✅ *(v1.4.0)*
 - [x] Trip goals & personal bests ✅ *(v1.4.0)*
+- [x] Standalone direct BYD telemetry runtime ✅ *(v2.0.0)*
+- [x] ABRP and outbound MQTT Connections ✅ *(v2.0.0)*
+- [x] Drive/regen mode timelines and analysis ✅ *(v2.0.0)*
+- [x] Environmentals PM2.5 display ✅ *(v2.0.0)*
+- [x] Slope in degrees display ✅ *(v2.0.0)*
+- [x] App diagnostics CPU/RAM monitor ✅ *(v2.0.0)*
+- [x] Physics-based per-trip energy breakdown ✅ *(v2.0.0)*
 
-### Planned (v1.4.0+)
+### Planned (v2.0.0+)
 
 - [ ] Recurring route detection — automatically group trips that share the same route (e.g. daily commute) and compare efficiency across instances
 - [ ] Trip merging — combine two auto-split trips that were the same journey, separated by a brief stop (e.g. petrol station, red light timeout)
 - [ ] Trip tagging — label trips with a custom tag (e.g. "commute", "motorway", "errand") and filter history and analytics by tag
 - [ ] Battery cell imbalance alert — threshold-based notification when cell voltage spread exceeds a configurable limit (e.g. 0.05 V), surfacing the diagnostic the Cell Voltage Spread heatmap already visualises
+- [ ] 12V DC monitoring when car is off — background monitoring and logging of the 12V battery voltage/state while the vehicle is off, with low-voltage alerts and offline-safe sampling
 - [ ] DiLink home screen widget — quick-glance tile showing current SoC, last trip distance, and range projection without opening the app
 - [ ] Web dashboard companion — browse trip history and charts on a desktop browser offline-first: upload your backup file, charts render locally, nothing leaves your device
 **Vote on features** by 👍 reacting to issues!
@@ -424,7 +468,7 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 
 ### Workarounds
 
-- **Route not showing:** Check that GPS coordinates in MQTT are non-zero
+- **Route not showing:** Check that GPS coordinates are non-zero and that DiLink location permissions/autostart are still enabled
 - **Trip not auto-starting:** Verify auto-detection is ON, gear is D/R
 - **Service not auto-starting:** Check Autostart permission (disable toggle at disable Autostart), reboot the UI and re-open the app
 
@@ -435,10 +479,10 @@ See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 ## ❓ FAQ
 
 ### Q: Does this work with other BYD EVs?
-**A:** Potentially! Any car using Electro app should work. Tested on BYD Seal only.
+**A:** Potentially. Compatibility depends on how similar your car's DiLink firmware is to the tested models. Tested primarily on BYD Seal.
 
-### Q: Do I need Electro subscription?
-**A:** Yes, currently. Even if you decide to use the external MQTT Broker, you still need to retrieve MQTT data from Electro.
+### Q: Do I need Electro or an Electro subscription?
+**A:** No. The app runs standalone on supported vehicles and does not require Electro, a broker, or an MQTT topic for normal use.
 
 ### Q: Will this drain my car's 12V battery?
 **A:** It uses your 12V which is always being charged via your high-voltage EV battery. Very minimal battery impact.
@@ -447,17 +491,17 @@ See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 **A:** No. The ultimate goal is for BYD to implement it natively as part of the infotainment system, without the need to side-load.
 
 ### Q: Is my data secure?
-**A:** Yes. All data stays on your device (or at your own external MQTT broker if you configured one). No analytics, no crash reporting, no advertising. The only outbound network traffic and only if you chose to is a) to your own MQTT broker and b) to your private encrypted telegram bot.
+**A:** Yes. All telemetry stays on your device by default. No analytics, no crash reporting, no advertising. The only optional outbound traffic is: **Telegram backup** (encrypted DB file to your own private bot), **MQTT publish** (live telemetry to a broker you configure), and **ABRP upload** (live snapshot to ABRP via your own user token). All three are opt-in and disabled unless you configure them. See the [Data Privacy](#-data-privacy--security) section for details.
 
 ### Q: Can I export to Excel?
 **A:** Export as CSV, then open in Excel, Google Sheets, etc.
 
-### Q: Why is MQTT connection failing?
+### Q: Why isn't the app receiving live data?
 **A:** Check:
-1. Electro is running and connected
-2. MQTT credentials are correct
-3. Internet connection is active
-4. Broker URL has no `http://` or `https://` prefix
+1. The app was started at least once after boot/update
+2. DiLink's "Disable Autostart" blocker is toggled off for BYD Trip Stats
+3. The car was rebooted after changing autostart behaviour
+4. Location/storage permissions are still granted
 
 ---
 
@@ -466,8 +510,7 @@ See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 ### Built With
 
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) - Modern Android UI
-- [HiveMQ MQTT Client](https://github.com/hivemq/hivemq-mqtt-client) - MQTT library
-- [Moquette](https://github.com/moquette-io/moquette) - MQTT Internal Broker
+- [HiveMQ MQTT Client](https://github.com/hivemq/hivemq-mqtt-client) - Optional outbound MQTT publishing
 - [osmdroid](https://github.com/osmdroid/osmdroid) - OpenStreetMap for Android
 - [Room](https://developer.android.com/training/data-storage/room) - Local database
 
@@ -478,7 +521,7 @@ See [Issues](https://github.com/angoikon/byd-trip-stats/issues) for full list.
 ### Get Help
 - 🐛 [GitHub Issues](https://github.com/angoikon/byd-trip-stats/issues)
 - 💬 [Discussions](https://github.com/angoikon/byd-trip-stats/discussions)
-- 🎮 [Discord — BYD Trip Stats](https://discord.com/channels/1482792494239453412/1482792495007137964)
+- 🎮 [Discord — BYD Trip Stats](https://discord.gg/pf8TjjTce9)
 
 ### Share Your Experience
 - ⭐ **Star this repo** if you find it useful!
@@ -515,8 +558,7 @@ This software is provided "as is" without warranty of any kind. Use at your own 
 
 - Not responsible for any vehicle damage or data loss
 - Always prioritize safe driving over app usage
-- MQTT credentials are stored locally - keep your device secure
-- If you think telegram encrypted private bot might leak your db to telegram servers, you should avoid using it
+- When Telegram backup is enabled, your encrypted database file is sent to Telegram's servers as a file attachment to your bot. If you do not trust a third-party server with your data even in encrypted form, use local filesystem backup instead
 
 
 ---
@@ -530,7 +572,7 @@ This software is provided "as is" without warranty of any kind. Use at your own 
 
 🔗 [github.com/angoikon](https://github.com/angoikon)
 
-🎮  <a href="https://discord.com/channels/1482792494239453412/1482792495007137964"><img src="https://img.shields.io/badge/Discord-BYD_Trip_Stats-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"/></a>
+🎮  <a href="https://discord.gg/pf8TjjTce9"><img src="https://img.shields.io/badge/Discord-BYD_Trip_Stats-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"/></a>
 
 ---
 

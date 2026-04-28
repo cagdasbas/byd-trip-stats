@@ -33,11 +33,11 @@ import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 // ── Thumbnail ─────────────────────────────────────────────────────────────────
 
 /**
- * Sparkline thumbnail showing the 7-day consumption trend.
+ * Sparkline thumbnail showing a compact consumption trend preview.
  * Tapping opens ConsumptionChartExpanded.
  */
 @Composable
-fun WeeklyEnergyThumbnail(
+fun ConsumptionThumbnail(
     data: List<DashboardViewModel.DailyEfficiency>,
     modifier: Modifier = Modifier
 ) {
@@ -119,6 +119,9 @@ fun ConsumptionChartExpanded(
         ConsumptionTab.MONTH -> monthlyData
         ConsumptionTab.YEAR  -> yearlyData
     }
+    val selectedDurationAverage = activeData.map { it.avgKwhPer100km }
+        .takeIf { it.isNotEmpty() }
+        ?.average()
     val labelEvery = when (selectedTab) {
         ConsumptionTab.WEEK  -> 1
         ConsumptionTab.MONTH -> 5
@@ -204,6 +207,28 @@ fun ConsumptionChartExpanded(
             }
         }
 
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            selectedDurationAverage?.let { avg ->
+                ConsumptionLegendItem(
+                    color = RegenGreen.copy(alpha = 0.9f),
+                    label = "Selected duration avg (${String.format("%.1f", avg)} kWh/100km)"
+                )
+            }
+            referenceConsumptionKwhPer100km?.let { avg ->
+                if (selectedDurationAverage != null) Spacer(Modifier.width(20.dp))
+                ConsumptionLegendItem(
+                    color = AccelerationOrange.copy(alpha = 0.9f),
+                    label = "Selected car avg (${String.format("%.1f", avg)} kWh/100km)"
+                )
+            }
+        }
+
         // ── Chart canvas ──────────────────────────────────────────────────────
         ConsumptionCanvas(
             data = activeData,
@@ -251,6 +276,7 @@ private fun ConsumptionCanvas(
     val pointFill     = BydElectricAzure
     val pointGlow     = BydElectricAzure.copy(alpha = 0.20f)
     val sealLineColor = AccelerationOrange.copy(alpha = 0.9f)
+    val durationAvgLineColor = RegenGreen.copy(alpha = 0.9f)
     val textColor     = MaterialTheme.colorScheme.onSurface
     val gridColor     = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
@@ -285,10 +311,11 @@ private fun ConsumptionCanvas(
         }
 
         val values = data.map { it.avgKwhPer100km }
+        val durationAverage = values.average()
         val allVals = if (referenceConsumptionKwhPer100km != null) {
-            values + listOf(referenceConsumptionKwhPer100km)
+            values + listOf(referenceConsumptionKwhPer100km, durationAverage)
         } else {
-            values
+            values + listOf(durationAverage)
         }
         val rawMin = allVals.min()
         val rawMax = allVals.max()
@@ -353,6 +380,16 @@ private fun ConsumptionCanvas(
             }
         }
 
+        // Selected duration average line
+        val durationAverageY = yOf(durationAverage)
+        drawLine(
+            color = durationAvgLineColor,
+            start = Offset(padL, durationAverageY),
+            end = Offset(w - padR, durationAverageY),
+            strokeWidth = 2f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f))
+        )
+
         // Selected car average reference line (dashed orange — distinct from cobalt line)
         referenceConsumptionKwhPer100km?.let { referenceValue ->
             val referenceY = yOf(referenceValue)
@@ -363,17 +400,6 @@ private fun ConsumptionCanvas(
                 end = Offset(w - padR, referenceY),
                 strokeWidth = 2f,
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 7f))
-            )
-
-            labelPaint.color = sealLineColor.toArgb()
-            labelPaint.textSize = 19f
-            labelPaint.textAlign = android.graphics.Paint.Align.LEFT
-
-            nc.drawText(
-                "Selected car avg (${String.format("%.1f", referenceValue)} kWh/100km)",
-                padL + 6f,
-                referenceY - 6f,
-                labelPaint
             )
         }
 
@@ -429,5 +455,29 @@ private fun ConsumptionCanvas(
             val labelY = if (y - 20f < padT + 20f) y + 32f else y - 20f
             nc.drawText("%.1f".format(d.avgKwhPer100km), x, labelY, labelPaint)
         }
+    }
+}
+
+@Composable
+private fun ConsumptionLegendItem(
+    color: Color,
+    label: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
+            drawLine(
+                color = color,
+                start = Offset(0f, size.height / 2f),
+                end = Offset(size.width, size.height / 2f),
+                strokeWidth = 3f,
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 7f))
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

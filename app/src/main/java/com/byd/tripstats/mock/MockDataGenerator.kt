@@ -173,7 +173,7 @@ class MockDataGenerator {
         currentSocPanel = currentSoc.toInt()  // simplified — usually ±1 of soc
 
         val gear  = if (progress > 0.95f) "P" else "D"
-        val carOn = if (progress > 0.97f) 0 else 1
+        val carOn = if (progress > 0.97f) 0 else 2
 
         val baseTemp   = 22
         val tempOffset = (sin(progress * 20.0) * 3.0).toInt()

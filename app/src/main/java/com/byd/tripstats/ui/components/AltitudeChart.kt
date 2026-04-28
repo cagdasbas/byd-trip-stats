@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -49,6 +50,10 @@ fun AltitudeChart(
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
 
+    val modes    = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
+
     Canvas(modifier = modifier.fillMaxSize().pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown()
@@ -76,6 +81,29 @@ fun AltitudeChart(
         }
         val totalDuration = if (dataPoints.size > 1)
             (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
+
+        // ── Drive mode background bands ──────────────────────────────────────
+        if (hasModes && dataPoints.size >= 2) {
+            var bandStart = 0
+            var bandMode = modes[0].driveMode
+            for (i in 1..dataPoints.size) {
+                val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                if (curMode != bandMode || i == dataPoints.size) {
+                    if (bandMode != 0) {
+                        val x0 = xOf(bandStart)
+                        val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                        drawRect(
+                            color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                            topLeft = Offset(x0, padT),
+                            size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                        )
+                    }
+                    bandStart = i
+                    bandMode = curMode
+                }
+            }
+        }
+
         val labelPaint = android.graphics.Paint().apply {
             color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
         }
@@ -131,6 +159,7 @@ fun AltitudeChart(
         } else {
             drawCircle(lineColor, 6f, Offset(xOf(0), yOf(altitudes[0])))
         }
+        drawDriveModeLabel(singleDriveMode, padR, padT)
         touchPos?.let { tp ->
             if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
                 val idx = ((tp.x - padL) / chartW * (dataPoints.size - 1)).roundToInt().coerceIn(0, dataPoints.size - 1)
@@ -143,7 +172,7 @@ fun AltitudeChart(
                     line1 = "%.0f m".format(altitudes[idx]),
                     line2 = realTime,
                     line3 = durationStr,
-                    accentColor = lineColor, textColor = textColor
+                    accentColor = lineColor
                 )
             }
         }

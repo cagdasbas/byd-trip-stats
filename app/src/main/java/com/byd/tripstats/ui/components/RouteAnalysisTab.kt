@@ -11,12 +11,16 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.ui.theme.*
 import java.text.SimpleDateFormat
@@ -29,6 +33,7 @@ import kotlin.math.abs
  */
 @Composable
 fun RouteAnalysisTab(
+    trip: TripEntity? = null,
     dataPoints: List<TripDataPointEntity>,
     modifier: Modifier = Modifier
 ) {
@@ -52,6 +57,10 @@ fun RouteAnalysisTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        ModeInsightsCard(
+            dataPoints = dataPoints,
+            trip = trip
+        )
         WaypointsCard(dataPoints)
         RouteSegmentsCard(dataPoints)
         EnergyHeatmapCard(dataPoints)
@@ -78,6 +87,375 @@ private val cardColors: CardColors
 
 private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 private fun fmt(ts: Long) = timeFormat.format(Date(ts))
+private const val MODE_SUMMARY_MIN_DURATION_MINUTES = 0.2
+
+internal data class ModeSummary(
+    val label: String,
+    val color: Color,
+    val distanceKm: Double,
+    val distanceSharePct: Double,
+    val durationMinutes: Double,
+    val consumptionKwhPer100Km: Double?,
+    val regenSharePct: Double?
+)
+
+@Composable
+private fun ModeInsightsCard(
+    dataPoints: List<TripDataPointEntity>,
+    trip: TripEntity?
+) {
+    if (!hasTripModeData(dataPoints)) return
+
+    val driveSummaries = remember(dataPoints, trip) {
+        buildDriveModeSummaries(
+            dataPoints = dataPoints,
+            trip = trip
+        )
+    }
+    val regenSummaries = remember(dataPoints, trip) {
+        buildRegenModeSummaries(
+            dataPoints = dataPoints,
+            trip = trip
+        )
+    }
+    val insights: List<String> = remember(driveSummaries, regenSummaries) {
+        buildList {
+            compareDriveModes(driveSummaries)?.let(::add)
+            compareRegenModes(regenSummaries)?.let(::add)
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().then(cardBorder),
+        colors = cardColors
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Mode Insights",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "What your drive and regen modes actually did on this trip",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // ── Horizontal stacked-bar summary ───────────────────────────────
+            ModeStackedBar(
+                label = "Drive",
+                summaries = driveSummaries
+            )
+            if (regenSummaries.isNotEmpty()) {
+                ModeStackedBar(
+                    label = "Regen",
+                    summaries = regenSummaries
+                )
+            }
+
+            if (insights.isNotEmpty()) {
+                insights.forEach { insight: String ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = insight,
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            if (driveSummaries.isNotEmpty()) {
+                Text("Drive mode usage", fontWeight = FontWeight.SemiBold)
+                driveSummaries.forEach { summary: ModeSummary ->
+                    ModeSummaryRow(summary)
+                }
+            }
+
+            if (regenSummaries.isNotEmpty()) {
+                Text("Regen mode usage", fontWeight = FontWeight.SemiBold)
+                regenSummaries.forEach { summary: ModeSummary ->
+                    ModeSummaryRow(summary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeStackedBar(
+    label: String,
+    summaries: List<ModeSummary>
+) {
+    if (summaries.isEmpty()) return
+    val total = summaries.sumOf { it.distanceKm }.takeIf { it > 0.0 } ?: return
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        // Stacked bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .clip(RoundedCornerShape(999.dp))
+        ) {
+            summaries.forEach { s ->
+                val frac = (s.distanceKm / total).toFloat().coerceIn(0f, 1f)
+                Box(
+                    modifier = Modifier
+                        .weight(frac.coerceAtLeast(0.001f))
+                        .fillMaxHeight()
+                        .background(s.color)
+                )
+            }
+        }
+        // Legend row beneath the bar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            summaries.forEach { s ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(s.color)
+                    )
+                    Text(
+                        text = "${s.label} ${String.format("%.0f", s.distanceSharePct)}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModeSummaryRow(summary: ModeSummary) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(summary.color, RoundedCornerShape(999.dp))
+            )
+            Column {
+                Text(summary.label, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "${String.format("%.1f", summary.distanceKm)} km • ${String.format("%.0f", summary.distanceSharePct)}% of mode-attributed trip",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = summary.consumptionKwhPer100Km?.let { "${String.format("%.1f", it)} kWh/100km" } ?: "—",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Text(
+                text = summary.regenSharePct?.let { "${String.format("%.1f", it)}% recovered via regen" } ?: "—",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+internal fun buildDriveModeSummaries(
+    dataPoints: List<TripDataPointEntity>,
+    trip: TripEntity?
+): List<ModeSummary> =
+    buildModeSummaries(
+        dataPoints = dataPoints,
+        trip = trip,
+        keySelector = { it.extractTripModes().driveMode },
+        labelSelector = ::driveModeLabel,
+        colorSelector = ::driveModeColor
+    )
+
+internal fun buildRegenModeSummaries(
+    dataPoints: List<TripDataPointEntity>,
+    trip: TripEntity?
+): List<ModeSummary> =
+    buildModeSummaries(
+        dataPoints = dataPoints,
+        trip = trip,
+        keySelector = { it.extractTripModes().regenMode },
+        labelSelector = ::regenModeLabel,
+        colorSelector = ::regenModeColor
+    )
+
+private fun buildModeSummaries(
+    dataPoints: List<TripDataPointEntity>,
+    trip: TripEntity?,
+    keySelector: (TripDataPointEntity) -> Int,
+    labelSelector: (Int) -> String,
+    colorSelector: (Int) -> Color
+): List<ModeSummary> {
+    data class Bucket(
+        var distanceKm: Double = 0.0,
+        var durationMinutes: Double = 0.0,
+        var netEnergyKwh: Double = 0.0,
+        var tractionKwh: Double = 0.0,
+        var regenKwh: Double = 0.0
+    )
+
+    // True trip totals from the stored trip row when available. These are the
+    // same resolved values shown in the overview tab, so normalising back to
+    // them keeps mode insights numerically consistent with the trip summary.
+    val tripDistanceKm = trip?.distance?.takeIf { it.isFinite() && it >= 0.0 }
+        ?: if (dataPoints.size >= 2) {
+            (dataPoints.last().odometer - dataPoints.first().odometer).coerceAtLeast(0.0)
+        } else 0.0
+    val tripEnergyKwh = trip?.energyConsumed?.takeIf { it.isFinite() && it >= 0.0 }
+
+    val buckets = mutableMapOf<Int, Bucket>()
+    dataPoints.zipWithNext { a, b ->
+        val mode = keySelector(a)
+        if (mode == 0) return@zipWithNext
+        val bucket = buckets.getOrPut(mode) { Bucket() }
+        // Cap dt to 10 s — data points are written only when something changes
+        // (write-throttle), so gaps can be several seconds. Without a cap, a
+        // long gap spanning a stop inflates speed×dt distance for that interval.
+        val dtMs = (b.timestamp - a.timestamp).coerceIn(0L, 10_000L)
+        val dtHours = dtMs / 3_600_000.0
+        val dtMinutes = dtHours * 60.0
+        val powerKw = a.power
+        // Derive distance from speed × time rather than odometer deltas.
+        // Odometer increments coarsely (often stays 0 between 1-second samples).
+        val avgSpeedKmh = (a.speed + b.speed) / 2.0
+        val distance = avgSpeedKmh * dtHours
+        bucket.distanceKm += distance
+        bucket.durationMinutes += dtMinutes
+        if (powerKw > 0.0) bucket.tractionKwh += powerKw * dtHours
+        if (powerKw < 0.0) bucket.regenKwh += abs(powerKw) * dtHours
+    }
+    // Derive net energy from traction − regen (power-integrated). totalDischarge deltas
+    // are unreliable — car frequently reports 0 for long stretches,
+    // producing 0.0 kWh/100km for modes that have real consumption. Power × dt is sampled
+    // every telemetry tick and reflects real-time battery draw.
+    buckets.values.forEach { b ->
+        b.netEnergyKwh = (b.tractionKwh - b.regenKwh).coerceAtLeast(0.0)
+    }
+
+    // Include all modes that had at least 12 seconds of active time.
+    val visibleBuckets = buckets.filterValues { it.durationMinutes >= MODE_SUMMARY_MIN_DURATION_MINUTES }
+
+    // Total raw distance attributed across all modes (before scaling).
+    val rawTotalDistance = visibleBuckets.values.sumOf { it.distanceKm }.takeIf { it > 0.0 } ?: 1.0
+
+    // Scale factor: normalise every bucket back to the true trip distance so the
+    // displayed mode distances sum to the same total shown in the overview tab.
+    // If the trip distance is unavailable, leave distances unscaled.
+    val scale = if (tripDistanceKm > 0.0 && rawTotalDistance > 0.0) {
+        tripDistanceKm / rawTotalDistance
+    } else {
+        1.0
+    }
+
+    val rawTotalEnergy = visibleBuckets.values.sumOf { it.netEnergyKwh }
+    val energyScale = if (tripEnergyKwh != null && tripEnergyKwh > 0.0 && rawTotalEnergy > 0.0) {
+        tripEnergyKwh / rawTotalEnergy
+    } else {
+        1.0
+    }
+
+    return visibleBuckets
+        .mapNotNull { (mode, bucket) ->
+            val scaledDistance = bucket.distanceKm * scale
+            val scaledEnergy = bucket.netEnergyKwh * energyScale
+            // Only show consumption when the mode covered meaningful distance.
+            val consumption = if (scaledDistance >= 0.1) {
+                (scaledEnergy / scaledDistance) * 100.0
+            } else null
+            val regenShare = if (bucket.tractionKwh + bucket.regenKwh > 0.0) {
+                (bucket.regenKwh / (bucket.tractionKwh + bucket.regenKwh)) * 100.0
+            } else null
+            ModeSummary(
+                label = labelSelector(mode),
+                color = colorSelector(mode),
+                distanceKm = scaledDistance,
+                distanceSharePct = (bucket.distanceKm / rawTotalDistance) * 100.0,
+                durationMinutes = bucket.durationMinutes,
+                consumptionKwhPer100Km = consumption,
+                regenSharePct = regenShare
+            )
+        }
+        .sortedByDescending { it.distanceKm }
+}
+
+private fun compareDriveModes(summaries: List<ModeSummary>): String? {
+    val eco = summaries.firstOrNull { it.label == "Eco" && it.distanceKm >= 1.0 }
+    val normal = summaries.firstOrNull { it.label == "Normal" && it.distanceKm >= 1.0 }
+    val sport = summaries.firstOrNull { it.label == "Sport" && it.distanceKm >= 1.0 }
+
+    if (eco != null && normal != null &&
+        eco.consumptionKwhPer100Km != null && normal.consumptionKwhPer100Km != null
+    ) {
+        val diffPct = ((eco.consumptionKwhPer100Km - normal.consumptionKwhPer100Km) / normal.consumptionKwhPer100Km) * 100.0
+        if (abs(diffPct) < 5.0) {
+            return "Eco and Normal were effectively the same on this trip, so route and traffic mattered more than the selected drive mode."
+        }
+    }
+
+    if (sport != null && normal != null &&
+        sport.consumptionKwhPer100Km != null && normal.consumptionKwhPer100Km != null
+    ) {
+        val delta = sport.consumptionKwhPer100Km - normal.consumptionKwhPer100Km
+        if (delta > 1.0) {
+            return "Sport used ${String.format("%.1f", delta)} kWh/100km more than Normal over comparable segments in this trip."
+        }
+    }
+    return null
+}
+
+private fun compareRegenModes(summaries: List<ModeSummary>): String? {
+    val standard = summaries.firstOrNull { it.label == "Standard" && it.distanceKm >= 1.0 }
+    val high = summaries.firstOrNull { it.label == "High" && it.distanceKm >= 1.0 }
+
+    if (high != null && standard != null &&
+        high.regenSharePct != null && standard.regenSharePct != null
+    ) {
+        val delta = high.regenSharePct - standard.regenSharePct
+        if (delta < 2.0) {
+            return "High regen did not materially improve recovered energy on this trip, so braking opportunities likely mattered more than the regen setting."
+        }
+    }
+    return null
+}
 
 // ── Waypoints ─────────────────────────────────────────────────────────────────
 
@@ -328,6 +706,7 @@ private fun TripTimelineCard(dataPoints: List<TripDataPointEntity>) {
     }
 
     events.add(TimelineEvent(fmt(dataPoints.last().timestamp), "Trip Ended", Icons.Filled.LocationOn, BydErrorRed))
+    val visibleEvents = sampleTimelineEvents(events, maxVisible = 15)
 
     Card(
         modifier = Modifier.fillMaxWidth().then(cardBorder),
@@ -341,9 +720,9 @@ private fun TripTimelineCard(dataPoints: List<TripDataPointEntity>) {
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            events.take(15).forEachIndexed { index, event ->
+            visibleEvents.forEachIndexed { index, event ->
                 TimelineEventItem(event)
-                if (index < (events.take(15).size - 1)) {
+                if (index < (visibleEvents.size - 1)) {
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -372,3 +751,15 @@ private data class TimelineEvent(
     val icon:  ImageVector,
     val color: Color
 )
+
+private fun sampleTimelineEvents(events: List<TimelineEvent>, maxVisible: Int): List<TimelineEvent> {
+    if (events.size <= maxVisible) return events
+    val lastIndex = events.lastIndex
+    val sampledIndices = (0 until maxVisible).map { slot ->
+        ((slot.toDouble() / (maxVisible - 1)) * lastIndex).toInt()
+    }.distinct().sorted()
+    val sampled = sampledIndices.map { events[it] }.toMutableList()
+    if (sampled.firstOrNull() != events.first()) sampled.add(0, events.first())
+    if (sampled.lastOrNull() != events.last()) sampled.add(events.last())
+    return sampled.distinct()
+}

@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.toArgb
  * @param line2       Second tooltip line — typically elapsed trip time (e.g. "5m 30s")
  * @param line3       Third tooltip line — real clock time (e.g. "13:45:30"), or null to omit
  * @param accentColor The chart's primary color — used for the lines and dot
- * @param textColor   Label text color (onSurface)
  */
 fun DrawScope.drawCrosshair(
     cx: Float,
@@ -36,8 +35,7 @@ fun DrawScope.drawCrosshair(
     line1: String,
     line2: String,
     line3: String? = null,
-    accentColor: Color,
-    textColor: Color
+    accentColor: Color
 ) {
     val nc = drawContext.canvas.nativeCanvas
     val dashEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 5f))

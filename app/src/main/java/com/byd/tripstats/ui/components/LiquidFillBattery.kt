@@ -47,6 +47,7 @@ import kotlin.math.sin
 fun LiquidFillBattery(
     soc: Float,
     isCharging: Boolean = false,
+    animationsEnabled: Boolean = true,
     modifier: Modifier = Modifier,
     width: Dp = 120.dp,
     height: Dp = 200.dp
@@ -54,7 +55,11 @@ fun LiquidFillBattery(
     // Animate the liquid fill level
     val animatedSoc by animateFloatAsState(
         targetValue = soc,
-        animationSpec = tween(durationMillis = 1500, easing = EaseInOutCubic),
+        animationSpec = if (animationsEnabled) {
+            tween(durationMillis = 1500, easing = EaseInOutCubic)
+        } else {
+            snap()
+        },
         label = "socAnimation"
     )
     
@@ -68,14 +73,18 @@ fun LiquidFillBattery(
     val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
     val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
 
-    // Wave offset: 0 → 360, loops while RESUMED
+    // Wave runs whenever animations are enabled and screen is resumed — regardless of charging.
+    // Only glow and bolt pulse are charging-specific.
+    val shouldAnimateWave = animationsEnabled && isResumed
+
+    // Wave offset: 0 → 360, loops while resumed with animations enabled
     val waveOffsetAnim = remember { Animatable(0f) }
-    LaunchedEffect(isResumed) {
-        if (isResumed) {
+    LaunchedEffect(shouldAnimateWave) {
+        if (shouldAnimateWave) {
             waveOffsetAnim.animateTo(
                 targetValue    = 360f,
                 animationSpec  = infiniteRepeatable(
-                    animation  = tween(durationMillis = 3000, easing = LinearEasing),
+                    animation  = tween(durationMillis = 6000, easing = LinearEasing),
                     repeatMode = RepeatMode.Restart
                 )
             )
@@ -87,11 +96,11 @@ fun LiquidFillBattery(
     // Charging glow: 0.3 ↔ 0.8, loops while charging AND RESUMED
     val glowAnim = remember { Animatable(0f) }
     LaunchedEffect(isCharging, isResumed) {
-        if (isCharging && isResumed) {
+        if (animationsEnabled && isCharging && isResumed) {
             glowAnim.animateTo(
                 targetValue   = 0.8f,
                 animationSpec = infiniteRepeatable(
-                    animation  = tween(durationMillis = 1500, easing = EaseInOutSine),
+                    animation  = tween(durationMillis = 3000, easing = EaseInOutSine),  // 2× slower
                     repeatMode = RepeatMode.Reverse,
                     initialStartOffset = StartOffset(0)
                 )
@@ -105,11 +114,11 @@ fun LiquidFillBattery(
     // Bolt pulse: 0.85 ↔ 1.15, loops while charging AND RESUMED
     val boltAnim = remember { Animatable(1f) }
     LaunchedEffect(isCharging, isResumed) {
-        if (isCharging && isResumed) {
+        if (animationsEnabled && isCharging && isResumed) {
             boltAnim.animateTo(
                 targetValue   = 1.15f,
                 animationSpec = infiniteRepeatable(
-                    animation  = tween(durationMillis = 900, easing = EaseInOutSine),
+                    animation  = tween(durationMillis = 1800, easing = EaseInOutSine),  // 2× slower
                     repeatMode = RepeatMode.Reverse,
                     initialStartOffset = StartOffset(0)
                 )
@@ -190,17 +199,26 @@ fun LiquidFillBattery(
             val wavePath = Path().apply {
                 val waveAmplitude = 4f
                 val waveFrequency = 0.08f
-                
-                moveTo(bodyLeft, fillTop)
-                
-                // Draw wave
-                for (x in 0..batteryBodyWidth.toInt() step 4) {
-                    val angle = (x * waveFrequency) + (waveOffset * 0.0174533f) // Convert to radians
-                    val y = fillTop + (sin(angle) * waveAmplitude)
+                val waveOffsetRad = waveOffset * 0.0174533f  // degrees → radians, computed once
+
+                // Start exactly on the wave curve at x=0 so the left wall has no gap.
+                // Previously moveTo(bodyLeft, fillTop) caused a slant because sin(waveOffset)
+                // is not zero — the wave's first lineTo jumped from fillTop to the sine value.
+                val startY = fillTop + sin(waveOffsetRad) * waveAmplitude
+                moveTo(bodyLeft, startY.toFloat())
+
+                // Draw wave across the full battery width in steps of 8px
+                for (x in 8..batteryBodyWidth.toInt() step 8) {
+                    val angle = (x * waveFrequency) + waveOffsetRad
+                    val y = fillTop + sin(angle) * waveAmplitude
                     lineTo(bodyLeft + x, y.toFloat())
                 }
-                
-                // Complete the path
+
+                // Close to the exact right wall (batteryBodyWidth, not toInt() which truncates)
+                // then down and back to seal the fill area.
+                val endAngle = (batteryBodyWidth * waveFrequency) + waveOffsetRad
+                val endY = fillTop + sin(endAngle) * waveAmplitude
+                lineTo(bodyLeft + batteryBodyWidth, endY.toFloat())
                 lineTo(bodyLeft + batteryBodyWidth, bodyTop + batteryBodyHeight)
                 lineTo(bodyLeft, bodyTop + batteryBodyHeight)
                 close()

@@ -9,3 +9,6 @@ release
 *.keystore
 *.db
 .env
+byd-trip-stats-private/
+private-telemetry/
+private-telemetry-*.aar

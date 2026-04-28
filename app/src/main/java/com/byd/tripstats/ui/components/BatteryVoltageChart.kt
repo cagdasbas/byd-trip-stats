@@ -54,6 +54,10 @@ fun BatteryVoltageChart(
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos  by remember { mutableStateOf<Offset?>(null) }
 
+    val modes    = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
+
     Column(modifier = modifier) {
 
         // ── Legend ────────────────────────────────────────────────────────────
@@ -107,6 +111,28 @@ fun BatteryVoltageChart(
             val totalDuration = if (dataPoints.size > 1)
                 (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
 
+            // ── Drive mode background bands ──────────────────────────────────────
+            if (hasModes && dataPoints.size >= 2) {
+                var bandStart = 0
+                var bandMode = modes[0].driveMode
+                for (i in 1..dataPoints.size) {
+                    val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                    if (curMode != bandMode || i == dataPoints.size) {
+                        if (bandMode != 0) {
+                            val x0 = xOf(bandStart)
+                            val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                            drawRect(
+                                color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                                topLeft = Offset(x0, padT),
+                                size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                            )
+                        }
+                        bandStart = i
+                        bandMode = curMode
+                    }
+                }
+            }
+
             val labelPaint = android.graphics.Paint().apply {
                 color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 20f; isAntiAlias = true
             }
@@ -120,6 +146,10 @@ fun BatteryVoltageChart(
             var hvTick = (hvMin / hvStep).toInt() * hvStep
             while (hvTick <= hvMax + 0.5f) {
                 val y = yOfHv(hvTick)
+                if (y >= padT + chartH - 4f) {
+                    hvTick += hvStep
+                    continue
+                }
                 drawLine(gridColor, Offset(padL, y), Offset(w - padR, y), 1f)
                 labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
                 nc.drawText("${hvTick.toInt()}", padL - 6f, y + 7f, labelPaint)
@@ -142,8 +172,11 @@ fun BatteryVoltageChart(
                 textAlign = android.graphics.Paint.Align.LEFT; isAntiAlias = true
             }
             while (cellTick <= cellMax + 0.005f) {
-                labelPaint.textAlign = android.graphics.Paint.Align.LEFT
-                nc.drawText("%.2f".format(cellTick), w - padR + 4f, yOfCell(cellTick) + 7f, rightAxisPaint)
+                val y = yOfCell(cellTick)
+                if (y < padT + chartH - 4f) {
+                    labelPaint.textAlign = android.graphics.Paint.Align.LEFT
+                    nc.drawText("%.2f".format(cellTick), w - padR + 4f, y + 7f, rightAxisPaint)
+                }
                 cellTick += cellStep
             }
             val rightAxisLabelPaint = android.graphics.Paint().apply {
@@ -209,6 +242,8 @@ fun BatteryVoltageChart(
                     style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
 
+            drawDriveModeLabel(singleDriveMode, padR, padT)
+
             // Crosshair
             touchPos?.let { tp ->
                 if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
@@ -225,7 +260,7 @@ fun BatteryVoltageChart(
                             minValues[idx], maxValues[idx]),
                         line2 = "Spread: %.3f V".format(maxValues[idx] - minValues[idx]),
                         line3 = "${(secs / 60).toInt()}m ${(secs % 60).toInt()}s  $clockTime",
-                        accentColor = hvColor, textColor = textColor
+                        accentColor = hvColor
                     )
                 }
             }

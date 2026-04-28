@@ -95,8 +95,6 @@ fun RangeProjectionChart(
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
 
     selectedCar?.let { car ->
-        val wltpKm = car.wltpKm
-
         // ── Derived values ────────────────────────────────────────────────────────
 
         // ViewModel already gates emission to SAMPLE_INTERVAL_KM resolution,
@@ -109,6 +107,15 @@ fun RangeProjectionChart(
         val startBmsRange = points.firstOrNull()?.electricDrivingRangeKm?.toDouble()
             ?: liveElectricRangeKm.toDouble().takeIf { it > 0 }
             ?: (liveSoc / 100.0 * 400.0)   // last-resort rough fallback
+
+        // For PHEVs the WLTP figure covers EV-only range, but our projection includes
+        // fuel range (EV + ICE combined). Use the trip-start BMS combined range as
+        // the effective ceiling, which already accounts for both energy sources.
+        // For BEVs this is always the catalog wltpKm.
+        val wltpKm = if (car.isPhev)
+            startBmsRange.coerceAtLeast(car.wltpKm.toDouble()).toInt()
+        else
+            car.wltpKm
 
         val maxDistanceKm = points.lastOrNull()?.distanceKm?.coerceAtLeast(1.0) ?: 1.0
 

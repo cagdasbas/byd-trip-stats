@@ -1,0 +1,158 @@
+package com.byd.tripstats.receiver
+
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.PowerManager
+import android.util.Log
+import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.util.McuWakeHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+
+/**
+ * Dedicated off-state keepalive receiver.
+ *
+ * Fires every [INTERVAL_MS] (4 minutes) after ACC_OFF to:
+ *   1. Call McuWakeHelper.keepAlive() — resets the MCU WiFi-cut countdown
+ *   2. Start VehicleTelemetryService — reviving it samples BMS/charging state
+ *      once per tick, so charging sessions that begin while the car is off
+ *      (e.g. overnight AC charging) get captured as real-time data points
+ *      rather than a lossy SoC-delta reconstruction.
+ *   3. Reschedule itself for the next interval — unbounded, stopped only on
+ *      ACC_ON by [cancel]. Overnight charging can run 4–8 hours, so a
+ *      fixed iteration cap would silently drop mid-session sampling.
+ *
+ * Unlike the in-service 5-minute coroutine loop, this receiver survives
+ * process death — AlarmManager fires the broadcast and Android recreates
+ * the process to handle it, giving keepalive a chance even after the OS
+ * kills our PID.
+ *
+ * Redundancy: two independent alarms (primary + backup) are kept live at all
+ * times. If the primary is dropped by the OS, the backup fires [BACKUP_OFFSET_MS]
+ * later and re-seeds both. Either alarm firing is sufficient to keep the chain
+ * alive indefinitely.
+ */
+class OffStateKeepaliveReceiver : BroadcastReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        val iteration = intent.getIntExtra(EXTRA_ITERATION, 0)
+        Log.i(TAG, "Off-state keepalive fired (iteration=$iteration)")
+
+        val appContext = context.applicationContext
+
+        // Acquire a partial wake lock for the duration of the async work.
+        // AlarmManager.RTC_WAKEUP holds a wake lock only until onReceive()
+        // returns — the goAsync() coroutine runs unprotected after that.
+        val pm = appContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_TAG).apply {
+            setReferenceCounted(false)
+            acquire(WAKE_LOCK_TIMEOUT_MS)
+        }
+
+        // Reschedule both alarms synchronously before any async work so that
+        // even a crash mid-execution doesn't break the chain.
+        try {
+            VehicleTelemetryService.start(appContext)
+        } catch (e: Exception) {
+            Log.w(TAG, "Service start error: ${e.message}")
+        }
+        schedule(appContext, iteration + 1)
+
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                withTimeout(10_000L) {
+                    McuWakeHelper.keepAlive(appContext)
+                }
+                Log.i(TAG, "MCU keepalive sent (iteration=$iteration)")
+            } catch (e: Exception) {
+                Log.w(TAG, "MCU keepalive failed/timed out (iteration=$iteration): ${e.message}")
+            } finally {
+                pending.finish()
+                if (wl.isHeld) wl.release()
+            }
+        }
+    }
+
+    companion object {
+        private const val TAG = "OffStateKeepalive"
+        const val ACTION = "com.byd.tripstats.action.OFF_STATE_KEEPALIVE"
+        private const val EXTRA_ITERATION = "iteration"
+        private const val WAKE_TAG = "bydstats:offstate_keepalive"
+        private const val WAKE_LOCK_TIMEOUT_MS = 15_000L
+
+        // 4 minutes — shorter than the MCU's ~10-15 min WiFi-cut timer
+        private const val INTERVAL_MS = 4 * 60 * 1000L
+
+        // Backup alarm fires this many ms after the primary. If the primary
+        // alarm is dropped, the backup re-seeds the chain.
+        private const val BACKUP_OFFSET_MS = 5 * 60 * 1000L
+
+        private val REQUEST_CODE = ACTION.hashCode()
+        private val BACKUP_REQUEST_CODE = (ACTION + "_backup").hashCode()
+
+        private fun pendingIntent(context: Context, iteration: Int, flags: Int): PendingIntent? {
+            val intent = Intent(context, OffStateKeepaliveReceiver::class.java).apply {
+                action = ACTION
+                data = Uri.parse("bydstats://keepalive")
+                putExtra(EXTRA_ITERATION, iteration)
+            }
+            return PendingIntent.getBroadcast(context, REQUEST_CODE, intent, flags)
+        }
+
+        private fun pendingIntentBackup(context: Context, iteration: Int, flags: Int): PendingIntent? {
+            val intent = Intent(context, OffStateKeepaliveReceiver::class.java).apply {
+                action = ACTION
+                data = Uri.parse("bydstats://keepalive-backup")
+                putExtra(EXTRA_ITERATION, iteration)
+            }
+            return PendingIntent.getBroadcast(context, BACKUP_REQUEST_CODE, intent, flags)
+        }
+
+        fun schedule(context: Context, iteration: Int = 0) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                ?: return
+            val now = System.currentTimeMillis()
+
+            pendingIntent(
+                context, iteration,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )?.let { pi ->
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, now + INTERVAL_MS, pi)
+                Log.i(TAG, "Scheduled primary keepalive iteration=$iteration in ${INTERVAL_MS / 1000}s")
+            }
+
+            pendingIntentBackup(
+                context, iteration,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )?.let { pi ->
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    now + INTERVAL_MS + BACKUP_OFFSET_MS,
+                    pi,
+                )
+                Log.i(TAG, "Scheduled backup keepalive iteration=$iteration in ${(INTERVAL_MS + BACKUP_OFFSET_MS) / 1000}s")
+            }
+        }
+
+        fun cancel(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                ?: return
+            pendingIntent(
+                context, 0,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            )?.let { alarmManager.cancel(it) }
+            pendingIntentBackup(
+                context, 0,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            )?.let { alarmManager.cancel(it) }
+            Log.i(TAG, "Off-state keepalive chain cancelled")
+        }
+    }
+}

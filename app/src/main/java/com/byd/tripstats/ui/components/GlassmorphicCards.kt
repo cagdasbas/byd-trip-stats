@@ -95,7 +95,7 @@ fun GlassmorphicCard(
 @Composable
 fun StatsGlassCard(
     modifier: Modifier = Modifier,
-    accentColor: Color = BydElectricBlue,
+    @Suppress("UNUSED_PARAMETER") accentColor: Color = BydElectricBlue,
     content: @Composable ColumnScope.() -> Unit
 ) {
     GlassmorphicCard(

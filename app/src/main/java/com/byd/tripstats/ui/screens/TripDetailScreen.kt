@@ -15,10 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.byd.tripstats.data.analysis.calculateTripEnergyBreakdown
+import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.ui.components.AltitudeChart
@@ -34,6 +37,8 @@ import com.byd.tripstats.ui.components.CondensedInstantConsumptionChart
 import com.byd.tripstats.ui.components.CondensedTyrePressureChart
 import com.byd.tripstats.ui.components.EnergyConsumptionChart
 import com.byd.tripstats.ui.components.InstantConsumptionChart
+import com.byd.tripstats.ui.components.ModeTimelineChart
+import com.byd.tripstats.ui.components.ModeTimelineControls
 import com.byd.tripstats.ui.components.TyrePressureChart
 import com.byd.tripstats.ui.components.MotorRpmChart
 import com.byd.tripstats.ui.components.OsmRouteMap
@@ -46,6 +51,9 @@ import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.abs
 import com.byd.tripstats.ui.components.condenseData
+import com.byd.tripstats.ui.components.condenseForRpm
+import com.byd.tripstats.ui.components.condenseForSpeed
+import com.byd.tripstats.ui.components.condenseForPower
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -63,6 +71,9 @@ fun TripDetailScreen(
     val regenEfficiencyPct = tripMetrics[tripId]?.regenEfficiencyPct
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol   by viewModel.currencySymbol.collectAsState()
+    val chargingSessions by viewModel.allChargingSessions.collectAsState()
+    val tripAdditionalChargingCosts by viewModel.tripAdditionalChargingCosts.collectAsState()
+    val selectedCarConfig by viewModel.selectedCarConfig.collectAsState(initial = null)
 
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Overview", "Charts", "Heatmaps", "Route", "Analysis")
@@ -150,14 +161,24 @@ fun TripDetailScreen(
                         0 -> TripOverviewTab(
                             trip = trip!!,
                             stats = stats,
+                            dataPoints = dataPoints,
+                            selectedCarConfig = selectedCarConfig,
                             regenEfficiencyPct = regenEfficiencyPct,
                             electricityPrice = electricityPrice,
-                            currencySymbol = currencySymbol
+                            currencySymbol = currencySymbol,
+                            chargingSessions = chargingSessions,
+                            additionalChargingCost = tripAdditionalChargingCosts[tripId] ?: 0.0,
+                            onSaveAdditionalChargingCost = { amount ->
+                                viewModel.saveTripAdditionalChargingCost(tripId, amount)
+                            }
                         )
                         1 -> TripChartsTab(dataPoints = dataPoints)
                         2 -> TripHeatmapsTab(dataPoints = dataPoints)
                         3 -> TripRouteTab(dataPoints = dataPoints)
-                        4 -> RouteAnalysisTab(dataPoints = dataPoints)
+                        4 -> RouteAnalysisTab(
+                            trip = trip,
+                            dataPoints = dataPoints
+                        )
                     }
                 }
             }
@@ -401,10 +422,49 @@ private fun saveToDownloads(
 fun TripOverviewTab(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
     stats: com.byd.tripstats.data.local.entity.TripStatsEntity?,
+    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
+    selectedCarConfig: CarConfig?,
     regenEfficiencyPct: Double?,
     electricityPrice: Double = 0.0,
-    currencySymbol: String = "€"
+    currencySymbol: String = "€",
+    chargingSessions: List<com.byd.tripstats.data.local.entity.ChargingSessionEntity> = emptyList(),
+    additionalChargingCost: Double = 0.0,
+    onSaveAdditionalChargingCost: (Double?) -> Unit = {}
 ) {
+    val energyBreakdown = remember(dataPoints, selectedCarConfig, trip.energyConsumed) {
+        calculateTripEnergyBreakdown(
+            dataPoints = dataPoints,
+            carConfig = selectedCarConfig,
+            totalEnergyConsumedKwh = trip.energyConsumed
+        )
+    }
+    val tripEnd = trip.endTime ?: System.currentTimeMillis()
+    val overlappingChargingSessions = remember(trip, tripEnd, chargingSessions) {
+        chargingSessions.filter { session ->
+            val sessionEnd = session.endTime ?: session.startTime
+            session.startTime <= tripEnd && sessionEnd >= trip.startTime
+        }
+    }
+    val overlappingChargingKwh = remember(overlappingChargingSessions) {
+        overlappingChargingSessions.sumOf { it.kwhAdded ?: 0.0 }
+    }
+    val tariffTripCost = remember(trip, electricityPrice) {
+        trip.energyConsumed?.takeIf { electricityPrice > 0.0 }?.let { it * electricityPrice }
+    }
+    val tariffDeductionKwh = remember(trip, overlappingChargingKwh) {
+        minOf(overlappingChargingKwh, trip.energyConsumed ?: 0.0)
+    }
+    val tariffDeductionCost = remember(tariffDeductionKwh, electricityPrice) {
+        tariffDeductionKwh * electricityPrice
+    }
+    val adjustedTripCost = remember(tariffTripCost, tariffDeductionCost, additionalChargingCost) {
+        tariffTripCost?.minus(tariffDeductionCost)?.plus(additionalChargingCost)
+    }
+    var showChargingCostDialog by remember { mutableStateOf(false) }
+    var chargingCostInput by remember(additionalChargingCost) {
+        mutableStateOf(if (additionalChargingCost > 0.0) "%.2f".format(additionalChargingCost) else "")
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -530,20 +590,251 @@ fun TripOverviewTab(
 
                 DetailRow("Energy consumed", trip.energyConsumed?.let { String.format("%.2f kWh", it) } ?: "-")
                 if (electricityPrice > 0.0) {
-                    val cost = trip.energyConsumed?.let { it * electricityPrice }
-                    DetailRow("Trip cost", cost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-")
+                    if (overlappingChargingKwh > 0.01) {
+                        DetailRow(
+                            "Trip cost @ fixed tariff",
+                            tariffTripCost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-"
+                        )
+                        DetailRow("En-route charging added", String.format("%.2f kWh", overlappingChargingKwh))
+                        DetailRow("Tariff deduction", "-${currencySymbol}${String.format("%.2f", tariffDeductionCost)}")
+                        EditableDetailRow(
+                            label = "Custom DC charging cost",
+                            value = if (additionalChargingCost > 0.0) {
+                                "${currencySymbol}${String.format("%.2f", additionalChargingCost)}"
+                            } else {
+                                "Set cost"
+                            },
+                            onEdit = { showChargingCostDialog = true }
+                        )
+                        DetailRow(
+                            "Adjusted trip cost",
+                            if (additionalChargingCost > 0.0 && adjustedTripCost != null) {
+                                "${currencySymbol}${String.format("%.2f", adjustedTripCost)}"
+                            } else {
+                                "Set DC cost"
+                            }
+                        )
+                    } else {
+                        DetailRow("Trip cost", tariffTripCost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-")
+                    }
                 }
                 DetailRow("Energy regenerated", stats?.totalRegenEnergy?.let { String.format("%.2f kWh", it) } ?: "-")
                 DetailRow("Gross energy consumed", String.format("%.2f kWh", (trip.energyConsumed ?: 0.0) + (stats?.totalRegenEnergy ?: 0.0)))
                 DetailRow("Regeneration efficiency", regenEfficiencyPct?.let { String.format("%.2f%%", it) } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Battery Temp Range", "${trip.minBatteryCellTemp}°C - ${trip.maxBatteryCellTemp}°C")
-                DetailRow("Avg Battery Temp", "${trip.avgBatteryTemp.toInt()}°C")
+                DetailRow("Battery Temp Range", tripBatteryTempRangeLabel(trip))
+                DetailRow("Avg Battery Temp", tripBatteryAvgTempLabel(trip))
+            }
+        }
+
+        energyBreakdown?.let { breakdown ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.medium
+                    ),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Energy Breakdown",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    val caveats = buildList {
+                        if (!breakdown.hasPhysicsBreakdown) add("Rolling, aero, and gradient estimates require vehicle mass")
+                        if (!breakdown.hasAeroEstimate) add("Aerodynamic estimate requires CdA for this model")
+                    }
+                    if (caveats.isNotEmpty()) {
+                        Text(
+                            text = caveats.joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                    )
+
+                    // ── Total ─────────────────────────────────────────────────
+                    DetailRow("Total consumed", formatKwh(breakdown.totalConsumedKwh))
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+                    )
+
+                    // Scale modelled components so they always sum to totalConsumedKwh.
+                    // When the physics model over-estimates (GPS/Crr noise), raw modelled
+                    // values exceed consumed — scaling down keeps the breakdown coherent.
+                    // When it under-estimates, the remainder shows as auxiliary losses.
+                    val modelledRaw = breakdown.rollingResistanceKwh +
+                        breakdown.aeroDragKwh +
+                        breakdown.netGradientKwh.coerceAtLeast(0.0)
+                    val scale = if (modelledRaw > breakdown.totalConsumedKwh && modelledRaw > 0.0)
+                        breakdown.totalConsumedKwh / modelledRaw else 1.0
+                    val rollingDisplay  = breakdown.rollingResistanceKwh * scale
+                    val aeroDisplay     = breakdown.aeroDragKwh * scale
+                    val climbDisplay    = breakdown.climbKwh * scale
+                    val descentDisplay  = breakdown.descentKwh * scale
+                    val netGradDisplay  = breakdown.netGradientKwh * scale
+                    val auxDisplay      = (breakdown.totalConsumedKwh - modelledRaw * scale).coerceAtLeast(0.0)
+                    fun pct(kwh: Double) = if (breakdown.totalConsumedKwh > 0.0)
+                        String.format("%.1f", kwh / breakdown.totalConsumedKwh * 100.0) else "0.0"
+
+                    // ── Rolling resistance ────────────────────────────────────
+                    DetailRow(
+                        "Rolling resistance",
+                        if (breakdown.hasPhysicsBreakdown) {
+                            "${formatKwh(rollingDisplay)} (${pct(rollingDisplay)}%)"
+                        } else "n/a"
+                    )
+
+                    // ── Aerodynamic drag ──────────────────────────────────────
+                    DetailRow(
+                        "Aerodynamic drag",
+                        if (breakdown.hasAeroEstimate) {
+                            "${formatKwh(aeroDisplay)} (${pct(aeroDisplay)}%)"
+                        } else "n/a"
+                    )
+
+                    // ── Gradient ──────────────────────────────────────────────
+                    DetailRow(
+                        "Climb",
+                        if (breakdown.hasGradientEstimate) formatKwh(climbDisplay) else "n/a"
+                    )
+                    DetailRow(
+                        "Descent (recovery)",
+                        if (breakdown.hasGradientEstimate) "−${formatKwh(descentDisplay)}" else "n/a"
+                    )
+                    DetailRow(
+                        "Net gradient",
+                        if (breakdown.hasGradientEstimate) {
+                            val signed = if (netGradDisplay >= 0.0) "+${formatKwh(netGradDisplay)}"
+                                         else "−${formatKwh(-netGradDisplay)}"
+                            "$signed (${pct(netGradDisplay.coerceAtLeast(0.0))}%)"
+                        } else "n/a"
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+                    )
+
+                    // ── Auxiliary losses ──────────────────────────────────────
+                    DetailRow(
+                        "Auxiliary losses",
+                        if (breakdown.hasPhysicsBreakdown) {
+                            "${formatKwh(auxDisplay)} (${pct(auxDisplay)}%)"
+                        } else "n/a"
+                    )
+                    Text(
+                        text = "12 V system, HVAC, and model residual. Shown as remainder after rolling, aero, and gradient. Motor/inverter losses are factored into the figures above",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
+                    )
+
+                    // ── Vehicle metadata ──────────────────────────────────────
+                    DetailRow(
+                        "Vehicle mass",
+                        breakdown.estimatedKerbMassKg?.let { "${it.toInt()} kg (estimate)" } ?: "n/a"
+                    )
+                    DetailRow(
+                        "CdA (drag area)",
+                        breakdown.cdA?.let { String.format("%.3f m²", it) } ?: "n/a"
+                    )
+                }
             }
         }
     }
+
+    if (showChargingCostDialog) {
+        AlertDialog(
+            onDismissRequest = { showChargingCostDialog = false },
+            title = { Text("Custom DC charging cost", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Enter the total amount you paid for DC charging during this trip. The app will deduct the overlapping charging energy from the fixed home-tariff estimate and add this custom cost instead.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = chargingCostInput,
+                        onValueChange = { chargingCostInput = it },
+                        label = { Text("Total DC charging cost") },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                        ),
+                        prefix = { Text(currencySymbol) }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val parsed = chargingCostInput.replace(',', '.').toDoubleOrNull()
+                    onSaveAdditionalChargingCost(parsed?.takeIf { it > 0.0 })
+                    showChargingCostDialog = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (additionalChargingCost > 0.0) {
+                        TextButton(onClick = {
+                            chargingCostInput = ""
+                            onSaveAdditionalChargingCost(null)
+                            showChargingCostDialog = false
+                        }) { Text("Clear") }
+                    }
+                    TextButton(onClick = { showChargingCostDialog = false }) { Text("Cancel") }
+                }
+            }
+        )
+    }
 }
+
+private fun tripBatteryTempRangeLabel(trip: TripEntity): String {
+    fun isValidCellTemp(value: Int): Boolean = value in -40..120
+    val min = trip.minBatteryCellTemp.takeIf(::isValidCellTemp)
+    val max = trip.maxBatteryCellTemp.takeIf(::isValidCellTemp)
+    return when {
+        min != null && max != null && max > min -> "${min}°C - ${max}°C"
+        min != null && max != null -> "${max}°C"
+        min != null -> "${min}°C"
+        max != null -> "${max}°C"
+        else -> "-"
+    }
+}
+
+private fun tripBatteryAvgTempLabel(trip: TripEntity): String =
+    trip.avgBatteryTemp
+        .takeIf { it.isFinite() && it in -40.0..120.0 }
+        ?.let { "${it.toInt()}°C" }
+        ?: "-"
+
+private fun formatKwh(value: Double): String =
+    String.format("%.2f kWh", value)
+
+private fun formatSignedKwh(value: Double): String =
+    if (value >= 0.0) "+${formatKwh(value)}" else "-${formatKwh(abs(value))}"
 
 @Composable
 fun TripChartsTab(
@@ -646,7 +937,7 @@ fun TripChartsTab(
         // 8. Tyre Pressures
         ClickableChartCard(
             title = "Tyre Pressures",
-            subtitle = "All four wheels (bar) over time",
+            subtitle = "All four wheels (pressure) over time",
             onClick = { expandedChart = ChartType.TYRE_PRESSURE }
         ) {
             CondensedTyrePressureChart(
@@ -667,6 +958,35 @@ fun TripChartsTab(
             )
         }
 
+        // 10. Drive / Regen Modes
+        ClickableChartCard(
+            title = "Drive / Regen Modes",
+            subtitle = "Mode timeline across the trip",
+            onClick = { expandedChart = ChartType.MODE_TIMELINE },
+            cardHeight = 360.dp
+        ) {
+            var showDriveModes by remember { mutableStateOf(true) }
+            var showRegenModes by remember { mutableStateOf(true) }
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                ModeTimelineControls(
+                    showDriveModes = showDriveModes,
+                    showRegenModes = showRegenModes,
+                    onToggleDriveModes = { showDriveModes = !showDriveModes },
+                    onToggleRegenModes = { showRegenModes = !showRegenModes }
+                )
+                ModeTimelineChart(
+                    dataPoints = dataPoints,
+                    showDriveModes = showDriveModes,
+                    showRegenModes = showRegenModes,
+                    compact = true,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+
     }
     
     // Fullscreen chart dialog
@@ -684,12 +1004,13 @@ private fun ClickableChartCard(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    cardHeight: Dp = 300.dp,
     content: @Composable () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .height(cardHeight)
             .clickable(onClick = onClick)
             .border(
                 width = 1.dp,
@@ -733,7 +1054,7 @@ private fun ClickableChartCard(
 
 enum class ChartType {
     ENERGY, SPEED, MOTOR_RPM, ALTITUDE, SOC, POWER,
-    BATTERY_VOLTAGE, TYRE_PRESSURE, INSTANT_CONSUMPTION
+    BATTERY_VOLTAGE, TYRE_PRESSURE, INSTANT_CONSUMPTION, MODE_TIMELINE
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -743,9 +1064,16 @@ private fun FullscreenChartDialog(
     dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
     onDismiss: () -> Unit
 ) {
-    // Condense to 144 points for readability
-    val condensedData = remember(dataPoints) {
-        condenseData(dataPoints, maxPoints = 144)
+    // Most fullscreen charts still use a condensed dataset for readability,
+    // but RPM needs an axle-aware reduction so short front/rear bursts are not
+    // lost between buckets.
+    val chartData = remember(chartType, dataPoints) {
+        when (chartType) {
+            ChartType.MOTOR_RPM -> condenseForRpm(dataPoints, maxPoints = 240)
+            ChartType.SPEED     -> condenseForSpeed(dataPoints, maxPoints = 144)
+            ChartType.POWER     -> condenseForPower(dataPoints, maxPoints = 144)
+            else                -> condenseData(dataPoints, maxPoints = 144)
+        }
     }
 
     Dialog(
@@ -773,6 +1101,7 @@ private fun FullscreenChartDialog(
                                     ChartType.BATTERY_VOLTAGE -> "Battery Voltage (Detailed)"
                                     ChartType.TYRE_PRESSURE -> "Tyre Pressures (Detailed)"
                                     ChartType.INSTANT_CONSUMPTION -> "Instantaneous Consumption (Detailed)"
+                                    ChartType.MODE_TIMELINE -> "Drive / Regen Modes (Detailed)"
                                 },
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
@@ -789,6 +1118,7 @@ private fun FullscreenChartDialog(
                                     ChartType.BATTERY_VOLTAGE -> "HV bus + cell min/max (V)"
                                     ChartType.TYRE_PRESSURE -> "All four wheels (bar)"
                                     ChartType.INSTANT_CONSUMPTION -> "kWh/100 km over distance"
+                                    ChartType.MODE_TIMELINE -> "Mode timeline over the trip"
                                 },
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.primary
@@ -805,7 +1135,7 @@ private fun FullscreenChartDialog(
                     )
                 )
                 
-                // Chart with condensed data
+                // Chart with chart-specific condensed data
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -813,41 +1143,62 @@ private fun FullscreenChartDialog(
                 ) {
                     when (chartType) {
                         ChartType.ENERGY -> EnergyConsumptionChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.SOC -> SocChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.SPEED -> SpeedChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.MOTOR_RPM -> MotorRpmChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.ALTITUDE -> AltitudeChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.POWER -> PowerChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.BATTERY_VOLTAGE -> BatteryVoltageChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.TYRE_PRESSURE -> TyrePressureChart(
-                            dataPoints = condensedData,
+                            dataPoints = chartData,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.INSTANT_CONSUMPTION -> InstantConsumptionChart(
                             dataPoints = dataPoints,  // full data — chart filters internally
                             modifier = Modifier.fillMaxSize()
                         )
+                        ChartType.MODE_TIMELINE -> {
+                            var showDriveModes by remember { mutableStateOf(true) }
+                            var showRegenModes by remember { mutableStateOf(true) }
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                ModeTimelineControls(
+                                    showDriveModes = showDriveModes,
+                                    showRegenModes = showRegenModes,
+                                    onToggleDriveModes = { showDriveModes = !showDriveModes },
+                                    onToggleRegenModes = { showRegenModes = !showRegenModes }
+                                )
+                                ModeTimelineChart(
+                                    dataPoints = dataPoints,
+                                    showDriveModes = showDriveModes,
+                                    showRegenModes = showRegenModes,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -950,6 +1301,33 @@ fun DetailRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+@Composable
+fun EditableDetailRow(label: String, value: String, onEdit: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp))
+            }
+        }
     }
 }
 

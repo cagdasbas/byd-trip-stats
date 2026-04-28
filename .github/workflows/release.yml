@@ -4,6 +4,7 @@ name: Release
 on:
   push:
     tags: [ 'v*' ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,6 +14,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Fetch private telemetry module
+        env:
+          PRIVATE_TELEMETRY_REPO_SSH_URL: ${{ secrets.PRIVATE_TELEMETRY_REPO_SSH_URL }}
+          PRIVATE_TELEMETRY_DEPLOY_KEY: ${{ secrets.PRIVATE_TELEMETRY_DEPLOY_KEY }}
+        run: |
+          if [ -z "$PRIVATE_TELEMETRY_REPO_SSH_URL" ] || [ -z "$PRIVATE_TELEMETRY_DEPLOY_KEY" ]; then
+            echo "Missing PRIVATE_TELEMETRY_REPO_SSH_URL or PRIVATE_TELEMETRY_DEPLOY_KEY."
+            echo "Cannot build the full release APK without the private telemetry module."
+            exit 1
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+
+          printf '%s\n' "$PRIVATE_TELEMETRY_DEPLOY_KEY" > "$HOME/.ssh/private_telemetry_key"
+          chmod 600 "$HOME/.ssh/private_telemetry_key"
+
+          ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+          rm -rf private-telemetry
+          GIT_SSH_COMMAND="ssh -i $HOME/.ssh/private_telemetry_key -o IdentitiesOnly=yes" \
+            git clone --depth 1 "$PRIVATE_TELEMETRY_REPO_SSH_URL" private-telemetry
 
       - uses: actions/setup-java@v4
         with:

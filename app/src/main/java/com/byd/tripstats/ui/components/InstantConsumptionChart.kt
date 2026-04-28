@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
@@ -32,7 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
 
 private const val ROLLING_WINDOW = 5   // points for rolling average
-private const val CLAMP_MAX = 100.0     // kWh/100km — clip outliers at extremes
+private const val CLAMP_MAX = 120.0     // kWh/100km — clip outliers at extremes
 
 @Composable
 fun InstantConsumptionChart(
@@ -77,6 +78,10 @@ fun InstantConsumptionChart(
     val zeroColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
     var touchPos  by remember { mutableStateOf<Offset?>(null) }
 
+    val modes    = remember(drivingPoints) { drivingPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
+
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
@@ -108,10 +113,12 @@ fun InstantConsumptionChart(
             val allVals = rawValues
             val rawMin = allVals.minOrNull() ?: -30f
             val rawMax = allVals.maxOrNull() ?: 60f
+            val yRange = rawMax - rawMin
             val yStep  = when {
-                rawMax - rawMin < 20f -> 5f
-                rawMax - rawMin < 50f -> 10f
-                else                  -> 20f
+                yRange <= 24f  -> 6f
+                yRange <= 60f  -> 15f
+                yRange <= 120f -> 30f
+                else           -> 40f
             }
             val yMin = (rawMin / yStep).toInt() * yStep - yStep
             val yMax = (rawMax / yStep).toInt() * yStep + yStep
@@ -122,6 +129,28 @@ fun InstantConsumptionChart(
 
             val totalDuration = if (drivingPoints.size > 1)
                 (drivingPoints.last().timestamp - drivingPoints.first().timestamp) / 1000.0 else 0.0
+
+            // ── Drive mode background bands ──────────────────────────────────────
+            if (hasModes && drivingPoints.size >= 2) {
+                var bandStart = 0
+                var bandMode = modes[0].driveMode
+                for (i in 1..drivingPoints.size) {
+                    val curMode = if (i < drivingPoints.size) modes[i].driveMode else -1
+                    if (curMode != bandMode || i == drivingPoints.size) {
+                        if (bandMode != 0) {
+                            val x0 = xOf(bandStart)
+                            val x1 = if (i < drivingPoints.size) xOf(i) else xOf(drivingPoints.size - 1)
+                            drawRect(
+                                color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                                topLeft = Offset(x0, padT),
+                                size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                            )
+                        }
+                        bandStart = i
+                        bandMode = curMode
+                    }
+                }
+            }
 
             val labelPaint = android.graphics.Paint().apply {
                 color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
@@ -136,8 +165,10 @@ fun InstantConsumptionChart(
             while (yTick <= yMax + 0.5f) {
                 val y = yOf(yTick)
                 drawLine(gridColor, Offset(padL, y), Offset(w - padR, y), 1f)
-                labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
-                nc.drawText("%.0f".format(yTick), padL - 6f, y + 8f, labelPaint)
+                if (yTick > yMin + 0.5f) {
+                    labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
+                    nc.drawText("%.0f".format(yTick), padL - 6f, y + 8f, labelPaint)
+                }
                 yTick += yStep
             }
 
@@ -189,6 +220,8 @@ fun InstantConsumptionChart(
                     style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
 
+            drawDriveModeLabel(singleDriveMode, padR, padT)
+
             touchPos?.let { tp ->
                 if (tp.x in padL..(w - padR) && drivingPoints.size > 1) {
                     val idx = ((tp.x - padL) / chartW * (drivingPoints.size - 1))
@@ -204,7 +237,7 @@ fun InstantConsumptionChart(
                         line2 = "Avg(5pt): %.1f kWh/100  |  %.0f km/h".format(
                             avgValues[idx], drivingPoints[idx].speed),
                         line3 = "${(secs / 60).toInt()}m ${(secs % 60).toInt()}s  $clockTime",
-                        accentColor = avgColor, textColor = textColor
+                        accentColor = avgColor
                     )
                 }
             }

@@ -42,7 +42,7 @@ import com.byd.tripstats.ui.components.StatsGlassCard
 import com.byd.tripstats.ui.components.GlassmorphicCard
 import com.byd.tripstats.ui.components.RangeProjectionChart
 import com.byd.tripstats.ui.components.RangeDataPoint
-import com.byd.tripstats.ui.components.WeeklyEnergyThumbnail
+import com.byd.tripstats.ui.components.ConsumptionThumbnail
 import com.byd.tripstats.ui.components.ConsumptionChartExpanded
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.theme.*
@@ -57,6 +57,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
+import kotlinx.coroutines.delay
 
 private const val SHOW_MOCK_BUTTON = false  // Set to true for testing, false for production
 
@@ -69,13 +72,15 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToBatteryDegradation: () -> Unit = {}
 ) {
-    val telemetry by viewModel.currentTelemetry.collectAsState()
+    val telemetry by viewModel.displayTelemetry.collectAsState()
+    val vehicleSnapshot by viewModel.displayVehicleSnapshot.collectAsState()
+    val isMockModeActive by viewModel.isMockModeActive.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
-    val mqttConnected by viewModel.mqttConnected.collectAsState()
-    val mqttConnectionError by viewModel.mqttConnectionError.collectAsState()
     val autoTripDetection by viewModel.autoTripDetection.collectAsState()
     val tripDataPoints by viewModel.tripDataPoints.collectAsState()
+    val liveDistanceKm by viewModel.liveDistanceKm.collectAsState()
+    val liveSegmentDistanceKm by viewModel.liveSegmentDistanceKm.collectAsState()
     val weeklyEfficiency by viewModel.weeklyEfficiency.collectAsState()
     val monthlyEfficiency by viewModel.monthlyEfficiency.collectAsState()
     val yearlyEfficiency by viewModel.yearlyEfficiency.collectAsState()
@@ -90,26 +95,10 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
 
-    val receivingTelemetry = telemetry != null
-
-    val groupedCars = remember {
-        linkedMapOf(
-            "BYD Seal" to listOf(
-                CarCatalog.BYD_SEAL_DYNAMIC_RWD,
-                CarCatalog.BYD_SEAL_PREMIUM_RWD,
-                CarCatalog.BYD_SEAL_EXCELLENCE
-            ),
-            "BYD Dolphin" to listOf(
-                CarCatalog.BYD_DOLPHIN_STANDARD,
-                CarCatalog.BYD_DOLPHIN_EXTENDED
-            ),
-            "BYD ATTO 3" to listOf(
-                CarCatalog.BYD_ATTO_3
-            ),
-            "BYD Seal U" to listOf(
-                CarCatalog.BYD_SEAL_U_COMFORT,
-                CarCatalog.BYD_SEAL_U_DESIGN
-            )
+    val carCategories = remember {
+        listOf(
+            "Battery Electric (BEV)" to CarCatalog.groupedBev,
+            "Plug-in Hybrid (PHEV / DM-i)" to CarCatalog.groupedPhev
         )
     }
 
@@ -117,9 +106,7 @@ fun DashboardScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "BYD trip stats",
                             fontSize = 24.sp,
@@ -128,7 +115,6 @@ fun DashboardScreen(
 
                         selectedCar?.let { car ->
                             Spacer(modifier = Modifier.width(16.dp))
-
                             TextButton(
                                 onClick = { showCarSelectionDialog = true },
                                 contentPadding = PaddingValues(0.dp)
@@ -144,12 +130,11 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    // Mock Data Button - only shown if SHOW_MOCK_BUTTON is true
                     if (SHOW_MOCK_BUTTON) {
                         IconButton(onClick = { viewModel.startMockDrive() }) {
                             Icon(
-                                imageVector = Icons.Filled.PlayArrow,
-                                contentDescription = "Mock Drive",
+                                imageVector = if (isMockModeActive) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                                contentDescription = if (isMockModeActive) "Stop Mock Drive" else "Mock Drive",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(28.dp)
                             )
@@ -158,7 +143,6 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // History Button
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(
                             imageVector = Icons.Filled.History,
@@ -168,27 +152,6 @@ fun DashboardScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(24.dp))
-
-                    // MQTT Status indicator - properly shows connection state
-                    Icon(
-                        imageVector = when {
-                            mqttConnectionError != null -> Icons.Filled.SyncProblem
-                            receivingTelemetry -> Icons.Filled.Sync
-                            else -> Icons.Filled.SyncDisabled
-                        },
-                        contentDescription = "MQTT Status",
-                        tint = when {
-                            mqttConnectionError != null -> MaterialTheme.colorScheme.error
-                            receivingTelemetry -> RegenGreen
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(28.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(24.dp))
-
-                    // Settings Button — badged when update is available
                     BadgedBox(
                         badge = {
                             if (updateInfo != null) {
@@ -218,103 +181,20 @@ fun DashboardScreen(
             )
         }
     ) { paddingValues ->
-        // Show error state if MQTT connection failed
-        if (mqttConnectionError != null) {
+        val currentTelemetry = telemetry
+        if (currentTelemetry == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.CloudOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Connection Failed",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = mqttConnectionError!!,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(onClick = onNavigateToSettings) {
-                        Text("Check Settings")
-                    }
-                }
-            }
-        } else if (telemetry == null && !mqttConnected) {
-            // Show "Not configured" state
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Filled.SettingsSuggest,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "MQTT Not Configured",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Configure MQTT settings to connect",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(onClick = onNavigateToSettings) {
-                        Icon(Icons.Filled.Settings, null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Configure MQTT")
-                    }
-                }
-            }
-        } else if (telemetry == null && mqttConnected) {
-            // Connected but waiting for data
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(modifier = Modifier.size(60.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Waiting for data...",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Listening to MQTT broker",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                CircularProgressIndicator()
             }
         } else {
-            // Normal dashboard with telemetry
             DashboardContent(
-                telemetry = telemetry!!,
+                telemetry = currentTelemetry,
+                vehicleSnapshot = vehicleSnapshot,
                 isInTrip = isInTrip,
                 autoTripDetection = autoTripDetection,
                 tripDataPoints = tripDataPoints,
@@ -327,6 +207,8 @@ fun DashboardScreen(
                 onNavigateToCharging = onNavigateToCharging,
                 onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                 widthSizeClass = widthSizeClass,
+                sessionDistanceKm = liveSegmentDistanceKm,
+                tripDistanceKm = liveDistanceKm,
                 modifier = Modifier.padding(paddingValues)
             )
         }
@@ -344,16 +226,21 @@ fun DashboardScreen(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    groupedCars.forEach { (groupTitle, cars) ->
+                    carCategories.forEach { (categoryTitle, groups) ->
+                        Text(
+                            text = categoryTitle,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        HorizontalDivider()
 
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
+                        groups.forEach { (groupTitle, cars) ->
                             Text(
                                 text = groupTitle,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 4.dp)
                             )
 
                             cars.forEach { car ->
@@ -366,7 +253,7 @@ fun DashboardScreen(
                                             }
                                             showCarSelectionDialog = false
                                         }
-                                        .padding(vertical = 6.dp),
+                                        .padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     RadioButton(
@@ -387,8 +274,9 @@ fun DashboardScreen(
                                             style = MaterialTheme.typography.bodyLarge
                                         )
 
+                                        val rangeLabel = if (car.isPhev) "EV range" else "WLTP"
                                         Text(
-                                            text = "WLTP: ${car.wltpKm} km",
+                                            text = "$rangeLabel: ${car.wltpKm} km",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -416,6 +304,7 @@ fun DashboardScreen(
 fun DashboardContent(
     modifier: Modifier = Modifier,
     telemetry: VehicleTelemetry,
+    vehicleSnapshot: VehicleTelemetrySnapshot? = null,
     isInTrip: Boolean,
     autoTripDetection: Boolean,
     tripDataPoints: List<RangeDataPoint>,
@@ -427,13 +316,12 @@ fun DashboardContent(
     onToggleAutoDetection: () -> Unit,
     onNavigateToCharging: () -> Unit = {},
     onNavigateToBatteryDegradation: () -> Unit = {},
-    widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded
+    widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
+    sessionDistanceKm: Double = 0.0,
+    tripDistanceKm: Double = 0.0
 ) {
-    // ── Session distance — resets to 0 on every app start (= every engine start) ──────────────
-    // The app only runs while the car is on (Electro stops publishing when off),
-    // so `remember` captures the odometer at first composition = engine-on moment.
-    val sessionStartOdometer = remember { telemetry.odometer }
-    val sessionDistanceKm    = (telemetry.odometer - sessionStartOdometer).coerceAtLeast(0.0)
+    // sessionDistanceKm is the current engine-on segment; tripDistanceKm is the
+    // cumulative trip distance since trip start.
 
     val styledModifier = modifier.background(MaterialTheme.colorScheme.background)
 
@@ -454,6 +342,7 @@ fun DashboardContent(
                 // Stats row at top — condensed horizontal strip
                 VehicleStats(
                     telemetry = telemetry,
+                    vehicleSnapshot = vehicleSnapshot,
                     modifier  = Modifier.fillMaxWidth(),
                     onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
                 )
@@ -466,6 +355,7 @@ fun DashboardContent(
                     monthlyEfficiency = monthlyEfficiency,
                     yearlyEfficiency = yearlyEfficiency,
                     sessionDistanceKm = sessionDistanceKm,
+                    tripDistanceKm = tripDistanceKm,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 320.dp)
@@ -499,7 +389,7 @@ fun DashboardContent(
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-        // Left column - Energy Flow Diagram
+                // Left column - Energy Flow Diagram
                 Column(
                     modifier = Modifier
                         .weight(0.70f)
@@ -513,6 +403,7 @@ fun DashboardContent(
                         monthlyEfficiency = monthlyEfficiency,
                         yearlyEfficiency = yearlyEfficiency,
                         sessionDistanceKm = sessionDistanceKm,
+                        tripDistanceKm = tripDistanceKm,
                         onNavigateToCharging = onNavigateToCharging,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -542,6 +433,7 @@ fun DashboardContent(
                 ) {
                     VehicleStats(
                         telemetry  = telemetry,
+                        vehicleSnapshot = vehicleSnapshot,
                         modifier   = Modifier.fillMaxWidth(),
                         fillHeight = true,
                         onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
@@ -571,15 +463,16 @@ fun DashboardContent(
                         monthlyEfficiency = monthlyEfficiency,
                         yearlyEfficiency = yearlyEfficiency,
                         sessionDistanceKm = sessionDistanceKm,
+                        tripDistanceKm = tripDistanceKm,
                         onNavigateToCharging = onNavigateToCharging,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(12.dp)
-                                )
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                shape = RoundedCornerShape(12.dp)
+                            )
                     )
                     TripControls(
                         telemetry = telemetry,
@@ -592,7 +485,7 @@ fun DashboardContent(
                     )
                 }
 
-        // Right column - Stats
+                // Right column - Stats
                 Column(
                     modifier = Modifier
                         .weight(0.15f)
@@ -601,6 +494,7 @@ fun DashboardContent(
                 ) {
                     VehicleStats(
                         telemetry  = telemetry,
+                        vehicleSnapshot = vehicleSnapshot,
                         modifier   = Modifier.fillMaxWidth(),
                         fillHeight = true,
                         onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
@@ -620,12 +514,18 @@ fun EnergyFlowDiagram(
     monthlyEfficiency: List<DashboardViewModel.DailyEfficiency>,
     yearlyEfficiency: List<DashboardViewModel.DailyEfficiency>,
     sessionDistanceKm: Double = 0.0,
+    tripDistanceKm: Double = 0.0,
     onNavigateToCharging: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val power = telemetry.enginePower
+    val power = if (telemetry.isCharging && telemetry.chargingPower > 0.1) {
+        -telemetry.chargingPower
+    } else {
+        telemetry.enginePower
+    }
     val isRegenerating = telemetry.isRegenerating
     val isCharging = telemetry.isCharging
+    val hasActiveEnergyFlow = abs(power) > 1.0 || isCharging
 
     // Two independent expanded states
     var consumptionExpanded by remember { mutableStateOf(false) }
@@ -636,6 +536,9 @@ fun EnergyFlowDiagram(
     val tyrePrefs: SharedPreferences = remember {
         context.getSharedPreferences("tyre_unit_prefs", 0)
     }
+    val appPrefs = remember { PreferencesManager(context.applicationContext) }
+    val dashboardAnimationsEnabled by appPrefs.dashboardAnimationsEnabled
+        .collectAsState(initial = appPrefs.getCachedAnimationsEnabled())
     var tyreUnit by remember {
         mutableStateOf(
             TyrePressureUnit.entries.getOrElse(
@@ -648,10 +551,14 @@ fun EnergyFlowDiagram(
 
     val rotation by animateFloatAsState(
         targetValue = if (rangeFlipped) 180f else 0f,
-        animationSpec = tween(
-            durationMillis = 650, // Slightly longer duration adds visual "weight"
-            easing = FastOutSlowInEasing 
-        ),
+        animationSpec = if (dashboardAnimationsEnabled) {
+            tween(
+                durationMillis = 650, // Slightly longer duration adds visual "weight"
+                easing = FastOutSlowInEasing
+            )
+        } else {
+            snap()
+        },
         label = "range_flip"
     )
     val isRangeBack = rotation > 90f
@@ -666,19 +573,17 @@ fun EnergyFlowDiagram(
     val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
 
     val flowOffsetAnim = remember { Animatable(0f) }
-    LaunchedEffect(isResumed) {
-        if (isResumed) {
-            flowOffsetAnim.animateTo(
-                targetValue   = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation  = tween(1000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                )
-            )
+    LaunchedEffect(isResumed, dashboardAnimationsEnabled, hasActiveEnergyFlow) {
+        if (dashboardAnimationsEnabled && isResumed && hasActiveEnergyFlow) {
+            while (true) {
+                delay(50L)  // 20fps
+                val next = (flowOffsetAnim.value + 0.05f) % 1f
+                flowOffsetAnim.snapTo(next)
+            }
         }
         // Coroutine cancelled when isResumed = false — freezes in place
     }
-    val flowOffset = flowOffsetAnim.value
+    val flowOffset = if (dashboardAnimationsEnabled && hasActiveEnergyFlow) flowOffsetAnim.value else 0f
 
     Card(
         modifier = modifier
@@ -739,19 +644,21 @@ fun EnergyFlowDiagram(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(110.dp),
-                        // contentAlignment = Alignment.TopCenter
+                    // contentAlignment = Alignment.TopCenter
                 ) {
                     EnergyFlowCanvas(
                         power = power,
                         isRegenerating = isRegenerating,
                         isCharging = isCharging,
-                        flowOffset = flowOffset
+                        flowOffset = { flowOffset },
+                        animationsEnabled = dashboardAnimationsEnabled
                     )
 
-                // Animated liquid fill battery — tap to open charging history
+                    // Animated liquid fill battery — tap to open charging history
                     LiquidFillBattery(
                         soc = telemetry.soc.toFloat(),
                         isCharging = isCharging,
+                        animationsEnabled = dashboardAnimationsEnabled,
                         width = 60.dp,
                         height = 100.dp,
                         modifier = Modifier
@@ -760,7 +667,7 @@ fun EnergyFlowDiagram(
                             .clickable { onNavigateToCharging() }
                     )
 
-                // AWD drivetrain with tyre pressures
+                    // AWD drivetrain with tyre pressures
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -779,41 +686,45 @@ fun EnergyFlowDiagram(
                         // Left Front (recommended: 2.6 bar)
                         TyrePressureIndicator(
                             pressure = telemetry.tyrePressureLF,
+                            tempC = telemetry.tyreTempLF.takeIf { it > 0 },
                             unit = tyreUnit,
                             isFront = true,
                             modifier = Modifier
                                 .align(Alignment.TopStart)
-                                .offset(x = (-18).dp, y = (-12).dp)
+                                .offset(x = (-24).dp, y = (-12).dp)
                         )
 
                         // Right Front (recommended: 2.6 bar)
                         TyrePressureIndicator(
                             pressure = telemetry.tyrePressureRF,
+                            tempC = telemetry.tyreTempRF.takeIf { it > 0 },
                             unit = tyreUnit,
                             isFront = true,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .offset(x = 20.dp, y = (-12).dp)
+                                .offset(x = 26.dp, y = (-12).dp)
                         )
 
                         // Left Rear (recommended: 2.9 bar)
                         TyrePressureIndicator(
                             pressure = telemetry.tyrePressureLR,
+                            tempC = telemetry.tyreTempLR.takeIf { it > 0 },
                             unit = tyreUnit,
                             isFront = false,
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .offset(x = (-18).dp, y = (14).dp)
+                                .offset(x = (-24).dp, y = (14).dp)
                         )
 
                         // Right Rear (recommended: 2.9 bar)
                         TyrePressureIndicator(
                             pressure = telemetry.tyrePressureRR,
+                            tempC = telemetry.tyreTempRR.takeIf { it > 0 },
                             unit = tyreUnit,
                             isFront = false,
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
-                                .offset(x = 20.dp, y = (14).dp)
+                                .offset(x = 26.dp, y = (14).dp)
                         )
                     }
 
@@ -844,8 +755,8 @@ fun EnergyFlowDiagram(
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(Modifier.height(2.dp))
-                        WeeklyEnergyThumbnail(
-                            data = weeklyEfficiency,
+                        ConsumptionThumbnail(
+                            data = monthlyEfficiency,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
@@ -875,9 +786,14 @@ fun EnergyFlowDiagram(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
+                    val powerDisplay = if (isCharging) {
+                        String.format("%.1f", power)
+                    } else {
+                        power.roundToInt().toString()
+                    }
                     PowerMetric(
                         label = "Power",
-                        value = "${power.toInt()}",
+                        value = powerDisplay,
                         unit = "kW",
                         color = when {
                             isRegenerating -> RegenGreen
@@ -905,7 +821,7 @@ fun EnergyFlowDiagram(
                     )
                     PowerMetric(
                         label = "Distance",
-                        value = "%.1f".format(sessionDistanceKm),
+                        value = formatDistanceDisplay(sessionDistanceKm, tripDistanceKm),
                         unit = "km",
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -996,6 +912,7 @@ private fun TyrePressureUnit.formatValue(psi: Double): String {
 fun TyrePressureIndicator(
     pressure: Double,           // Always PSI from telemetry
     isFront: Boolean,           // true = front, false = rear
+    tempC: Int? = null,         // Tyre temperature in °C — null when not available
     unit: TyrePressureUnit = TyrePressureUnit.BAR,
     modifier: Modifier = Modifier
 ) {
@@ -1007,7 +924,7 @@ fun TyrePressureIndicator(
 
     val frontTyrePressureBar = car.frontTyrePressureBar
     val rearTyrePressureBar = car.rearTyrePressureBar
-    
+
     // Alarm thresholds are always evaluated in bar regardless of display unit
     val pressureBar = pressure.toBarFromPsi()
     val recommendedPressure = if (isFront) frontTyrePressureBar else rearTyrePressureBar
@@ -1025,8 +942,8 @@ fun TyrePressureIndicator(
             else     -> RegenGreen.copy(alpha = 0.9f)
         }
     ) {
-        Box(
-            contentAlignment = Alignment.Center,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
             Text(
@@ -1034,8 +951,16 @@ fun TyrePressureIndicator(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                fontSize = 10.sp
+                fontSize = 12.sp
             )
+            if (tempC != null) {
+                Text(
+                    text = "${tempC}°C",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 10.sp
+                )
+            }
         }
     }
 }
@@ -1045,16 +970,17 @@ fun EnergyFlowCanvas(
     power: Double,
     isRegenerating: Boolean,
     isCharging: Boolean,
-    flowOffset: Float
+    flowOffset: () -> Float,
+    animationsEnabled: Boolean
 ) {
     val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Canvas(modifier = Modifier.fillMaxSize()) {
 
         val topY = size.height * 0.3f + 30f  // Move up - 30% from top + 30px for better alignment with battery/motor icons
-        
+
         val batteryY = topY
-        
+
         val motorX = size.width * 0.5f
         val motorY = topY
 
@@ -1068,10 +994,10 @@ fun EnergyFlowCanvas(
                 power > 0 -> AccelerationOrange
                 else -> idleColor
             }
-            
+
             // Create animated flow effect
-            val dashPhase = flowOffset * 30f
-            
+            val dashPhase = if (animationsEnabled) flowOffset() * 50f else 0f
+
             // batteryEdge is derived from the actual LiquidFillBattery icon geometry:
             //   padding(start = 16.dp), width = 60.dp → right edge at 76.dp from left.
             // This ensures the flow line docks flush into the battery icon regardless
@@ -1086,7 +1012,8 @@ fun EnergyFlowCanvas(
                     to   = motorEdge,
                     color = flowColor,
                     dashPhase = dashPhase,
-                    reverse = true
+                    reverse = true,
+                    animated = animationsEnabled
                 )
             } else if (power > 0) {
                 // Battery → Motor (acceleration): arrows travel left-to-right
@@ -1095,7 +1022,8 @@ fun EnergyFlowCanvas(
                     to   = batteryEdge,
                     color = flowColor,
                     dashPhase = dashPhase,
-                    reverse = true
+                    reverse = true,
+                    animated = animationsEnabled
                 )
             }
         }
@@ -1107,57 +1035,43 @@ fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEnergyFlow(
     to: Offset,
     color: Color,
     dashPhase: Float,
-    reverse: Boolean
+    reverse: Boolean,
+    animated: Boolean
 ) {
-    // Draw solid line
-    drawLine(
-        color = color,
-        start = from,
-        end = to,
-        strokeWidth = 6f
-    )
-    
-    // Draw animated arrows along the line
+    drawLine(color = color, start = from, end = to, strokeWidth = 6f)
+    if (!animated) return
+
     val dx = to.x - from.x
     val dy = to.y - from.y
     val lineLength = kotlin.math.sqrt(dx * dx + dy * dy)
-    val arrowSpacing = 50f  // Increased spacing for smoother animation
-    val numArrows = (lineLength / arrowSpacing).toInt() + 2  // Extra arrows for smooth loop
-    
-    val angle = kotlin.math.atan2(dy.toDouble(), dx.toDouble()).toFloat()
-    val arrowAngle = if (!reverse) angle else (angle + kotlin.math.PI).toFloat()
-    
+    if (lineLength == 0f) return
+
+    // Pre-compute trig once per call instead of per arrow
+    val ux = dx / lineLength
+    val uy = dy / lineLength
+    val cosA = 0.921f; val sinA = 0.389f
+    val dir = if (!reverse) 1f else -1f
+    val wx1 = dir * (-ux * cosA + uy * sinA) * 10f
+    val wy1 = dir * (-uy * cosA - ux * sinA) * 10f
+    val wx2 = dir * (-ux * cosA - uy * sinA) * 10f
+    val wy2 = dir * ( ux * sinA - uy * cosA) * 10f
+
+    val arrowSpacing = 50f
+    val numArrows = (lineLength / arrowSpacing).toInt() + 2
+    val phase = dashPhase % arrowSpacing
+    val path = Path()  // reused across arrows
+
     for (i in 0 until numArrows) {
-        // Smooth continuous animation using modulo
-        val offset = (dashPhase * 1.5) % arrowSpacing
-        val position = (i * arrowSpacing - offset)
-        
-        if (position < 0 || position > lineLength) continue
-        
+        val position = i * arrowSpacing - phase
+        if (position < 0f || position > lineLength) continue
         val progress = position / lineLength
-        val arrowX = (from.x + dx * progress).toFloat()
-        val arrowY = (from.y + dy * progress).toFloat()
-        
-        // Draw arrow head (simplified for performance)
-        val arrowSize = 10f
-        val path = Path().apply {
-            moveTo(arrowX, arrowY)
-            lineTo(
-                arrowX - arrowSize * kotlin.math.cos(arrowAngle - 0.4).toFloat(),
-                arrowY - arrowSize * kotlin.math.sin(arrowAngle - 0.4).toFloat()
-            )
-            moveTo(arrowX, arrowY)
-            lineTo(
-                arrowX - arrowSize * kotlin.math.cos(arrowAngle + 0.4).toFloat(),
-                arrowY - arrowSize * kotlin.math.sin(arrowAngle + 0.4).toFloat()
-            )
-        }
-        
-        drawPath(
-            path = path,
-            color = color,
-            style = Stroke(width = 3f, cap = StrokeCap.Round)
-        )
+        val ax = from.x + dx * progress
+        val ay = from.y + dy * progress
+        path.reset()
+        path.moveTo(ax + wx1, ay + wy1)
+        path.lineTo(ax, ay)
+        path.lineTo(ax + wx2, ay + wy2)
+        drawPath(path = path, color = color, style = Stroke(width = 3f, cap = StrokeCap.Round))
     }
 }
 
@@ -1200,6 +1114,16 @@ fun PowerMetric(
     }
 }
 
+private fun formatDistanceDisplay(segmentKm: Double, cumulativeKm: Double): String {
+    val segment = segmentKm.coerceAtLeast(0.0)
+    val cumulative = cumulativeKm.coerceAtLeast(0.0)
+    return if (cumulative > 0.05 && abs(segment - cumulative) >= 0.05) {
+        "%.1f (%.1f)".format(segment, cumulative)
+    } else {
+        "%.1f".format(maxOf(segment, cumulative))
+    }
+}
+
 @Composable
 fun TripControls(
     telemetry: VehicleTelemetry,
@@ -1228,8 +1152,12 @@ fun TripControls(
             title = { Text("Stop recording?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "The current trip will be saved and closed. " +
-                    "This cannot be undone.",
+                    buildString {
+                        append("The current trip will be saved and closed. This cannot be undone.")
+                        if (autoTripDetection) {
+                            append("\n\nAutomatic trip recording will be turned off and future trips will be manual until you switch it back on.")
+                        }
+                    },
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -1237,6 +1165,9 @@ fun TripControls(
                 Button(
                     onClick = {
                         showStopConfirmDialog = false
+                        if (autoTripDetection) {
+                            onToggleAutoDetection()
+                        }
                         onEndTrip()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BydErrorRed)
@@ -1284,7 +1215,7 @@ fun TripControls(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 var showManualWarning by remember { mutableStateOf(false) }
 
                 if (showManualWarning) {
@@ -1303,10 +1234,10 @@ fun TripControls(
                         text = {
                             Text(
                                 "With manual tracking enabled, trip data will not be recorded " +
-                                "automatically when you start driving. You will need to start " +
-                                "and stop each trip yourself.\n\n" +
-                                "Trips that are not recorded will be absent from your daily, " +
-                                "weekly, and monthly consumption statistics.",
+                                        "automatically when you start driving. You will need to start " +
+                                        "and stop each trip yourself.\n\n" +
+                                        "Trips that are not recorded will be absent from your daily, " +
+                                        "weekly, and monthly consumption statistics.",
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
@@ -1358,9 +1289,9 @@ fun TripControls(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             // ── Unified layout: gear status (left, fills) + action button (right, fixed) ──
             // Fixed height so toggling auto on/off doesn't shift the gear/status text vertically
             Row(
@@ -1374,7 +1305,7 @@ fun TripControls(
                 val gearColor = when (telemetry.gear) {
                     "R"  -> AccelerationOrange
                     else -> if (isInTrip) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 }
                 Surface(
                     modifier = Modifier
@@ -1457,6 +1388,7 @@ fun TripControls(
 @Composable
 fun VehicleStats(
     telemetry: VehicleTelemetry,
+    vehicleSnapshot: VehicleTelemetrySnapshot? = null,
     modifier: Modifier = Modifier,
     /** true in side-by-side layouts: cards share available height via weight(1f), no scroll */
     fillHeight: Boolean = false,
@@ -1475,9 +1407,31 @@ fun VehicleStats(
     ) {
         // weight(1f) is a ColumnScope extension — must be declared inside the Column lambda
         val cardMod = if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth()
+        // SOH: use the higher-fidelity source if available,
+        // otherwise fall back to the estimated Int from toTelemetry() (also 1 decimal).
+        // Allow up to 110% for the estimated path since the remaining-energy estimator
+        // can slightly exceed 100% on a fully healthy pack.
+        val sohDisplay: String = run {
+            val directSoh = vehicleSnapshot?.statisticBatterySoh
+                ?: telemetry.statisticBatterySoh
+            when {
+                directSoh != null && directSoh in 50.0..110.0 ->
+                    String.format("%.1f%%", directSoh)
+                telemetry.soh in 1..110 ->
+                    String.format("%.1f%%", telemetry.soh.toDouble())
+                else -> "—"
+            }
+        }
+        val sohTitle = when {
+            telemetry.sohEstimated                    -> "SoH (estimated)"
+            vehicleSnapshot?.statisticBatterySoh != null ||
+                    telemetry.statisticBatterySoh != null -> "Battery health"
+            telemetry.soh in 1..110                   -> "Battery health"
+            else                                      -> "Battery health"
+        }
         StatCard(
-            title   = "Battery health",
-            value   = "${telemetry.soh}%",
+            title   = sohTitle,
+            value   = sohDisplay,
             icon    = Icons.Filled.BatteryChargingFull,
             color   = BatteryBlue,
             compact = fillHeight,
@@ -1485,36 +1439,90 @@ fun VehicleStats(
             onClick  = onNavigateToBatteryDegradation
         )
         StatCard(
-            title    = "Battery temperature",
-            value    = "${telemetry.batteryTempAvg.toInt()}°C",
-            subtitle = "Cells: ${telemetry.batteryCellTempMin}°C - ${telemetry.batteryCellTempMax}°C",
-            icon     = Icons.Filled.Thermostat,
-            color    = BydErrorRed,
+            title    = "Environment",
+            value    = run {
+                val externalTemp = vehicleSnapshot?.instrumentOutCarTemperature
+                    ?: telemetry.instrumentOutCarTemperature
+                if (externalTemp != null) "Ambient: $externalTemp °C" else "Ambient: — °C"
+            },
+            subtitle = run {
+                val pm25In = vehicleSnapshot?.pm25InCar
+                val pm25Out = vehicleSnapshot?.pm25OutCar
+                val slope = vehicleSnapshot?.roadSlopeDeg
+                buildList {
+                    if (slope != null) add("${slope}°")
+                    if (pm25In != null || pm25Out != null)
+                        add("PM2.5: ${pm25In ?: "—"} / ${pm25Out ?: "—"} μg/m³")
+                }.joinToString(" · ").ifEmpty { null }
+            },
+            icon     = Icons.Filled.Public,
+            color    = RegenGreen,
             compact  = fillHeight,
             modifier = cardMod
         )
         StatCard(
             title    = "HV / 12V",
-            value    = "${telemetry.batteryTotalVoltage} V / ${String.format("%.2f", telemetry.battery12vVoltage)} V",
-            subtitle = "Cell: ${String.format("%.3f", telemetry.batteryCellVoltageMin)} - ${String.format("%.3f", telemetry.batteryCellVoltageMax)} V",
+            value    = run {
+                // Use the live vehicle snapshot for cell voltage updates.
+                val cellMin  = vehicleSnapshot?.statisticCellVoltageMin
+                    ?: telemetry.statisticCellVoltageMin
+                    ?: telemetry.batteryCellVoltageMin.takeIf { it > 0.0 }
+                val cellMax  = vehicleSnapshot?.statisticCellVoltageMax
+                    ?: telemetry.statisticCellVoltageMax
+                    ?: telemetry.batteryCellVoltageMax.takeIf { it > 0.0 }
+                val cellV    = cellMin ?: cellMax
+                val cells    = selectedCar?.cellCount ?: 0
+                val packVoltage = vehicleSnapshot?.batteryTotalVoltage?.takeIf { it > 0 }
+                    ?: telemetry.batteryTotalVoltage.takeIf { it > 0 }
+                val hvVolts: Int? = when {
+                    packVoltage != null               -> packVoltage
+                    cellV != null && cells > 0        -> (cellV * cells).toInt()
+                    else                              -> null
+                }
+                val hvStr    = if (hvVolts != null) "$hvVolts V" else "— V"
+                val v12Str   = if (telemetry.battery12vVoltage > 0.0) String.format("%.2f", telemetry.battery12vVoltage) + " V" else "— V"
+                "$hvStr / $v12Str"
+            },
+            subtitle = run {
+                val cellMin = vehicleSnapshot?.statisticCellVoltageMin
+                    ?: telemetry.statisticCellVoltageMin
+                    ?: telemetry.batteryCellVoltageMin.takeIf { it > 0.0 }
+                val cellMax = vehicleSnapshot?.statisticCellVoltageMax
+                    ?: telemetry.statisticCellVoltageMax
+                    ?: telemetry.batteryCellVoltageMax.takeIf { it > 0.0 }
+                when {
+                    cellMin != null && cellMax != null ->
+                        "Cells: ${String.format("%.3f", cellMin)} – ${String.format("%.3f", cellMax)} V"
+                    cellMin != null ->
+                        "Cells: ${String.format("%.3f", cellMin)} V"
+                    cellMax != null ->
+                        "Cells: ${String.format("%.3f", cellMax)} V"
+                    else -> "Cells: awaiting data…"
+                }
+            },
             icon     = Icons.Filled.Bolt,
             color    = BydEcoTealDim,
             compact  = fillHeight,
             modifier = cardMod
         )
 
-        // ── Motor card — adapts to the selected car's drivetrain ──────────────
-        // AWD (Seal Excellence): both motors shown with their confirmed per-motor
-        // peak ratings (front 160 kW, rear 230 kW, combined 390 kW — all PSM).
-        // The proportional split is a reasonable live estimate since the MQTT stream
-        // only exposes total enginePower; true per-motor output is not published.
-        // FWD / RWD: only the driven axle's RPM is shown; no power subtitle since
-        // there is no split to estimate.
+        // Dead-band: BYD motor sensors report 1-9 RPM noise at standstill.
+        // Also force to 0 when speed is zero to ignore larger noise spikes at standstill.
+        val isStopped = telemetry.speed < 0.5
+        val frontMotorRpm = if (isStopped) null else telemetry.engineSpeedFront.takeIf { it >= 10 }
+        val rearMotorRpm  = if (isStopped) null else telemetry.engineSpeedRear.takeIf  { it >= 10 }
+        val motorsAreSpinning = (frontMotorRpm != null || rearMotorRpm != null)
+
+        // ── Motor card
         when (selectedCar?.drivetrain) {
             Drivetrain.FWD -> StatCard(
                 title    = "Front Motor",
-                value    = "${telemetry.engineSpeedFront} RPM",
-                subtitle = "${telemetry.enginePower.toInt()} kW",
+                value    = frontMotorRpm?.let { "$it RPM" } ?: "0 RPM",
+                subtitle = if (motorsAreSpinning) {
+                    "${telemetry.enginePower.toInt()} kW"
+                } else {
+                    "0 kW"
+                },
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1522,8 +1530,12 @@ fun VehicleStats(
             )
             Drivetrain.RWD -> StatCard(
                 title    = "Rear Motor",
-                value    = "${telemetry.engineSpeedRear} RPM",
-                subtitle = "${telemetry.enginePower.toInt()} kW",
+                value    = rearMotorRpm?.let { "$it RPM" } ?: "0 RPM",
+                subtitle = if (motorsAreSpinning) {
+                    "${telemetry.enginePower.toInt()} kW"
+                } else {
+                    "0 kW"
+                },
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1531,8 +1543,8 @@ fun VehicleStats(
             )
             else -> StatCard(   // AWD (Seal Excellence) or null fallback
                 title    = "Front / Rear Motors",
-                value    = "${telemetry.engineSpeedFront} / ${telemetry.engineSpeedRear} RPM",
-                subtitle = if (telemetry.engineSpeedFront > 0 || telemetry.engineSpeedRear > 0) {
+                value    = "${frontMotorRpm ?: "0"} / ${rearMotorRpm ?: "0"} RPM",
+                subtitle = if (motorsAreSpinning) {
                     "${((telemetry.enginePower * 160 / 390).toInt())} / ${((telemetry.enginePower * 230 / 390).toInt())} kW"
                 } else {
                     "0 / 0 kW"
@@ -1545,6 +1557,15 @@ fun VehicleStats(
         }
 
         StatCard(
+            title    = "Regen / Driving Mode",
+            value    = "${telemetry.regenModeName} / ${telemetry.driveModeName}",
+            icon     = Icons.Filled.DirectionsCar,
+            color    = BydElectricBlue,
+            compact  = fillHeight,
+            modifier = cardMod
+        )
+
+        StatCard(
             title    = "Odometer",
             value    = "${String.format("%.1f", telemetry.odometer)} km",
             icon     = Icons.Filled.Speed,
@@ -1555,6 +1576,15 @@ fun VehicleStats(
         StatCard(
             title    = "Total Discharge",
             value    = "${String.format("%.1f", telemetry.totalDischarge)} kWh",
+            subtitle = run {
+                val phm = telemetry.totalElecConPHM ?: return@run null
+                val mileage = vehicleSnapshot?.statisticTotalMileageValue?.toDouble()
+                    ?: vehicleSnapshot?.statisticTotalMileageDecimal
+                    ?: telemetry.odometer
+                if (mileage > 0)
+                    "Drivetrain: ${String.format("%.1f", phm * mileage / 100.0)} kWh"
+                else null
+            },
             icon     = Icons.Filled.ElectricalServices,
             color    = AccelerationOrange,
             compact  = fillHeight,
@@ -1622,7 +1652,7 @@ fun StatCard(
                 Text(
                     text     = title,
                     style    = if (compact) MaterialTheme.typography.labelMedium
-                               else MaterialTheme.typography.bodyMedium,
+                    else MaterialTheme.typography.bodyMedium,
                     color    = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1630,14 +1660,14 @@ fun StatCard(
                 Text(
                     text       = value,
                     style      = if (compact) MaterialTheme.typography.titleSmall
-                                 else MaterialTheme.typography.titleLarge,
+                    else MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 subtitle?.let {
                     Text(
                         text  = it,
                         style = if (compact) MaterialTheme.typography.labelSmall
-                                else MaterialTheme.typography.bodySmall,
+                        else MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

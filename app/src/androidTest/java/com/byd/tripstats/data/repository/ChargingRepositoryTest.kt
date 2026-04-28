@@ -1,14 +1,18 @@
 package com.byd.tripstats.data.repository
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import com.byd.tripstats.data.config.CarCatalog
 import com.byd.tripstats.data.local.BydStatsDatabase
+import com.byd.tripstats.data.local.TestDatabaseRule
+import org.junit.Rule
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.mock.MockDataGenerator
+import com.byd.tripstats.test.telemetry
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -41,11 +45,11 @@ class ChargingRepositoryTest {
     private val KEY_TEMP    = "last_temp_avg"
     private val KEY_VOLTAGE = "last_voltage"
 
+    @get:Rule val dbRule = TestDatabaseRule()
+
     @Before fun setUp() {
-        db = Room.inMemoryDatabaseBuilder(context, BydStatsDatabase::class.java)
-            .allowMainThreadQueries().build()
-        BydStatsDatabase::class.java.getDeclaredField("INSTANCE")
-            .also { it.isAccessible = true }.set(null, db)
+        // dbRule already injected the in-memory DB into BydStatsDatabase.INSTANCE
+        db = dbRule.db
         ChargingRepository::class.java.getDeclaredField("INSTANCE")
             .also { it.isAccessible = true }.set(null, null)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
@@ -55,12 +59,11 @@ class ChargingRepositoryTest {
     }
 
     @After fun tearDown() {
+        repo.close()
         ChargingRepository::class.java.getDeclaredField("INSTANCE")
             .also { it.isAccessible = true }.set(null, null)
-        BydStatsDatabase::class.java.getDeclaredField("INSTANCE")
-            .also { it.isAccessible = true }.set(null, null)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
-        db.close()
+        // BydStatsDatabase INSTANCE reset and db.close() handled by TestDatabaseRule.after()
     }
 
     // ── Initial state ─────────────────────────────────────────────────────────
@@ -140,16 +143,33 @@ class ChargingRepositoryTest {
         assertFalse(repo.getAllSessions().first().first().isActive)
     }
 
-    @Test fun carOffPacketClosesRealTimeSession() = runBlocking {
+    @Test fun carOffPacketKeepsSessionOpenWhenStillCharging() = runBlocking {
+        // Car-off while still charging = session stays open and continues recording.
+        // The process survives ACC_OFF so real-time data collection continues.
         repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
         Thread.sleep(SETTLE)
         assertNotNull(repo.activeSessionId.value)
 
-        // Car turns off
+        // Car turns off but charging power is still > 0
         repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 0), car)
         Thread.sleep(SETTLE)
 
-        assertNull("Session should be closed on car-off", repo.activeSessionId.value)
+        // Session should remain open — car-off + charging = keep recording
+        assertNotNull("Session should remain open while charging continues after car-off", repo.activeSessionId.value)
+        assertTrue(repo.isCharging.value)
+    }
+
+    @Test fun carOffWithNoChargingClosesSession() = runBlocking {
+        // Car-off + no charging = session closes
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1), car)
+        Thread.sleep(SETTLE)
+        assertNotNull(repo.activeSessionId.value)
+
+        // Car turns off and charging stops
+        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 0, chargingPower = 0.0), car)
+        Thread.sleep(SETTLE)
+
+        assertNull("Session should close when car-off and not charging", repo.activeSessionId.value)
         assertFalse(repo.isCharging.value)
     }
 
@@ -224,18 +244,34 @@ class ChargingRepositoryTest {
 
     // ── SoC persistence ───────────────────────────────────────────────────────
 
-    @Test fun shutdownStatePersistsOnCarOffPackets() = runBlocking {
-        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 0, soc = 65.0), car)
-        Thread.sleep(SETTLE)
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        assertEquals(65.0f, prefs.getFloat(KEY_SOC, -1f), 0.1f)
+    @Test fun carOffPacketsDoNotOverwriteShutdownBaseline() = runBlocking {
+        // Baseline captured while the car was last on (e.g. 60 %).
+        writeShutdownState(soc = 60.0f, tsOffsetMs = -60_000L)
+
+        // An off-state packet arrives showing a higher SoC (mid-charge). The
+        // baseline must remain unchanged so the next wake-up can compute the
+        // correct delta and reconstruct the session.
+        repo.onTelemetry(
+            telemetry(
+                gear = "P", speed = 0.0, enginePower = 0.0,
+                chargingPower = 0.0, carOn = 0, soc = 72.0, battery12vVoltage = 12.4
+            ),
+            car
+        )
+        assertEquals(60.0f, repoPrefs().getFloat(KEY_SOC, -1f), 0.1f)
     }
 
     @Test fun shutdownStatePersistsOnCarOnPackets() = runBlocking {
-        repo.onTelemetry(gen.generateAcChargingTelemetry(carOn = 1, soc = 72.0, chargingPower = 0.0), car)
-        Thread.sleep(SETTLE)
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        assertEquals(72.0f, prefs.getFloat(KEY_SOC, -1f), 0.1f)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
+        // persistShutdownState is synchronous — read immediately after onTelemetry returns.
+        repo.onTelemetry(
+            telemetry(
+                gear = "P", speed = 0.0, enginePower = 0.0,
+                chargingPower = 0.0, carOn = 1, soc = 72.0
+            ),
+            car
+        )
+        assertEquals(72.0f, repoPrefs().getFloat(KEY_SOC, -1f), 0.1f)
     }
 
     // ── Deletion ──────────────────────────────────────────────────────────────
@@ -253,11 +289,16 @@ class ChargingRepositoryTest {
     // ── Helper ────────────────────────────────────────────────────────────────
 
     private fun writeShutdownState(soc: Float, tsOffsetMs: Long) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+        repoPrefs().edit()
             .putFloat(KEY_SOC,     soc)
             .putLong(KEY_TS,       System.currentTimeMillis() + tsOffsetMs)
             .putFloat(KEY_TEMP,    22.0f)
             .putInt(KEY_VOLTAGE,   450)
             .commit()
     }
+
+    private fun repoPrefs(): SharedPreferences =
+        ChargingRepository::class.java.getDeclaredField("prefs")
+            .also { it.isAccessible = true }
+            .get(repo) as SharedPreferences
 }

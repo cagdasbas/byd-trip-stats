@@ -5,16 +5,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import com.byd.tripstats.receiver.InstallStatusReceiver
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.FileInputStream
 import java.net.URL
 
 /**
@@ -238,28 +243,100 @@ class UpdateRepository private constructor(private val context: Context) {
     // ── Install ───────────────────────────────────────────────────────────────
 
     /**
-     * Launches the system APK installer for [apkFile].
-     * The user sees the standard Android "Install this app?" dialog.
+     * Installs [apkFile] silently using the PackageInstaller session API.
+     *
+     * Equivalent to: pm install-create -g -r -> pm install-write -> pm install-commit
+     *
+     * The -g flag (INSTALL_GRANT_RUNTIME_PERMISSIONS) ensures all dangerous permissions
+     * declared in the manifest are granted with RESTRICTION_INSTALLER_EXEMPT, exactly
+     * replicating what the ADB install script does. Location, storage, and background
+     * location are granted automatically on every update — no user interaction or ADB.
+     *
+     * Falls back to the system installer dialog if the session API fails.
      *
      * Only call this when the car is parked, no trip is active, and no charging
      * session is ongoing — enforced by DashboardViewModel.canInstallNow.
      */
-    fun installUpdate(apkFile: File) {
+    suspend fun installUpdate(apkFile: File) = withContext(Dispatchers.IO) {
+        try {
+            installViaSilentSession(apkFile)
+        } catch (e: Exception) {
+            Log.w(TAG, "Silent install failed (${e.message}), falling back to system installer")
+            installViaSystemInstaller(apkFile)
+        }
+    }
+
+    /**
+     * Silent install via PackageInstaller session API with runtime permission grants.
+     * Requires REQUEST_INSTALL_PACKAGES permission (declared in manifest).
+     */
+    private fun installViaSilentSession(apkFile: File) {
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(
+            PackageInstaller.SessionParams.MODE_FULL_INSTALL
+        ).apply {
+            setAppPackageName(context.packageName)
+            setSize(apkFile.length())
+            // Grant all dangerous permissions at install time — equivalent to pm install -g.
+            // Sets RESTRICTION_INSTALLER_EXEMPT so grants survive future silent updates too.
+            // Primary path: setGrantedRuntimePermissions(null) grants all declared permissions.
+            try {
+                val method = PackageInstaller.SessionParams::class.java
+                    .getMethod("setGrantedRuntimePermissions", Array<String>::class.java)
+                method.invoke(this, null as? Array<String>?)
+                Log.i(TAG, "setGrantedRuntimePermissions(null) succeeded")
+            } catch (_: NoSuchMethodException) {
+                // Fallback: set INSTALL_GRANT_RUNTIME_PERMISSIONS flag (0x100) directly.
+                try {
+                    val field = PackageInstaller.SessionParams::class.java
+                        .getDeclaredField("installFlags")
+                    field.isAccessible = true
+                    field.setInt(this, field.getInt(this) or 0x00000100)
+                    Log.i(TAG, "Set INSTALL_GRANT_RUNTIME_PERMISSIONS via reflection on installFlags")
+                } catch (ex: Exception) {
+                    Log.w(TAG, "Could not set grant flag: ${ex.message}")
+                }
+            }
+        }
+
+        val sessionId = installer.createSession(params)
+        Log.i(TAG, "PackageInstaller session created: $sessionId")
+
+        installer.openSession(sessionId).use { session ->
+            FileInputStream(apkFile).use { apkStream ->
+                session.openWrite("base.apk", 0, apkFile.length()).use { out ->
+                    apkStream.copyTo(out)
+                    session.fsync(out)
+                }
+            }
+            val intent = Intent(context, InstallStatusReceiver::class.java).apply {
+                action = InstallStatusReceiver.ACTION_INSTALL_STATUS
+            }
+            val pi = android.app.PendingIntent.getBroadcast(
+                context, sessionId, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or
+                    android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            session.commit(pi.intentSender)
+            Log.i(TAG, "PackageInstaller session committed — install in progress")
+        }
+    }
+
+    /** Fallback: fires the system installer dialog (user must tap Install). */
+    private fun installViaSystemInstaller(apkFile: File) {
         try {
             val uri = androidx.core.content.FileProvider.getUriForFile(
-                context,
-                PROVIDER_AUTHORITY,
-                apkFile
+                context, PROVIDER_AUTHORITY, apkFile
             )
-            val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                data  = uri
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
                 flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
                 putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
             }
             context.startActivity(intent)
-            Log.i(TAG, "Install intent fired for ${apkFile.name}")
+            Log.i(TAG, "Fallback system installer launched for ${apkFile.name}")
         } catch (e: Exception) {
-            Log.e(TAG, "Install failed: ${e.message}")
+            Log.e(TAG, "Fallback install also failed: ${e.message}")
         }
     }
 

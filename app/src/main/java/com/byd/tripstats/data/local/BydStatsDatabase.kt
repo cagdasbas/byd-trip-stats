@@ -32,7 +32,7 @@ import java.io.IOException
         ChargingSessionEntity::class,
         ChargingDataPointEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,14 +53,24 @@ abstract class BydStatsDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): BydStatsDatabase {
             return INSTANCE ?: synchronized(this) {
+                val appCtx = context.applicationContext
+                // Safety guard: if running under the test package, refuse to open
+                // the real on-disk database. Tests must inject an in-memory DB via
+                // reflection before calling getDatabase(). If they forget, we crash
+                // loudly here rather than silently corrupting production data.
+                check(appCtx.packageName != "com.byd.tripstats.test") {
+                    "getDatabase() called from test package without injecting " +
+                    "an in-memory DB first. Set BydStatsDatabase.INSTANCE before " +
+                    "calling getDatabase() in your test setUp()."
+                }
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appCtx,
                     BydStatsDatabase::class.java,
                     DB_NAME
                 )
                     // .fallbackToDestructiveMigration()
                     // .fallbackToDestructiveMigrationOnDowngrade()
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance
@@ -96,16 +106,16 @@ abstract class BydStatsDatabase : RoomDatabase() {
         //   • charging_sessions table
         //   • charging_data_points table
         val MIGRATION_1_2 = object : Migration(1, 2) {
-            override fun migrate(database: SupportSQLiteDatabase) {
+            override fun migrate(db: SupportSQLiteDatabase) {
                 // New trip_data_points columns
-                database.execSQL("ALTER TABLE trip_data_points ADD COLUMN socPanel INTEGER NOT NULL DEFAULT 0")
-                database.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempLF INTEGER NOT NULL DEFAULT 0")
-                database.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempRF INTEGER NOT NULL DEFAULT 0")
-                database.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempLR INTEGER NOT NULL DEFAULT 0")
-                database.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempRR INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN socPanel INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempLF INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempRF INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempLR INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN tyreTempRR INTEGER NOT NULL DEFAULT 0")
 
                 // Charging sessions table
-                database.execSQL("""
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS charging_sessions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         startTime INTEGER NOT NULL,
@@ -126,7 +136,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
                 """.trimIndent())
 
                 // Charging data points table
-                database.execSQL("""
+                db.execSQL("""
                     CREATE TABLE IF NOT EXISTS charging_data_points (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                         sessionId INTEGER NOT NULL,
@@ -145,7 +155,15 @@ abstract class BydStatsDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
 
-                database.execSQL("CREATE INDEX IF NOT EXISTS index_charging_data_points_sessionId ON charging_data_points(sessionId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_charging_data_points_sessionId ON charging_data_points(sessionId)")
+            }
+        }
+
+        // ── Migration 2 → 3 ──────────────────────────────────────────────────
+        // Adds raw JSON payload capture to charging_data_points.
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE charging_data_points ADD COLUMN rawJson TEXT NOT NULL DEFAULT '{}' ")
             }
         }
 

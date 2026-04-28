@@ -34,6 +34,7 @@ import java.util.Date
 import java.util.Locale
 import com.byd.tripstats.ui.theme.*
 import kotlin.math.roundToInt
+import androidx.compose.ui.geometry.Size
 
 private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
@@ -65,6 +66,10 @@ fun MotorRpmChart(
     val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
 
+    val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
+
     val showFront = car.drivetrain == Drivetrain.FWD || car.drivetrain == Drivetrain.AWD
     val showRear  = car.drivetrain == Drivetrain.RWD || car.drivetrain == Drivetrain.AWD
 
@@ -88,6 +93,13 @@ fun MotorRpmChart(
                 LegendDot(frontColor, "Front motor")
             }
         }
+
+        Text(
+            text = "Very short axle bursts may appear smoothed - fullscreen for details",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
 
         Canvas(
             modifier = Modifier
@@ -142,6 +154,28 @@ fun MotorRpmChart(
                 (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0
             } else {
                 0.0
+            }
+
+            // ── Drive mode background bands ──────────────────────────────────
+            if (hasModes && dataPoints.size >= 2) {
+                var bandStart = 0
+                var bandMode = modes[0].driveMode
+                for (i in 1..dataPoints.size) {
+                    val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                    if (curMode != bandMode || i == dataPoints.size) {
+                        if (bandMode != 0) {
+                            val x0 = xOf(bandStart)
+                            val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                            drawRect(
+                                color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                                topLeft = Offset(x0, padT),
+                                size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                            )
+                        }
+                        bandStart = i
+                        bandMode = curMode
+                    }
+                }
             }
 
             val labelPaint = android.graphics.Paint().apply {
@@ -266,6 +300,8 @@ fun MotorRpmChart(
                 }
             }
 
+            drawDriveModeLabel(singleDriveMode, padR, padT)
+
             // Crosshair — shows only the motors available on the selected car
             touchPos?.let { tp ->
                 if (tp.x in padL..(w - padR) && dataPoints.size > 1) {
@@ -295,11 +331,18 @@ fun MotorRpmChart(
                         Drivetrain.AWD -> "R: ${formatRpm(rRpm)}  F: ${formatRpm(fRpm)}"
                     }
 
-                    val accentColor = when (car.drivetrain) {
-                        Drivetrain.FWD -> frontColor
-                        Drivetrain.RWD -> rearColor
-                        Drivetrain.AWD -> rearColor
+                    val mode = modes[idx]
+                    val modeStr = buildString {
+                        if (mode.driveMode != 0) append(driveModeLabel(mode.driveMode))
+                        if (mode.driveMode != 0 && mode.regenMode != 0) append(" · ")
+                        if (mode.regenMode != 0) append("Regen ${regenModeLabel(mode.regenMode)}")
                     }
+
+                    val accentColor = if (mode.driveMode != 0) driveModeColor(mode.driveMode)
+                                      else when (car.drivetrain) {
+                                          Drivetrain.FWD -> frontColor
+                                          else -> rearColor
+                                      }
 
                     drawCrosshair(
                         cx = xOf(idx),
@@ -310,10 +353,9 @@ fun MotorRpmChart(
                         padT = padT,
                         chartH = chartH,
                         line1 = line1,
-                        line2 = realTime,
-                        line3 = durationStr,
+                        line2 = if (modeStr.isNotEmpty()) modeStr else realTime,
+                        line3 = if (modeStr.isNotEmpty()) "$realTime  $durationStr" else durationStr,
                         accentColor = accentColor,
-                        textColor = textColor
                     )
                 }
             }

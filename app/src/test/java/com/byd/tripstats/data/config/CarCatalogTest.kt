@@ -65,11 +65,13 @@ class CarCatalogTest {
         }
     }
 
-    @Test fun `reference consumption is higher than WLTP implied efficiency`() {
+    @Test fun `BEV reference consumption is higher than WLTP implied efficiency`() {
         // WLTP range is measured at ideal conditions — real-world reference consumption
         // is always higher than batteryKwh/wltpKm*100 (the theoretical WLTP-implied value).
-        // The ratio across all BYD catalog cars is 1.15x–1.35x.
-        CarCatalog.allCars.forEach { car ->
+        // The ratio across all BYD BEV catalog cars is 1.1x–1.4x.
+        // PHEVs are excluded: their WLTP EV range and gross battery capacity are not
+        // directly comparable via this formula.
+        CarCatalog.allCars.filter { !it.isPhev }.forEach { car ->
             val wltpImplied = car.batteryKwh / car.wltpKm * 100.0
             val ref = car.referenceConsumptionKwhPer100km
             assertTrue(
@@ -103,7 +105,7 @@ class CarCatalogTest {
         assertEquals(Drivetrain.FWD, CarCatalog.BYD_SEAL_U_DESIGN.drivetrain)
     }
 
-    @Test fun `catalog contains all 6 expected cars`() {
-        assertEquals(8, CarCatalog.allCars.size)
+    @Test fun `catalog contains all 12 expected cars`() {
+        assertEquals(12, CarCatalog.allCars.size)
     }
 }

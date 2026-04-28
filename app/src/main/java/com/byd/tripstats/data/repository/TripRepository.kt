@@ -11,9 +11,15 @@ import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripSegmentEntity
 import com.byd.tripstats.data.local.entity.TripStatsEntity
 import com.byd.tripstats.data.model.VehicleTelemetry
+import com.byd.tripstats.data.preferences.PreferencesManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -25,7 +31,7 @@ import kotlin.math.sqrt
  * mutex, no @Volatile, no concurrency reasoning anywhere in the business logic.
  */
 sealed class TripEvent {
-    /** Live telemetry packet arriving from MQTT. */
+    /** Live telemetry packet arriving from the vehicle telemetry service. */
     data class Telemetry(val data: VehicleTelemetry) : TripEvent()
 
     /** User tapped "Start trip" in the UI. */
@@ -51,12 +57,15 @@ sealed class TripEvent {
 
 private enum class TripState { IDLE, ACTIVE }
 
+private const val KEY_LAST_TELEMETRY_JSON = "last_telemetry_json"
+
 // ── Repository ────────────────────────────────────────────────────────────────
 
 class TripRepository private constructor(context: Context) {
 
     private val TAG = "TripRepository"
 
+    private val appContext   = context.applicationContext
     private val database     = BydStatsDatabase.getDatabase(context)
     private val tripDao      = database.tripDao()
     private val dataPointDao = database.tripDataPointDao()
@@ -64,6 +73,8 @@ class TripRepository private constructor(context: Context) {
     private val segmentDao   = database.tripSegmentDao()
 
     private val prefs = context.getSharedPreferences("trip_prefs", Context.MODE_PRIVATE)
+    private val telemetryCachePrefs = context.getSharedPreferences("telemetry_cache", Context.MODE_PRIVATE)
+    private val telemetryJson = Json { ignoreUnknownKeys = true }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -81,7 +92,7 @@ class TripRepository private constructor(context: Context) {
     // ── Event channel ─────────────────────────────────────────────────────────
 
     /**
-     * UNLIMITED so producers never block. At 1 Hz MQTT the queue depth will
+     * UNLIMITED so producers never block. At 1 Hz telemetry the queue depth will
      * never exceed a handful of items — memory is not a concern.
      * Control events (ManualStart, ManualStop, WatchdogTick, Recover) are rare,
      * and the processor drains them as fast as DB I/O allows.
@@ -100,11 +111,60 @@ class TripRepository private constructor(context: Context) {
     private var batteryTempSum        = 0.0
     private var batteryTempSamples    = 0
 
-    private var autoTripDetection = prefs.getBoolean(PREF_AUTO_TRIP, false)
+    // Running "best known" distance in km, computed per tick as the max of the
+    // odometer delta and a speed-integrated distance. Survives periods where
+    // car is offline and reports odometer=0 (commonly seen after the
+    // car has parked and on the first telemetry ticks post-resume). Used as an
+    // end-odometer fallback so a trip closed immediately after a resume does
+    // not collapse to the pre-off distance.
+    private var tripBestDistanceKm    = 0.0
+
+    // Running max of telemetry.totalDischarge seen during the active trip. Same
+    // motivation as tripBestDistanceKm but for energy accounting: when the final
+    // telemetry/data-point reads for discharge come back stale (0 or still at
+    // trip.startTotalDischarge), this gives doEndTrip a non-stale value that was
+    // actually observed mid-trip. Absolute kWh value, not a delta.
+    private var tripBestTotalDischarge = 0.0
+    // Running sum of max(0, enginePower) × dt over the active trip, in kWh. Serves as
+    // a power-integrated floor for end discharge: when car under-
+    // reports totalDischarge for long stretches, this integral still reflects the
+    // energy the car actually pulled from the pack tick-by-tick.
+    private var tripIntegratedDischargeKwh = 0.0
+    // Running min of telemetry.soc seen during the active trip. Pairs with the
+    // discharge running-max so endSoc can fall back to the lowest mid-trip SoC
+    // when the final reads are stale.
+    private var tripMinSoc             = Double.MAX_VALUE
+
+    // Default TRUE — auto-recording works immediately after install without
+    // requiring the user to open the app and toggle the switch first.
+    // @Volatile: read from the event-processor coroutine, written from the UI thread
+    // via setAutoTripDetection. Without volatile the processor may read a stale value.
+    @Volatile private var autoTripDetection = prefs.getBoolean(PREF_AUTO_TRIP, true)
+
+    // Manual stop grace window. After the user explicitly stops a trip, suppress
+    // auto-start until the cooldown expires — otherwise the very next telemetry tick
+    // (car still in D, still moving) would re-open a fresh trip and the user
+    // perceives the stop as having had no effect.
+    @Volatile private var manualStopCooldownUntilMs: Long = 0L
+    private val MANUAL_STOP_COOLDOWN_MS = 60_000L
+
+    // ── Car-off continuation window ────────────────────────────────────────────
+    // When the car turns off we do NOT end the trip immediately — the driver may
+    // just be stopped briefly (coffee stop, red light, parking briefly).
+    // Instead we start a timer and keep the trip open for a continuation window.
+    // Timestamp (ms) when the car turned off during an active trip.
+    // 0L means the car is currently on (or no active trip).
+    private var carOffSinceMs: Long = 0L
+
+    // Hard timeout after engine-off before the trip is automatically ended.
+    // 30 min covers highway toilet breaks, fuel stops, drive-through queues.
+    // If the engine comes back on within this window, the trip continues seamlessly.
+    private val CAR_OFF_TIMEOUT_MS = 30 * 60 * 1000L
 
     // ── Timing constants ──────────────────────────────────────────────────────
 
-    private val TELEMETRY_TIMEOUT_MS = 3 * 60 * 1000L
+    // 8 min — survives the ~8s service restart gap without closing the trip.
+    private val TELEMETRY_TIMEOUT_MS = 8 * 60 * 1000L
 
     // Flush a segment every 30 s. At 50 km/h ≈ 417 m per endpoint pair —
     // accurate enough for route display; RDP compression smooths it at end.
@@ -114,6 +174,24 @@ class TripRepository private constructor(context: Context) {
     private val WRITE_INTERVAL_MS = 10_000L
 
     private val DRIVE_GEARS = setOf("D", "R")
+
+    private fun validBatteryTemp(temp: Double): Double? =
+        temp.takeIf { it > 0.0 }
+
+    private fun validCellTemp(temp: Int): Int? =
+        temp.takeIf { it > 0 }
+
+    private fun effectiveSpeedKmh(t: VehicleTelemetry): Double =
+        maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
+
+    private fun shouldBackAnchorTripStart(previousTelemetry: VehicleTelemetry?): Boolean {
+        if (previousTelemetry == null) return true
+        return previousTelemetry.gear in DRIVE_GEARS ||
+            effectiveSpeedKmh(previousTelemetry) > 2.0 ||
+            kotlin.math.abs(previousTelemetry.enginePower) > 5.0 ||
+            previousTelemetry.engineSpeedFront > 0 ||
+            previousTelemetry.engineSpeedRear > 0
+    }
 
     // ── Segment builder ───────────────────────────────────────────────────────
 
@@ -137,6 +215,8 @@ class TripRepository private constructor(context: Context) {
     // ── Initialisation ────────────────────────────────────────────────────────
 
     init {
+        restoreCachedTelemetry()
+
         // Start the single processor coroutine — this is the only place that
         // ever reads or writes trip state.
         scope.launch {
@@ -154,6 +234,20 @@ class TripRepository private constructor(context: Context) {
         tripEvents.trySend(TripEvent.Recover)
 
         startWatchdog()
+
+        // Backfill stats for any completed trips that are missing a trip_stats
+        // row — these arise when calculateTripStats threw or returned early.
+        scope.launch(Dispatchers.IO) {
+            try {
+                val missing = tripDao.getCompletedTripsWithoutStats()
+                if (missing.isNotEmpty()) {
+                    Log.i(TAG, "Backfilling stats for ${missing.size} trips without stats rows")
+                    missing.forEach { calculateTripStats(it.id) }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Stats backfill failed: ${e.message}")
+            }
+        }
     }
 
     // ── Event dispatcher ──────────────────────────────────────────────────────
@@ -179,32 +273,151 @@ class TripRepository private constructor(context: Context) {
         when (tripState) {
 
             TripState.IDLE -> {
-                lastTelemetry     = t
-                lastTelemetryTime = now
-
-                if (autoTripDetection) {
-                    if (shouldAutoStart(t)) {
-                        Log.i(TAG, "Auto-detect: movement → starting trip")
-                        doStartTrip(t, isManual = false)
-                    }
+                val inCooldown = now < manualStopCooldownUntilMs
+                val previousTelemetry = lastTelemetry
+                if (!inCooldown && autoTripDetection && shouldAutoStart(t, previousTelemetry)) {
+                    val backAnchorToJourney = shouldBackAnchorTripStart(previousTelemetry)
+                    // Assign lastTelemetry AFTER the check so odometer
+                    // comparison uses the actual previous packet.
+                    Log.i(TAG, "Auto-detect: movement → starting trip")
+                    lastTelemetry     = t
+                    lastTelemetryTime = now
+                    doStartTrip(
+                        telemetry = t,
+                        isManual = false,
+                        backAnchorToJourney = backAnchorToJourney
+                    )
+                } else {
+                    lastTelemetry     = t
+                    lastTelemetryTime = now
                 }
             }
 
             TripState.ACTIVE -> {
-                // Engine off → close immediately
+                // ── Engine-off handling ───────────────────────────────────────
+                // Requirements:
+                //   • Engine on in P gear → keep recording (driver waiting/parked)
+                //   • Driver exits with engine on → keep recording
+                //   • Engine off, returns within 30 min → resume seamlessly
+                //   • Engine off > 30 min → end trip
+                // The current implementation is intentionally simple:
+                //   • first off packet starts a timer
+                //   • any on packet before timeout resumes the same trip
+                //   • off for longer than CAR_OFF_TIMEOUT_MS ends the trip
+                // Always update min/max stats — the car can be moving while
+                // isCarOn is false in edge cases (slow speed, gear=P, etc.).
+                updateTripMetrics(t)
+
                 if (!t.isCarOn) {
-                    Log.i(TAG, "Engine OFF → ending trip")
-                    doEndTrip()
+                    if (carOffSinceMs == 0L) {
+                        carOffSinceMs = resolveCarOffSince(now)
+                        Log.i(TAG, "Engine OFF — will end trip in ${CAR_OFF_TIMEOUT_MS / 60_000} min if not restarted")
+
+                        // Persist the off-transition so recoverActiveTrip can preserve
+                        // carOffSinceMs across process death. Without this, a process
+                        // kill during the off window loses the already-accrued off time
+                        // and the 30-min watchdog effectively restarts on the next off.
+                        //
+                        // Car often goes offline at the moment of
+                        // car-off and returns odometer/discharge/soc as 0. Copy the
+                        // last known-good values so this point doesn't skew
+                        // calculateTripStats' per-pair deltas with a stale 0.
+                        _currentTripId.value?.let { tripId ->
+                            val lastGood = lastRecordedTelemetry
+                            val startDischarge = cachedCurrentTrip?.startTotalDischarge ?: 0.0
+                            val odoOverride = if (t.odometer > 0.0) null
+                                              else lastGood?.odometer
+                            val dischargeOverride = if (t.totalDischarge > 0.0 && t.totalDischarge >= startDischarge) null
+                                                    else lastGood?.totalDischarge
+                            val socOverride = if (t.soc > 0.0) null else lastGood?.soc
+                            recordDataPoint(
+                                tripId, t,
+                                overrideOdometer       = odoOverride,
+                                overrideTotalDischarge = dischargeOverride,
+                                overrideSoc            = socOverride
+                            )
+                            lastRecordedTelemetry = t
+                            lastWriteTime = now
+                        }
+                    }
+                    val carOffDuration = now - carOffSinceMs
+                    if (carOffDuration > CAR_OFF_TIMEOUT_MS) {
+                        Log.i(TAG, "Engine off for ${carOffDuration / 60_000} min → ending trip")
+                        doEndTrip(overrideEndTime = carOffSinceMs + CAR_OFF_TIMEOUT_MS)
+                    }
                     lastTelemetry     = t
                     lastTelemetryTime = now
                     return
                 }
 
-                // Inline gap check — if the processor was somehow stalled and a
-                // burst of packets arrives at once, close before recording more.
-                if (lastTelemetryTime > 0 && now - lastTelemetryTime > TELEMETRY_TIMEOUT_MS) {
-                    Log.w(TAG, "Gap detected inside telemetry handler → ending trip")
+                // Engine came back on — continue trip seamlessly
+                if (carOffSinceMs > 0L) {
+                    Log.i(TAG, "Engine back ON after ${(now - carOffSinceMs) / 1000}s — continuing trip")
+                    carOffSinceMs = 0L
+                }
+
+                // Extend the best-known distance. Odometer delta is ground truth
+                // when fresh, but car can be slow to come back online
+                // after a resume and return odometer=0 for several ticks while the
+                // car is actually driving — speed integration bridges that gap.
+                val startOdo = cachedCurrentTrip?.startOdometer
+                if (startOdo != null) {
+                    val dtSec = if (lastTelemetryTime > 0L)
+                        (now - lastTelemetryTime) / 1000.0 else 0.0
+                    if (dtSec in 0.1..10.0) {
+                        val speedKmh = maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
+                        if (speedKmh > 0.0) {
+                            tripBestDistanceKm += speedKmh * dtSec / 3600.0
+                        }
+                    }
+                    val odoDelta = t.odometer - startOdo
+                    if (odoDelta.isFinite() && odoDelta > tripBestDistanceKm) {
+                        tripBestDistanceKm = odoDelta
+                    }
+                }
+
+                // Running max/min for energy accounting. Only advance on readings
+                // that are plausibly non-stale — a 0 is always stale, and discharge
+                // must have advanced past the trip start.
+                if (t.totalDischarge.isFinite() &&
+                    t.totalDischarge > 0.0 &&
+                    t.totalDischarge > tripBestTotalDischarge) {
+                    tripBestTotalDischarge = t.totalDischarge
+                }
+                if (t.soc.isFinite() && t.soc > 0.0 && t.soc < tripMinSoc) {
+                    tripMinSoc = t.soc
+                }
+                // Power × dt integrated draw. Same gap-guard as distance to reject
+                // backgrounded/stalled ticks that would otherwise inflate the integral.
+                if (lastTelemetryTime > 0L) {
+                    val dtH = (now - lastTelemetryTime) / 3_600_000.0
+                    if (dtH in 0.0..(10.0 / 3600.0) && t.enginePower.isFinite() && t.enginePower > 0.0) {
+                        tripIntegratedDischargeKwh += t.enginePower * dtH
+                    }
+                }
+
+                // Gap check: if car is now on but there was a long unexplained
+                // telemetry gap (service crashed while car was driving), end the
+                // stale trip and let shouldAutoStart open a new one.
+                // Use CAR_OFF_TIMEOUT_MS so a normal stop+restart within 30 min
+                // is never falsely closed here.
+                if (lastTelemetryTime > 0 && now - lastTelemetryTime > CAR_OFF_TIMEOUT_MS) {
+                    Log.w(TAG, "Long gap (${(now - lastTelemetryTime) / 60_000} min) while car on → ending stale trip")
                     doEndTrip(overrideEndTime = lastTelemetryTime)
+                    // Re-evaluate this same packet for a new auto-start rather than
+                    // discarding it — avoids a one-packet hole after stale-trip close.
+                    val inCooldown = now < manualStopCooldownUntilMs
+                    if (!inCooldown && autoTripDetection && shouldAutoStart(t, null)) {
+                        Log.i(TAG, "Immediately re-starting trip after stale close")
+                        lastTelemetry     = t
+                        lastTelemetryTime = now
+                        doStartTrip(
+                            telemetry = t,
+                            isManual = false,
+                            backAnchorToJourney = true
+                        )
+                        return
+                    }
                     lastTelemetry     = t
                     lastTelemetryTime = now
                     return
@@ -224,7 +437,6 @@ class TripRepository private constructor(context: Context) {
                 if (shouldRecordDataPoint(t, now)) {
                     _currentTripId.value?.let { tripId ->
                         recordDataPoint(tripId, t)
-                        updateTripMetrics(t)
                         lastRecordedTelemetry = t
                         lastWriteTime = now
                     }
@@ -237,21 +449,33 @@ class TripRepository private constructor(context: Context) {
     }
 
     private suspend fun handleManualStart() {
-        if (tripState == TripState.ACTIVE) {
-            Log.w(TAG, "ManualStart ignored — trip already active")
-            return
-        }
         val t = lastTelemetry ?: run {
             Log.w(TAG, "ManualStart ignored — no telemetry yet")
             return
         }
+        // If an auto-trip is already active when the user taps Manual Start,
+        // close it and open a fresh manual trip. Previously we silently ignored
+        // the request, which left the user with an auto trip (and a confusing
+        // UX where the manual-stop button would end it, but the saved trip
+        // looked like a manual one with stale bounds).
+        if (tripState == TripState.ACTIVE) {
+            Log.i(TAG, "Manual start requested while auto trip active — closing auto trip first")
+            doEndTrip()
+        }
         Log.i(TAG, "Manual start requested")
-        doStartTrip(t, isManual = true)
+        doStartTrip(
+            telemetry = t,
+            isManual = true,
+            backAnchorToJourney = false
+        )
     }
 
     private suspend fun handleManualStop() {
+        // Arm the cooldown regardless of state — a user Stop press means "don't
+        // auto-open a new trip for the next minute", even if we were already IDLE.
+        manualStopCooldownUntilMs = System.currentTimeMillis() + MANUAL_STOP_COOLDOWN_MS
         if (tripState == TripState.IDLE) {
-            Log.w(TAG, "ManualStop ignored — no active trip")
+            Log.w(TAG, "ManualStop ignored — no active trip (cooldown armed)")
             return
         }
         Log.i(TAG, "Manual stop requested")
@@ -260,7 +484,17 @@ class TripRepository private constructor(context: Context) {
 
     private suspend fun handleWatchdogTick() {
         if (tripState != TripState.ACTIVE) return
-        val silence = System.currentTimeMillis() - lastTelemetryTime
+        val now = System.currentTimeMillis()
+        if (carOffSinceMs > 0L) {
+            val offDuration = now - carOffSinceMs
+            if (offDuration > CAR_OFF_TIMEOUT_MS) {
+                Log.w(TAG, "Watchdog: engine off for ${offDuration / 60_000} min → ending trip")
+                doEndTrip(overrideEndTime = carOffSinceMs + CAR_OFF_TIMEOUT_MS)
+            }
+            return
+        }
+
+        val silence = now - lastTelemetryTime
         if (silence > TELEMETRY_TIMEOUT_MS) {
             Log.w(TAG, "Watchdog: ${silence / 1000}s silence → ending trip")
             doEndTrip(overrideEndTime = lastTelemetryTime)
@@ -274,25 +508,69 @@ class TripRepository private constructor(context: Context) {
      */
     private suspend fun recoverActiveTrip() {
         val activeTrip = tripDao.getActiveTrip() ?: return
-        val lastPoint  = dataPointDao.getLastDataPointForTrip(activeTrip.id)
+        val dataPoints = dataPointDao.getDataPointsForTripSync(activeTrip.id)
+        val lastPoint  = dataPoints.lastOrNull()
 
         val now  = System.currentTimeMillis()
         val gap  = if (lastPoint != null) now - lastPoint.timestamp
                    else                   now - activeTrip.startTime
-        val STALE_THRESHOLD = 10 * 60 * 1000L
+        // Match TELEMETRY_TIMEOUT_MS exactly — a trip with a gap large enough
+        // to trigger the in-loop timeout should be closed here upfront, not
+        // resumed and then immediately closed on the first telemetry packet.
+        // A recovered trip is stale only if the gap exceeds CAR_OFF_TIMEOUT_MS.
+        // This matches the in-flight logic: engine-off for < 30 min = trip continues.
+        val STALE_THRESHOLD = CAR_OFF_TIMEOUT_MS
+        val storedOffSince = trailingStoredCarOffStart(dataPoints)
+        val staleBecauseCarOff = storedOffSince != null && now - storedOffSince > STALE_THRESHOLD
 
-        if (gap > STALE_THRESHOLD) {
+        // Seed best-known distance / discharge / min-SoC from recorded data
+        // points so a recovered trip doesn't lose ground already persisted.
+        // Use the whole point list to compute running max/min — the last
+        // valid-odometer point gives distance but mid-trip extremes matter
+        // for discharge and SoC.
+        val validPoint = dataPointDao
+            .getLastValidOdometerPointForTrip(activeTrip.id, activeTrip.startOdometer)
+        tripBestDistanceKm = validPoint?.odometer?.let {
+            (it - activeTrip.startOdometer).coerceAtLeast(0.0)
+        } ?: 0.0
+        tripBestTotalDischarge = dataPoints
+            .mapNotNull { it.totalDischarge.takeIf { v -> v > activeTrip.startTotalDischarge } }
+            .maxOrNull()
+            ?: activeTrip.startTotalDischarge
+        tripMinSoc = dataPoints
+            .mapNotNull { it.soc.takeIf { v -> v > 0.0 } }
+            .minOrNull()
+            ?: Double.MAX_VALUE
+        // Re-integrate Σ max(0, power) × dt across the persisted data points so a
+        // recovery resumes the power-integrated floor rather than restarting at 0.
+        tripIntegratedDischargeKwh = run {
+            var sum = 0.0
+            dataPoints.zipWithNext { a, b ->
+                val dtH = (b.timestamp - a.timestamp).coerceAtLeast(0L) / 3_600_000.0
+                if (dtH in 0.0..(60.0 / 3600.0) && a.power > 0.0) sum += a.power * dtH
+            }
+            sum
+        }
+
+        if (gap > STALE_THRESHOLD || staleBecauseCarOff) {
             Log.w(TAG, "Stale trip ${activeTrip.id} — closing with last DB values")
             // Seed state so doEndTrip can find the trip
             _currentTripId.value = activeTrip.id
             cachedCurrentTrip    = activeTrip
             tripState            = TripState.ACTIVE
 
+            // Prefer the last driving sample over the very last recorded point:
+            // once the car parks and car goes offline, samples return
+            // odometer=0 and would zero out trip distance/energy if used as-is.
+            // Pass null rather than a stale zero so doEndTrip's fallback chain
+            // lands on trip.startOdometer instead of storing a 0 endOdometer.
             doEndTrip(
-                overrideEndTime        = lastPoint?.timestamp,
-                overrideOdometer       = lastPoint?.odometer,
-                overrideSoc            = lastPoint?.soc,
-                overrideTotalDischarge = lastPoint?.totalDischarge
+                overrideEndTime        = storedOffSince?.let { it + CAR_OFF_TIMEOUT_MS }
+                                            ?: validPoint?.timestamp
+                                            ?: lastPoint?.timestamp,
+                overrideOdometer       = validPoint?.odometer,
+                overrideSoc            = validPoint?.soc,
+                overrideTotalDischarge = validPoint?.totalDischarge
             )
         } else {
             Log.i(TAG, "Resuming active trip ${activeTrip.id}")
@@ -301,23 +579,95 @@ class TripRepository private constructor(context: Context) {
             cachedCurrentTrip    = activeTrip
             tripState            = TripState.ACTIVE
             lastTelemetryTime    = lastPoint?.timestamp ?: activeTrip.startTime
+            carOffSinceMs        = storedOffSince ?: 0L
+            // Restore lastTelemetry from the UI cache so the watchdog and
+            // handleTelemetry have a non-null odometer until the first live packet.
+            lastTelemetry        = _latestTelemetry.value
         }
+    }
+
+    private suspend fun resolveCarOffSince(now: Long): Long {
+        val tripId = _currentTripId.value ?: return now
+        val storedOffSince = trailingStoredCarOffStart(dataPointDao.getDataPointsForTripSync(tripId))
+        if (storedOffSince != null && storedOffSince < now) {
+            Log.i(TAG, "Restored engine-off timer from stored trip history (${(now - storedOffSince) / 60_000} min ago)")
+            return storedOffSince
+        }
+        return now
+    }
+
+    private fun trailingStoredCarOffStart(points: List<TripDataPointEntity>): Long? {
+        var offStart: Long? = null
+        for (point in points.asReversed()) {
+            if (storedPointLooksCarOff(point)) {
+                offStart = point.timestamp
+            } else {
+                break
+            }
+        }
+        return offStart
+    }
+
+    private fun storedPointLooksCarOff(point: TripDataPointEntity): Boolean {
+        val rawCarOn = runCatching {
+            telemetryJson.parseToJsonElement(point.rawJson)
+                .jsonObject["car_on"]
+                ?.jsonPrimitive
+                ?.intOrNull
+        }.getOrNull()
+
+        // engineSpeedFront/Rear are intentionally excluded: on cars without an Engine or
+        // Speed device the instrument cluster provides RPM, and the cluster may return
+        // non-zero values while the car is parked/off. Use kinematic + carOn signals only.
+        return rawCarOn == 0 &&
+            point.gear == "P" &&
+            point.speed <= 0.5 &&
+            abs(point.power) <= 2.0
     }
 
     // ── Core trip operations ──────────────────────────────────────────────────
 
-    private suspend fun doStartTrip(telemetry: VehicleTelemetry, isManual: Boolean) {
+    private suspend fun doStartTrip(
+        telemetry: VehicleTelemetry,
+        isManual: Boolean,
+        backAnchorToJourney: Boolean
+    ) {
+        val now = System.currentTimeMillis()
+        // Back-anchor using the car's journey counter so a trip opened mid-drive
+        // (auto-start late, or user opened app after already driving) represents
+        // the full drive from car-on, not from the moment the trip was opened.
+        // Do not use it for manual starts or for the first moving packet seen
+        // after a parked/off packet, otherwise the trip grows beyond the exact
+        // timestamps the user expects.
+        val journeyKm = telemetry.currentJourneyDriveMileage
+            ?.takeIf { backAnchorToJourney && it.isFinite() && it > 0.01 } ?: 0.0
+        val startOdometer = (telemetry.odometer - journeyKm).coerceAtLeast(0.0)
+        val backdateMs = if (journeyKm > 0.0) {
+            telemetry.currentJourneyDriveTime
+                ?.takeIf { it.isFinite() && it > 0.0 }
+                ?.let { (it * 60_000.0).toLong() }
+                ?: run {
+                    val effectiveSpeedKmh = effectiveSpeedKmh(telemetry).coerceAtLeast(1.0)
+                    ((journeyKm / effectiveSpeedKmh) * 3_600_000.0).toLong()
+                }
+        } else 0L
+        val clampedBackdateMs = backdateMs.coerceAtMost(CAR_OFF_TIMEOUT_MS)
+        val startTime = now - clampedBackdateMs
+
+        val startBatteryTemp = validBatteryTemp(telemetry.batteryTempAvg)
+        val startCellTempMax = validCellTemp(telemetry.batteryCellTempMax)
+        val startCellTempMin = validCellTemp(telemetry.batteryCellTempMin)
         val trip = TripEntity(
-            startTime           = System.currentTimeMillis(),
-            startOdometer       = telemetry.odometer,
+            startTime           = startTime,
+            startOdometer       = startOdometer,
             startSoc            = telemetry.soc,
             startTotalDischarge = telemetry.totalDischarge,
             isActive            = true,
             isManual            = isManual,
             minSoc              = telemetry.soc,
-            avgBatteryTemp      = telemetry.batteryTempAvg,
-            maxBatteryCellTemp  = telemetry.batteryCellTempMax,
-            minBatteryCellTemp  = telemetry.batteryCellTempMin
+            avgBatteryTemp      = startBatteryTemp ?: 0.0,
+            maxBatteryCellTemp  = startCellTempMax ?: Int.MIN_VALUE,
+            minBatteryCellTemp  = startCellTempMin ?: Int.MAX_VALUE
         )
 
         val tripId = tripDao.insertTrip(trip)
@@ -327,12 +677,39 @@ class TripRepository private constructor(context: Context) {
         cachedCurrentTrip    = trip.copy(id = tripId)
         tripState            = TripState.ACTIVE
 
-        batteryTempSum     = telemetry.batteryTempAvg
-        batteryTempSamples = 1
+        batteryTempSum     = startBatteryTemp ?: 0.0
+        batteryTempSamples = if (startBatteryTemp != null) 1 else 0
+
+        // Seed the best-known distance from the back-anchored portion. Future
+        // telemetry ticks extend this via speed integration or odometer delta.
+        tripBestDistanceKm         = journeyKm
+        tripBestTotalDischarge     = telemetry.totalDischarge
+        tripIntegratedDischargeKwh = 0.0
+        tripMinSoc                 = telemetry.soc
 
         currentSegment = openSegment(tripId, telemetry)
 
-        Log.i(TAG, "Trip started id=$tripId (manual=$isManual)")
+        // Synthetic anchor point at the back-calculated trip start. Carries current
+        // telemetry values but odometer/timestamp reflect the real car-on moment so
+        // Charts/Route/Analysis tabs span the full trip.
+        if (clampedBackdateMs > 0L) {
+            recordDataPoint(
+                tripId = tripId,
+                t = telemetry,
+                overrideTimestamp = startTime,
+                overrideOdometer = startOdometer
+            )
+        }
+
+        // Write the opening datapoint immediately so short trips and
+        // early sparse packets are always captured from the first moment.
+        recordDataPoint(tripId, telemetry)
+        lastRecordedTelemetry = telemetry
+        lastWriteTime = System.currentTimeMillis()
+
+        Log.i(TAG, "Trip started id=$tripId (manual=$isManual) " +
+            "startOdo=$startOdometer backdate=${clampedBackdateMs / 1000}s " +
+            "journey=$journeyKm backAnchor=$backAnchorToJourney")
     }
 
     /**
@@ -357,8 +734,35 @@ class TripRepository private constructor(context: Context) {
             return
         }
 
-        val endTime      = overrideEndTime ?: System.currentTimeMillis()
         val endTelemetry = lastTelemetry
+
+        // When lastTelemetry is null (service was restarted — in-memory variable is not
+        // persisted) or reports an unusable odometer (car-off mode: car goes
+        // offline and returns 0.0), fall back to the last saved data point so that
+        // distance and energy are not zeroed out.
+        val endPointFallback: TripDataPointEntity? = run {
+            if (overrideOdometer != null) return@run null   // caller already provides correct values
+            val odo        = endTelemetry?.odometer        ?: 0.0
+            val discharge  = endTelemetry?.totalDischarge  ?: 0.0
+            // Also fall back when totalDischarge hasn't advanced past the trip-start value —
+            // this happens when the car is slow to initialise or the car-off
+            // car path returns a stale read. Without this branch, distance would be correct
+            // but energyConsumed would be computed as 0 because endTotalDischarge == startTotalDischarge.
+            if (endTelemetry == null
+                || odo       <= trip.startOdometer
+                || discharge <= trip.startTotalDischarge) {
+                // Skip data points recorded after car went offline
+                // (odometer falls back to 0). Otherwise endOdometer collapses to
+                // trip.startOdometer → distance=0 even after real driving.
+                dataPointDao.getLastValidOdometerPointForTrip(tripId, trip.startOdometer)
+                    ?: dataPointDao.getLastDataPointForTrip(tripId)
+            } else null
+        }
+
+        // Floor endTime against the last data-point timestamp so that a service-restart
+        // recovery with lastTelemetryTime ≈ trip.startTime cannot produce duration = 0.
+        val endTime = (overrideEndTime ?: System.currentTimeMillis())
+            .coerceAtLeast(endPointFallback?.timestamp ?: trip.startTime)
 
         flushSegment(endTelemetry = endTelemetry)
 
@@ -367,12 +771,52 @@ class TripRepository private constructor(context: Context) {
         else
             trip.avgBatteryTemp
 
+        // End-odometer resolution: take the maximum of every candidate so a fresh
+        // telemetry read never loses ground to a stale DB point or vice-versa.
+        // tripBestDistanceKm covers the case where car is offline
+        // on resume and all odometer reads are 0 while the car is actually driving.
+        val odoCandidates = listOfNotNull(
+            endTelemetry?.odometer?.takeIf { it > trip.startOdometer },
+            endPointFallback?.odometer?.takeIf { it > trip.startOdometer },
+            (trip.startOdometer + tripBestDistanceKm).takeIf { tripBestDistanceKm > 0.0 }
+        )
+        val resolvedEndOdometer = overrideOdometer ?: odoCandidates.maxOrNull() ?: trip.startOdometer
+
+        // Guard totalDischarge fallbacks against stale 0 reads (car
+        // offline path). Energy consumed is computed as end - start, so a 0 here
+        // silently zeroes the trip's energy. Prefer the reported counter whenever
+        // we have a plausible value; only fall back to power integration when the
+        // discharge counter never advanced beyond the trip start.
+        val dischargeCandidates = listOfNotNull(
+            endTelemetry?.totalDischarge?.takeIf { it > trip.startTotalDischarge },
+            endPointFallback?.totalDischarge?.takeIf { it > trip.startTotalDischarge },
+            tripBestTotalDischarge.takeIf { it > trip.startTotalDischarge }
+        )
+        val powerIntegratedFallback = (trip.startTotalDischarge + tripIntegratedDischargeKwh)
+            .takeIf { dischargeCandidates.isEmpty() && tripIntegratedDischargeKwh > 0.0 }
+        val resolvedEndDischarge = overrideTotalDischarge
+            ?: dischargeCandidates.maxOrNull()
+            ?: powerIntegratedFallback
+            ?: trip.startTotalDischarge
+
+        // SoC: 0 is possible as a real reading when fully discharged, but in
+        // practice a 0 here almost always means stale telemetry. Prefer the
+        // lowest plausible reading (SoC only decreases while discharging).
+        val socCandidates = listOfNotNull(
+            endTelemetry?.soc?.takeIf { it > 0.0 },
+            endPointFallback?.soc?.takeIf { it > 0.0 },
+            tripMinSoc.takeIf { it != Double.MAX_VALUE }
+        )
+        val resolvedEndSoc = overrideSoc
+            ?: socCandidates.minOrNull()
+            ?: trip.startSoc
+
         tripDao.updateTrip(
             trip.copy(
                 endTime           = endTime,
-                endOdometer       = overrideOdometer       ?: endTelemetry?.odometer       ?: trip.startOdometer,
-                endSoc            = overrideSoc            ?: endTelemetry?.soc            ?: trip.startSoc,
-                endTotalDischarge = overrideTotalDischarge ?: endTelemetry?.totalDischarge ?: trip.startTotalDischarge,
+                endOdometer       = resolvedEndOdometer,
+                endSoc            = resolvedEndSoc,
+                endTotalDischarge = resolvedEndDischarge,
                 isActive          = false,
                 avgBatteryTemp    = finalAvgTemp
             )
@@ -395,6 +839,11 @@ class TripRepository private constructor(context: Context) {
         lastWriteTime         = 0L
         batteryTempSum        = 0.0
         batteryTempSamples    = 0
+        carOffSinceMs         = 0L
+        tripBestDistanceKm    = 0.0
+        tripBestTotalDischarge = 0.0
+        tripIntegratedDischargeKwh = 0.0
+        tripMinSoc             = Double.MAX_VALUE
         tripState             = TripState.IDLE
         _currentTripId.value  = null
         _isInTrip.value       = false
@@ -413,12 +862,43 @@ class TripRepository private constructor(context: Context) {
 
     // ── Auto-start detection ──────────────────────────────────────────────────
 
-    private fun shouldAutoStart(t: VehicleTelemetry): Boolean {
-        if (!t.isCarOn) return false
-        if (t.gear !in DRIVE_GEARS) return false
-        return t.speed > 5 ||
-               t.enginePower > 5 ||
-               (lastTelemetry != null && t.odometer > lastTelemetry!!.odometer)
+    private fun shouldAutoStart(
+        t: VehicleTelemetry,
+        previousTelemetry: VehicleTelemetry?
+    ): Boolean {
+        // All available signals may not arrive on every packet.
+        val movedByOdometer = previousTelemetry != null &&
+            t.odometer > previousTelemetry.odometer + 0.01
+        val effectiveSpeed = maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
+        val drivetrainAlive = t.engineSpeedFront > 0 ||
+            t.engineSpeedRear > 0 ||
+            kotlin.math.abs(t.enginePower) > 2.0
+        val carLooksOn = t.isCarOn || drivetrainAlive
+
+        // Primary: car on, in drive gear, any movement signal
+        if (carLooksOn && t.gear in DRIVE_GEARS) {
+            if (effectiveSpeed > 2.0 || drivetrainAlive || movedByOdometer) {
+                Log.i(TAG, "shouldAutoStart: YES (primary) — carOn=${t.carOn} " +
+                    "gear=${t.gear} speed=$effectiveSpeed power=${t.enginePower} " +
+                    "frontRpm=${t.engineSpeedFront} rearRpm=${t.engineSpeedRear} " +
+                    "odomMoved=$movedByOdometer")
+                return true
+            }
+        }
+        // Fallbacks: unambiguous movement even if carOn/gear not yet populated
+        if (effectiveSpeed > 5.0) {
+            Log.i(TAG, "shouldAutoStart: YES (speed fallback) speed=$effectiveSpeed")
+            return true
+        }
+        if (movedByOdometer) {
+            Log.i(TAG, "shouldAutoStart: YES (odometer moved)")
+            return true
+        }
+        if (drivetrainAlive && t.gear in DRIVE_GEARS) {
+            Log.i(TAG, "shouldAutoStart: YES (drivetrain alive in drive gear)")
+            return true
+        }
+        return false
     }
 
     // ── Data-point throttle ───────────────────────────────────────────────────
@@ -429,6 +909,8 @@ class TripRepository private constructor(context: Context) {
         if (abs(t.speed        - last.speed)        >= 5)        return true
         if (abs(t.soc          - last.soc)          >= 0.5)      return true
         if (abs(t.enginePower  - last.enginePower)  >= 10)       return true
+        if (abs(t.engineSpeedFront - last.engineSpeedFront) >= 300) return true
+        if (abs(t.engineSpeedRear  - last.engineSpeedRear)  >= 300) return true
         if (t.gear != last.gear)                                  return true
         return false
     }
@@ -500,37 +982,71 @@ class TripRepository private constructor(context: Context) {
 
     // ── Data point recording ──────────────────────────────────────────────────
 
-    private suspend fun recordDataPoint(tripId: Long, t: VehicleTelemetry) {
-        dataPointDao.insertDataPoint(
-            TripDataPointEntity(
-                tripId                 = tripId,
-                timestamp              = System.currentTimeMillis(),
-                latitude               = t.locationLatitude,
-                longitude              = t.locationLongitude,
-                altitude               = t.locationAltitude,
-                speed                  = t.speed,
-                power                  = t.enginePower,
-                soc                    = t.soc,
-                odometer               = t.odometer,
-                batteryTemp            = t.batteryTempAvg,
-                totalDischarge         = t.totalDischarge,
-                gear                   = t.gear,
-                isRegenerating         = t.isRegenerating,
-                engineSpeedFront       = t.engineSpeedFront,
-                engineSpeedRear        = t.engineSpeedRear,
-                electricDrivingRangeKm = t.electricDrivingRangeKm,
-                tyrePressureLF         = t.tyrePressureLF,
-                tyrePressureRF         = t.tyrePressureRF,
-                tyrePressureLR         = t.tyrePressureLR,
-                tyrePressureRR         = t.tyrePressureRR,
-                soh                    = t.soh,
-                batteryTotalVoltage    = t.batteryTotalVoltage,
-                battery12vVoltage      = t.battery12vVoltage,
-                batteryCellVoltageMax  = t.batteryCellVoltageMax,
-                batteryCellVoltageMin  = t.batteryCellVoltageMin,
-                rawJson                = t.toRawJson(isPhev = false)  // BEV always — CarConfig has no PHEV models)
+    private suspend fun recordDataPoint(
+        tripId: Long,
+        t: VehicleTelemetry,
+        overrideTimestamp: Long? = null,
+        overrideOdometer: Double? = null,
+        overrideTotalDischarge: Double? = null,
+        overrideSoc: Double? = null,
+    ) {
+        try {
+            val isPhevSample = PreferencesManager(appContext).getCachedSelectedCarConfig()?.isPhev ?: false
+
+            // Guard against NaN/Infinity values that would either crash the JSON
+            // encoder or produce an invalid rawJson that Room rejects.
+            fun Double.safe() = if (isFinite()) this else 0.0
+
+            // Schema JSON is best-effort: if serialization throws (e.g. an
+            // unregistered type in probe_values) we must still persist the row —
+            // first-class columns carry the essential telemetry, and losing the
+            // rawJson blob is far better than losing the whole data point.
+            val rawJson = try {
+                t.toSchemaJson(isPhev = isPhevSample)
+            } catch (e: Exception) {
+                Log.w(TAG, "toSchemaJson failed for tripId=$tripId — writing empty rawJson: ${e.message}")
+                "{}"
+            }
+
+            dataPointDao.insertDataPoint(
+                TripDataPointEntity(
+                    tripId                 = tripId,
+                    timestamp              = overrideTimestamp ?: System.currentTimeMillis(),
+                    latitude               = t.locationLatitude.safe(),
+                    longitude              = t.locationLongitude.safe(),
+                    altitude               = t.locationAltitude.safe(),
+                    speed                  = t.speed.safe(),
+                    power                  = t.enginePower.safe(),
+                    soc                    = (overrideSoc ?: t.soc).safe(),
+                    odometer               = (overrideOdometer ?: t.odometer).safe(),
+                    batteryTemp            = t.batteryTempAvg.safe(),
+                    totalDischarge         = (overrideTotalDischarge ?: t.totalDischarge).safe(),
+                    gear                   = t.gear,
+                    isRegenerating         = t.isRegenerating,
+                    engineSpeedFront       = t.engineSpeedFront,
+                    engineSpeedRear        = t.engineSpeedRear,
+                    electricDrivingRangeKm = t.electricDrivingRangeKm,
+                    tyrePressureLF         = t.tyrePressureLF.safe(),
+                    tyrePressureRF         = t.tyrePressureRF.safe(),
+                    tyrePressureLR         = t.tyrePressureLR.safe(),
+                    tyrePressureRR         = t.tyrePressureRR.safe(),
+                    socPanel               = t.socPanel,
+                    tyreTempLF             = t.tyreTempLF,
+                    tyreTempRF             = t.tyreTempRF,
+                    tyreTempLR             = t.tyreTempLR,
+                    tyreTempRR             = t.tyreTempRR,
+                    soh                    = t.soh,
+                    batteryTotalVoltage    = t.batteryTotalVoltage,
+                    battery12vVoltage      = t.battery12vVoltage.safe(),
+                    batteryCellVoltageMax  = t.batteryCellVoltageMax.safe(),
+                    batteryCellVoltageMin  = t.batteryCellVoltageMin.safe(),
+                    rawJson                = rawJson
+                )
             )
-        )
+            Log.v(TAG, "recordDataPoint: tripId=$tripId odo=${t.odometer} speed=${t.speed}")
+        } catch (e: Exception) {
+            Log.e(TAG, "recordDataPoint FAILED for tripId=$tripId: ${e.javaClass.simpleName}: ${e.message}", e)
+        }
     }
 
     // ── Trip metrics ──────────────────────────────────────────────────────────
@@ -538,8 +1054,18 @@ class TripRepository private constructor(context: Context) {
     private suspend fun updateTripMetrics(t: VehicleTelemetry) {
         val trip = cachedCurrentTrip ?: return
 
-        batteryTempSum += t.batteryTempAvg
-        batteryTempSamples++
+        val batteryTemp = validBatteryTemp(t.batteryTempAvg)
+        if (batteryTemp != null) {
+            batteryTempSum += batteryTemp
+            batteryTempSamples++
+        }
+
+        val nextMaxCellTemp = validCellTemp(t.batteryCellTempMax)?.let {
+            if (trip.maxBatteryCellTemp == Int.MIN_VALUE) it else maxOf(trip.maxBatteryCellTemp, it)
+        } ?: trip.maxBatteryCellTemp
+        val nextMinCellTemp = validCellTemp(t.batteryCellTempMin)?.let {
+            if (trip.minBatteryCellTemp == Int.MAX_VALUE) it else minOf(trip.minBatteryCellTemp, it)
+        } ?: trip.minBatteryCellTemp
 
         val updated = trip.copy(
             maxSpeed           = maxOf(trip.maxSpeed, t.speed),
@@ -548,9 +1074,9 @@ class TripRepository private constructor(context: Context) {
                                      minOf(trip.maxRegenPower, t.enginePower)
                                  else trip.maxRegenPower,
             minSoc             = minOf(trip.minSoc, t.soc),
-            avgBatteryTemp     = batteryTempSum / batteryTempSamples,
-            maxBatteryCellTemp = maxOf(trip.maxBatteryCellTemp, t.batteryCellTempMax),
-            minBatteryCellTemp = minOf(trip.minBatteryCellTemp, t.batteryCellTempMin)
+            avgBatteryTemp     = if (batteryTempSamples > 0) batteryTempSum / batteryTempSamples else trip.avgBatteryTemp,
+            maxBatteryCellTemp = nextMaxCellTemp,
+            minBatteryCellTemp = nextMinCellTemp
         )
 
         cachedCurrentTrip = updated
@@ -597,9 +1123,45 @@ class TripRepository private constructor(context: Context) {
 
     private suspend fun calculateTripStats(tripId: Long) {
         val dataPoints = dataPointDao.getDataPointsForTripSync(tripId)
-        if (dataPoints.isEmpty()) return
 
         val trip = tripDao.getTripById(tripId) ?: return
+
+        // When there are no data points we still write a minimal stats row so
+        // the UI doesn't show blank fields. Use values already stored in the
+        // trip entity (maxSpeed, maxPower, distance, duration, efficiency).
+        if (dataPoints.isEmpty()) {
+            val segments = segmentDao.getSegmentsForTripSync(tripId)
+            val startLat = segments.firstOrNull()?.startLat ?: 0.0
+            val startLon = segments.firstOrNull()?.startLon ?: 0.0
+            val endLat   = segments.lastOrNull()?.endLat    ?: 0.0
+            val endLon   = segments.lastOrNull()?.endLon    ?: 0.0
+            statsDao.insertStats(
+                TripStatsEntity(
+                    tripId                   = tripId,
+                    totalDistance            = trip.distance       ?: 0.0,
+                    totalDuration            = trip.duration       ?: 0L,
+                    totalEnergyConsumed      = trip.energyConsumed ?: 0.0,
+                    totalRegenEnergy         = 0.0,
+                    avgSpeed                 = 0.0,
+                    avgEfficiency            = trip.efficiency ?: 0.0,
+                    maxSpeed                 = trip.maxSpeed,
+                    maxPower                 = trip.maxPower,
+                    maxRegenPower            = trip.maxRegenPower,
+                    powerDistribution        = emptyMap(),
+                    speedDistribution        = emptyMap(),
+                    startLatitude            = startLat,
+                    startLongitude           = startLon,
+                    endLatitude              = endLat,
+                    endLongitude             = endLon,
+                    matrixDistribution       = emptyMap(),
+                    energyConsumptionBySpeed = emptyMap(),
+                    regenEnergy              = 0.0,
+                    mechanicalEnergy         = 0.0,
+                    compressedRoute          = emptyList()
+                )
+            )
+            return
+        }
 
         val totalDistance       = trip.distance       ?: 0.0
         val totalDuration       = trip.duration       ?: 0L
@@ -612,8 +1174,12 @@ class TripRepository private constructor(context: Context) {
             }.sum()
         }
 
-        val avgSpeed = dataPoints.filter { it.speed > 0 }
-            .takeIf { it.isNotEmpty() }?.map { it.speed }?.average() ?: 0.0
+        val avgSpeed = if (totalDuration > 0L && totalDistance > 0.0) {
+            totalDistance / (totalDuration / 3_600_000.0)
+        } else {
+            dataPoints.filter { it.speed > 0 }
+                .takeIf { it.isNotEmpty() }?.map { it.speed }?.average() ?: 0.0
+        }
 
         val energyBySpeed   = mutableMapOf<String, Double>()
         val distanceBySpeed = mutableMapOf<String, Double>()
@@ -727,12 +1293,35 @@ class TripRepository private constructor(context: Context) {
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Called by the MQTT service on every incoming packet.
-     * Non-suspend: just enqueues — never blocks the MQTT thread.
+     * Called by the foreground telemetry service on every incoming packet.
+     * Non-suspend: just enqueues — never blocks the service thread.
      */
     fun processTelemetry(telemetry: VehicleTelemetry) {
         _latestTelemetry.value = telemetry   // immediate UI update, no wait for queue
+        cacheLatestTelemetry(telemetry)
         tripEvents.trySend(TripEvent.Telemetry(telemetry))
+    }
+
+    private fun restoreCachedTelemetry() {
+        val cachedJson = telemetryCachePrefs.getString(KEY_LAST_TELEMETRY_JSON, null) ?: return
+        runCatching {
+            telemetryJson.decodeFromString(VehicleTelemetry.serializer(), cachedJson)
+        }.onSuccess { cached ->
+            _latestTelemetry.value = cached
+            Log.d(TAG, "Restored cached telemetry snapshot for faster startup")
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to restore cached telemetry snapshot", error)
+        }
+    }
+
+    private fun cacheLatestTelemetry(telemetry: VehicleTelemetry) {
+        runCatching {
+            telemetryCachePrefs.edit()
+                .putString(KEY_LAST_TELEMETRY_JSON, telemetryJson.encodeToString(telemetry))
+                .apply()
+        }.onFailure { error ->
+            Log.w(TAG, "Failed to cache latest telemetry snapshot", error)
+        }
     }
 
     /** Called by the UI "Start trip" button. Non-suspend. */
@@ -865,6 +1454,11 @@ class TripRepository private constructor(context: Context) {
     }
 
     // ── Singleton ─────────────────────────────────────────────────────────────
+
+    fun close() {
+        scope.cancel()
+        tripEvents.close()
+    }
 
     companion object {
         private const val PREF_AUTO_TRIP = "auto_trip_detection"

@@ -49,6 +49,11 @@ interface TripDao {
      *  Used by DatabaseMaintenanceWorker to find candidates for point thinning. */
     @Query("SELECT * FROM trips WHERE isActive = 0 AND startTime < :beforeTimestamp")
     suspend fun getCompletedTripsBefore(beforeTimestamp: Long): List<TripEntity>
+
+    /** Returns completed trips that have no corresponding row in trip_stats.
+     *  Used on startup to backfill stats for trips that missed calculateTripStats. */
+    @Query("SELECT * FROM trips WHERE isActive = 0 AND id NOT IN (SELECT tripId FROM trip_stats)")
+    suspend fun getCompletedTripsWithoutStats(): List<TripEntity>
 }
 
 @Dao
@@ -76,6 +81,13 @@ interface TripDataPointDao {
 
     @Query("SELECT * FROM trip_data_points WHERE tripId = :tripId ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastDataPointForTrip(tripId: Long): TripDataPointEntity?
+
+    /** Most recent point whose odometer has advanced past [minOdometer].
+     *  After the car parks, it can go offline and fill
+     *  subsequent samples with odometer=0 — skip those so trip-close logic
+     *  doesn't collapse endOdometer down to trip.startOdometer. */
+    @Query("SELECT * FROM trip_data_points WHERE tripId = :tripId AND odometer > :minOdometer ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLastValidOdometerPointForTrip(tripId: Long, minOdometer: Double): TripDataPointEntity?
 
     /** Bulk-deletes points by primary key. Room batches the IN (...) clause.
      *  Used by thinOldDataPoints — first and last points of each trip are never passed here. */

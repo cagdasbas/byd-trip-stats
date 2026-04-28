@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -43,11 +44,27 @@ fun EnergyConsumptionChart(
     }
 
     val values = remember(dataPoints) {
+        // Integrate positive instantaneous power (kW) × dt to produce a smooth discharge
+        // curve from trip start. Using totalDischarge directly is unreliable: Car
+        // frequently reports 0 for the first minutes of a trip and then
+        // jumps to the final value at the end, producing a flat line that spikes at the
+        // very end of the chart. Power-integration reflects what the car is actually
+        // drawing in real time and matches the user's felt consumption.
+        val result = ArrayList<Float>(dataPoints.size)
         var cumulative = 0.0
-        dataPoints.mapIndexed { i, point ->
-            if (i > 0) cumulative += (point.totalDischarge - dataPoints[i - 1].totalDischarge)
-            cumulative.toFloat()
+        result.add(0f)
+        for (i in 1 until dataPoints.size) {
+            val a = dataPoints[i - 1]
+            val b = dataPoints[i]
+            val dtH = (b.timestamp - a.timestamp).coerceAtLeast(0L) / 3_600_000.0
+            // Only positive power counts as discharge. Gap-guard prevents a long stale
+            // interval (app backgrounded, etc.) from injecting a phantom bar.
+            if (dtH in 0.0..(60.0 / 3600.0) && a.power > 0.0) {
+                cumulative += a.power * dtH
+            }
+            result.add(cumulative.toFloat())
         }
+        result
     }
 
     if (values.isEmpty()) {
@@ -63,6 +80,10 @@ fun EnergyConsumptionChart(
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+
+    val modes    = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
+    val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
 
     Canvas(modifier = modifier.fillMaxSize().pointerInput(Unit) {
         awaitEachGesture {
@@ -88,6 +109,29 @@ fun EnergyConsumptionChart(
         }
         val totalDuration = if (dataPoints.size > 1)
             (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
+
+        // ── Drive mode background bands ──────────────────────────────────────
+        if (hasModes && dataPoints.size >= 2) {
+            var bandStart = 0
+            var bandMode = modes[0].driveMode
+            for (i in 1..dataPoints.size) {
+                val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
+                if (curMode != bandMode || i == dataPoints.size) {
+                    if (bandMode != 0) {
+                        val x0 = xOf(bandStart)
+                        val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                        drawRect(
+                            color = driveModeColor(bandMode).copy(alpha = 0.07f),
+                            topLeft = Offset(x0, padT),
+                            size = Size((x1 - x0).coerceAtLeast(0f), chartH)
+                        )
+                    }
+                    bandStart = i
+                    bandMode = curMode
+                }
+            }
+        }
+
         val labelPaint = android.graphics.Paint().apply {
             color = textColor.copy(alpha = 0.7f).toArgb(); textSize = 22f; isAntiAlias = true
         }
@@ -141,6 +185,7 @@ fun EnergyConsumptionChart(
             }
             drawPath(linePath, lineColor, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
+        drawDriveModeLabel(singleDriveMode, padR, padT)
         touchPos?.let { tp ->
             if (tp.x in padL..(w - padR) && values.size > 1) {
                 val idx = ((tp.x - padL) / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
@@ -153,7 +198,7 @@ fun EnergyConsumptionChart(
                     line1 = "%.2f kWh".format(values[idx]),
                     line2 = realTime,
                     line3 = durationStr,
-                    accentColor = lineColor, textColor = textColor
+                    accentColor = lineColor
                 )
             }
         }

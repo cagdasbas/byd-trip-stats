@@ -28,3 +28,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "BYD Trip Stats"
 include(":app")
+
+val privateTelemetryModule = file("private-telemetry")
+if (privateTelemetryModule.exists()) {
+    include(":private-telemetry")
+}

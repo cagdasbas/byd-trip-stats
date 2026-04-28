@@ -149,3 +149,53 @@
 # 4. Preserve SLF4J ServiceLoader behavior
 -keepnames class org.slf4j.simple.SimpleServiceProvider
 -keepnames class org.slf4j.simple.SimpleLogger
+
+# Optional runtime hook loaded reflectively by the app.
+-keep class com.byd.tripstats.runtime.RuntimeExtensionHooks {
+    public static *;
+}
+
+# 5. HiveMQ/Netty optional desktop/server transports not packaged on Android
+-dontwarn io.netty.channel.epoll.Epoll
+-dontwarn io.netty.channel.epoll.EpollEventLoopGroup
+-dontwarn io.netty.channel.epoll.EpollSocketChannel
+-dontwarn io.netty.handler.codec.http.FullHttpResponse
+-dontwarn io.netty.handler.codec.http.HttpClientCodec
+-dontwarn io.netty.handler.codec.http.HttpHeaders
+-dontwarn io.netty.handler.codec.http.HttpObjectAggregator
+-dontwarn io.netty.handler.codec.http.HttpRequest
+-dontwarn io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.CloseWebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.PingWebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.PongWebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.TextWebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker
+-dontwarn io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory
+-dontwarn io.netty.handler.codec.http.websocketx.WebSocketFrame
+-dontwarn io.netty.handler.codec.http.websocketx.WebSocketHandshakeException
+-dontwarn io.netty.handler.codec.http.websocketx.WebSocketVersion
+-dontwarn io.netty.handler.proxy.HttpProxyHandler
+-dontwarn io.netty.handler.proxy.ProxyHandler
+-dontwarn io.netty.handler.proxy.Socks4ProxyHandler
+-dontwarn io.netty.handler.proxy.Socks5ProxyHandler
+-dontwarn java.util.spi.ToolProvider
+-dontwarn org.apache.log4j.Level
+-dontwarn org.apache.log4j.Logger
+-dontwarn org.apache.log4j.Priority
+
+# -----------------------------------------------------------------
+# RELEASE PRIVACY
+# -----------------------------------------------------------------
+# Release APKs should not expose diagnostic breadcrumbs through logcat. Debug builds keep
+# logs because they do not use this release-only R8 configuration.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
+}
+
+# Reduce source-file breadcrumbs in obfuscated release stack traces.
+-renamesourcefileattribute SourceFile

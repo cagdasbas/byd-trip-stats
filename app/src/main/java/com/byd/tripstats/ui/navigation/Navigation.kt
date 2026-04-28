@@ -76,9 +76,6 @@ fun AppNavigation(
                 },
                 onNavigateToSeasonalAnalysis = {
                     navController.navigate(Screen.SeasonalAnalysis.route)
-                },
-                onNavigateToTripGoals = {
-                    navController.navigate(Screen.TripGoals.route)
                 }
             )
         }
@@ -107,6 +104,9 @@ fun AppNavigation(
                 },
                 onNavigateToBackup = {
                     navController.navigate(Screen.LocalBackup.route)
+                },
+                onNavigateToTripGoals = {
+                    navController.navigate(Screen.TripGoals.route)
                 }
             )
         }

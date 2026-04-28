@@ -33,9 +33,9 @@ android {
     defaultConfig {
         applicationId = "com.byd.tripstats"
         minSdk = 29
-        targetSdk = 25
-        versionCode = 9
-        versionName = "1.4.2"
+        targetSdk = 29
+        versionCode = 10
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Run instrumented tests as a separate package with its own isolated data
@@ -50,11 +50,13 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("release")
+            buildConfigField("Boolean", "SENSITIVE_DIAGNOSTICS_ENABLED", "true")
         }
         release {
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("Boolean", "SENSITIVE_DIAGNOSTICS_ENABLED", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -99,14 +101,18 @@ android {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/DEPENDENCIES"
             excludes += "META-INF/io.netty.versions.properties"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
+            excludes += "META-INF/NOTICE.md"
+            excludes += "META-INF/*.kotlin_module"
         }
     }
 
     // Use `adb install -r` (replace, keep data) instead of uninstall+install.
     // Must be a top-level android {} block — placing this inside defaultConfig {} is
     // invalid DSL and silently ignored, which is why the DB was still getting wiped.
-    adbOptions {
-        installOptions("-r")
+    installation {
+        installOptions.add("-r")
     }
 
     testOptions {
@@ -116,6 +122,7 @@ android {
 
 dependencies {
     // Core Android
+    implementation(kotlin("stdlib"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core)
     implementation(libs.androidx.appcompat)
@@ -142,9 +149,6 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     
-    // HiveMQ MQTT Client
-    implementation(libs.hivemq.mqtt.client)
-    
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)
     
@@ -154,6 +158,7 @@ dependencies {
     
     // DataStore for preferences
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.hivemq.mqtt.client)
     
     // Testing
     testImplementation(libs.junit)
@@ -166,20 +171,18 @@ dependencies {
 
     // osmdroid for offline maps
     implementation("org.osmdroid:osmdroid-android:6.1.18")
-
-    // Embedded MQTT Broker
-    implementation("io.moquette:moquette-broker:0.17")
-    
-    // Required dependencies for Moquette
-    implementation("io.netty:netty-all:4.1.100.Final")
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    implementation("org.slf4j:slf4j-simple:2.0.9")
+    // dadb — JVM ADB client for wireless ADB self-permission setup
+    implementation("dev.mobile:dadb:1.2.7")
 
     // WorkManager for background tasks
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Window size classes for responsive design
     implementation("androidx.compose.material3:material3-window-size-class:1.3.1")
+
+    rootProject.findProject(":private-telemetry")?.let {
+        implementation(it)
+    }
 
     // ── Unit tests (src/test) ─────────────────────────────────────────────────
     // JUnit 4 is already present via libs.junit — no change needed there.

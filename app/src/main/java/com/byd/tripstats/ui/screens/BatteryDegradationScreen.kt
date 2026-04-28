@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,7 @@ fun BatteryDegradationScreen(
     onNavigateBack: () -> Unit
 ) {
     val data by viewModel.batteryDegradationData.collectAsState()
+    val baselineEpoch by viewModel.sohBaselineEpochMs.collectAsState()
 
     Scaffold(
         topBar = {
@@ -88,7 +90,7 @@ fun BatteryDegradationScreen(
 
         // ── Compute regression + projection ───────────────────────────────────
         val regression  = linearRegression(data)
-        val stats       = degradationStats(data, regression)
+        val stats       = degradationStats(regression)
 
         Column(
             modifier = Modifier
@@ -115,7 +117,7 @@ fun BatteryDegradationScreen(
                     modifier  = Modifier.weight(1f),
                     label     = "Lowest recorded",
                     value     = "${"%.1f".format(data.minOf { it.avgSoh })}%",
-                    icon      = Icons.Filled.TrendingDown,
+                    icon      = Icons.AutoMirrored.Filled.TrendingDown,
                     color     = MaterialTheme.colorScheme.error
                 )
             }
@@ -195,7 +197,8 @@ fun BatteryDegradationScreen(
                             fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        "SoH (State of Health) is reported directly by the BYD BMS via Electro. " +
+                        "SoH (State of Health) is shown when the car exposes a direct battery-health value, " +
+                        "or as an estimate derived from vehicle telemetry when a direct value is unavailable. " +
                         "100% means the pack is at factory capacity. The orange trend line is a " +
                         "least-squares linear fit across all your recorded trips.",
                         style = MaterialTheme.typography.bodySmall,
@@ -218,6 +221,61 @@ fun BatteryDegradationScreen(
                     )
                 }
             }
+            // ── Data source baseline card ──────────────────────────────────────
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Filled.FilterList, null,
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Text("Data baseline", style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold)
+                    }
+                    if (baselineEpoch != null) {
+                        val fmt = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+                        Text(
+                            "Showing trips from ${fmt.format(java.util.Date(baselineEpoch!!))} onwards. " +
+                            "Trips before this date are excluded from the chart and trend line.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(
+                            onClick = { viewModel.clearSohBaseline() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Clear, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Show all trips (remove baseline)")
+                        }
+                    } else {
+                        Text(
+                            "All recorded trips are included. If you previously used a different data source " +
+                            "(e.g. Electro/MQTT) whose SoH values are not comparable, set a baseline to " +
+                            "exclude those older trips.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = { viewModel.setSohBaselineToNow() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.RestartAlt, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Start tracking from today")
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
         }
     }
@@ -367,7 +425,6 @@ private data class RegressionResult(
 }
 
 private fun linearRegression(data: List<DashboardViewModel.SohDataPoint>): RegressionResult {
-    val n   = data.size.toDouble()
     val xs  = data.map { it.timestamp.toDouble() }
     val ys  = data.map { it.avgSoh }
     val xMean = xs.average()
@@ -392,7 +449,6 @@ private data class DegradationStats(
 )
 
 private fun degradationStats(
-    data      : List<DashboardViewModel.SohDataPoint>,
     regression: RegressionResult
 ): DegradationStats {
     // slope is % per ms → convert to % per year
@@ -403,10 +459,10 @@ private fun degradationStats(
         regression.slope >= 0 -> "Not declining"
         regression.projectedAt80Ms == null -> "Far future"
         else -> {
-            val cal = Calendar.getInstance().apply {
+            val calendar = Calendar.getInstance().apply {
                 timeInMillis = regression.projectedAt80Ms
             }
-            "${cal.get(Calendar.YEAR)}"
+            "${calendar.get(Calendar.YEAR)}"
         }
     }
     return DegradationStats(declinePerYear.coerceAtLeast(0.0), projLabel)

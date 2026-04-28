@@ -55,7 +55,7 @@ data class ChargingSessionEntity(
 }
 
 /**
- * One row per MQTT message received during a charging session.
+ * One row per telemetry sample received during a charging session.
  *
  * Mirrors TripDataPointEntity in structure but contains only the fields
  * relevant during charging. Motor RPM, gear, and speed are intentionally
@@ -94,5 +94,8 @@ data class ChargingDataPointEntity(
     val batteryCellTempMax: Int = 0,
 
     val batteryCellVoltageMin: Double = 0.0,
-    val batteryCellVoltageMax: Double = 0.0
+    val batteryCellVoltageMax: Double = 0.0,
+
+    /** Full telemetry payload captured alongside the charging sample. */
+    val rawJson: String = "{}"
 )
