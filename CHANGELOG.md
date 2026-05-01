@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.1.0] - 2026-May-01
+
+### Added
+
+- **BYD Seagull / Dolphin Surf** — three new BEV trims added to the car catalog: Active, Boost and Comfort.
+- **BYD Seal 5 / Sealion 5 DM-i** — two new PHEV trims added to the car catalog: Comfort and Design.
+- **48-hour live 12V history chart** — tapping the dashboard `HV / 12V` stat card now opens a rolling 48-hour chart of the auxiliary battery voltage, recorded from live telemetry in a dedicated history buffer so users can inspect 12V health and overnight drain behaviour independently of trip or charging-session history.
+
+### Changed
+
+- **Battery stat card** — title is now always "Battery"; value shows "SoH: X.X%" with one decimal place; subtitle shows the average battery temperature ("Temp: X.X °C") when available.
+- **PHEV false-positive detection** — sentinel values (≥ 100,000) returned by BEV firmware for fuel-system fields are now excluded from the PHEV signal count; `getEnergyMode` is also excluded for confirmed BEV models, preventing BEV cars from being mis-classified as PHEVs during the compatibility probe sweep.
+- **Motor RPM detailed chart** — the fullscreen/detailed view now uses peak-only bucketing at 480-point resolution (4× the condensed thumbnail) so the front motor shows a natural flat-zero baseline with real engagement spikes, rather than an artificially dense spike pattern. The condensed dashboard thumbnail is unchanged.
+- **AWD motor stat card** — subtitle now shows total drive power only (e.g. "AWD · 187 kW") instead of a fabricated per-axle split that assumed a fixed front/rear ratio regardless of driving conditions.
+- **Duration format** — minutes are now shown as "min" instead of "m" across trip history, trip detail, charging history, charging detail, and trip compare to avoid ambiguity with meters. Hours format updated accordingly (e.g. "1h 19min").
+- **Drive/regen mode timeline** — each lane (Drive mode, Regen mode) is now individually gated on its own data availability. Previously, if one mode had data but the other did not, the mode-less lane rendered as a solid grey bar. Now each lane is only shown when it has at least one recorded data point with a known mode value.
+- **Background poll rate** — when the car is off, the telemetry poll interval is reduced from 1 s to 30 s, significantly reducing CPU active time and 12V battery drain during overnight parking and long AC charging sessions. An intermediate 5 s tier applies when the SDK has sent events within the last 60 s (e.g. a remotely-awoken car sitting in Park), keeping mode changes visible promptly without continuous fast polling. DC fast charging (above 23 kW) retains 1 s polling for accurate power curve resolution. The service remains always-on as a foreground service; no data or functionality is lost. The delay now precedes the poll work and is based on the previous tick's state, eliminating any unnecessary fast poll on a car-on to car-off transition and maximising idle sleep time.
+- **Regen / Driving Dynamics stat card** — renamed from "Regen / Driving Mode"; road grade (slope in degrees) is now shown in the subtitle when available, relocated from the Environment card where it did not fit contextually.
+- **Drive/regen mode prompt** — the "Regen / Driving Dynamics" stat card on the dashboard now shows a hint when the car is on but either mode has not yet been detected, prompting the user to tap a mode on the car display. Trip Detail also shows a persistent info chip above the mode timeline when a saved trip is missing drive or regen mode data, with a message explaining how to enable recording on future trips.
+
+### Fixed
+
+- **Drivetrain mode label (AWD / FWD / RWD) always blank** — on some firmware builds the drivetrain state getter returns 0 when polled outside an active event callback. The app now falls back to the car catalog drivetrain type when the getter returns 0, so the motor stat card shows the correct AWD / FWD / RWD label throughout the drive.
+- **Road slope reading 10× too steep** — the raw SDK value is in tenths of a degree but was being treated as whole degrees, so a barely noticeable descent would display as e.g. −6° instead of −0.6°. The value is now correctly divided by 10 at the read site and displayed with one decimal place.
+- **Range projection chart changes after navigating away and back** — when returning to the dashboard from another screen (or after the app process was recreated), the range projection chart could gain an orange "Projected (actual)" line that was not visible during the live drive session before navigation. This happened because the trip restore path always assigned a projected value to every data point, including those below the calibration threshold. The restore path now leaves unstabilised points without a projected value, matching live session behaviour.
+
+---
+
 ## [2.0.0] - 2026-Apr-28
 
 ### Added
