@@ -109,6 +109,12 @@ data class VehicleTelemetrySnapshot(
     /** PHEV energy/powertrain source mode from Energy device (m09). 0 on BEVs. */
     val energyMode: Int = 0,
     val regenMode: Int = 0,
+    /**
+     * Drivetrain engagement state from Energy device getEnergyState().
+     * 0=none, 1=AWD, 2=FWD, 3=RWD, 4=AWD-regen, 5=FWD-regen, 6=RWD-regen, 19=series-RWD.
+     * Used to zero engineSpeedFront when the front motor is confirmed off.
+     */
+    val drivetrainState: Int = 0,
     val instrumentCurrentJourneyDriveTime: Double? = null,
     val instrumentBatteryPercent: Double? = null,
     val instrumentChargePercent: Double? = null,
@@ -194,7 +200,7 @@ data class VehicleTelemetrySnapshot(
     val acPtcPreheatSignal: Int? = null,
     val tecControlTempRaw: Int? = null,
     val hvacEstimatedKw: Double? = null,
-    val roadSlopeDeg: Int? = null,
+    val roadSlopeDeg: Double? = null,
 ) {
     private fun estimateSohFromBodyworkCapacity(carConfig: CarConfig?): Double? {
         val capacityAh = bodyworkBatteryCapacity?.toDouble()?.takeIf { it > 0.0 } ?: return null
@@ -339,6 +345,7 @@ data class VehicleTelemetrySnapshot(
             driveMode = driveMode,
             energyMode = energyMode,
             regenMode = regenMode,
+            drivetrainState = drivetrainState,
             wifiSsid = "",
             // Derive HV from live cell voltage × cell count if Battery Device is silent
             batteryTotalVoltage = inferredPackVoltage ?: 0,
@@ -671,10 +678,16 @@ class BydVehicleDataSource(context: Context) {
     private val _statisticSocBms          = MutableStateFlow<Double?>(null)
     private val _statisticAvailPower      = MutableStateFlow<Double?>(null)
     private val lastDiagnosticLogs = mutableMapOf<String, String>()
+    private val lastRegenDiagMessages = mutableMapOf<String, String>()
     private val listenerReferences = mutableListOf<Any>()
     // Method cache: eliminates repeated Class.getMethod() lookups (~12,000/min without this).
     private val methodCache = java.util.concurrent.ConcurrentHashMap<Pair<Class<*>, String>, java.lang.reflect.Method?>()
     // Tick counter for tiered polling
+    // Updated on every SDK feature event (dispatchDynamicRawFeatureEvent).
+    // Used by the service to widen the poll interval when the car stops talking.
+    @Volatile var lastFeatureEventElapsedMs: Long = 0L
+        private set
+
     private var snapshotTick = 0
     private var mqttSnapshotLogged = false
     private var hasConfirmedDriveMode = false
@@ -986,6 +999,13 @@ class BydVehicleDataSource(context: Context) {
     }
 
     fun start() {
+        try {
+            appContext.contentResolver.delete(
+                android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                "${android.provider.MediaStore.Downloads.DISPLAY_NAME} = ? AND ${android.provider.MediaStore.Downloads.RELATIVE_PATH} = ?",
+                arrayOf("regen_diag.txt", "Download/BydTripStats/")
+            )
+        } catch (_: Exception) { }
         var anySuccess = false
         if (RuntimeExtensionBridge.isAvailable) {
             Log.i(TAG, "Optional runtime module: ${RuntimeExtensionBridge.describe()}")
@@ -3209,6 +3229,38 @@ class BydVehicleDataSource(context: Context) {
                 updateRegenModeCandidate(mEn, strong = false, source = "energy-mode")
             }
 
+            // getEnergyState distinguishes RWD-only (3, 6, 19) from AWD (1, 4) and FWD (2, 5).
+            // When confirmed RWD-only, zero out the front motor RPM so it doesn't stick at the
+            // last event value after the front motor disengages (no Engine/Motor/Speed device
+            // exists on some firmwares, so the event path never writes a zero back).
+            // On some firmware builds getEnergyState() returns 0 when polled outside a DiLink
+            // callback context — skip 0 to preserve any value already written by the event path
+            // (dispatchDynamicRawFeatureEvent). Log the raw result once on change for diagnostics.
+            val drivetrainRaw = invokeGetter(device, "getEnergyState")
+            logInfoIfChanged(
+                "drivetrainStateRaw",
+                "⚡ getEnergyState raw=${drivetrainRaw?.let { "$it(${it.javaClass.simpleName})" } ?: "null"}"
+            )
+            val drivetrainState = when (drivetrainRaw) {
+                null     -> null
+                is Number -> drivetrainRaw.toInt().takeIf { it > 0 }
+                else      -> null
+            }
+            if (drivetrainState != null) {
+                val rwdOnly = drivetrainState in setOf(3, 6, 19)
+                _vehicleSnapshot.update { snap ->
+                    snap.copy(
+                        drivetrainState = drivetrainState,
+                        engineSpeedFront = if (rwdOnly) 0 else snap.engineSpeedFront
+                    )
+                }
+                if (rwdOnly) publishSnapshot()
+                logInfoIfChanged(
+                    "drivetrainState",
+                    "⚡ drivetrainState=$drivetrainState rwdOnly=$rwdOnly"
+                )
+            }
+
             updateDiagnosticProbeValues(source = "energy", values = energyProbeValues)
 
             if (
@@ -3277,7 +3329,8 @@ class BydVehicleDataSource(context: Context) {
             val hvVoltage      = invokeIntGetter(device, *m51["hvVoltage"].orEmpty().toTypedArray())
             val hvCurrent      = invokeNumericDoubleGetter(device, *m51["hvCurrent"].orEmpty().toTypedArray())
             val auxBatt12v     = invokeNumericDoubleGetter(device, *m51["aux12v"].orEmpty().toTypedArray())
-            val roadSlope      = invokeIntGetter(device, *m51["roadSlope"].orEmpty().toTypedArray())
+            val roadSlopeRaw   = invokeIntGetter(device, *m51["roadSlope"].orEmpty().toTypedArray())
+            val roadSlope      = roadSlopeRaw?.let { it / 10.0 }
             _vehicleSnapshot.value = _vehicleSnapshot.value.copy(
                 batteryPackTemp  = batteryTemp ?: _vehicleSnapshot.value.batteryPackTemp,
                 cabinTemperature = cabinTemp   ?: _vehicleSnapshot.value.cabinTemperature,
@@ -3906,10 +3959,9 @@ class BydVehicleDataSource(context: Context) {
             val mEn = invokeIntGetter(device, *runtimeMethodNames("m09"))
             val mFb = invokeIntGetter(device, *runtimeMethodNames("m03"))
             val mRg = invokeIntGetter(device, *runtimeMethodNames("m14"))
-            val mLv = invokeIntGetter(device, *runtimeMethodNames("m03"))
 
             if (ENABLE_LAB_DIAGNOSTICS) {
-                Log.i(TAG, "🔍 Mode State (Instrument): op=$mOp dr=$mDr en=$mEn | fb=$mFb rg=$mRg lv=$mLv")
+                Log.i(TAG, "🔍 Mode State (Instrument): op=$mOp dr=$mDr en=$mEn | fb=$mFb rg=$mRg")
             }
 
             val driveInfo = invokeIntGetter(device, *runtimeMethodNames("m11"))
@@ -3929,7 +3981,7 @@ class BydVehicleDataSource(context: Context) {
             val fallbackDriveMode = sequenceOf(mDr, mOp, mEn)
                 .filterNotNull()
                 .firstOrNull { it in 1..6 }
-            val regenMode = mFb ?: mRg ?: mLv
+            val regenMode = mFb ?: mRg
             val driveModeCandidate = driveModeFromText ?: driveModeFromIndicator ?: fallbackDriveMode
             val driveModeSource = when {
                 driveModeFromText != null -> "instrument-text"
@@ -4350,8 +4402,53 @@ class BydVehicleDataSource(context: Context) {
         }
     }
 
+    private fun writeRegenDiag(key: String?, message: String) {
+        if (key != null) {
+            val previous = lastRegenDiagMessages.put(key, message)
+            if (previous == message) return
+        }
+        try {
+            val ts = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+            val line = "$ts $message\n"
+            val resolver = appContext.contentResolver
+            val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val name = "regen_diag.txt"
+            val relativePath = "Download/BydTripStats/"
+            val existingUri = resolver.query(
+                collection,
+                arrayOf(android.provider.MediaStore.Downloads._ID),
+                "${android.provider.MediaStore.Downloads.DISPLAY_NAME} = ? AND ${android.provider.MediaStore.Downloads.RELATIVE_PATH} = ?",
+                arrayOf(name, relativePath), null
+            )?.use { c ->
+                if (c.moveToFirst()) android.content.ContentUris.withAppendedId(
+                    collection, c.getLong(c.getColumnIndexOrThrow(android.provider.MediaStore.Downloads._ID))
+                ) else null
+            }
+            if (existingUri != null) {
+                resolver.openOutputStream(existingUri, "wa")?.use { it.write(line.toByteArray()) }
+            } else {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.Downloads.MIME_TYPE, "text/plain")
+                    put(android.provider.MediaStore.Downloads.RELATIVE_PATH, relativePath)
+                }
+                val uri = resolver.insert(collection, values) ?: return
+                resolver.openOutputStream(uri)?.use { it.write(line.toByteArray()) }
+            }
+        } catch (_: Exception) { }
+    }
+
     private fun updateRegenModeCandidate(mode: Int?, strong: Boolean, source: String) {
-        val normalized = mode?.takeIf { it in 1..2 } ?: return
+        if (mode == null) {
+            Log.e(TAG, "regenMode null source=$source (getter not resolved)")
+            writeRegenDiag("null-$source", "regenMode null source=$source (getter not resolved)")
+            return
+        }
+        if (mode !in 1..2) {
+            Log.e(TAG, "regenMode out of range: raw=$mode source=$source (expected 1..2)")
+            writeRegenDiag("range-$source", "regenMode out of range: raw=$mode source=$source (expected 1..2)")
+        }
+        val normalized = mode.takeIf { it in 1..2 } ?: return
         val current = _regenMode.value
         val shouldApply = when {
             strong -> true
@@ -4365,6 +4462,10 @@ class BydVehicleDataSource(context: Context) {
                 Log.i(TAG, "🔍 Regen mode preserved: current=$current incoming=$normalized source=$source")
             }
             return
+        }
+        if (normalized != current) {
+            Log.e(TAG, "regenMode changed: $current -> $normalized source=$source strong=$strong confirmed=$hasConfirmedRegenMode")
+            writeRegenDiag(null, "regenMode changed: $current -> $normalized source=$source strong=$strong confirmed=$hasConfirmedRegenMode")
         }
         _regenMode.value = normalized
         if (strong) {
@@ -5514,6 +5615,7 @@ class BydVehicleDataSource(context: Context) {
     private fun describeRawValueFallbackHint(featureId: Int, rawNumber: Number?): String? = null
 
     private fun dispatchDynamicRawFeatureEvent(label: String, featureId: Int, rawNumber: Number) {
+        lastFeatureEventElapsedMs = SystemClock.elapsedRealtime()
         when (label) {
             "Speed" -> {
                 val spIds = speedAuxFeatureIds
@@ -5561,6 +5663,33 @@ class BydVehicleDataSource(context: Context) {
                         publishSnapshot()
                         logInfoIfChanged("engine-rear-rpm", "🔬 applied Engine rearRpm=$decodedRpm")
                     }
+                }
+            }
+            "Energy" -> {
+                // getEnergyState fires an event every time the drivetrain engagement changes
+                // (AWD ↔ RWD ↔ FWD). We don't have the feature ID mapping, so re-read the
+                // getter by name immediately so the front-RPM zero-out fires within the same
+                // callback rather than waiting up to 1 s for the next poll tick.
+                // If getEnergyState() returns 0 (SDK not in active event context), fall back
+                // to the raw event value when it falls in the valid drivetrain-state range.
+                energyDevice?.let { dev ->
+                    val DRIVETRAIN_STATES = setOf(1, 2, 3, 4, 5, 6, 19)
+                    val fromGetter = invokeIntGetter(dev, "getEnergyState")?.takeIf { it > 0 }
+                    val state = fromGetter
+                        ?: rawNumber.toInt().takeIf { it in DRIVETRAIN_STATES }
+                        ?: return@let
+                    val rwdOnly = state in setOf(3, 6, 19)
+                    _vehicleSnapshot.update { snap ->
+                        snap.copy(
+                            drivetrainState = state,
+                            engineSpeedFront = if (rwdOnly) 0 else snap.engineSpeedFront
+                        )
+                    }
+                    if (rwdOnly) publishSnapshot()
+                    logInfoIfChanged(
+                        "drivetrainState-event",
+                        "⚡ drivetrainState(event)=$state (getter=${fromGetter ?: "fallback"}) rwdOnly=$rwdOnly"
+                    )
                 }
             }
             "Tyre" -> {

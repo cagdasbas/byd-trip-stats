@@ -248,7 +248,7 @@ class VehicleTelemetryService : Service() {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "Service destroyed")
+        Log.e(TAG, "Service destroyed — stopRequested=$stopRequested intentionalStop=$intentionalStop")
         telemetryLoopJob?.cancel()
         telemetryLoopActive = false
         telemetryLoopStarting = false
@@ -359,10 +359,12 @@ class VehicleTelemetryService : Service() {
                 var lastTelemetry: VehicleTelemetry? = null
                 var lastLoopTime = SystemClock.elapsedRealtime()
                 while (true) {
+                    val msSinceLastEvent = SystemClock.elapsedRealtime() - vehicleDataSource.lastFeatureEventElapsedMs
                     val pollIntervalMs = when {
                         lastTelemetry == null -> 0L
                         lastTelemetry.isCarOn -> 1_000L
                         lastTelemetry.isCharging && lastTelemetry.chargingPower > 23.0 -> 1_000L
+                        msSinceLastEvent < 60_000L -> 5_000L  // car awake (recent SDK event) but not driving
                         else -> 30_000L
                     }
                     delay(pollIntervalMs)

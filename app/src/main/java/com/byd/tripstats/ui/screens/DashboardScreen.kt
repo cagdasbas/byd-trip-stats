@@ -4,6 +4,9 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
@@ -24,16 +27,21 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import android.content.SharedPreferences
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.config.CarCatalog
 import com.byd.tripstats.data.config.Drivetrain
+import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.R
@@ -44,6 +52,7 @@ import com.byd.tripstats.ui.components.RangeProjectionChart
 import com.byd.tripstats.ui.components.RangeDataPoint
 import com.byd.tripstats.ui.components.ConsumptionThumbnail
 import com.byd.tripstats.ui.components.ConsumptionChartExpanded
+import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.theme.*
 import androidx.compose.animation.core.tween
@@ -55,11 +64,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private const val SHOW_MOCK_BUTTON = false  // Set to true for testing, false for production
 
@@ -74,6 +90,7 @@ fun DashboardScreen(
 ) {
     val telemetry by viewModel.displayTelemetry.collectAsState()
     val vehicleSnapshot by viewModel.displayVehicleSnapshot.collectAsState()
+    val batteryVoltageHistory24h by viewModel.batteryVoltageHistory24h.collectAsState()
     val isMockModeActive by viewModel.isMockModeActive.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
@@ -94,6 +111,7 @@ fun DashboardScreen(
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
+    var showBattery12vDialog by remember { mutableStateOf(false) }
 
     val carCategories = remember {
         listOf(
@@ -206,10 +224,22 @@ fun DashboardScreen(
                 onToggleAutoDetection = { viewModel.toggleAutoTripDetection() },
                 onNavigateToCharging = onNavigateToCharging,
                 onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
+                onShowBattery12vHistory = { showBattery12vDialog = true },
                 widthSizeClass = widthSizeClass,
                 sessionDistanceKm = liveSegmentDistanceKm,
                 tripDistanceKm = liveDistanceKm,
                 modifier = Modifier.padding(paddingValues)
+            )
+        }
+    }
+
+    telemetry?.let { currentTelemetry ->
+        if (showBattery12vDialog) {
+            Battery12vHistoryDialog(
+                historyPoints = batteryVoltageHistory24h,
+                telemetry = currentTelemetry,
+                vehicleSnapshot = vehicleSnapshot,
+                onDismiss = { showBattery12vDialog = false }
             )
         }
     }
@@ -316,6 +346,7 @@ fun DashboardContent(
     onToggleAutoDetection: () -> Unit,
     onNavigateToCharging: () -> Unit = {},
     onNavigateToBatteryDegradation: () -> Unit = {},
+    onShowBattery12vHistory: () -> Unit = {},
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
     sessionDistanceKm: Double = 0.0,
     tripDistanceKm: Double = 0.0
@@ -344,7 +375,8 @@ fun DashboardContent(
                     telemetry = telemetry,
                     vehicleSnapshot = vehicleSnapshot,
                     modifier  = Modifier.fillMaxWidth(),
-                    onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
+                    onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
+                    onShowBattery12vHistory = onShowBattery12vHistory
                 )
 
                 // Energy flow / range card
@@ -436,7 +468,8 @@ fun DashboardContent(
                         vehicleSnapshot = vehicleSnapshot,
                         modifier   = Modifier.fillMaxWidth(),
                         fillHeight = true,
-                        onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
+                        onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
+                        onShowBattery12vHistory = onShowBattery12vHistory
                     )
                 }
             }
@@ -497,7 +530,8 @@ fun DashboardContent(
                         vehicleSnapshot = vehicleSnapshot,
                         modifier   = Modifier.fillMaxWidth(),
                         fillHeight = true,
-                        onNavigateToBatteryDegradation = onNavigateToBatteryDegradation
+                        onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
+                        onShowBattery12vHistory = onShowBattery12vHistory
                     )
                 }
             }
@@ -1392,7 +1426,8 @@ fun VehicleStats(
     modifier: Modifier = Modifier,
     /** true in side-by-side layouts: cards share available height via weight(1f), no scroll */
     fillHeight: Boolean = false,
-    onNavigateToBatteryDegradation: () -> Unit = {}
+    onNavigateToBatteryDegradation: () -> Unit = {},
+    onShowBattery12vHistory: () -> Unit = {}
 ) {
     val context     = LocalContext.current
     val prefs       = remember { PreferencesManager(context.applicationContext) }
@@ -1414,27 +1449,26 @@ fun VehicleStats(
         val sohDisplay: String = run {
             val directSoh = vehicleSnapshot?.statisticBatterySoh
                 ?: telemetry.statisticBatterySoh
-            when {
+            val pct = when {
                 directSoh != null && directSoh in 50.0..110.0 ->
                     String.format("%.1f%%", directSoh)
                 telemetry.soh in 1..110 ->
                     String.format("%.1f%%", telemetry.soh.toDouble())
                 else -> "—"
             }
+            "SoH: $pct"
         }
-        val sohTitle = when {
-            telemetry.sohEstimated                    -> "SoH (estimated)"
-            vehicleSnapshot?.statisticBatterySoh != null ||
-                    telemetry.statisticBatterySoh != null -> "Battery health"
-            telemetry.soh in 1..110                   -> "Battery health"
-            else                                      -> "Battery health"
-        }
+        val batteryTempSubtitle: String = run {
+            val temp = telemetry.batteryTempAvg.takeIf { it > 0.0 }
+            if (temp != null) "Temp: ${String.format("%.1f", temp)} °C" else null
+        } ?: ""
         StatCard(
-            title   = sohTitle,
-            value   = sohDisplay,
-            icon    = Icons.Filled.BatteryChargingFull,
-            color   = BatteryBlue,
-            compact = fillHeight,
+            title    = "Battery",
+            value    = sohDisplay,
+            icon     = Icons.Filled.BatteryChargingFull,
+            color    = BatteryBlue,
+            compact  = fillHeight,
+            subtitle = batteryTempSubtitle.ifEmpty { null },
             modifier = cardMod,
             onClick  = onNavigateToBatteryDegradation
         )
@@ -1448,12 +1482,9 @@ fun VehicleStats(
             subtitle = run {
                 val pm25In = vehicleSnapshot?.pm25InCar
                 val pm25Out = vehicleSnapshot?.pm25OutCar
-                val slope = vehicleSnapshot?.roadSlopeDeg
-                buildList {
-                    if (slope != null) add("${slope}°")
-                    if (pm25In != null || pm25Out != null)
-                        add("PM2.5: ${pm25In ?: "—"} / ${pm25Out ?: "—"} μg/m³")
-                }.joinToString(" · ").ifEmpty { null }
+                if (pm25In != null || pm25Out != null)
+                    "PM2.5: ${pm25In ?: "—"}/${pm25Out ?: "—"} μg/m³"
+                else null
             },
             icon     = Icons.Filled.Public,
             color    = RegenGreen,
@@ -1503,7 +1534,8 @@ fun VehicleStats(
             icon     = Icons.Filled.Bolt,
             color    = BydEcoTealDim,
             compact  = fillHeight,
-            modifier = cardMod
+            modifier = cardMod,
+            onClick  = onShowBattery12vHistory
         )
 
         // Dead-band: BYD motor sensors report 1-9 RPM noise at standstill.
@@ -1541,24 +1573,47 @@ fun VehicleStats(
                 compact  = fillHeight,
                 modifier = cardMod
             )
-            else -> StatCard(   // AWD (Seal Excellence) or null fallback
-                title    = "Front / Rear Motors",
-                value    = "${frontMotorRpm ?: "0"} / ${rearMotorRpm ?: "0"} RPM",
-                subtitle = if (motorsAreSpinning) {
-                    "${((telemetry.enginePower * 160 / 390).toInt())} / ${((telemetry.enginePower * 230 / 390).toInt())} kW"
-                } else {
-                    "0 / 0 kW"
-                },
-                iconRes  = R.drawable.ic_motor_axle,
-                color    = BydElectricBlue,
-                compact  = fillHeight,
-                modifier = cardMod
-            )
+            else -> {
+                val drivetrainLabel = when (telemetry.drivetrainState) {
+                    1, 4 -> "AWD"
+                    2, 5 -> "FWD"
+                    3, 6, 19 -> "RWD"
+                    else -> when (selectedCar?.drivetrain) {
+                        Drivetrain.AWD -> "AWD"
+                        Drivetrain.FWD -> "FWD"
+                        Drivetrain.RWD -> "RWD"
+                        else -> null
+                    }
+                }
+                StatCard(
+                    title    = "Front / Rear Motors",
+                    value    = "${frontMotorRpm ?: "0"} / ${rearMotorRpm ?: "0"} RPM",
+                    subtitle = if (motorsAreSpinning) {
+                        val kwLine = "${telemetry.enginePower} kW"
+                        if (drivetrainLabel != null) "$drivetrainLabel · $kwLine" else kwLine
+                    } else {
+                        drivetrainLabel ?: "0 kW"
+                    },
+                    iconRes  = R.drawable.ic_motor_axle,
+                    color    = BydElectricBlue,
+                    compact  = fillHeight,
+                    modifier = cardMod
+                )
+            }
         }
 
         StatCard(
-            title    = "Regen / Driving Mode",
+            title    = "Regen / Driving Dynamics",
             value    = "${telemetry.regenModeName} / ${telemetry.driveModeName}",
+            subtitle = run {
+                val slope = vehicleSnapshot?.roadSlopeDeg
+                val needsInit = telemetry.isCarOn && (telemetry.driveMode == 0 || telemetry.regenMode == 0)
+                when {
+                    needsInit -> "Change drive/regen modes to initialize display"
+                    slope != null -> "Slope: ${String.format("%.1f", slope)}°"
+                    else -> null
+                }
+            },
             icon     = Icons.Filled.DirectionsCar,
             color    = BydElectricBlue,
             compact  = fillHeight,
@@ -1590,6 +1645,299 @@ fun VehicleStats(
             compact  = fillHeight,
             modifier = cardMod
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Battery12vHistoryDialog(
+    historyPoints: List<BatteryVoltageHistoryPoint>,
+    telemetry: VehicleTelemetry,
+    vehicleSnapshot: VehicleTelemetrySnapshot?,
+    onDismiss: () -> Unit
+) {
+    val liveTimestamp = remember(
+        telemetry.battery12vVoltage,
+        telemetry.batteryTotalVoltage,
+        vehicleSnapshot?.batteryTotalVoltage
+    ) {
+        System.currentTimeMillis()
+    }
+    val liveHvVoltage = vehicleSnapshot?.batteryTotalVoltage?.takeIf { it > 0 }
+        ?: telemetry.batteryTotalVoltage.takeIf { it > 0 }
+        ?: 0
+    val mergedPoints = remember(historyPoints, telemetry.battery12vVoltage, liveTimestamp, liveHvVoltage) {
+        val livePoint = telemetry.battery12vVoltage.takeIf { it > 0.0 }?.let {
+            BatteryVoltageHistoryPoint(
+                timestamp = liveTimestamp,
+                battery12vVoltage = it,
+                batteryTotalVoltage = liveHvVoltage,
+                isChargingSample = telemetry.isCharging
+            )
+        }
+        val base = historyPoints.toMutableList()
+        if (livePoint != null) {
+            val last = base.lastOrNull()
+            val shouldAppend = last == null ||
+                livePoint.timestamp - last.timestamp > 60_000L ||
+                kotlin.math.abs(livePoint.battery12vVoltage - last.battery12vVoltage) >= 0.01
+            if (shouldAppend) base += livePoint
+        }
+        base.sortedBy { it.timestamp }
+    }
+
+    val latest = mergedPoints.lastOrNull()
+    val min12v = mergedPoints.minOfOrNull { it.battery12vVoltage }
+    val max12v = mergedPoints.maxOfOrNull { it.battery12vVoltage }
+    val delta12v = if (mergedPoints.size >= 2) {
+        mergedPoints.last().battery12vVoltage - mergedPoints.first().battery12vVoltage
+    } else null
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("12V Battery - Last 48 Hours")
+                            Text(
+                                "Recorded telemetry samples plus the current live reading",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Filled.Close, contentDescription = "Close")
+                        }
+                    }
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Battery12vSummaryChip("Latest", latest?.let { "%.2f V".format(it.battery12vVoltage) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip("Min", min12v?.let { "%.2f V".format(it) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip("Max", max12v?.let { "%.2f V".format(it) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip("Delta", delta12v?.let { "%+.2f V".format(it) } ?: "—", Modifier.weight(1f))
+                    }
+                    Battery12vHistoryChart(
+                        points = mergedPoints,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Battery12vSummaryChip(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun Battery12vHistoryChart(
+    points: List<BatteryVoltageHistoryPoint>,
+    modifier: Modifier = Modifier
+) {
+    if (points.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                "No 12V history recorded yet.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
+
+    val nowMs = remember(points) { max(points.last().timestamp, System.currentTimeMillis()) }
+    val historyWindowMs = 48L * 60L * 60L * 1000L
+    val tickStepMs = 6L * 60L * 60L * 1000L
+    val startMs = nowMs - historyWindowMs
+    val minVoltage = 11.0
+    val maxVoltage = 14.0
+    val chartColor = BatteryBlue
+    val chargeColor = RegenGreen.copy(alpha = 0.12f)
+    val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
+    val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    var touchPos by remember { mutableStateOf<Offset?>(null) }
+
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("12V voltage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
+                        drawLine(chartColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 4f, cap = StrokeCap.Round)
+                    }
+                    Text("12V", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(points) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown()
+                            touchPos = down.position
+                            drag(down.id) { change -> touchPos = change.position }
+                            touchPos = null
+                        }
+                    }
+            ) {
+                val padL = 54f
+                val padR = 20f
+                val padT = 18f
+                val padB = 42f
+                val chartW = size.width - padL - padR
+                val chartH = size.height - padT - padB
+                val nc = drawContext.canvas.nativeCanvas
+                val labelPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = axisColor.toArgb()
+                    textSize = 19f
+                }
+
+                fun xOf(timestamp: Long): Float =
+                    (padL + ((timestamp - startMs).toDouble() / (nowMs - startMs).coerceAtLeast(1L).toDouble()).toFloat() * chartW)
+                        .coerceIn(padL, padL + chartW)
+
+                fun yOf(voltage: Double): Float =
+                    padT + chartH - (((voltage - minVoltage) / (maxVoltage - minVoltage).coerceAtLeast(0.1)).toFloat() * chartH)
+
+                listOf(14.0, 13.0, 12.0, 11.0).forEachIndexed { index, value ->
+                    val y = padT + chartH * index / 3f
+                    drawLine(gridColor, Offset(padL, y), Offset(size.width - padR, y), 1f)
+                    labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
+                    nc.drawText("%.1f".format(value), padL - 8f, y + 7f, labelPaint)
+                }
+
+                val timeTicks = buildList {
+                    var tick = startMs
+                    while (tick <= nowMs) {
+                        add(tick)
+                        tick += tickStepMs
+                    }
+                    if (lastOrNull() != nowMs) add(nowMs)
+                }
+                labelPaint.textAlign = android.graphics.Paint.Align.CENTER
+                timeTicks.forEach { tick ->
+                    val x = xOf(tick)
+                    drawLine(gridColor, Offset(x, padT), Offset(x, padT + chartH), 1f)
+                    val label = if (tick == nowMs) {
+                        timeFormatter.format(Date(tick))
+                    } else {
+                        "now - ${((nowMs - tick) / 3_600_000L)}h"
+                    }
+                    nc.drawText(label, x, size.height - 10f, labelPaint)
+                }
+
+                val chargingSegments = points.filter { it.isChargingSample }
+                chargingSegments.forEach { point ->
+                    val x = xOf(point.timestamp)
+                    drawRect(
+                        color = chargeColor,
+                        topLeft = Offset((x - 1.5f).coerceAtLeast(padL), padT),
+                        size = androidx.compose.ui.geometry.Size(3f, chartH)
+                    )
+                }
+
+                if (points.size == 1) {
+                    val x = xOf(points.first().timestamp)
+                    val y = yOf(points.first().battery12vVoltage)
+                    drawCircle(chartColor, radius = 6f, center = Offset(x, y))
+                } else {
+                    val path = Path().apply {
+                        moveTo(xOf(points.first().timestamp), yOf(points.first().battery12vVoltage))
+                        points.drop(1).forEach { point ->
+                            lineTo(xOf(point.timestamp), yOf(point.battery12vVoltage))
+                        }
+                    }
+                    drawPath(
+                        path = path,
+                        color = chartColor,
+                        style = Stroke(width = 4f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                    )
+                }
+
+                drawRect(
+                    color = gridColor,
+                    topLeft = Offset(padL, padT),
+                    size = androidx.compose.ui.geometry.Size(chartW, chartH),
+                    style = Stroke(width = 1f)
+                )
+
+                touchPos?.let { tp ->
+                    if (tp.x in padL..(padL + chartW)) {
+                        val closest = points.minByOrNull { kotlin.math.abs(xOf(it.timestamp) - tp.x) } ?: return@let
+                        val cx = xOf(closest.timestamp)
+                        val cy = yOf(closest.battery12vVoltage)
+                        drawCrosshair(
+                            cx = cx,
+                            cy = cy,
+                            w = size.width,
+                            padL = padL,
+                            padR = padR,
+                            padT = padT,
+                            chartH = chartH,
+                            line1 = "%.2f V".format(closest.battery12vVoltage),
+                            line2 = if (closest.isChargingSample) "charging sample" else "drive/live sample",
+                            line3 = timeFormatter.format(Date(closest.timestamp)),
+                            accentColor = chartColor
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

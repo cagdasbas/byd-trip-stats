@@ -117,6 +117,8 @@ data class VehicleTelemetry(
         @SerialName("drive_mode") val driveMode: Int = 0,
         @SerialName("energy_mode") val energyMode: Int = 0,
         @SerialName("regen_mode") val regenMode: Int = 0,
+        /** 0=none, 1=AWD, 2=FWD, 3=RWD, 4=AWD-regen, 5=FWD-regen, 6=RWD-regen, 19=series-RWD */
+        @SerialName("drivetrain_state") val drivetrainState: Int = 0,
         // ── HVAC fields ─────────────────────────────────────────────────────────
         /** 0 = off, non-zero = compressor running. Sourced from getAcCompressorMode(). */
         @SerialName("ac_compressor_mode") val acCompressorMode: Int? = null,
