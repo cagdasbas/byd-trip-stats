@@ -20,6 +20,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.net.wifi.WifiManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -31,6 +32,7 @@ import com.byd.tripstats.R
 import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.TripRepository
 import com.byd.tripstats.connections.AbrpConnectionManager
@@ -98,6 +100,7 @@ class VehicleTelemetryService : Service() {
 
     private var tripRepository: TripRepository? = null
     private var chargingRepository: ChargingRepository? = null
+    private var batteryVoltageHistoryRepository: BatteryVoltageHistoryRepository? = null
     private var carConfig: CarConfig? = null
     private var abrpConnectionManager: AbrpConnectionManager? = null
     private var mqttConnectionManager: MqttConnectionManager? = null
@@ -192,6 +195,7 @@ class VehicleTelemetryService : Service() {
 
         tripRepository = TripRepository.getInstance(applicationContext)
         chargingRepository = ChargingRepository.getInstance(applicationContext)
+        batteryVoltageHistoryRepository = BatteryVoltageHistoryRepository.getInstance(applicationContext)
         abrpConnectionManager = AbrpConnectionManager(applicationContext)
         mqttConnectionManager = MqttConnectionManager(applicationContext)
 
@@ -342,26 +346,55 @@ class VehicleTelemetryService : Service() {
                 _connectionState.value = ConnectionState.Connected
                 updateNotification("Trip recording and data visualization")
 
+                // When the car is off, slow the poll interval to 30 s regardless of
+                // whether a charging session is in progress. This keeps the CPU idle
+                // between ticks instead of spinning at 1 Hz, reducing 12V drain
+                // overnight and during long AC charging sessions. 30 s matches the
+                // MQTT publish rate, so no data is lost. The service stays alive as
+                // a foreground service throughout; the loop never stops.
+                //
+                // Delay comes BEFORE the work so the interval is based on the last
+                // known state — avoids one unnecessary fast poll on ON→OFF transition.
+                // null on first boot resolves to 0 ms (immediate first poll).
+                var lastTelemetry: VehicleTelemetry? = null
+                var lastLoopTime = SystemClock.elapsedRealtime()
                 while (true) {
+                    val pollIntervalMs = when {
+                        lastTelemetry == null -> 0L
+                        lastTelemetry.isCarOn -> 1_000L
+                        lastTelemetry.isCharging && lastTelemetry.chargingPower > 23.0 -> 1_000L
+                        else -> 30_000L
+                    }
+                    delay(pollIntervalMs)
+
+                    val now = SystemClock.elapsedRealtime()
+                    val delta = now - lastLoopTime
+                    lastLoopTime = now
+
+                    if (pollIntervalMs > 0L && delta > pollIntervalMs * 2) {
+                        Log.w(TAG, "⏱ Telemetry loop delayed: ${delta}ms (expected ~${pollIntervalMs}ms) — system may have suspended")
+                        if (delta > 60_000L) {
+                            Log.w(TAG, "⏱ Long suspension detected (${delta}ms) — forcing immediate snapshot refresh")
+                            try { vehicleDataSource.refreshSnapshots() } catch (t: Throwable) { Log.w(TAG, "Force refresh after sleep failed: ${t.message}") }
+                        }
+                    }
+
                     try {
                         vehicleDataSource.refreshSnapshots()
                         val snapshot = vehicleDataSource.vehicleSnapshot.value
                         val telemetry = snapshot.toTelemetry(carConfig)
+                        lastTelemetry = telemetry
 
+                        batteryVoltageHistoryRepository?.onTelemetry(telemetry)
                         tripRepository?.processTelemetry(telemetry)
                         chargingRepository?.onTelemetry(telemetry, carConfig)
                         abrpConnectionManager?.onTelemetry(telemetry, carConfig, serviceScope)
                         mqttConnectionManager?.onTelemetry(telemetry, serviceScope)
 
                         _telemetryCount.value = _telemetryCount.value + 1
-
-                        // Nothing to update in the notification text — the chronometer
-                        // handles elapsed time display automatically.
                     } catch (t: Throwable) {
                         Log.e(TAG, "Error in telemetry loop tick", t)
                     }
-
-                    delay(1_000)
                 }
             } finally {
                 telemetryLoopActive = false

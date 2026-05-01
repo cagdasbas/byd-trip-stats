@@ -523,5 +523,5 @@ private fun SessionMetricChip(
 private fun formatDuration(seconds: Long): String {
     val h = TimeUnit.SECONDS.toHours(seconds)
     val m = TimeUnit.SECONDS.toMinutes(seconds) % 60
-    return if (h > 0) "${h}h ${m}m" else "${m}m"
+    return if (h > 0) "${h}h ${m}min" else "${m}min"
 }

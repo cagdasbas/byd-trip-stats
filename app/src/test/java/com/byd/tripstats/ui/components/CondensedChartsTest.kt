@@ -10,13 +10,11 @@ class CondensedChartsTest {
     fun condenseForSpeed_preserves_peak_speed_within_bucket() {
         val points = listOf(
             point(id = 1, timestamp = 1_000L, speed = 80.0),
-            point(id = 2, timestamp = 2_000L, speed = 173.0),  // spike
+            point(id = 2, timestamp = 2_000L, speed = 173.0),
             point(id = 3, timestamp = 3_000L, speed = 90.0),
             point(id = 4, timestamp = 4_000L, speed = 95.0)
         )
-
         val condensed = condenseForSpeed(points, maxPoints = 2)
-
         assertEquals(2, condensed.size)
         assertEquals(173.0, condensed[0].speed, 0.001)
         assertEquals(95.0, condensed[1].speed, 0.001)
@@ -26,13 +24,11 @@ class CondensedChartsTest {
     fun condenseForPower_preserves_peak_absolute_power_within_bucket() {
         val points = listOf(
             point(id = 1, timestamp = 1_000L, power = 100.0),
-            point(id = 2, timestamp = 2_000L, power = 295.0),  // spike
+            point(id = 2, timestamp = 2_000L, power = 295.0),
             point(id = 3, timestamp = 3_000L, power = -80.0),
-            point(id = 4, timestamp = 4_000L, power = -200.0)  // regen peak
+            point(id = 4, timestamp = 4_000L, power = -200.0)
         )
-
         val condensed = condenseForPower(points, maxPoints = 2)
-
         assertEquals(2, condensed.size)
         assertEquals(295.0, condensed[0].power, 0.001)
         assertEquals(-200.0, condensed[1].power, 0.001)

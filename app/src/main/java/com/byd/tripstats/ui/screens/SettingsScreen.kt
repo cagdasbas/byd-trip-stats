@@ -2742,7 +2742,7 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "No for normal use. Trips, charging sessions, charts, and local history are recorded " +
         "entirely on-device.\n\n" +
         "Internet is only needed for optional features such as app update checks, opening web " +
-        "links, and Telegram backups if you enable them."
+        "links, MQTT / ABRP integration and Telegram backups if you enable them."
     ),
 
     FaqEntry(
@@ -2752,6 +2752,19 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "2. Make sure Location permission is granted if you want GPS points in trips\n" +
         "3. Check that BYD's Disable Autostart app is not blocking BYD Trip Stats from autostarting\n" +
         "4. Wait a few seconds after a head-unit restart for the car services to come up\n"
+    ),
+
+    FaqEntry(
+        "Why is 'auto/unknown' shown at driving / regen modes?",
+        "The app reads drive and regen modes directly from the car's instrument cluster, but the " +
+        "car only broadcasts a mode value when you actively change it — it does not report the " +
+        "current mode on startup.\n\n" +
+        "Until you tap a mode on the car display, the app has no value to show and falls back to " +
+        "'Auto' (regen) or 'Unknown' (drive). To fix this:\n\n" +
+        "1. Cycle through each regen level on the car's touchscreen once\n" +
+        "2. Cycle through each drive mode (Eco / Normal / Sport) once\n\n" +
+        "The app will immediately pick up both values and start recording them with every trip data point. " +
+        "You only need to do this once — after that, changing modes during normal driving keeps everything in sync."
     ),
 
     FaqEntry(
@@ -2844,13 +2857,6 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     ),
 
     FaqEntry(
-        "Does this work on BYD Dolphin or Atto 3?",
-        "Potentially yes. The app has been tested primarily on the Seal, and support on other " +
-        "BYD models depends on which car fields their firmware exposes.\n\n" +
-        "The core trip pipeline is model-agnostic, but some detail fields can vary by car and software version."
-    ),
-
-    FaqEntry(
         "Can I export data to Excel?",
         "Yes. Open any trip, tap the share icon (top-right), then Save as CSV. The file lands " +
         "in the Download folder and can be opened directly in Excel, Google Sheets, or any " +
@@ -2868,11 +2874,10 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     ),
 
     FaqEntry(
-        "Where can I get help or report a bug?",
-        "Check the README.md file or open an issue on GitHub — tap the link below.\n\n" +
-        "Include your BYD model, the steps to reproduce the problem, and logcat output " +
-        "if available. Feature requests are also welcome — use the 'enhancement' label.",
-        url = "https://github.com/angoikon/byd-trip-stats/issues"
+        "Where can I get help, request a feature or report a bug?",
+        "Check the README.md file, open an issue on GitHub or visit the discord server — tap the link below.\n\n" +
+        "Include your BYD model and the steps to reproduce the problem. ",
+        url = "https://discord.gg/pf8TjjTce9"
     )
 )
 

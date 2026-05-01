@@ -675,7 +675,7 @@ private fun tripShortLabel(trip: TripEntity): String =
 private fun formatDurationCompare(ms: Long): String {
     val h = TimeUnit.MILLISECONDS.toHours(ms)
     val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
-    return if (h > 0) "${h}h ${m}m" else "${m}m"
+    return if (h > 0) "${h}h ${m}min" else "${m}min"
 }
 
 private fun niceStepCompare(range: Double): Double = when {

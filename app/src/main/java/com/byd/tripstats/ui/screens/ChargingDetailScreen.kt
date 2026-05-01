@@ -1287,5 +1287,5 @@ private fun formatDurationLong(seconds: Long): String {
     val h = TimeUnit.SECONDS.toHours(seconds)
     val m = TimeUnit.SECONDS.toMinutes(seconds) % 60
     val s = seconds % 60
-    return if (h > 0) "${h}h ${m}m ${s}s" else "${m}m ${s}s"
+    return if (h > 0) "${h}h ${m}min ${s}s" else "${m}min ${s}s"
 }

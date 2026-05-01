@@ -40,12 +40,14 @@ fun ModeTimelineChart(
     val pointsWithModes = remember(dataPoints) {
         dataPoints.map { it to it.extractTripModes() }
     }
+    val hasAnyDriveMode = remember(pointsWithModes) { pointsWithModes.any { (_, m) -> m.driveMode != 0 } }
+    val hasAnyRegenMode = remember(pointsWithModes) { pointsWithModes.any { (_, m) -> m.regenMode != 0 } }
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
     val verticalSpacing = if (compact) 8.dp else 12.dp
     val laneSpacing = if (compact) 10.dp else 14.dp
     val laneHeight = if (compact) 34.dp else 44.dp
 
-    if (!hasTripModeData(dataPoints)) {
+    if (!hasAnyDriveMode && !hasAnyRegenMode) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 text = "No drive/regen mode data recorded for this trip.",
@@ -61,12 +63,12 @@ fun ModeTimelineChart(
         verticalArrangement = Arrangement.spacedBy(verticalSpacing)
     ) {
         ModeTimelineLegend(
-            showDriveModes = showDriveModes,
-            showRegenModes = showRegenModes,
+            showDriveModes = showDriveModes && hasAnyDriveMode,
+            showRegenModes = showRegenModes && hasAnyRegenMode,
             compact = compact
         )
 
-        if (!showDriveModes && !showRegenModes) {
+        if ((!showDriveModes || !hasAnyDriveMode) && (!showRegenModes || !hasAnyRegenMode)) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = "Enable Drive mode or Regen mode to view the timeline.",
@@ -81,7 +83,7 @@ fun ModeTimelineChart(
                     .weight(1f),
                 verticalArrangement = Arrangement.spacedBy(laneSpacing)
             ) {
-                if (showDriveModes) {
+                if (showDriveModes && hasAnyDriveMode) {
                     ModeTimelineLane(
                         title = "Drive mode",
                         pointsWithModes = pointsWithModes,
@@ -90,7 +92,7 @@ fun ModeTimelineChart(
                         colorFor = { driveModeColor(it.driveMode) }
                     )
                 }
-                if (showRegenModes) {
+                if (showRegenModes && hasAnyRegenMode) {
                     ModeTimelineLane(
                         title = "Regen mode",
                         pointsWithModes = pointsWithModes,

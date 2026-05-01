@@ -923,8 +923,8 @@ private fun formatDuration(milliseconds: Long): String {
     val seconds = milliseconds / 1000
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
-    return if (hours > 0) String.format("%dh %dm", hours, minutes)
-    else String.format("%dm", minutes)
+    return if (hours > 0) String.format("%dh %dmin", hours, minutes)
+    else String.format("%dmin", minutes)
 }
 
 private fun formatTimestamp(timestamp: Long): String {

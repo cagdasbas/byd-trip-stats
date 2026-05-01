@@ -54,6 +54,7 @@ import com.byd.tripstats.ui.components.condenseData
 import com.byd.tripstats.ui.components.condenseForRpm
 import com.byd.tripstats.ui.components.condenseForSpeed
 import com.byd.tripstats.ui.components.condenseForPower
+import com.byd.tripstats.ui.components.extractTripModes
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -967,10 +968,15 @@ fun TripChartsTab(
         ) {
             var showDriveModes by remember { mutableStateOf(true) }
             var showRegenModes by remember { mutableStateOf(true) }
+            val missingDriveMode = remember(dataPoints) { dataPoints.none { it.extractTripModes().driveMode != 0 } }
+            val missingRegenMode = remember(dataPoints) { dataPoints.none { it.extractTripModes().regenMode != 0 } }
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (missingDriveMode || missingRegenMode) {
+                    ModeRecordingHint(missingDriveMode, missingRegenMode)
+                }
                 ModeTimelineControls(
                     showDriveModes = showDriveModes,
                     showRegenModes = showRegenModes,
@@ -1069,7 +1075,7 @@ private fun FullscreenChartDialog(
     // lost between buckets.
     val chartData = remember(chartType, dataPoints) {
         when (chartType) {
-            ChartType.MOTOR_RPM -> condenseForRpm(dataPoints, maxPoints = 240)
+            ChartType.MOTOR_RPM -> condenseForRpm(dataPoints, maxPoints = 480)
             ChartType.SPEED     -> condenseForSpeed(dataPoints, maxPoints = 144)
             ChartType.POWER     -> condenseForPower(dataPoints, maxPoints = 144)
             else                -> condenseData(dataPoints, maxPoints = 144)
@@ -1181,10 +1187,15 @@ private fun FullscreenChartDialog(
                         ChartType.MODE_TIMELINE -> {
                             var showDriveModes by remember { mutableStateOf(true) }
                             var showRegenModes by remember { mutableStateOf(true) }
+                            val missingDriveMode = remember(dataPoints) { dataPoints.none { it.extractTripModes().driveMode != 0 } }
+                            val missingRegenMode = remember(dataPoints) { dataPoints.none { it.extractTripModes().regenMode != 0 } }
                             Column(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(14.dp)
                             ) {
+                                if (missingDriveMode || missingRegenMode) {
+                                    ModeRecordingHint(missingDriveMode, missingRegenMode)
+                                }
                                 ModeTimelineControls(
                                     showDriveModes = showDriveModes,
                                     showRegenModes = showRegenModes,
@@ -1202,6 +1213,37 @@ private fun FullscreenChartDialog(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ModeRecordingHint(missingDriveMode: Boolean, missingRegenMode: Boolean) {
+    val missing = buildList {
+        if (missingDriveMode) add("drive")
+        if (missingRegenMode) add("regen")
+    }.joinToString(" and ")
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = "No $missing mode recorded — on future trips tap each mode on the car display once to enable analytics.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -1336,9 +1378,9 @@ private fun formatDuration(milliseconds: Long): String {
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
     return if (hours > 0) {
-        String.format("%dh %dm", hours, minutes)
+        String.format("%dh %dmin", hours, minutes)
     } else {
-        String.format("%dm", minutes)
+        String.format("%dmin", minutes)
     }
 }
 

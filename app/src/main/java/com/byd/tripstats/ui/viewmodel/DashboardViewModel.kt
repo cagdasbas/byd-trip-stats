@@ -11,8 +11,10 @@ import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripStatsEntity
+import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.TripRepository
 import com.byd.tripstats.data.repository.UpdateRepository
@@ -55,6 +57,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val tripRepository      = TripRepository.getInstance(application)
     private val chargingRepository  = ChargingRepository.getInstance(application)
+    private val batteryVoltageHistoryRepository = BatteryVoltageHistoryRepository.getInstance(application)
     private val preferencesManager  = PreferencesManager(application)
     val updateRepository            = UpdateRepository.getInstance(application)
 
@@ -132,6 +135,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // to fire instead, resetting the chart from the current position rather than trip start.
     val currentTripId: StateFlow<Long?> = tripRepository.currentTripId
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val batteryVoltageHistory24h: StateFlow<List<BatteryVoltageHistoryPoint>> =
+        batteryVoltageHistoryRepository.history
 
     // ── Charging session state ────────────────────────────────────────────────
 
@@ -1194,8 +1200,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
                     val stabilised = dKm >= STABILISATION_KM
                     val remainingWh = batteryKwh * 1000.0 * (dp.soc / 100.0)
+                    // Null for non-stabilised points — matches live path behaviour so the
+                    // orange projected line doesn't appear after navigation before it would
+                    // appear during a fresh live drive session.
                     val projected: Double? = when {
-                        stabilised && restoredSmoothed != null && restoredSmoothed > 0.0 ->
+                        !stabilised -> null
+                        restoredSmoothed != null && restoredSmoothed > 0.0 ->
                             ((remainingWh / restoredSmoothed) + fuelRangeKm).coerceAtLeast(0.0)
                         else ->
                             ((remainingWh / baselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0)
