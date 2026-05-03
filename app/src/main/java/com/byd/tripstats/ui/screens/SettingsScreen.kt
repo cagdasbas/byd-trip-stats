@@ -3004,7 +3004,7 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
 
             // Action buttons
             val isSending = telegramState is TelegramManager.TelegramState.InProgress
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
                         if (telegramConfig == null) {
@@ -3030,7 +3030,7 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
                         }
                     },
                     enabled = entryCount > 0 && !isSending,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(2f),
                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
                 ) {
                     if (isSending) {
@@ -3043,17 +3043,43 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
                         Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
                     }
                     Spacer(Modifier.width(6.dp))
-                    Text(if (isSending) "Sending…" else "Send via Telegram to your private bot")
+                    Text(if (isSending) "Sending…" else "Telegram")
                 }
 
-                OutlinedButton(
+                Button(
+                    onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            try {
+                                VehicleCompatibilityProbe.exportReportFile()
+                                launch(Dispatchers.Main) {
+                                    statusMessage = "Saved to Download/BydTripStats/compat_probe.json"
+                                }
+                            } catch (e: Exception) {
+                                launch(Dispatchers.Main) {
+                                    statusMessage = "Save failed: ${e.message}"
+                                }
+                            }
+                        }
+                    },
+                    enabled = entryCount > 0 && !isSending,
+                    modifier = Modifier.weight(2f),
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) {
+                    Icon(Icons.Filled.Download, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Save")
+                }
+
+                Button(
                     onClick = {
                         VehicleCompatibilityProbe.clear()
                         statusMessage = "Probe data cleared."
                     },
-                    enabled = entryCount > 0 && !isSending
+                    enabled = entryCount > 0 && !isSending,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Clear")
+                    Icon(Icons.Filled.Delete, null, modifier = Modifier.size(16.dp))
                 }
             }
 

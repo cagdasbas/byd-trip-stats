@@ -3981,6 +3981,7 @@ class BydVehicleDataSource(context: Context) {
             val fallbackDriveMode = sequenceOf(mDr, mOp, mEn)
                 .filterNotNull()
                 .firstOrNull { it in 1..6 }
+            val energyFeedback = invokeIntGetter(device, "getEnergyFeedback")?.takeIf { it != 65535 }
             val regenMode = mFb ?: mRg
             val driveModeCandidate = driveModeFromText ?: driveModeFromIndicator ?: fallbackDriveMode
             val driveModeSource = when {
@@ -3995,6 +3996,9 @@ class BydVehicleDataSource(context: Context) {
                 source = driveModeSource
             )
             updateRegenModeCandidate(regenMode, strong = true, source = "instrument")
+            if (regenMode == null) {
+                updateRegenModeCandidate(energyFeedback, strong = true, source = "energy-feedback")
+            }
 
             val pm25In = invokeIntGetter(device, *runtimeMethodNames("m15"))?.takeIf { it in 0..999 }
             val pm25Out = invokeIntGetter(device, *runtimeMethodNames("m16"))?.takeIf { it in 0..999 }
@@ -4008,7 +4012,7 @@ class BydVehicleDataSource(context: Context) {
                 outCarTemp != null || cabinTemp != null || averageSpeed != null || currentJourneyDriveMileage != null ||
                 currentJourneyDriveTime != null || batteryPercent != null || chargePercent != null ||
                 odometerDisplay != null || powerUnit != null || externalChargingPower != null ||
-                driveModeCandidate != null || regenMode != null
+                driveModeCandidate != null || regenMode != null || energyFeedback != null
             ) {
                 logVerboseInfoIfChanged(
                     "instrumentSnapshot",
@@ -4019,7 +4023,7 @@ class BydVehicleDataSource(context: Context) {
                         "odometerDisplay=$odometerDisplay powerUnit=$powerUnit externalChargingPower=$externalChargingPower instrumentChargingPower=$instrumentChargingPower " +
                         "coolantTemp=$instrumentCoolantTemp waterMeterPct=$instrumentWaterTempMeterPercent rawWaterMeterPct=$instrumentWaterTempMeterPercentRaw " +
                         "cabinValues=${instrumentCabinValues.entries.joinToString(" ") { (key, value) -> "$key=${String.format("%.1f", value)}" }.ifBlank { "n/a" }} " +
-                        "driveMode=$driveModeCandidate source=$driveModeSource ecoIndicatorState=$ecoIndicatorState regenMode=$regenMode"
+                        "driveMode=$driveModeCandidate source=$driveModeSource ecoIndicatorState=$ecoIndicatorState regenMode=$regenMode energyFeedback=$energyFeedback"
                 }
             }
 

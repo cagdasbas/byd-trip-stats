@@ -490,7 +490,29 @@ object VehicleCompatibilityProbe {
         val file = File(appContext.cacheDir, "byd_compat_probe_$ts.json")
         file.writeText(json, Charsets.UTF_8)
         Log.i(TAG, "Probe report written: ${file.absolutePath} (${file.length()} bytes)")
+        exportReportToDownloads(json)
         return file
+    }
+
+    private fun exportReportToDownloads(json: String) {
+        try {
+            val resolver = appContext.contentResolver
+            val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val name = "compat_probe.json"
+            val relativePath = "Download/BydTripStats/"
+            resolver.delete(
+                collection,
+                "${android.provider.MediaStore.Downloads.DISPLAY_NAME} = ? AND ${android.provider.MediaStore.Downloads.RELATIVE_PATH} = ?",
+                arrayOf(name, relativePath)
+            )
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+                put(android.provider.MediaStore.Downloads.RELATIVE_PATH, relativePath)
+            }
+            val uri = resolver.insert(collection, values) ?: return
+            resolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+        } catch (_: Exception) { }
     }
 
     /**
