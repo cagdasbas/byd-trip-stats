@@ -403,7 +403,7 @@ object VehicleCompatibilityProbe {
      *   "androidBuild": "...",
      *   "deviceClasses": { "climate": "...", ... },
      *   "deviceSnapshots": { "climate": { ... }, "phev-sweep": { ... }, ... },
-     *   "phevAnalysis": { "energyMode": "...", "phevSignalsFound": [...] },
+     *   "vehicleAnalysis": { "energyMode": "...", "phevSignalsFound": [...] },
      *   "changeLog": [ "...", ... ]
      * }
      */
@@ -439,7 +439,7 @@ object VehicleCompatibilityProbe {
         root.put("deviceSnapshots", snapshots)
 
         // ── PHEV analysis summary ─────────────────────────────────────────────
-        root.put("phevAnalysis", buildPhevAnalysis())
+        root.put("vehicleAnalysis", buildVehicleAnalysis())
 
         val log = JSONArray()
         changeLog.toList().forEach { log.put(it) }
@@ -448,7 +448,7 @@ object VehicleCompatibilityProbe {
         return root.toString(2)
     }
 
-    private fun buildPhevAnalysis(): JSONObject {
+    private fun buildVehicleAnalysis(): JSONObject {
         val obj = JSONObject()
 
         val isConfirmedBev = userModelIsPhev == false
@@ -529,21 +529,113 @@ object VehicleCompatibilityProbe {
         obj.put("gearboxDeviceRegistered", gearboxSnap != null)
         obj.put("tyreDeviceRegistered", tyreSnap != null)
 
-        // Battery / cell temperature availability
+        // ── Battery / cell temperature — full categorisation with cross-validation ──
         val tempSnap = deviceSnapshots["temp-sweep"]
-        val packTempEntry  = tempSnap?.entries?.firstOrNull { (k, _) -> k.contains("Temp") && !k.contains("Max") && !k.contains("Min") && !k.contains("max") && !k.contains("min") }
-        val cellMaxEntry   = tempSnap?.entries?.firstOrNull { (k, _) -> k.contains("Max", ignoreCase = true) || k.contains("max", ignoreCase = false) }
-        val cellMinEntry   = tempSnap?.entries?.firstOrNull { (k, _) -> k.contains("Min", ignoreCase = true) || k.contains("min", ignoreCase = false) }
         val tempAnalysis = JSONObject()
-        tempAnalysis.put("packTempAvailable",    packTempEntry != null)
-        tempAnalysis.put("cellTempMaxAvailable", cellMaxEntry != null)
-        tempAnalysis.put("cellTempMinAvailable", cellMinEntry != null)
-        if (packTempEntry != null)  tempAnalysis.put("packTempSource",    "${packTempEntry.key}=${packTempEntry.value}")
-        if (cellMaxEntry != null)   tempAnalysis.put("cellTempMaxSource", "${cellMaxEntry.key}=${cellMaxEntry.value}")
-        if (cellMinEntry != null)   tempAnalysis.put("cellTempMinSource", "${cellMinEntry.key}=${cellMinEntry.value}")
-        if (tempSnap != null && tempSnap.isEmpty()) tempAnalysis.put("note", "temp-sweep ran but no getters returned a non-zero value")
-        if (tempSnap == null)       tempAnalysis.put("note", "temp-sweep has not run yet (charging or power device may not be registered)")
+        if (tempSnap == null) {
+            tempAnalysis.put("note", "temp-sweep has not run yet (charging or power device may not be registered)")
+        } else if (tempSnap.isEmpty()) {
+            tempAnalysis.put("note", "temp-sweep ran but no getters returned a non-zero value")
+        } else {
+            val avgEntries = tempSnap.entries.filter { (k, _) ->
+                !k.contains("Max", ignoreCase = true) && !k.contains("Min", ignoreCase = true)
+            }
+            val maxEntries = tempSnap.entries.filter { (k, _) -> k.contains("Max", ignoreCase = true) }
+            val minEntries = tempSnap.entries.filter { (k, _) -> k.contains("Min", ignoreCase = true) }
+
+            tempAnalysis.put("packTempAvailable",    avgEntries.isNotEmpty())
+            tempAnalysis.put("cellTempMaxAvailable", maxEntries.isNotEmpty())
+            tempAnalysis.put("cellTempMinAvailable", minEntries.isNotEmpty())
+            tempAnalysis.put("totalGettersWithData", tempSnap.size)
+
+            // All matching sources (may be multiple getters per role)
+            if (avgEntries.isNotEmpty()) tempAnalysis.put("packTempSources",    JSONArray(avgEntries.map { "${it.key}=${it.value}" }))
+            if (maxEntries.isNotEmpty()) tempAnalysis.put("cellTempMaxSources", JSONArray(maxEntries.map { "${it.key}=${it.value}" }))
+            if (minEntries.isNotEmpty()) tempAnalysis.put("cellTempMinSources", JSONArray(minEntries.map { "${it.key}=${it.value}" }))
+
+            // Parsed °C (handles both direct-degree and tenths-of-degree encoding)
+            val avgParsed = avgEntries.firstOrNull()?.value?.let { inferTempDegC(it) }
+            val maxParsed = maxEntries.firstOrNull()?.value?.let { inferTempDegC(it) }
+            val minParsed = minEntries.firstOrNull()?.value?.let { inferTempDegC(it) }
+            if (avgParsed != null) tempAnalysis.put("packTempDegC",    avgParsed)
+            if (maxParsed != null) tempAnalysis.put("cellTempMaxDegC", maxParsed)
+            if (minParsed != null) tempAnalysis.put("cellTempMinDegC", minParsed)
+
+            // Cross-validation — flag physically impossible combinations
+            if (avgParsed != null && minParsed != null && minParsed > avgParsed)
+                tempAnalysis.put("suspiciousMinTemp",
+                    "cellTempMin (${minParsed}°C) > packTemp (${avgParsed}°C) — mislabeled probe getter suspected (observed on Seal Excellence 0x44700020)")
+            if (maxParsed != null && avgParsed != null && maxParsed < avgParsed)
+                tempAnalysis.put("suspiciousMaxVsAvg",
+                    "cellTempMax (${maxParsed}°C) < packTemp (${avgParsed}°C) — physically impossible")
+            if (maxParsed != null && minParsed != null && maxParsed < minParsed)
+                tempAnalysis.put("suspiciousMaxVsMin",
+                    "cellTempMax (${maxParsed}°C) < cellTempMin (${minParsed}°C) — inconsistent readings")
+        }
         obj.put("batteryTemperatureAnalysis", tempAnalysis)
+
+        // ── Registered devices summary ────────────────────────────────────────
+        val deviceSummary = JSONObject()
+        deviceSnapshots.forEach { (label, snap) ->
+            val entry = JSONObject()
+            entry.put("entryCount", snap.size)
+            entry.put("class", deviceClasses[label]?.substringAfterLast('.') ?: "unknown")
+            deviceSummary.put(label, entry)
+        }
+        obj.put("registeredDevicesSummary", deviceSummary)
+
+        // ── StatisticDevice feature-ID values ────────────────────────────────
+        val statFeatSnap = deviceSnapshots["statistic-features"]
+        if (statFeatSnap != null) {
+            val featSummary = JSONObject()
+            featSummary.put("totalFeaturesWithData", statFeatSnap.size)
+            val values = JSONObject()
+            statFeatSnap.forEach { (k, v) -> values.put(k, v) }
+            featSummary.put("values", values)
+            obj.put("statisticFeatureSummary", featSummary)
+        }
+
+        // ── Charging analysis ─────────────────────────────────────────────────
+        val chargingSnap = deviceSnapshots["charging"]
+        val chargingAnalysis = JSONObject()
+        chargingAnalysis.put("chargingDeviceRegistered", chargingSnap != null)
+        if (chargingSnap != null) {
+            chargingAnalysis.put("entryCount", chargingSnap.size)
+            val powerEntry   = chargingSnap.entries.firstOrNull { (k, _) -> k.contains("Power",   ignoreCase = true) || k.contains("Watt", ignoreCase = true) }
+            val currentEntry = chargingSnap.entries.firstOrNull { (k, _) -> k.contains("Current", ignoreCase = true) }
+            val modeEntry    = chargingSnap.entries.firstOrNull { (k, _) -> k.contains("Mode",    ignoreCase = true) || k.contains("Type", ignoreCase = true) }
+            val statusEntry  = chargingSnap.entries.firstOrNull { (k, _) -> k.contains("Status",  ignoreCase = true) || k.contains("State", ignoreCase = true) }
+            val voltageEntry = chargingSnap.entries.firstOrNull { (k, _) -> k.contains("Voltage", ignoreCase = true) }
+            if (powerEntry   != null) chargingAnalysis.put("powerGetter",   "${powerEntry.key}=${powerEntry.value}")
+            if (currentEntry != null) chargingAnalysis.put("currentGetter", "${currentEntry.key}=${currentEntry.value}")
+            if (voltageEntry != null) chargingAnalysis.put("voltageGetter", "${voltageEntry.key}=${voltageEntry.value}")
+            if (modeEntry    != null) chargingAnalysis.put("modeGetter",    "${modeEntry.key}=${modeEntry.value}")
+            if (statusEntry  != null) chargingAnalysis.put("statusGetter",  "${statusEntry.key}=${statusEntry.value}")
+        }
+        obj.put("chargingAnalysis", chargingAnalysis)
+
+        // ── Slope / sensor analysis ───────────────────────────────────────────
+        val slopeHit = deviceSnapshots.entries
+            .flatMap { (label, snap) -> snap.entries.map { Triple(label, it.key, it.value) } }
+            .firstOrNull { (_, k, _) -> k.contains("Slope", ignoreCase = true) }
+        val slopeAnalysis = JSONObject()
+        slopeAnalysis.put("slopeAvailable", slopeHit != null)
+        if (slopeHit != null)
+            slopeAnalysis.put("slopeGetter", "${slopeHit.first}.${slopeHit.second}=${slopeHit.third}")
+        obj.put("slopeAnalysis", slopeAnalysis)
+
+        // ── Motor analysis ────────────────────────────────────────────────────
+        val motorSnap = deviceSnapshots["motor"]
+        if (motorSnap != null) {
+            val motorAnalysis = JSONObject()
+            motorAnalysis.put("motorDeviceRegistered", true)
+            motorAnalysis.put("entryCount", motorSnap.size)
+            listOf("Torque", "Speed", "Power", "Temp", "Current", "Voltage", "Rpm").forEach { kw ->
+                motorSnap.entries.firstOrNull { (k, _) -> k.contains(kw, ignoreCase = true) }
+                    ?.let { (k, v) -> motorAnalysis.put("${kw.lowercase()}Example", "$k=$v") }
+            }
+            obj.put("motorAnalysis", motorAnalysis)
+        }
 
         return obj
     }
