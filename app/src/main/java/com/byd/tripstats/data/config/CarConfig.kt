@@ -201,6 +201,23 @@ object CarCatalog {
         cdA = 0.653       // Cd 0.29 × A 2.25 m² (estimate)
     )
 
+    // ── BYD M6 ───────────────────────────────────────────────────────────────
+
+    val BYD_M6 = CarConfig(
+        id = "BYD_M6",
+        displayName = "BYD M6",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 71.8,
+        estimatedKerbMassKg = 1915.0,
+        wltpKm = 440,
+        referenceConsumptionKwhPer100km = 18.7,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 100,
+        cellCount = 184,  // 71.8 kWh @ ~589V → 184S LFP (estimate, same pack as Seal U Comfort)
+        cdA = 0.868       // Cd 0.33 × A ~2.63 m² (1.81 × 1.69 × 0.86)
+    )
+
     // ── BYD Seal U DM-i / Song Plus DM-i ─────────────────────────────────────
 
     val BYD_SEAL_U_DM_I = CarConfig(
@@ -321,6 +338,7 @@ object CarCatalog {
         BYD_DOLPHIN_SURF_ACTIVE,
         BYD_DOLPHIN_SURF_BOOST,
         BYD_DOLPHIN_SURF_COMFORT,
+        BYD_M6,
         BYD_SEAL_U_DM_I,
         BYD_SONG_PLUS_DM_I,
         BYD_HAN_DM_I,
@@ -344,6 +362,7 @@ object CarCatalog {
         "BYD Atto 3" to listOf(BYD_ATTO_3),
         "BYD Seal U" to listOf(BYD_SEAL_U_COMFORT, BYD_SEAL_U_DESIGN),
         "BYD Seagull / Dolphin Surf" to listOf(BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),
+        "BYD M6" to listOf(BYD_M6),
     )
 
     val groupedPhev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(

@@ -842,14 +842,22 @@ fun EnergyFlowDiagram(
                         color = BydEcoTealDim
                     )
                     PowerMetric(
-                        label = "Battery (SoC)",
-                        value = "${telemetry.soc.toInt()}",
+                        label = "SoC (BMS)",
+                        value = run {
+                            val panel = telemetry.socPanel
+                            val bms   = telemetry.soc.toInt()
+                            if (panel > 0) "$panel ($bms)" else "$bms"
+                        },
                         unit = "%",
                         color = BatteryBlue
                     )
                     PowerMetric(
                         label = "Range (BMS)",
-                        value = "${telemetry.electricDrivingRangeKm}",
+                        value = run {
+                            val projected = tripDataPoints.lastOrNull()?.projectedRangeKm
+                            val bms       = telemetry.electricDrivingRangeKm
+                            if (projected != null) "${projected.toInt()} ($bms)" else "$bms"
+                        },
                         unit = "km",
                         color = MaterialTheme.extendedColors.range
                     )

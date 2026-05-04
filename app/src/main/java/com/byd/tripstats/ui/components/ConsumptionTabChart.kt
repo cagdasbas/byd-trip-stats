@@ -85,7 +85,7 @@ fun ConsumptionThumbnail(
 // ── Unified expanded chart ────────────────────────────────────────────────────
 
 private enum class ConsumptionTab(val label: String) {
-    WEEK("Daily consumption"),
+    WEEK("Weekly consumption"),
     MONTH("Monthly consumption"),
     YEAR("Yearly consumption");
 }

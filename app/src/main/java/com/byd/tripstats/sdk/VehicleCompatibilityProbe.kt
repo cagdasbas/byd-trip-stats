@@ -84,6 +84,13 @@ object VehicleCompatibilityProbe {
         RuntimeExtensionBridge.methodGroups("probe01").flatMap { (_, v) -> v }
     }
 
+    // ── Temperature getter names to sweep across every registered device ──────
+    // Consolidates m36 (pack/avg), m39 (cell max), m40 (cell min), and m51 candidates.
+    // Non-null results are captured under the "temp-sweep" label.
+    private val TEMP_NAMED_GETTERS: List<String> by lazy {
+        RuntimeExtensionBridge.methodGroups("probe03").flatMap { (_, v) -> v }
+    }
+
     // Indexed getter names to probe with indices 0..INDEXED_PROBE_MAX on every device.
     // Covers wheel slots, seat slots, door slots, and low-range feature IDs.
     // Names are supplied by the private extension (probe02) to keep them out of public source.
@@ -285,6 +292,51 @@ object VehicleCompatibilityProbe {
     }
 
     /**
+     * Sweep [TEMP_NAMED_GETTERS] across every device in [devices] and record any
+     * non-null, non-zero result under the "temp-sweep" label, prefixed with the
+     * device name so the report shows exactly which device and method name returned data.
+     *
+     * Called once per slow-tier refresh alongside [recordPhevSection].
+     */
+    fun recordTemperatureSection(devices: Map<String, Any?>) {
+        if (!_isEnabled.value) return
+        try {
+            val snapshot = deviceSnapshots.getOrPut("temp-sweep") { LinkedHashMap() }
+            val changed = mutableListOf<String>()
+
+            devices.forEach { (deviceLabel, device) ->
+                if (device == null) return@forEach
+                val cls = device.javaClass
+                TEMP_NAMED_GETTERS.forEach { getterName ->
+                    runCatching {
+                        val method = cls.methods.firstOrNull {
+                            it.name == getterName && it.parameterCount == 0
+                        } ?: return@runCatching
+                        val result = method.invoke(device) ?: return@runCatching
+                        val rawStr = encodeValue(result)
+                        if (rawStr != "null" && rawStr != "0" && rawStr != "0.0" && rawStr != "false") {
+                            val key = "$deviceLabel.$getterName"
+                            val prev = snapshot.put(key, rawStr)
+                            if (prev != rawStr) changed.add("$key=$rawStr")
+                        }
+                    }
+                }
+            }
+
+            if (changed.isNotEmpty()) {
+                val now = Instant.now().toString()
+                _lastCaptureAt.value = now
+                _entryCount.value = deviceSnapshots.values.sumOf { it.size }
+                val line = "[$now][temp-sweep] ${changed.joinToString(" | ")}"
+                changeLog.offer(line)
+                while (changeLog.size > CHANGE_LOG_MAX) changeLog.poll()
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "recordTemperatureSection failed: ${t.message}")
+        }
+    }
+
+    /**
      * Records named feature-ID getter results from [device] under [label]-features.
      * Used to capture StatisticDevice feature-ID-based fields (cell voltages, SOH, etc.)
      * that are not accessible via reflection on named no-arg methods.
@@ -477,6 +529,22 @@ object VehicleCompatibilityProbe {
         obj.put("gearboxDeviceRegistered", gearboxSnap != null)
         obj.put("tyreDeviceRegistered", tyreSnap != null)
 
+        // Battery / cell temperature availability
+        val tempSnap = deviceSnapshots["temp-sweep"]
+        val packTempEntry  = tempSnap?.entries?.firstOrNull { (k, _) -> k.contains("Temp") && !k.contains("Max") && !k.contains("Min") && !k.contains("max") && !k.contains("min") }
+        val cellMaxEntry   = tempSnap?.entries?.firstOrNull { (k, _) -> k.contains("Max", ignoreCase = true) || k.contains("max", ignoreCase = false) }
+        val cellMinEntry   = tempSnap?.entries?.firstOrNull { (k, _) -> k.contains("Min", ignoreCase = true) || k.contains("min", ignoreCase = false) }
+        val tempAnalysis = JSONObject()
+        tempAnalysis.put("packTempAvailable",    packTempEntry != null)
+        tempAnalysis.put("cellTempMaxAvailable", cellMaxEntry != null)
+        tempAnalysis.put("cellTempMinAvailable", cellMinEntry != null)
+        if (packTempEntry != null)  tempAnalysis.put("packTempSource",    "${packTempEntry.key}=${packTempEntry.value}")
+        if (cellMaxEntry != null)   tempAnalysis.put("cellTempMaxSource", "${cellMaxEntry.key}=${cellMaxEntry.value}")
+        if (cellMinEntry != null)   tempAnalysis.put("cellTempMinSource", "${cellMinEntry.key}=${cellMinEntry.value}")
+        if (tempSnap != null && tempSnap.isEmpty()) tempAnalysis.put("note", "temp-sweep ran but no getters returned a non-zero value")
+        if (tempSnap == null)       tempAnalysis.put("note", "temp-sweep has not run yet (charging or power device may not be registered)")
+        obj.put("batteryTemperatureAnalysis", tempAnalysis)
+
         return obj
     }
 
@@ -558,6 +626,20 @@ object VehicleCompatibilityProbe {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Try to interpret a raw SDK string as a temperature in °C.
+     * SDK may return direct degrees (22.7) or tenths-of-degree (227).
+     * Returns null if the value is outside any plausible range.
+     */
+    private fun inferTempDegC(rawStr: String): Double? {
+        val v = rawStr.toDoubleOrNull() ?: return null
+        return when {
+            v in -50.0..80.0   -> v           // direct °C
+            v in -500.0..800.0 -> v / 10.0    // tenths of °C
+            else               -> null
+        }
+    }
 
     private fun encodeValue(value: Any?): String {
         if (value == null) return "null"

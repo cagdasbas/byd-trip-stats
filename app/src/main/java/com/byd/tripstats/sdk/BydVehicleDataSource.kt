@@ -1616,19 +1616,19 @@ class BydVehicleDataSource(context: Context) {
                 // registered device and records the results for compat report analysis.
                 // No-op when probe is disabled.
                 if (VehicleCompatibilityProbe.isEnabled.value) {
-                    VehicleCompatibilityProbe.recordPhevSection(
-                        mapOf(
-                            "power"      to powerDevice,
-                            "engine"     to engineDevice,
-                            "statistic"  to statisticDevice,
-                            "energy"     to energyDevice,
-                            "instrument" to instrumentDevice,
-                            "charging"   to chargingDevice,
-                            "battery"    to batteryDevice,
-                            "bms"        to bmsDevice,
-                            "motor"      to motorDevice,
-                        )
+                    val probeDevices = mapOf(
+                        "power"      to powerDevice,
+                        "engine"     to engineDevice,
+                        "statistic"  to statisticDevice,
+                        "energy"     to energyDevice,
+                        "instrument" to instrumentDevice,
+                        "charging"   to chargingDevice,
+                        "battery"    to batteryDevice,
+                        "bms"        to bmsDevice,
+                        "motor"      to motorDevice,
                     )
+                    VehicleCompatibilityProbe.recordPhevSection(probeDevices)
+                    VehicleCompatibilityProbe.recordTemperatureSection(probeDevices)
                 }
             }
 
@@ -2392,7 +2392,10 @@ class BydVehicleDataSource(context: Context) {
         if (vMin != null || vMax != null || tMin != null || tAvg != null || tMax != null || soh != null || socB != null || socPanel != null || availPower != null) {
             if (vMin != null) _statisticCellVoltageMin.value = vMin
             if (vMax != null) _statisticCellVoltageMax.value = vMax
-            if (tMin != null) _statisticCellTempMin.value = tMin
+            if (tMin != null) {
+                val avg = tAvg ?: _statisticCellTempAvg.value
+                if (avg == null || tMin <= avg) _statisticCellTempMin.value = tMin
+            }
             if (tAvg != null) _statisticCellTempAvg.value = tAvg
             if (tMax != null) _statisticCellTempMax.value = tMax
             if (soh != null) _statisticBatterySoh.value = soh
@@ -2953,7 +2956,10 @@ class BydVehicleDataSource(context: Context) {
 
             if (cellVMin != null) _statisticCellVoltageMin.value = cellVMin
             if (cellVMax != null) _statisticCellVoltageMax.value = cellVMax
-            if (cellTMin != null) _statisticCellTempMin.value = cellTMin
+            if (cellTMin != null) {
+                val avg = cellTAvg ?: _statisticCellTempAvg.value
+                if (avg == null || cellTMin <= avg) _statisticCellTempMin.value = cellTMin
+            }
             if (cellTAvg != null) _statisticCellTempAvg.value = cellTAvg
             if (cellTMax != null) _statisticCellTempMax.value = cellTMax
             if (soh != null) _statisticBatterySoh.value = soh
@@ -3329,8 +3335,7 @@ class BydVehicleDataSource(context: Context) {
             val hvVoltage      = invokeIntGetter(device, *m51["hvVoltage"].orEmpty().toTypedArray())
             val hvCurrent      = invokeNumericDoubleGetter(device, *m51["hvCurrent"].orEmpty().toTypedArray())
             val auxBatt12v     = invokeNumericDoubleGetter(device, *m51["aux12v"].orEmpty().toTypedArray())
-            val roadSlopeRaw   = invokeIntGetter(device, *m51["roadSlope"].orEmpty().toTypedArray())
-            val roadSlope      = roadSlopeRaw?.let { it / 10.0 }
+            val roadSlope      = invokeNumericDoubleGetter(device, *m51["roadSlope"].orEmpty().toTypedArray())
             _vehicleSnapshot.value = _vehicleSnapshot.value.copy(
                 batteryPackTemp  = batteryTemp ?: _vehicleSnapshot.value.batteryPackTemp,
                 cabinTemperature = cabinTemp   ?: _vehicleSnapshot.value.cabinTemperature,
@@ -5735,12 +5740,24 @@ class BydVehicleDataSource(context: Context) {
             sdf["batteryCurrent"] -> if (v in 10.0..200000.0) _statisticBatteryCurrent.value  = v / 100.0  else matched = false
             // Auxiliary temperature sensor; intentionally ignored for cell temps.
             sdf["auxHousingTemp"] -> matched = false
-            sdf["cellTMin"] -> if (v in -1000.0..1000.0) _statisticCellTempMin.value = v / runtimeScale01 else matched = false
+            sdf["cellTMin"] -> if (v in -1000.0..1000.0) {
+                val candidate = v / runtimeScale01
+                val avg = _statisticCellTempAvg.value
+                // 0x44700020 returns a non-minimum probe on some firmware (observed > avg on Seal Excellence).
+                // Only accept the value when it is physically valid (≤ avg, or avg unknown).
+                if (avg == null || candidate <= avg) _statisticCellTempMin.value = candidate
+            } else matched = false
             sdf["socBms"] -> {
                 val decoded = decodeStatisticPercentRaw(v.toInt(), _vehicleSnapshot.value.statisticElecPercentageValue ?: _instrumentBatteryPercent.value)
                 if (decoded != null) _statisticSocBms.value = decoded else matched = false
             }
-            sdf["cellTAvg"] -> if (v in -1000.0..1000.0) _statisticCellTempAvg.value = v / runtimeScale01 else matched = false
+            sdf["cellTAvg"] -> if (v in -1000.0..1000.0) {
+                val newAvg = v / runtimeScale01
+                _statisticCellTempAvg.value = newAvg
+                // Evict a stale cellTMin that now exceeds the freshly-arrived avg.
+                val storedMin = _statisticCellTempMin.value
+                if (storedMin != null && storedMin > newAvg) _statisticCellTempMin.value = null
+            } else matched = false
             sdf["soh"] -> {
                 val decoded = decodeStatisticPercentRaw(v.toInt())?.takeIf { it in 50.0..110.0 }
                 if (decoded != null) _statisticBatterySoh.value = decoded else matched = false
