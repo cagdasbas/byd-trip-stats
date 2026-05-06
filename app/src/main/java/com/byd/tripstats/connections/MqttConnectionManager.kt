@@ -282,7 +282,7 @@ class MqttConnectionManager(context: Context) {
             SensorDef("ext_temp", "External Temperature", "°C", "temperature", "measurement"),
             SensorDef("cabin_temp", "Cabin Temperature", "°C", "temperature", "measurement"),
             SensorDef("soh", "State of Health", "%", null, "measurement"),
-            SensorDef("statistic_soh", "Statistic SOH", "%", null, "measurement"),
+            SensorDef("statistic_soh", "Statistic SOH", "%", null, "measurement"), // Falls back to capacity-based soh or remaining-energy-based 
             SensorDef("available_power", "Available Power", "kW", "power", "measurement"),
             SensorDef("battery_remain_power_ev", "Battery Remain Power EV", "kW", null, "measurement"),
             SensorDef("battery_pack_temp", "Battery Pack Temp", "°C", "temperature", "measurement"),

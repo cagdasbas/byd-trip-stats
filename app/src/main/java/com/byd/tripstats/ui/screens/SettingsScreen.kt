@@ -3050,7 +3050,7 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             try {
-                                VehicleCompatibilityProbe.exportReportFile()
+                                VehicleCompatibilityProbe.exportReportFile(saveToDownloads = true)
                                 launch(Dispatchers.Main) {
                                     statusMessage = "Saved to Download/BydTripStats/compat_probe.json"
                                 }

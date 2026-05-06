@@ -111,6 +111,36 @@ object CarCatalog {
         cdA = 0.682       // Cd 0.29 × A 2.35 m²
     )
 
+    val BYD_ATTO_2_ACTIVE = CarConfig(
+        id = "BYD_ATTO_2_ACTIVE",
+        displayName = "BYD Atto 2 Active",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 45.1,
+        estimatedKerbMassKg = 1570.0,
+        wltpKm = 312,
+        referenceConsumptionKwhPer100km = 18.7,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 130,
+        cellCount = 94,   // EV Database: 45.1 kWh usable, 94 cells, 400V architecture
+        cdA = 0.700       // estimate for compact SUV body
+    )
+
+    val BYD_ATTO_2_COMFORT = CarConfig(
+        id = "BYD_ATTO_2_COMFORT",
+        displayName = "BYD Atto 2 Comfort",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 64.8,
+        estimatedKerbMassKg = 1720.0,
+        wltpKm = 430,
+        referenceConsumptionKwhPer100km = 19.1,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 150,
+        cellCount = 112,  // EV Database: 64.8 kWh usable, 112 cells, 400V architecture
+        cdA = 0.700       // estimate for compact SUV body
+    )
+
     val BYD_ATTO_3 = CarConfig(
         id = "BYD_ATTO_3",
         displayName = "BYD Atto 3",
@@ -152,12 +182,6 @@ object CarCatalog {
         cellCount = 207,  // 87.0 kWh @ ~663V → 207S LFP (estimate)
         cdA = 0.762       // Cd 0.28 × A 2.72 m² (estimate, same body as Comfort)
     )
-
-    // ── BYD Seagull / Dolphin Surf ────────────────────────────────────────────
-    // Sold in Europe as "BYD Dolphin Surf". Three trims share the same body
-    // (Cd 0.29, frontal area ~2.25 m²). Active uses a 30 kWh pack (94S, 301V); Boost and
-    // Comfort share the 43.2 kWh pack (90S, 288V) — Comfort adds a more powerful motor.
-    // Cell counts from ev-database.org.
 
     val BYD_DOLPHIN_SURF_ACTIVE = CarConfig(
         id = "BYD_DOLPHIN_SURF_ACTIVE",
@@ -201,8 +225,6 @@ object CarCatalog {
         cdA = 0.653       // Cd 0.29 × A 2.25 m² (estimate)
     )
 
-    // ── BYD M6 ───────────────────────────────────────────────────────────────
-
     val BYD_M6 = CarConfig(
         id = "BYD_M6",
         displayName = "BYD M6",
@@ -217,8 +239,6 @@ object CarCatalog {
         cellCount = 184,  // 71.8 kWh @ ~589V → 184S LFP (estimate, same pack as Seal U Comfort)
         cdA = 0.868       // Cd 0.33 × A ~2.63 m² (1.81 × 1.69 × 0.86)
     )
-
-    // ── BYD Seal U DM-i / Song Plus DM-i ─────────────────────────────────────
 
     val BYD_SEAL_U_DM_I = CarConfig(
         id = "BYD_SEAL_U_DM_I",
@@ -286,14 +306,6 @@ object CarCatalog {
         phevUsableBatteryKwh = 44.0
     )
 
-    // ── BYD Seal 5 DM-i / Sealion 5 DM-i / Destroyer 05 ─────────────────────
-    // Sold in Europe as "BYD Sealion 5 DM-i". Two trims, both FWD, sharing the
-    // same 1.5L Xiaoyun engine (72 kW) + 145 kW front e-motor.
-    // Comfort: 15.0 kWh gross / 12.96 kWh usable → 61 km EV WLTP.
-    // Design:  21.5 kWh gross / 18.3 kWh usable  → 86 km EV WLTP.
-    // Cell counts derived from the DM-i ~59 Ah Blade cell profile:
-    //   Comfort 80S × 3.22V = 258V → 58 Ah  |  Design 112S × 3.22V = 361V → 60 Ah.
-
     val BYD_SEALION_5_DMI_COMFORT = CarConfig(
         id = "BYD_SEALION_5_DMI_COMFORT",
         displayName = "BYD Seal 5 / Sealion 5 DM-i Comfort",
@@ -332,6 +344,8 @@ object CarCatalog {
         BYD_SEAL_EXCELLENCE,
         BYD_DOLPHIN_STANDARD,
         BYD_DOLPHIN_EXTENDED,
+        BYD_ATTO_2_ACTIVE,
+        BYD_ATTO_2_COMFORT,
         BYD_ATTO_3,
         BYD_SEAL_U_COMFORT,
         BYD_SEAL_U_DESIGN,
@@ -359,6 +373,7 @@ object CarCatalog {
     val groupedBev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(
         "BYD Seal" to listOf(BYD_SEAL_DYNAMIC_RWD, BYD_SEAL_PREMIUM_RWD, BYD_SEAL_EXCELLENCE),
         "BYD Dolphin" to listOf(BYD_DOLPHIN_STANDARD, BYD_DOLPHIN_EXTENDED),
+        "BYD Atto 2" to listOf(BYD_ATTO_2_ACTIVE, BYD_ATTO_2_COMFORT),
         "BYD Atto 3" to listOf(BYD_ATTO_3),
         "BYD Seal U" to listOf(BYD_SEAL_U_COMFORT, BYD_SEAL_U_DESIGN),
         "BYD Seagull / Dolphin Surf" to listOf(BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),

@@ -3,6 +3,7 @@ package com.byd.tripstats.sdk
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Environment
 import android.util.Log
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -644,35 +645,58 @@ object VehicleCompatibilityProbe {
      * Write the report to the app's cache dir and return a content URI suitable
      * for sharing via [Intent.ACTION_SEND] even on restricted Android builds.
      */
-    fun exportReportFile(): File {
+    fun exportReportFile(saveToDownloads: Boolean = false): File {
         val json = buildReportJson()
         val ts = Instant.now().toString().replace(":", "-").replace(".", "-")
         val file = File(appContext.cacheDir, "byd_compat_probe_$ts.json")
         file.writeText(json, Charsets.UTF_8)
         Log.i(TAG, "Probe report written: ${file.absolutePath} (${file.length()} bytes)")
-        exportReportToDownloads(json)
+        if (saveToDownloads) exportReportToDownloads(json)
         return file
     }
 
     private fun exportReportToDownloads(json: String) {
         try {
-            val resolver = appContext.contentResolver
-            val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
-            val name = "compat_probe.json"
-            val relativePath = "Download/BydTripStats/"
-            resolver.delete(
-                collection,
-                "${android.provider.MediaStore.Downloads.DISPLAY_NAME} = ? AND ${android.provider.MediaStore.Downloads.RELATIVE_PATH} = ?",
-                arrayOf(name, relativePath)
+            val downloadsDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "BydTripStats"
             )
-            val values = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
-                put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
-                put(android.provider.MediaStore.Downloads.RELATIVE_PATH, relativePath)
+            if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
+                throw IllegalStateException("Could not create ${downloadsDir.absolutePath}")
             }
-            val uri = resolver.insert(collection, values) ?: return
-            resolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
-        } catch (_: Exception) { }
+            val file = File(downloadsDir, "compat_probe.json")
+            file.writeText(json, Charsets.UTF_8)
+            Log.i(TAG, "Probe report exported to filesystem: ${file.absolutePath}")
+            return
+        } catch (filesystemError: Exception) {
+            Log.w(TAG, "Filesystem export failed, trying MediaStore fallback", filesystemError)
+        }
+
+        val resolver = appContext.contentResolver
+        val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val name = "compat_probe.json"
+        val relativePath = "Download/BydTripStats"
+        resolver.delete(
+            collection,
+            "${android.provider.MediaStore.Downloads.DISPLAY_NAME} = ? AND ${android.provider.MediaStore.Downloads.RELATIVE_PATH} LIKE ?",
+            arrayOf(name, "%BydTripStats%")
+        )
+        val values = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+            put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/json")
+            put(android.provider.MediaStore.Downloads.RELATIVE_PATH, relativePath)
+            put(android.provider.MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(collection, values)
+            ?: throw IllegalStateException("Could not create compat probe file in Download")
+        resolver.openOutputStream(uri)?.use { output ->
+            output.write(json.toByteArray(Charsets.UTF_8))
+        } ?: throw IllegalStateException("Could not open compat probe file for writing")
+        val published = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Downloads.IS_PENDING, 0)
+        }
+        resolver.update(uri, published, null, null)
+        Log.i(TAG, "Probe report exported to Downloads via MediaStore: $uri")
     }
 
     /**

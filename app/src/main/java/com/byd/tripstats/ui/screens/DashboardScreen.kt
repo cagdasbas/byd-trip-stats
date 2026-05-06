@@ -61,7 +61,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.imageResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.window.Dialog
@@ -619,6 +623,9 @@ fun EnergyFlowDiagram(
     }
     val flowOffset = if (dashboardAnimationsEnabled && hasActiveEnergyFlow) flowOffsetAnim.value else 0f
 
+    // Load as ImageBitmap
+    val awdBitmap = ImageBitmap.imageResource(id = R.drawable.awd)
+
     Card(
         modifier = modifier
             .clipToBounds()
@@ -709,11 +716,13 @@ fun EnergyFlowDiagram(
                     ) {
                         // AWD Image — tap to change pressure unit
                         Image(
-                            painter = painterResource(R.drawable.awd),
+                            bitmap = awdBitmap,
                             contentDescription = "AWD drivetrain — tap to change pressure unit",
                             modifier = Modifier
                                 .size(90.dp)
-                                .clickable { showTyreUnitDialog = true }
+                                .clickable { showTyreUnitDialog = true },
+                            contentScale = ContentScale.Fit,
+                            filterQuality = FilterQuality.High
                         )
 
                         // Tyre Pressure Overlays
@@ -1611,7 +1620,7 @@ fun VehicleStats(
         }
 
         StatCard(
-            title    = "Regen / Driving Dynamics",
+            title    = "Driving Dynamics",
             value    = "${telemetry.regenModeName} / ${telemetry.driveModeName}",
             subtitle = run {
                 val slope = vehicleSnapshot?.roadSlopeDeg

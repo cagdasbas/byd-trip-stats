@@ -207,7 +207,8 @@ data class VehicleTelemetrySnapshot(
         val batteryKwh = carConfig?.batteryKwh?.takeIf { it > 0.0 } ?: return null
         val cellCount = carConfig.cellCount.takeIf { it > 0 } ?: return null
         val nominalCapacityAh = (batteryKwh * 1000.0) / (cellCount * BYD_BLADE_REFERENCE_CELL_VOLTAGE)
-        return ((capacityAh / nominalCapacityAh) * 100.0).takeIf { it in 50.0..110.0 }
+        return ((capacityAh / nominalCapacityAh) * 100.0)
+            .coerceIn(50.0, 100.0)
     }
 
     private fun estimateSohFromRemainingEnergy(carConfig: CarConfig?): Double? {
@@ -222,7 +223,7 @@ data class VehicleTelemetrySnapshot(
             ?.div(100.0)
             ?: return null
         return ((remainingKwh / normalizedSoc) / batteryKwh * 100.0)
-            .takeIf { it in 50.0..110.0 }
+            .coerceIn(50.0, 100.0)
     }
 
     fun asSchemaMap(): Map<String, Any?> {
@@ -249,7 +250,7 @@ data class VehicleTelemetrySnapshot(
         val fallbackSoh = statisticBatterySoh
             ?: estimateSohFromBodyworkCapacity(carConfig)
             ?: estimateSohFromRemainingEnergy(carConfig)
-        val inferredSoh = batterySoh ?: fallbackSoh?.toInt()
+        val inferredSoh = (batterySoh ?: fallbackSoh?.toInt())?.coerceIn(0, 100)
         val inferredSohEstimated = sohEstimated ||
             (batterySoh == null && statisticBatterySoh == null && fallbackSoh != null)
         val panelSoc = statisticElecPercentageValue
@@ -403,7 +404,7 @@ data class VehicleTelemetrySnapshot(
             statisticCellTempMin = statisticCellTempMin,
             statisticCellTempMax = statisticCellTempMax,
             statisticCellTempAvg = statisticCellTempAvg,
-            statisticBatterySoh = statisticBatterySoh ?: fallbackSoh,
+            statisticBatterySoh = (statisticBatterySoh ?: fallbackSoh)?.coerceIn(0.0, 100.0),
             statisticSocBms = effectiveBmsSoc ?: statisticSocBms,
             statisticAvailPower = statisticAvailPower,
             probeValues = probeValues,

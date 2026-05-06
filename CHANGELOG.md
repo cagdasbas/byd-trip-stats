@@ -6,6 +6,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.1.1] - 2026-May-06
+
+### Added
+
+- **BYD ATTO 2 support** — new BEV trims added to the car catalog: Active and Comfort.
+- **BYD M6 support** — the M6 is now available as a selectable BEV profile.
+- **Public compatibility probe export** — the compatibility probe can now be saved as `Download/BydTripStats/compat_probe.json` locally instead of only being generated in the app cache and sent via private telegram bot.
+
+### Changed
+
+- **SoH handling** — SoH estimates are now capped at 100% before they reach the dashboard, MQTT, and history due to `bodyworkBatteryCapacity` being rough or slightly inflated number and `remainingKwh / soc` could overshoot when one of the inputs would be coarse or stale
+- **Probe export flow** — the Settings screen now only reports success after the public Downloads file has actually been written.
+- **Regen mode detection** — additional firmware paths are now used to surface drive/regen modes on more car models beyond the original supported set.
+- **Vehicle analysis naming** — the trip analysis screen now uses the broader `vehicleAnalysis` label instead of `phevAnalysis`.
+- **AWD icon rendering** — the drivetrain icon in the dashboard was switched to a sharper bitmap path, improving clarity on the car head unit.
+
+### Fixed
+
+- **Compatibility probe save** — the saved probe file now uses the same Downloads path as the app’s other backup/export flows, so it actually appears in the file manager on supported BYD head units.
+
+### Reverted changes
+
+- **Road slope×** — the value is no longer divided by 10 at the read (change implemented at 2.1.0)
+
+---
+
 ## [2.1.0] - 2026-May-01
 
 ### Added
