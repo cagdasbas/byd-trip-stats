@@ -210,9 +210,11 @@ class ChargingRepository private constructor(context: Context) {
         val id = sessionDao.insertSession(session)
         activeSession = session.copy(id = id)
         lastChargingSeenAtMs = System.currentTimeMillis()
+        recordDataPoint(telemetry)
+        // Signal observers only after the first data point is committed,
+        // so any close triggered immediately after open sees non-empty data.
         _activeSessionId.value = id
         _isCharging.value = true
-        recordDataPoint(telemetry)
     }
 
     private suspend fun recordDataPoint(telemetry: VehicleTelemetry) {

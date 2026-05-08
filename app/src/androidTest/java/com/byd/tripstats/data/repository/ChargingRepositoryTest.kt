@@ -253,7 +253,7 @@ class ChargingRepositoryTest {
         // correct delta and reconstruct the session.
         repo.onTelemetry(
             telemetry(
-                gear = "P", speed = 0.0, enginePower = 0.0,
+                gear = "P", speed = 0.0, enginePower = 0,
                 chargingPower = 0.0, carOn = 0, soc = 72.0, battery12vVoltage = 12.4
             ),
             car
@@ -266,7 +266,7 @@ class ChargingRepositoryTest {
         // persistShutdownState is synchronous — read immediately after onTelemetry returns.
         repo.onTelemetry(
             telemetry(
-                gear = "P", speed = 0.0, enginePower = 0.0,
+                gear = "P", speed = 0.0, enginePower = 0,
                 chargingPower = 0.0, carOn = 1, soc = 72.0
             ),
             car
