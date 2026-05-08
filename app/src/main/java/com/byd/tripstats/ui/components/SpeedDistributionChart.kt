@@ -25,6 +25,7 @@ import com.byd.tripstats.ui.theme.*
 @Composable
 fun SpeedDistributionChart(
     speedDistribution: Map<String, Double>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (speedDistribution.isEmpty()) {
@@ -140,6 +141,6 @@ fun SpeedDistributionChart(
             color = textColor.copy(alpha = 0.4f).toArgb(); textSize = 17f
             textAlign = android.graphics.Paint.Align.RIGHT; isAntiAlias = true
         }
-        nc.drawText("km/h", w - padR, padT + chartH + 28f, unitPaint)
+        nc.drawText(if (useImperial) "mph" else "km/h", w - padR, padT + chartH + 28f, unitPaint)
     }
 }

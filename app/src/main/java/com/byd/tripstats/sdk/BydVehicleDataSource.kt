@@ -321,7 +321,7 @@ data class VehicleTelemetrySnapshot(
             speed = effectiveSpeed,
             gear = gear,
             odometer = odometerValue,
-            enginePower = enginePower?.toDouble() ?: 0.0,
+            enginePower = enginePower ?: 0,
             totalDischarge = statisticTotalElecConValue ?: 0.0,
             totalElecConPHM = statisticTotalElecConPHMValue,
             battery12vVoltage = battery12vVoltage ?: 0.0,

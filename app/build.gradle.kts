@@ -120,6 +120,14 @@ android {
     }
 }
 
+// Keep app/src/main/assets/changelog.md in sync with the root CHANGELOG.md at every build
+tasks.register<Copy>("syncChangelog") {
+    from(rootProject.file("CHANGELOG.md"))
+    into(layout.projectDirectory.dir("src/main/assets"))
+    rename { "changelog.md" }
+}
+tasks.named("preBuild") { dependsOn("syncChangelog") }
+
 dependencies {
     // Core Android
     implementation(kotlin("stdlib"))

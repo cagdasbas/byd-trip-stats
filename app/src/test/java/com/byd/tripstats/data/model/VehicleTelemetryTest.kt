@@ -8,7 +8,7 @@ import java.time.Instant
 private fun telemetry(
     gear          : String = "P",
     speed         : Double = 0.0,
-    enginePower   : Double = 0.0,
+    enginePower   : Int    = 0,
     chargingPower : Double = 0.0,
     soc           : Double = 80.0,
     carOn         : Int    = 1,
@@ -84,13 +84,13 @@ class VehicleTelemetryTest {
     @Test fun `isCarOn is true when drivetrain signals imply the car is active`() {
         assertTrue(telemetry(carOn = 0, gear = "D", speed = 1.0).isCarOn)
         assertTrue(telemetry(carOn = 0, speed = 3.0).isCarOn)
-        assertTrue(telemetry(carOn = 0, enginePower = 6.0).isCarOn)
+        assertTrue(telemetry(carOn = 0, enginePower = 6).isCarOn)
     }
 
     @Test fun `isCarOn is true for D or R gear regardless of speed`() {
         // Car stopped at red light — segment must not reset
-        assertTrue(telemetry(carOn = 0, gear = "D", speed = 0.0, enginePower = 0.0).isCarOn)
-        assertTrue(telemetry(carOn = 0, gear = "R", speed = 0.0, enginePower = 0.0).isCarOn)
+        assertTrue(telemetry(carOn = 0, gear = "D", speed = 0.0, enginePower = 0).isCarOn)
+        assertTrue(telemetry(carOn = 0, gear = "R", speed = 0.0, enginePower = 0).isCarOn)
     }
 
     @Test fun `isCarOn is false when only twelve volt rail is alive`() {
@@ -133,20 +133,20 @@ class VehicleTelemetryTest {
     // ── isRegenerating ────────────────────────────────────────────────────────
 
     @Test fun `isRegenerating is true when enginePower is below minus 1`() {
-        assertTrue(telemetry(enginePower = -1.5).isRegenerating)
-        assertTrue(telemetry(enginePower = -50.0).isRegenerating)
+        assertTrue(telemetry(enginePower = -2).isRegenerating)
+        assertTrue(telemetry(enginePower = -50).isRegenerating)
     }
 
     @Test fun `isRegenerating is false at exactly minus 1 (noise threshold)`() {
-        assertFalse(telemetry(enginePower = -1.0).isRegenerating)
+        assertFalse(telemetry(enginePower = -1).isRegenerating)
     }
 
     @Test fun `isRegenerating is false when power is positive`() {
-        assertFalse(telemetry(enginePower = 10.0).isRegenerating)
+        assertFalse(telemetry(enginePower = 10).isRegenerating)
     }
 
     @Test fun `isRegenerating is false when power is zero`() {
-        assertFalse(telemetry(enginePower = 0.0).isRegenerating)
+        assertFalse(telemetry(enginePower = 0).isRegenerating)
     }
 
     // ── isDriving / isMoving / isParked ───────────────────────────────────────

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import java.util.Locale
 
 // The backing file keeps its historical name so existing installs preserve
 // their selected car and other preferences across upgrades.
@@ -28,6 +29,7 @@ private val DASHBOARD_ANIMATIONS_ENABLED = booleanPreferencesKey("dashboard_anim
 private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_price_per_kwh")
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
 private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms")
+private val UNIT_SYSTEM                  = stringPreferencesKey("unit_system")
 
 class PreferencesManager(private val context: Context) {
 
@@ -132,4 +134,28 @@ class PreferencesManager(private val context: Context) {
     suspend fun clearSohBaselineEpochMs() {
         context.dataStore.edit { it.remove(SOH_BASELINE_EPOCH_MS) }
     }
+
+    // ── Unit system ───────────────────────────────────────────────────────────
+
+    val unitSystem: Flow<UnitSystem> = context.dataStore.data
+        .map { prefs ->
+            prefs[UNIT_SYSTEM]
+                ?.let { runCatching { UnitSystem.valueOf(it) }.getOrNull() }
+                ?: localeDefaultUnitSystem()
+        }
+        .onEach { cache.edit().putString("unit_system", it.name).apply() }
+
+    fun getCachedUnitSystem(): UnitSystem =
+        cache.getString("unit_system", null)
+            ?.let { runCatching { UnitSystem.valueOf(it) }.getOrNull() }
+            ?: localeDefaultUnitSystem()
+
+    suspend fun saveUnitSystem(system: UnitSystem) {
+        context.dataStore.edit { it[UNIT_SYSTEM] = system.name }
+        cache.edit().putString("unit_system", system.name).apply()
+    }
+
+    private fun localeDefaultUnitSystem(): UnitSystem =
+        if (Locale.getDefault().country.uppercase() == "GB") UnitSystem.IMPERIAL
+        else UnitSystem.METRIC
 }

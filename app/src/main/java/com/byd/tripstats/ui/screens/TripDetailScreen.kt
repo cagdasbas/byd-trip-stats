@@ -47,6 +47,13 @@ import com.byd.tripstats.ui.components.RouteAnalysisTab
 import com.byd.tripstats.ui.components.TripHeatmapsTab
 import com.byd.tripstats.ui.components.SocChart
 import com.byd.tripstats.ui.components.SpeedChart
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.isImperial
+import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.abs
@@ -72,6 +79,7 @@ fun TripDetailScreen(
     val regenEfficiencyPct = tripMetrics[tripId]?.regenEfficiencyPct
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol   by viewModel.currencySymbol.collectAsState()
+    val unitSystem       by viewModel.unitSystem.collectAsState()
     val chargingSessions by viewModel.allChargingSessions.collectAsState()
     val tripAdditionalChargingCosts by viewModel.tripAdditionalChargingCosts.collectAsState()
     val selectedCarConfig by viewModel.selectedCarConfig.collectAsState(initial = null)
@@ -167,13 +175,14 @@ fun TripDetailScreen(
                             regenEfficiencyPct = regenEfficiencyPct,
                             electricityPrice = electricityPrice,
                             currencySymbol = currencySymbol,
+                            unitSystem = unitSystem,
                             chargingSessions = chargingSessions,
                             additionalChargingCost = tripAdditionalChargingCosts[tripId] ?: 0.0,
                             onSaveAdditionalChargingCost = { amount ->
                                 viewModel.saveTripAdditionalChargingCost(tripId, amount)
                             }
                         )
-                        1 -> TripChartsTab(dataPoints = dataPoints)
+                        1 -> TripChartsTab(dataPoints = dataPoints, useImperial = unitSystem.isImperial)
                         2 -> TripHeatmapsTab(dataPoints = dataPoints)
                         3 -> TripRouteTab(dataPoints = dataPoints)
                         4 -> RouteAnalysisTab(
@@ -428,6 +437,7 @@ fun TripOverviewTab(
     regenEfficiencyPct: Double?,
     electricityPrice: Double = 0.0,
     currencySymbol: String = "€",
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     chargingSessions: List<com.byd.tripstats.data.local.entity.ChargingSessionEntity> = emptyList(),
     additionalChargingCost: Double = 0.0,
     onSaveAdditionalChargingCost: (Double?) -> Unit = {}
@@ -480,8 +490,8 @@ fun TripOverviewTab(
         ) {
             MetricCard(
                 title = "Distance",
-                value = String.format("%.1f", trip.distance ?: 0.0),
-                unit = "km",
+                value = String.format("%.1f", unitSystem.convertDistance(trip.distance ?: 0.0)),
+                unit = unitSystem.distanceUnit,
                 icon = Icons.Filled.Route,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier
@@ -530,8 +540,8 @@ fun TripOverviewTab(
             
             MetricCard(
                 title = "Average consumption",
-                value = String.format("%.2f", trip.efficiency ?: 0.0),
-                unit = "kWh / 100km",
+                value = String.format("%.2f", unitSystem.convertEfficiency(trip.efficiency ?: 0.0)),
+                unit = "kWh / 100${unitSystem.distanceUnit}",
                 icon = Icons.Filled.Eco,
                 color = RegenGreen,
                 modifier = Modifier
@@ -571,9 +581,9 @@ fun TripOverviewTab(
                 DetailRow("End Time", trip.endTime?.let { formatTimestamp(it) } ?: "In Progress")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Initial mileage", "${String.format("%.1f", trip.startOdometer)} km")
-                DetailRow("Final mileage", trip.endOdometer?.let { "${String.format("%.1f", it)} km" } ?: "-")
-                DetailRow("Trip distance", trip.distance?.let { "${String.format("%.1f", it)} km" } ?: "-")
+                DetailRow("Initial mileage", "${String.format("%.1f", trip.startOdometer)} ${unitSystem.distanceUnit}")
+                DetailRow("Final mileage", trip.endOdometer?.let { "${String.format("%.1f", it)} ${unitSystem.distanceUnit}" } ?: "-")
+                DetailRow("Trip distance", trip.distance?.let { "${String.format("%.1f", unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
                 DetailRow("Start SOC", "${String.format("%.1f", trip.startSoc)}%")
@@ -581,8 +591,8 @@ fun TripOverviewTab(
                 DetailRow("SOC Change", trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Max Speed", "${trip.maxSpeed.toInt()} km/h")
-                DetailRow("Avg Speed", stats?.avgSpeed?.toInt()?.toString()?.plus(" km/h") ?: "-")
+                DetailRow("Max Speed", "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}")
+                DetailRow("Avg Speed", stats?.avgSpeed?.toInt()?.toString()?.plus(" ${unitSystem.speedUnit}") ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
                 DetailRow("Max Power", "${trip.maxPower.toInt()} kW")
@@ -839,7 +849,8 @@ private fun formatSignedKwh(value: Double): String =
 
 @Composable
 fun TripChartsTab(
-    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>
+    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
+    useImperial: Boolean = false
 ) {
     // Track which chart is expanded
     var expandedChart by remember { mutableStateOf<ChartType?>(null) }
@@ -854,7 +865,7 @@ fun TripChartsTab(
         // 1. Speed Profile
         ClickableChartCard(
             title = "Speed Profile",
-            subtitle = "km/h over time",
+            subtitle = "${if (useImperial) "mph" else "km/h"} over time",
             onClick = { expandedChart = ChartType.SPEED }
         ) {
             CondensedSpeedChart(
@@ -950,7 +961,7 @@ fun TripChartsTab(
         // 9. Instantaneous Consumption
         ClickableChartCard(
             title = "Instantaneous Consumption",
-            subtitle = "kWh/100 km — raw + rolling average",
+            subtitle = "${if (useImperial) "kWh/100mi" else "kWh/100km"} — raw + rolling average",
             onClick = { expandedChart = ChartType.INSTANT_CONSUMPTION }
         ) {
             CondensedInstantConsumptionChart(
@@ -1000,6 +1011,7 @@ fun TripChartsTab(
         FullscreenChartDialog(
             chartType = chartType,
             dataPoints = dataPoints,  // Full data
+            useImperial = useImperial,
             onDismiss = { expandedChart = null }
         )
     }
@@ -1068,6 +1080,7 @@ enum class ChartType {
 private fun FullscreenChartDialog(
     chartType: ChartType,
     dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
+    useImperial: Boolean = false,
     onDismiss: () -> Unit
 ) {
     // Most fullscreen charts still use a condensed dataset for readability,
@@ -1117,13 +1130,13 @@ private fun FullscreenChartDialog(
                                 text = when (chartType) {
                                     ChartType.ENERGY -> "kWh over time"
                                     ChartType.SOC -> "SoC% over time"
-                                    ChartType.SPEED -> "km/h over time"
+                                    ChartType.SPEED -> "${if (useImperial) "mph" else "km/h"} over time"
                                     ChartType.MOTOR_RPM -> "RPM over time"
                                     ChartType.ALTITUDE -> "Altitude over time"
                                     ChartType.POWER -> "kW over time"
                                     ChartType.BATTERY_VOLTAGE -> "HV bus + cell min/max (V)"
                                     ChartType.TYRE_PRESSURE -> "All four wheels (bar)"
-                                    ChartType.INSTANT_CONSUMPTION -> "kWh/100 km over distance"
+                                    ChartType.INSTANT_CONSUMPTION -> "${if (useImperial) "kWh/100mi" else "kWh/100km"} over distance"
                                     ChartType.MODE_TIMELINE -> "Mode timeline over the trip"
                                 },
                                 fontSize = 14.sp,
@@ -1158,6 +1171,7 @@ private fun FullscreenChartDialog(
                         )
                         ChartType.SPEED -> SpeedChart(
                             dataPoints = chartData,
+                            useImperial = useImperial,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.MOTOR_RPM -> MotorRpmChart(
@@ -1182,6 +1196,7 @@ private fun FullscreenChartDialog(
                         )
                         ChartType.INSTANT_CONSUMPTION -> InstantConsumptionChart(
                             dataPoints = dataPoints,  // full data — chart filters internally
+                            useImperial = useImperial,
                             modifier = Modifier.fillMaxSize()
                         )
                         ChartType.MODE_TIMELINE -> {

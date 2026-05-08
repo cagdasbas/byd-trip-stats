@@ -25,6 +25,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.min
@@ -39,6 +44,7 @@ fun TripGoalsScreen(
     val personalBests  by viewModel.personalBests.collectAsState()
     val distanceMonth  by viewModel.distanceThisMonth.collectAsState()
     val allTrips       by viewModel.allTrips.collectAsState()
+    val unitSystem     by viewModel.unitSystem.collectAsState()
 
     // Recent efficiency: average of last 5 completed trips with distance ≥ 1 km
     val recentAvgConsumption = remember(allTrips) {
@@ -103,7 +109,7 @@ fun TripGoalsScreen(
                     color    = RegenGreen,
                     label    = "Best efficiency",
                     value    = personalBests.bestConsumption
-                        ?.let { "${"%.2f".format(it)} kWh/100km" } ?: "No data",
+                        ?.let { "${"%.2f".format(unitSystem.convertEfficiency(it))} ${unitSystem.consumptionUnit}" } ?: "No data",
                     sub      = "Lowest ever recorded"
                 )
                 BestCard(
@@ -112,7 +118,7 @@ fun TripGoalsScreen(
                     color    = BatteryBlue,
                     label    = "Longest trip",
                     value    = personalBests.bestDistance
-                        ?.let { "${"%.1f".format(it)} km" } ?: "No data",
+                        ?.let { "${"%.1f".format(unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "No data",
                     sub      = "Single trip distance"
                 )
             }
@@ -194,28 +200,32 @@ fun TripGoalsScreen(
 
             // Efficiency goal progress
             goals.targetConsumptionKwhPer100km?.let { target ->
+                val displayTarget = unitSystem.convertEfficiency(target)
+                val displayCurrent = recentAvgConsumption?.let { unitSystem.convertEfficiency(it) }
                 GoalProgressCard(
                     icon        = Icons.Filled.Eco,
                     color       = RegenGreen,
                     title       = "Efficiency target",
-                    subtitle    = "≤ ${"%.2f".format(target)} kWh/100km (last 5 trips avg)",
-                    current     = recentAvgConsumption,
-                    target      = target,
-                    unit        = "kWh/100km",
+                    subtitle    = "≤ ${"%.2f".format(displayTarget)} ${unitSystem.consumptionUnit} (last 5 trips avg)",
+                    current     = displayCurrent,
+                    target      = displayTarget,
+                    unit        = unitSystem.consumptionUnit,
                     lowerIsBetter = true
                 )
             }
 
             // Monthly distance goal progress
             goals.targetDistanceKmPerMonth?.let { target ->
+                val displayTarget = unitSystem.convertDistance(target)
+                val displayCurrent = unitSystem.convertDistance(distanceMonth)
                 GoalProgressCard(
                     icon        = Icons.Filled.Route,
                     color       = BatteryBlue,
                     title       = "Monthly distance",
-                    subtitle    = "${"%.0f".format(distanceMonth)} / ${"%.0f".format(target)} km this month",
-                    current     = distanceMonth,
-                    target      = target,
-                    unit        = "km",
+                    subtitle    = "${"%.0f".format(displayCurrent)} / ${"%.0f".format(displayTarget)} ${unitSystem.distanceUnit} this month",
+                    current     = displayCurrent,
+                    target      = displayTarget,
+                    unit        = unitSystem.distanceUnit,
                     lowerIsBetter = false
                 )
             }
@@ -225,8 +235,9 @@ fun TripGoalsScreen(
 
         if (showGoalDialog) {
             GoalEditDialog(
-                current  = goals,
-                onSave   = { cons, dist ->
+                current    = goals,
+                unitSystem = unitSystem,
+                onSave     = { cons, dist ->
                     viewModel.saveTripGoals(cons, dist)
                     showGoalDialog = false
                 },
@@ -326,9 +337,9 @@ private fun GoalProgressCard(
 
             if (!achieved && current != null) {
                 val remaining = if (lowerIsBetter)
-                    "Need ${"%.2f".format(current - target)} kWh/100km improvement"
+                    "Need ${"%.2f".format(current - target)} $unit improvement"
                 else
-                    "${"%.0f".format(target - current)} km remaining this month"
+                    "${"%.0f".format(target - current)} $unit remaining this month"
                 Text(remaining, style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -379,15 +390,18 @@ private fun SectionLabel(text: String) {
 
 @Composable
 private fun GoalEditDialog(
-    current  : DashboardViewModel.TripGoals,
-    onSave   : (consumption: Double?, distancePerMonth: Double?) -> Unit,
-    onDismiss: () -> Unit
+    current    : DashboardViewModel.TripGoals,
+    unitSystem : UnitSystem = UnitSystem.METRIC,
+    onSave     : (consumption: Double?, distancePerMonth: Double?) -> Unit,
+    onDismiss  : () -> Unit
 ) {
+    val efficiencyFactor = if (unitSystem == UnitSystem.IMPERIAL) 1.0 / 0.621371 else 1.0
+    val distanceFactor   = if (unitSystem == UnitSystem.IMPERIAL) 0.621371 else 1.0
     var consInput  by remember {
-        mutableStateOf(current.targetConsumptionKwhPer100km?.let { "%.2f".format(it) } ?: "")
+        mutableStateOf(current.targetConsumptionKwhPer100km?.let { "%.2f".format(it * efficiencyFactor) } ?: "")
     }
     var distInput  by remember {
-        mutableStateOf(current.targetDistanceKmPerMonth?.let { "%.0f".format(it) } ?: "")
+        mutableStateOf(current.targetDistanceKmPerMonth?.let { "%.0f".format(it * distanceFactor) } ?: "")
     }
 
     AlertDialog(
@@ -408,7 +422,7 @@ private fun GoalEditDialog(
                     onValueChange = { consInput = it },
                     label = { Text("Target consumption") },
                     placeholder = { Text("e.g. 17.0") },
-                    suffix = { Text("kWh/100km") },
+                    suffix = { Text(unitSystem.consumptionUnit) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -421,7 +435,7 @@ private fun GoalEditDialog(
                     onValueChange = { distInput = it },
                     label = { Text("Monthly distance target") },
                     placeholder = { Text("e.g. 500") },
-                    suffix = { Text("km/month") },
+                    suffix = { Text("${unitSystem.distanceUnit}/month") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -432,7 +446,9 @@ private fun GoalEditDialog(
             Button(onClick = {
                 val cons = consInput.trim().replace(',', '.').toDoubleOrNull()
                     ?.takeIf { it > 0 }
+                    ?.let { if (unitSystem == UnitSystem.IMPERIAL) it * 0.621371 else it }
                 val dist = distInput.trim().toDoubleOrNull()?.takeIf { it > 0 }
+                    ?.let { if (unitSystem == UnitSystem.IMPERIAL) it / 0.621371 else it }
                 onSave(cons, dist)
             }) { Text("Save") }
         },

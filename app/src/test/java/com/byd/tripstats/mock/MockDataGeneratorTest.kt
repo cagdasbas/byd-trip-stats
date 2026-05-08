@@ -141,7 +141,7 @@ class MockDataGeneratorTest {
         val t = gen.generateParkedTelemetry()
         assertEquals("P", t.gear)
         assertEquals(0.0, t.speed, 0.001)
-        assertEquals(0.0, t.enginePower, 0.001)
+        assertEquals(0, t.enginePower)
         assertEquals(0.0, t.chargingPower, 0.001)
     }
 

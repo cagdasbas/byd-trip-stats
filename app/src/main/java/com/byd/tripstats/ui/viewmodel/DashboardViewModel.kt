@@ -14,6 +14,7 @@ import com.byd.tripstats.data.local.entity.TripStatsEntity
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.TripRepository
@@ -100,6 +101,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun saveElectricityPrice(price: Double, symbol: String) {
         viewModelScope.launch { preferencesManager.saveElectricityPrice(price, symbol) }
+    }
+
+    // ── Unit system ───────────────────────────────────────────────────────────
+
+    val unitSystem: StateFlow<UnitSystem> = preferencesManager.unitSystem
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000),
+            preferencesManager.getCachedUnitSystem())
+
+    fun saveUnitSystem(system: UnitSystem) {
+        viewModelScope.launch { preferencesManager.saveUnitSystem(system) }
     }
 
     // ── Telemetry & trip state (from repository) ──────────────────────────────
@@ -579,6 +590,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _liveSegmentDistanceKm = MutableStateFlow(0.0)
     val liveSegmentDistanceKm: StateFlow<Double> = _liveSegmentDistanceKm.asStateFlow()
 
+    // Wall-clock ms when the current trip started (original start, survives resumes).
+    private val _liveSessionStartMs = MutableStateFlow<Long?>(null)
+    val liveSessionStartMs: StateFlow<Long?> = _liveSessionStartMs.asStateFlow()
+
+    // Accumulated energy discharge for the current trip in kWh.
+    private val _liveAccumulatedKwh = MutableStateFlow(0.0)
+    val liveAccumulatedKwh: StateFlow<Double> = _liveAccumulatedKwh.asStateFlow()
+
     private val _activeRangeModel = MutableStateFlow(RangeModel.BASELINE)
     val activeRangeModel: StateFlow<RangeModel> = _activeRangeModel.asStateFlow()
 
@@ -642,7 +661,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private fun shouldStartLiveDriveSession(inTrip: Boolean, telemetry: VehicleTelemetry): Boolean =
         inTrip ||
             effectiveSpeed(telemetry) > 0.5 ||
-            telemetry.enginePower > 1.0 ||
+            telemetry.enginePower > 1 ||
             telemetry.gear in listOf("D", "R")
 
     private fun shouldContinueLiveDriveSession(
@@ -654,7 +673,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             tripOpen ||
             telemetry.isCarOn ||
             effectiveSpeed(telemetry) > 0.5 ||
-            telemetry.enginePower > 1.0 ||
+            telemetry.enginePower > 1 ||
             telemetry.gear in listOf("D", "R")
 
     private fun currentLiveSessionDistanceKm(telemetry: VehicleTelemetry): Double =
@@ -718,9 +737,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         if (isFirstTripStart) {
             integratedDistanceKm = 0.0
             accumulatedEnergyWh = 0.0
+            _liveAccumulatedKwh.value = 0.0
             smoothedWhPerKm = null
             energySamples.clear()
             liveSpeedBins.clear()
+            _liveSessionStartMs.value = System.currentTimeMillis()
         }
         integratedSegmentDistanceKm = 0.0
         val initialTripDistanceKm = currentLiveSessionDistanceKm(telemetry)
@@ -755,11 +776,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         integratedDistanceKm = 0.0
         integratedSegmentDistanceKm = 0.0
         accumulatedEnergyWh = 0.0
+        _liveAccumulatedKwh.value = 0.0
         smoothedWhPerKm = null
         energySamples.clear()
         liveSpeedBins.clear()
         _liveDistanceKm.value = 0.0
         _liveSegmentDistanceKm.value = 0.0
+        _liveSessionStartMs.value = null
         _activeRangeModel.value = RangeModel.BASELINE
         lastTelemetryWasCarOn = null
         segmentOffSinceMs = null
@@ -942,6 +965,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val distKm = currentDistanceKm
                     _liveDistanceKm.value = distKm
                     _liveSegmentDistanceKm.value = currentSegmentDistanceKm
+                    _liveAccumulatedKwh.value = accumulatedEnergyWh / 1000.0
 
                     val lastDist = _tripDataPoints.value.lastOrNull()?.distanceKm ?: distKm
                     if (distKm - lastDist < SAMPLE_INTERVAL_KM) {
@@ -1144,11 +1168,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 integratedDistanceKm = liveDistanceKm
                 integratedSegmentDistanceKm = _liveSegmentDistanceKm.value
 
+                _liveSessionStartMs.value = trip.startTime
+
                 // Reconstruct accumulated energy from the last data point if possible
                 val lastPoint = dataPoints.lastOrNull()
                 accumulatedEnergyWh = if (lastPoint != null) {
                     (lastPoint.totalDischarge - trip.startTotalDischarge).coerceAtLeast(0.0) * 1000.0
                 } else 0.0
+                _liveAccumulatedKwh.value = accumulatedEnergyWh / 1000.0
 
                 // Reconstruct energy samples for the rolling window
                 energySamples.clear()
@@ -1273,7 +1300,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             statisticCellTempMax = batteryCellTempMax.takeIf { it > 0 }?.toDouble(),
             statisticSocBatteryPct = soc,
             statisticElecPercentageValue = socPanel.toDouble(),
-            enginePower = enginePower.toInt(),
+            enginePower = enginePower,
             engineSpeedFront = engineSpeedFront,
             engineSpeedRear = engineSpeedRear,
             powerBatteryRemainPowerEV = batteryRemainPowerEV,

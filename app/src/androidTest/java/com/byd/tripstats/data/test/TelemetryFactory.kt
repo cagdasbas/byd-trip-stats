@@ -10,7 +10,7 @@ import java.time.Instant
 fun telemetry(
     gear          : String = "P",
     speed         : Double = 0.0,
-    enginePower   : Double = 0.0,
+    enginePower   : Int    = 0,
     chargingPower : Double = 0.0,
     soc           : Double = 80.0,
     carOn         : Int    = 1,

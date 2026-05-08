@@ -87,6 +87,7 @@ fun RangeProjectionChart(
     activeRangeModel: DashboardViewModel.RangeModel = DashboardViewModel.RangeModel.BASELINE,
     liveSoc: Double = 100.0,
     liveElectricRangeKm: Int = 0,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // ── Config values ────────────────────────────────────────────────────────
@@ -273,7 +274,7 @@ fun RangeProjectionChart(
                 // Rotated Y-axis label
                 nc.save()
                 nc.rotate(-90f, 18f, padT + chartH / 2f)
-                nc.drawText("km", 18f, padT + chartH / 2f, yAxisPaint)
+                nc.drawText(if (useImperial) "mi" else "km", 18f, padT + chartH / 2f, yAxisPaint)
                 nc.restore()
 
                 // Y grid lines + labels

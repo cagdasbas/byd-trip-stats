@@ -23,6 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.roundToInt
@@ -36,6 +39,7 @@ fun SeasonalAnalysisScreen(
     val seasonalStats  by viewModel.seasonalStats.collectAsState()
     val selectedCar    by viewModel.selectedCarConfig.collectAsState()
     val reference      = selectedCar?.referenceConsumptionKwhPer100km
+    val unitSystem     by viewModel.unitSystem.collectAsState()
 
     Scaffold(
         topBar = {
@@ -105,30 +109,31 @@ fun SeasonalAnalysisScreen(
                         fontWeight = FontWeight.Bold)
                     if (reference != null) {
                         Text("Dashed line = your car's reference (${
-                            "%.1f".format(reference)} kWh/100km)",
+                            "%.1f".format(unitSystem.convertEfficiency(reference))} ${unitSystem.consumptionUnit})",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.height(6.dp))
                     SeasonalBarChart(
-                        stats     = seasonalStats,
-                        reference = reference,
-                        modifier  = Modifier.fillMaxSize()
+                        stats      = seasonalStats,
+                        reference  = reference,
+                        unitSystem = unitSystem,
+                        modifier   = Modifier.fillMaxSize()
                     )
                 }
             }
 
             // ── Season cards ──────────────────────────────────────────────────
             seasonalStats.forEach { stat ->
-                SeasonCard(stat = stat, reference = reference)
+                SeasonCard(stat = stat, reference = reference, unitSystem = unitSystem)
             }
 
             // ── Insight card ──────────────────────────────────────────────────
             val winter = seasonalStats.find { it.season == DashboardViewModel.Season.WINTER }
             val summer = seasonalStats.find { it.season == DashboardViewModel.Season.SUMMER }
             if (winter != null && summer != null) {
-                val delta  = winter.avgConsumption - summer.avgConsumption
-                val deltaPct = (delta / summer.avgConsumption * 100).roundToInt()
+                val delta    = unitSystem.convertEfficiency(winter.avgConsumption - summer.avgConsumption)
+                val deltaPct = (delta / unitSystem.convertEfficiency(summer.avgConsumption) * 100).roundToInt()
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -148,7 +153,7 @@ fun SeasonalAnalysisScreen(
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold)
                             Text(
-                                "Your winter consumption is ${"%.1f".format(delta)} kWh/100km " +
+                                "Your winter consumption is ${"%.1f".format(delta)} ${unitSystem.consumptionUnit} " +
                                 "higher than summer (+${deltaPct}%). " +
                                 "This is primarily battery chemistry — lithium cells deliver less " +
                                 "capacity below 15°C and the BMS draws extra power to maintain " +
@@ -169,20 +174,22 @@ fun SeasonalAnalysisScreen(
 
 @Composable
 private fun SeasonalBarChart(
-    stats     : List<DashboardViewModel.SeasonStats>,
-    reference : Double?,
-    modifier  : Modifier = Modifier
+    stats      : List<DashboardViewModel.SeasonStats>,
+    reference  : Double?,
+    unitSystem : UnitSystem = UnitSystem.METRIC,
+    modifier   : Modifier = Modifier
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.10f)
+    val effFactor = if (unitSystem == UnitSystem.IMPERIAL) 1.0 / 0.621371 else 1.0
 
     Canvas(modifier = modifier) {
         val w = size.width; val h = size.height
         val padL = 48f; val padR = 12f; val padT = 8f; val padB = 36f
         val chartW = w - padL - padR; val chartH = h - padT - padB
 
-        val maxVal  = (stats.maxOf { it.avgConsumption } * 1.15).coerceAtLeast(
-            reference?.times(1.15) ?: 20.0)
+        val maxVal  = (stats.maxOf { it.avgConsumption * effFactor } * 1.15).coerceAtLeast(
+            reference?.times(effFactor * 1.15) ?: 20.0)
         val minVal  = 0.0
         val valRange = maxVal - minVal
 
@@ -212,7 +219,7 @@ private fun SeasonalBarChart(
         stats.forEachIndexed { i, stat ->
             val barColor = seasonColor(stat.season)
             val x = padL + i * groupStep + groupStep / 2f - barWidth / 2f
-            val barTop = yOf(stat.avgConsumption)
+            val barTop = yOf(stat.avgConsumption * effFactor)
             val barBot = yOf(0.0)
 
             drawRoundRect(
@@ -224,7 +231,7 @@ private fun SeasonalBarChart(
 
             // Value label above bar
             nc.drawText(
-                "%.1f".format(stat.avgConsumption),
+                "%.1f".format(stat.avgConsumption * effFactor),
                 x + barWidth / 2f,
                 barTop - 6f,
                 android.graphics.Paint().apply {
@@ -250,8 +257,8 @@ private fun SeasonalBarChart(
         }
 
         // Reference line
-        if (reference != null && reference < maxVal) {
-            val refY = yOf(reference)
+        if (reference != null && reference * effFactor < maxVal) {
+            val refY = yOf(reference * effFactor)
             drawLine(
                 color       = AccelerationOrange.copy(alpha = 0.7f),
                 start       = Offset(padL, refY),
@@ -268,8 +275,9 @@ private fun SeasonalBarChart(
 
 @Composable
 private fun SeasonCard(
-    stat      : DashboardViewModel.SeasonStats,
-    reference : Double?
+    stat       : DashboardViewModel.SeasonStats,
+    reference  : Double?,
+    unitSystem : UnitSystem = UnitSystem.METRIC
 ) {
     val barColor = seasonColor(stat.season)
 
@@ -303,12 +311,12 @@ private fun SeasonCard(
                     }
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("${"%.1f".format(stat.avgConsumption)} kWh/100km",
+                    Text("${"%.1f".format(unitSystem.convertEfficiency(stat.avgConsumption))} ${unitSystem.consumptionUnit}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = barColor)
                     if (reference != null) {
-                        val diff = stat.avgConsumption - reference
+                        val diff = unitSystem.convertEfficiency(stat.avgConsumption - reference)
                         val sign = if (diff >= 0) "+" else ""
                         Text("${sign}${"%.1f".format(diff)} vs reference",
                             style = MaterialTheme.typography.labelSmall,

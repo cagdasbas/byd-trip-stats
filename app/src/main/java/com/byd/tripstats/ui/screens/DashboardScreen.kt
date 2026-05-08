@@ -8,11 +8,9 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -44,10 +43,15 @@ import com.byd.tripstats.data.config.Drivetrain
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.isImperial
+import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.R
 import com.byd.tripstats.ui.components.LiquidFillBattery
-import com.byd.tripstats.ui.components.StatsGlassCard
-import com.byd.tripstats.ui.components.GlassmorphicCard
 import com.byd.tripstats.ui.components.RangeProjectionChart
 import com.byd.tripstats.ui.components.RangeDataPoint
 import com.byd.tripstats.ui.components.ConsumptionThumbnail
@@ -73,7 +77,6 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
 import kotlinx.coroutines.delay
@@ -102,6 +105,8 @@ fun DashboardScreen(
     val tripDataPoints by viewModel.tripDataPoints.collectAsState()
     val liveDistanceKm by viewModel.liveDistanceKm.collectAsState()
     val liveSegmentDistanceKm by viewModel.liveSegmentDistanceKm.collectAsState()
+    val liveSessionStartMs by viewModel.liveSessionStartMs.collectAsState()
+    val liveAccumulatedKwh by viewModel.liveAccumulatedKwh.collectAsState()
     val weeklyEfficiency by viewModel.weeklyEfficiency.collectAsState()
     val monthlyEfficiency by viewModel.monthlyEfficiency.collectAsState()
     val yearlyEfficiency by viewModel.yearlyEfficiency.collectAsState()
@@ -232,6 +237,8 @@ fun DashboardScreen(
                 widthSizeClass = widthSizeClass,
                 sessionDistanceKm = liveSegmentDistanceKm,
                 tripDistanceKm = liveDistanceKm,
+                liveSessionStartMs = liveSessionStartMs,
+                liveAccumulatedKwh = liveAccumulatedKwh,
                 modifier = Modifier.padding(paddingValues)
             )
         }
@@ -353,8 +360,13 @@ fun DashboardContent(
     onShowBattery12vHistory: () -> Unit = {},
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
     sessionDistanceKm: Double = 0.0,
-    tripDistanceKm: Double = 0.0
+    tripDistanceKm: Double = 0.0,
+    liveSessionStartMs: Long? = null,
+    liveAccumulatedKwh: Double = 0.0,
 ) {
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context.applicationContext) }
+    val unitSystem by prefs.unitSystem.collectAsState(initial = prefs.getCachedUnitSystem())
     // sessionDistanceKm is the current engine-on segment; tripDistanceKm is the
     // cumulative trip distance since trip start.
 
@@ -457,6 +469,10 @@ fun DashboardContent(
                         onStartTrip = onStartTrip,
                         onEndTrip = onEndTrip,
                         onToggleAutoDetection = onToggleAutoDetection,
+                        liveSessionStartMs = liveSessionStartMs,
+                        liveDistanceKm = tripDistanceKm,
+                        liveAccumulatedKwh = liveAccumulatedKwh,
+                        unitSystem = unitSystem,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -518,6 +534,10 @@ fun DashboardContent(
                         onStartTrip = onStartTrip,
                         onEndTrip = onEndTrip,
                         onToggleAutoDetection = onToggleAutoDetection,
+                        liveSessionStartMs = liveSessionStartMs,
+                        liveDistanceKm = tripDistanceKm,
+                        liveAccumulatedKwh = liveAccumulatedKwh,
+                        unitSystem = unitSystem,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -541,7 +561,42 @@ fun DashboardContent(
             }
         }
     }
+}
 
+/**
+ * Formats segment and cumulative distances for UI display.
+ *
+ * Both values are coerced to be at least `0.0` and **truncated** to integers.
+ * If the cumulative distance is greater than 0 and differs from the segment
+ * distance by at least 1 (after truncation), returns the segment followed by
+ * the cumulative distance in parentheses (e.g., `"5, (12)"`). Otherwise,
+ * returns the larger of the two truncated values as a string.
+ *
+ * @param segmentKm The current segment distance in kilometers.
+ * @param cumulativeKm The total cumulative distance in kilometers.
+ * @return A formatted string representing the distance(s) to display.
+ */
+private fun formatDistanceDisplay(segmentKm: Double, cumulativeKm: Double): String {
+    val segment = segmentKm.coerceAtLeast(0.0).toInt() // Convert to Int here
+    val cumulative = cumulativeKm.coerceAtLeast(0.0).toInt() // Convert to Int here
+    return if (cumulative > 0 && abs(segment - cumulative) >= 1) {
+        "$segment, ($cumulative)"
+    } else {
+        "${maxOf(segment, cumulative)}"
+    }
+}
+
+/**
+ * Formats a distance value as a string by truncating the decimal portion.
+ *
+ * The result is an integer string representing the value in kilometers. The unit
+ * display (km or miles) is handled by the `unit` field of the caller.
+ *
+ * @param km The distance value in kilometers.
+ * @return A string representing the truncated integer value.
+ */
+private fun formatDistanceValue(km: Double): String {
+    return "${km.toInt()}"
 }
 
 @Composable
@@ -559,7 +614,7 @@ fun EnergyFlowDiagram(
     val power = if (telemetry.isCharging && telemetry.chargingPower > 0.1) {
         -telemetry.chargingPower
     } else {
-        telemetry.enginePower
+        telemetry.enginePower.toDouble()
     }
     val isRegenerating = telemetry.isRegenerating
     val isCharging = telemetry.isCharging
@@ -626,6 +681,10 @@ fun EnergyFlowDiagram(
     // Load as ImageBitmap
     val awdBitmap = ImageBitmap.imageResource(id = R.drawable.awd)
 
+    val unitSystem by appPrefs.unitSystem.collectAsState(initial = appPrefs.getCachedUnitSystem())
+    val distanceUnit = unitSystem.distanceUnit
+    val speedUnit = unitSystem.speedUnit
+
     Card(
         modifier = modifier
             .clipToBounds()
@@ -660,6 +719,7 @@ fun EnergyFlowDiagram(
                     dataPoints = tripDataPoints,
                     liveSoc = telemetry.soc,
                     liveElectricRangeKm = telemetry.electricDrivingRangeKm,
+                    useImperial = unitSystem.isImperial,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -816,6 +876,7 @@ fun EnergyFlowDiagram(
                         dataPoints = tripDataPoints,
                         liveSoc = telemetry.soc,
                         liveElectricRangeKm = telemetry.electricDrivingRangeKm,
+                        useImperial = unitSystem.isImperial,
                         modifier = Modifier
                             .fillMaxSize()
                             .clickable { rangeFlipped = true }
@@ -847,33 +908,31 @@ fun EnergyFlowDiagram(
                     PowerMetric(
                         label = "Speed",
                         value = "${telemetry.speed.toInt()}",
-                        unit = "km/h",
+                        unit = speedUnit,
                         color = BydEcoTealDim
                     )
                     PowerMetric(
                         label = "SoC (BMS)",
-                        value = run {
-                            val panel = telemetry.socPanel
-                            val bms   = telemetry.soc.toInt()
-                            if (panel > 0) "$panel ($bms)" else "$bms"
-                        },
+                        value = "${telemetry.soc.toInt()}",
                         unit = "%",
                         color = BatteryBlue
                     )
                     PowerMetric(
-                        label = "Range (BMS)",
+                        label = "Range",
                         value = run {
                             val projected = tripDataPoints.lastOrNull()?.projectedRangeKm
-                            val bms       = telemetry.electricDrivingRangeKm
-                            if (projected != null) "${projected.toInt()} ($bms)" else "$bms"
+                            val bms = telemetry.electricDrivingRangeKm
+                            if (projected != null && projected.toInt() < bms) formatDistanceValue(projected) else formatDistanceValue(
+                                bms.toDouble()
+                            )
                         },
-                        unit = "km",
+                        unit = distanceUnit,
                         color = MaterialTheme.extendedColors.range
                     )
                     PowerMetric(
                         label = "Distance",
                         value = formatDistanceDisplay(sessionDistanceKm, tripDistanceKm),
-                        unit = "km",
+                        unit = distanceUnit,
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
@@ -1150,7 +1209,7 @@ fun PowerMetric(
         ) {
             Text(
                 text = value,
-                style = if (compact) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displaySmall,
+                style = if (compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = color
             )
@@ -1165,13 +1224,22 @@ fun PowerMetric(
     }
 }
 
-private fun formatDistanceDisplay(segmentKm: Double, cumulativeKm: Double): String {
-    val segment = segmentKm.coerceAtLeast(0.0)
-    val cumulative = cumulativeKm.coerceAtLeast(0.0)
-    return if (cumulative > 0.05 && abs(segment - cumulative) >= 0.05) {
-        "%.1f (%.1f)".format(segment, cumulative)
-    } else {
-        "%.1f".format(maxOf(segment, cumulative))
+@Composable
+private fun LiveTripStat(label: String, value: String, unit: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(value, style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface)
+            if (unit.isNotEmpty()) {
+                Spacer(Modifier.width(2.dp))
+                Text(unit, style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 1.dp))
+            }
+        }
     }
 }
 
@@ -1183,6 +1251,10 @@ fun TripControls(
     onStartTrip: () -> Unit,
     onEndTrip: () -> Unit,
     onToggleAutoDetection: () -> Unit,
+    liveSessionStartMs: Long? = null,
+    liveDistanceKm: Double = 0.0,
+    liveAccumulatedKwh: Double = 0.0,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     modifier: Modifier = Modifier
 ) {
     var showStopConfirmDialog by remember { mutableStateOf(false) }
@@ -1242,142 +1314,134 @@ fun TripControls(
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .padding(
-                    start = 8.dp,
-                    end = 8.dp,
-                    top = 8.dp,
-                    bottom = 4.dp  // ← Less bottom padding
-                )
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(30.dp)
-                    .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Trip Tracking",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                var showManualWarning by remember { mutableStateOf(false) }
-
-                if (showManualWarning) {
-                    AlertDialog(
-                        onDismissRequest = { showManualWarning = false },
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        icon = {
-                            Icon(Icons.Filled.WarningAmber, null,
-                                tint = MaterialTheme.colorScheme.error)
-                        },
-                        title = {
-                            Text("Switch to Manual Tracking?",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold)
-                        },
-                        text = {
-                            Text(
-                                "With manual tracking enabled, trip data will not be recorded " +
-                                        "automatically when you start driving. You will need to start " +
-                                        "and stop each trip yourself.\n\n" +
-                                        "Trips that are not recorded will be absent from your daily, " +
-                                        "weekly, and monthly consumption statistics.",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                showManualWarning = false
-                                onToggleAutoDetection()
-                            }) {
-                                Text("Switch to Manual",
-                                    color = MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.SemiBold)
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showManualWarning = false }) {
-                                Text("Keep Auto")
-                            }
-                        }
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Auto",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Switch(
-                        checked = autoTripDetection,
-                        onCheckedChange = { enabled ->
-                            if (!enabled) showManualWarning = true
-                            else onToggleAutoDetection()
-                        },
-                        thumbContent = if (!autoTripDetection) {
-                            {
-                                // Donut effect: white outer thumb + coloured inner circle
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .background(ToggleUncheckedTrack, CircleShape)
-                                )
-                            }
-                        } else null,
-                        colors = SwitchDefaults.colors(
-                            uncheckedThumbColor  = Color.White,
-                            uncheckedTrackColor  = ToggleUncheckedTrack,
-                            uncheckedBorderColor = ToggleUncheckedTrack
-                        )
-                    )
-                }
+        // Elapsed time ticker — runs only while recording, survives car-off pauses
+        var elapsedMs by remember(liveSessionStartMs) {
+            mutableStateOf(liveSessionStartMs?.let { System.currentTimeMillis() - it } ?: 0L)
+        }
+        LaunchedEffect(liveSessionStartMs) {
+            if (liveSessionStartMs == null) return@LaunchedEffect
+            while (true) {
+                delay(1000L)
+                elapsedMs = System.currentTimeMillis() - liveSessionStartMs
             }
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
+        var showManualWarning by remember { mutableStateOf(false) }
+        if (showManualWarning) {
+            AlertDialog(
+                onDismissRequest = { showManualWarning = false },
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                icon = {
+                    Icon(Icons.Filled.WarningAmber, null,
+                        tint = MaterialTheme.colorScheme.error)
+                },
+                title = {
+                    Text("Switch to Manual Tracking?",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold)
+                },
+                text = {
+                    Text(
+                        "With manual tracking enabled, trip data will not be recorded " +
+                                "automatically when you start driving. You will need to start " +
+                                "and stop each trip yourself.\n\n" +
+                                "Trips that are not recorded will be absent from your daily, " +
+                                "weekly, and monthly consumption statistics.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showManualWarning = false
+                        onToggleAutoDetection()
+                    }) {
+                        Text("Switch to Manual",
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showManualWarning = false }) {
+                        Text("Keep Auto")
+                    }
+                }
+            )
+        }
 
-            // ── Unified layout: gear status (left, fills) + action button (right, fixed) ──
-            // Fixed height so toggling auto on/off doesn't shift the gear/status text vertically
+        val gearColor = when (telemetry.gear) {
+            "R"  -> AccelerationOrange
+            else -> if (isInTrip) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        val statusText = when {
+            isInTrip && telemetry.speed > 0.5              -> "Driving"
+            isInTrip && telemetry.gear in listOf("D", "R") -> "Ready"
+            isInTrip                                        -> "Trip in Progress"
+            telemetry.gear == "D"                           -> "Ready to Drive"
+            telemetry.gear == "R"                           -> "Reverse"
+            telemetry.gear == "P"                           -> "Waiting for Trip..."
+            telemetry.gear == "N"                           -> "Neutral"
+            else                                            -> "Waiting for Trip..."
+        }
+
+        val autoToggle: @Composable () -> Unit = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Auto", style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = autoTripDetection,
+                    onCheckedChange = { enabled ->
+                        if (!enabled) showManualWarning = true
+                        else onToggleAutoDetection()
+                    },
+                    thumbContent = if (!autoTripDetection) {
+                        {
+                            Box(modifier = Modifier.size(12.dp).background(ToggleUncheckedTrack, CircleShape))
+                        }
+                    } else null,
+                    colors = SwitchDefaults.colors(
+                        uncheckedThumbColor  = Color.White,
+                        uncheckedTrackColor  = ToggleUncheckedTrack,
+                        uncheckedBorderColor = ToggleUncheckedTrack
+                    )
+                )
+            }
+        }
+
+        if (isInTrip) {
+            // ── 3-column in-trip layout (fixed 100dp, no animation) ─────────
+            val elapsedH   = elapsedMs / 3_600_000L
+            val elapsedM   = (elapsedMs % 3_600_000L) / 60_000L
+            val elapsedS   = (elapsedMs % 60_000L) / 1000L
+            val elapsedStr = "%02d:%02d:%02d".format(elapsedH, elapsedM, elapsedS)
+
+            val distKm = liveDistanceKm
+            val avgSpeedDisplay = if (elapsedMs > 10_000L) {
+                unitSystem.convertDistance(distKm) / (elapsedMs / 3_600_000.0)
+            } else 0.0
+            val kwhPer100km = if (distKm > 0.5) (liveAccumulatedKwh / distKm) * 100.0 else 0.0
+            val effDisplay  = unitSystem.convertEfficiency(kwhPer100km)
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .height(100.dp)
+                    .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: gear circle + status text
-                val gearColor = when (telemetry.gear) {
-                    "R"  -> AccelerationOrange
-                    else -> if (isInTrip) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    color = Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
+                // Left: "Trip Tracking" title above; gear circle + status below
+                Column(
+                    modifier = Modifier.fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(28.dp),
-                            shape = CircleShape,
-                            color = gearColor
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
+                    Text(
+                        text = "Trip Tracking",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(modifier = Modifier.size(28.dp), shape = CircleShape, color = gearColor) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Text(
                                     text = telemetry.gear,
                                     style = MaterialTheme.typography.titleSmall,
@@ -1386,49 +1450,108 @@ fun TripControls(
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = when {
-                                isInTrip && telemetry.speed > 0.5              -> "Driving"
-                                isInTrip && telemetry.gear in listOf("D", "R") -> "Ready"
-                                isInTrip                                        -> "Trip in Progress"
-                                telemetry.gear == "D"                           -> "Ready to Drive"
-                                telemetry.gear == "R"                           -> "Reverse"
-                                telemetry.gear == "P"                           -> "Waiting for Trip..."
-                                telemetry.gear == "N"                           -> "Neutral"
-                                else                                            -> "Waiting for Trip..."
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                     }
                 }
 
-                // Right: fixed-width action button — same size regardless of manual/auto
-                if (isInTrip || !autoTripDetection) {
-                    Button(
-                        onClick = if (isInTrip) {
-                            { showStopConfirmDialog = true }
-                        } else {
-                            onStartTrip
-                        },
-                        modifier = Modifier
-                            .width(120.dp)
-                            .fillMaxHeight(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isInTrip) BydErrorRed else BydElectricAzure
-                        )
+                // Center: live stats
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Icon(
-                            imageVector = if (isInTrip) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isInTrip) "Stop" else "Record",
-                            fontSize = 15.sp
-                        )
+                        LiveTripStat(label = "TIME",        value = elapsedStr,                                             unit = "")
+                        LiveTripStat(label = "AVG SPEED",   value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit)
+                        LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh")
+                        LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit)
+                    }
+                }
+
+                // Right: Auto toggle above; Stop button below
+                Column(
+                    modifier = Modifier.fillMaxHeight().padding(start = 4.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.End
+                ) {
+                    autoToggle()
+                    Button(
+                        onClick = { showStopConfirmDialog = true },
+                        modifier = Modifier.width(100.dp).height(36.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BydErrorRed)
+                    ) {
+                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Stop", fontSize = 14.sp)
+                    }
+                }
+            }
+        } else {
+            // ── Original 2-row stacked layout (not in trip, fixed 100dp) ────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Trip Tracking",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    autoToggle()
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        color = Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(modifier = Modifier.size(28.dp), shape = CircleShape, color = gearColor) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Text(
+                                        text = telemetry.gear,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(text = statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    if (!autoTripDetection) {
+                        Button(
+                            onClick = onStartTrip,
+                            modifier = Modifier.width(120.dp).fillMaxHeight(),
+                            colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Record", fontSize = 15.sp)
+                        }
                     }
                 }
             }
@@ -1449,6 +1572,8 @@ fun VehicleStats(
     val context     = LocalContext.current
     val prefs       = remember { PreferencesManager(context.applicationContext) }
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
+    val unitSystem  by prefs.unitSystem.collectAsState(initial = prefs.getCachedUnitSystem())
+    val distanceUnit = unitSystem.distanceUnit
 
     val colModifier = if (fillHeight) modifier.fillMaxHeight() else modifier.verticalScroll(rememberScrollState())
     val spacing     = if (fillHeight) 4.dp else 8.dp
@@ -1568,7 +1693,7 @@ fun VehicleStats(
                 title    = "Front Motor",
                 value    = frontMotorRpm?.let { "$it RPM" } ?: "0 RPM",
                 subtitle = if (motorsAreSpinning) {
-                    "${telemetry.enginePower.toInt()} kW"
+                    "${telemetry.enginePower} kW"
                 } else {
                     "0 kW"
                 },
@@ -1581,7 +1706,7 @@ fun VehicleStats(
                 title    = "Rear Motor",
                 value    = rearMotorRpm?.let { "$it RPM" } ?: "0 RPM",
                 subtitle = if (motorsAreSpinning) {
-                    "${telemetry.enginePower.toInt()} kW"
+                    "${telemetry.enginePower} kW"
                 } else {
                     "0 kW"
                 },
@@ -1639,7 +1764,7 @@ fun VehicleStats(
 
         StatCard(
             title    = "Odometer",
-            value    = "${String.format("%.1f", telemetry.odometer)} km",
+            value    = "${String.format("%.1f", telemetry.odometer)} $distanceUnit",
             icon     = Icons.Filled.Speed,
             color    = MaterialTheme.colorScheme.primary,
             compact  = fillHeight,
@@ -1689,7 +1814,8 @@ private fun Battery12vHistoryDialog(
                 timestamp = liveTimestamp,
                 battery12vVoltage = it,
                 batteryTotalVoltage = liveHvVoltage,
-                isChargingSample = telemetry.isCharging
+                isChargingSample = telemetry.isCharging,
+                soc = telemetry.soc
             )
         }
         val base = historyPoints.toMutableList()
@@ -1722,7 +1848,7 @@ private fun Battery12vHistoryDialog(
                 TopAppBar(
                     title = {
                         Column {
-                            Text("12V Battery - Last 48 Hours")
+                            Text("HV / 12V Batteries - Last 48 Hours")
                             Text(
                                 "Recorded telemetry samples plus the current live reading",
                                 style = MaterialTheme.typography.bodySmall,
@@ -1812,6 +1938,7 @@ private fun Battery12vHistoryChart(
     val minVoltage = 11.0
     val maxVoltage = 14.0
     val chartColor = BatteryBlue
+    val socColor   = Color(0xFFBA68C8)
     val chargeColor = RegenGreen.copy(alpha = 0.12f)
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
@@ -1829,11 +1956,17 @@ private fun Battery12vHistoryChart(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("12V voltage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
                         drawLine(chartColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 4f, cap = StrokeCap.Round)
                     }
                     Text("12V", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
+                        drawLine(socColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 3f,
+                            cap = StrokeCap.Round,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f)))
+                    }
+                    Text("SoC", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -1852,7 +1985,7 @@ private fun Battery12vHistoryChart(
                     }
             ) {
                 val padL = 54f
-                val padR = 20f
+                val padR = 58f
                 val padT = 18f
                 val padB = 42f
                 val chartW = size.width - padL - padR
@@ -1871,11 +2004,28 @@ private fun Battery12vHistoryChart(
                 fun yOf(voltage: Double): Float =
                     padT + chartH - (((voltage - minVoltage) / (maxVoltage - minVoltage).coerceAtLeast(0.1)).toFloat() * chartH)
 
+                fun yOfSoc(pct: Double): Float =
+                    padT + chartH - (pct / 100.0).toFloat() * chartH
+
                 listOf(14.0, 13.0, 12.0, 11.0).forEachIndexed { index, value ->
                     val y = padT + chartH * index / 3f
                     drawLine(gridColor, Offset(padL, y), Offset(size.width - padR, y), 1f)
                     labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
                     nc.drawText("%.1f".format(value), padL - 8f, y + 7f, labelPaint)
+                }
+
+                // Right axis — SoC (%)
+                val socAxisPaint = android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = socColor.copy(alpha = 0.8f).toArgb()
+                    textSize = 19f
+                    textAlign = android.graphics.Paint.Align.LEFT
+                }
+                for (tick in listOf(0, 25, 50, 75, 100)) {
+                    val y = yOfSoc(tick.toDouble())
+                    if (y in padT..(padT + chartH)) {
+                        nc.drawText("$tick%", size.width - padR + 6f, y + 7f, socAxisPaint)
+                    }
                 }
 
                 val timeTicks = buildList {
@@ -1924,6 +2074,22 @@ private fun Battery12vHistoryChart(
                         color = chartColor,
                         style = Stroke(width = 4f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
+                    // SoC line (dashed, only for points that have SoC recorded)
+                    val socPoints = points.filter { it.soc > 0.0 }
+                    if (socPoints.size >= 2) {
+                        val socPath = Path().apply {
+                            moveTo(xOf(socPoints.first().timestamp), yOfSoc(socPoints.first().soc))
+                            socPoints.drop(1).forEach { pt ->
+                                lineTo(xOf(pt.timestamp), yOfSoc(pt.soc))
+                            }
+                        }
+                        drawPath(
+                            path = socPath,
+                            color = socColor.copy(alpha = 0.85f),
+                            style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 6f)))
+                        )
+                    }
                 }
 
                 drawRect(
@@ -1946,7 +2112,7 @@ private fun Battery12vHistoryChart(
                             padR = padR,
                             padT = padT,
                             chartH = chartH,
-                            line1 = "%.2f V".format(closest.battery12vVoltage),
+                            line1 = "12V: %.2f V${if (closest.soc > 0.0) "  |  SoC: ${"%.1f".format(closest.soc)}%" else ""}",
                             line2 = if (closest.isChargingSample) "charging sample" else "drive/live sample",
                             line3 = timeFormatter.format(Date(closest.timestamp)),
                             accentColor = chartColor

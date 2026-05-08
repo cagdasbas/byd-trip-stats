@@ -240,6 +240,22 @@ object CarCatalog {
         cdA = 0.868       // Cd 0.33 × A ~2.63 m² (1.81 × 1.69 × 0.86)
     )
 
+    val BYD_TANG_EV = CarConfig(
+        id = "BYD_TANG_EV",
+        displayName = "BYD Tang EV",
+        drivetrain = Drivetrain.AWD,
+        batteryKwh = 108.8,
+        estimatedKerbMassKg = 2635.0,
+        wltpKm = 530,
+        referenceConsumptionKwhPer100km = 22.3,
+        frontTyrePressureBar = 2.6,
+        rearTyrePressureBar = 2.9,
+        frontMotorRatedKw = 163,
+        rearMotorRatedKw = 200,
+        cellCount = 204,  // 108.8 kWh @ ~640V → 204S Blade LFP (estimate)
+        cdA = 0.827       // Cd 0.29 × A 2.85 m² (same body as Tang DM-i)
+    )
+
     val BYD_SEAL_U_DM_I = CarConfig(
         id = "BYD_SEAL_U_DM_I",
         displayName = "BYD Seal U DM-i",
@@ -353,6 +369,7 @@ object CarCatalog {
         BYD_DOLPHIN_SURF_BOOST,
         BYD_DOLPHIN_SURF_COMFORT,
         BYD_M6,
+        BYD_TANG_EV,
         BYD_SEAL_U_DM_I,
         BYD_SONG_PLUS_DM_I,
         BYD_HAN_DM_I,
@@ -378,6 +395,7 @@ object CarCatalog {
         "BYD Seal U" to listOf(BYD_SEAL_U_COMFORT, BYD_SEAL_U_DESIGN),
         "BYD Seagull / Dolphin Surf" to listOf(BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),
         "BYD M6" to listOf(BYD_M6),
+        "BYD Tang" to listOf(BYD_TANG_EV),
     )
 
     val groupedPhev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(

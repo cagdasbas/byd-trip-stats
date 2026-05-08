@@ -31,6 +31,7 @@ private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 @Composable
 fun SpeedChart(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (dataPoints.isEmpty()) {
@@ -121,7 +122,7 @@ fun SpeedChart(
             textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
         }
         nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
-        nc.drawText("km/h", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
+        nc.drawText(if (useImperial) "mph" else "km/h", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
         drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
         val labelEvery = when {
             dataPoints.size > 200 -> 40; dataPoints.size > 100 -> 20; dataPoints.size > 50 -> 10; else -> 5

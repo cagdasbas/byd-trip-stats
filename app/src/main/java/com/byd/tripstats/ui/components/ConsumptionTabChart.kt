@@ -27,8 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
+
+private const val METRIC_TO_IMPERIAL_EFFICIENCY = 1.0 / 0.621371
 
 // ── Thumbnail ─────────────────────────────────────────────────────────────────
 
@@ -109,6 +114,9 @@ fun ConsumptionChartExpanded(
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context.applicationContext) }
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
+    val unitSystem  by prefs.unitSystem.collectAsState(initial = prefs.getCachedUnitSystem())
+    val useImperial = unitSystem == UnitSystem.IMPERIAL
+    val efficiencyFactor = if (useImperial) METRIC_TO_IMPERIAL_EFFICIENCY else 1.0
 
     val referenceConsumptionKwhPer100km = selectedCar?.referenceConsumptionKwhPer100km
 
@@ -119,7 +127,7 @@ fun ConsumptionChartExpanded(
         ConsumptionTab.MONTH -> monthlyData
         ConsumptionTab.YEAR  -> yearlyData
     }
-    val selectedDurationAverage = activeData.map { it.avgKwhPer100km }
+    val selectedDurationAverage = activeData.map { it.avgKwhPer100km * efficiencyFactor }
         .takeIf { it.isNotEmpty() }
         ?.average()
     val labelEvery = when (selectedTab) {
@@ -217,14 +225,14 @@ fun ConsumptionChartExpanded(
             selectedDurationAverage?.let { avg ->
                 ConsumptionLegendItem(
                     color = RegenGreen.copy(alpha = 0.9f),
-                    label = "Selected duration avg (${String.format("%.1f", avg)} kWh/100km)"
+                    label = "Selected duration avg (${String.format("%.1f", avg)} ${unitSystem.consumptionUnit})"
                 )
             }
             referenceConsumptionKwhPer100km?.let { avg ->
                 if (selectedDurationAverage != null) Spacer(Modifier.width(20.dp))
                 ConsumptionLegendItem(
                     color = AccelerationOrange.copy(alpha = 0.9f),
-                    label = "Selected car avg (${String.format("%.1f", avg)} kWh/100km)"
+                    label = "Selected car avg (${String.format("%.1f", avg * efficiencyFactor)} ${unitSystem.consumptionUnit})"
                 )
             }
         }
@@ -234,6 +242,7 @@ fun ConsumptionChartExpanded(
             data = activeData,
             labelEvery = labelEvery,
             referenceConsumptionKwhPer100km = referenceConsumptionKwhPer100km,
+            useImperial = useImperial,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -269,6 +278,7 @@ private fun ConsumptionCanvas(
     data: List<DashboardViewModel.DailyEfficiency>,
     labelEvery: Int,
     referenceConsumptionKwhPer100km: Double?,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Resolve all theme-aware colors before entering DrawScope
@@ -310,10 +320,12 @@ private fun ConsumptionCanvas(
             return@Canvas
         }
 
-        val values = data.map { it.avgKwhPer100km }
+        val factor = if (useImperial) METRIC_TO_IMPERIAL_EFFICIENCY else 1.0
+        val values = data.map { it.avgKwhPer100km * factor }
         val durationAverage = values.average()
-        val allVals = if (referenceConsumptionKwhPer100km != null) {
-            values + listOf(referenceConsumptionKwhPer100km, durationAverage)
+        val refConverted = referenceConsumptionKwhPer100km?.times(factor)
+        val allVals = if (refConverted != null) {
+            values + listOf(refConverted, durationAverage)
         } else {
             values + listOf(durationAverage)
         }
@@ -367,7 +379,7 @@ private fun ConsumptionCanvas(
         }
         nc.save()
         nc.rotate(-90f, 18f, padT + chartH / 2f)
-        nc.drawText("kWh/100km", 18f, padT + chartH / 2f, yAxisPaint)
+        nc.drawText(if (useImperial) "kWh/100mi" else "kWh/100km", 18f, padT + chartH / 2f, yAxisPaint)
         nc.restore()
 
         // X axis line
@@ -391,7 +403,7 @@ private fun ConsumptionCanvas(
         )
 
         // Selected car average reference line (dashed orange — distinct from cobalt line)
-        referenceConsumptionKwhPer100km?.let { referenceValue ->
+        refConverted?.let { referenceValue ->
             val referenceY = yOf(referenceValue)
 
             drawLine(

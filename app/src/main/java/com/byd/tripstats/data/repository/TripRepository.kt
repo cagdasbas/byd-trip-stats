@@ -188,7 +188,7 @@ class TripRepository private constructor(context: Context) {
         if (previousTelemetry == null) return true
         return previousTelemetry.gear in DRIVE_GEARS ||
             effectiveSpeedKmh(previousTelemetry) > 2.0 ||
-            kotlin.math.abs(previousTelemetry.enginePower) > 5.0 ||
+            kotlin.math.abs(previousTelemetry.enginePower) > 5 ||
             previousTelemetry.engineSpeedFront > 0 ||
             previousTelemetry.engineSpeedRear > 0
     }
@@ -391,7 +391,7 @@ class TripRepository private constructor(context: Context) {
                 // backgrounded/stalled ticks that would otherwise inflate the integral.
                 if (lastTelemetryTime > 0L) {
                     val dtH = (now - lastTelemetryTime) / 3_600_000.0
-                    if (dtH in 0.0..(10.0 / 3600.0) && t.enginePower.isFinite() && t.enginePower > 0.0) {
+                    if (dtH in 0.0..(10.0 / 3600.0) && t.enginePower > 0) {
                         tripIntegratedDischargeKwh += t.enginePower * dtH
                     }
                 }
@@ -872,7 +872,7 @@ class TripRepository private constructor(context: Context) {
         val effectiveSpeed = maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
         val drivetrainAlive = t.engineSpeedFront > 0 ||
             t.engineSpeedRear > 0 ||
-            kotlin.math.abs(t.enginePower) > 2.0
+            kotlin.math.abs(t.enginePower) > 2
         val carLooksOn = t.isCarOn || drivetrainAlive
 
         // Primary: car on, in drive gear, any movement signal
@@ -1016,7 +1016,7 @@ class TripRepository private constructor(context: Context) {
                     longitude              = t.locationLongitude.safe(),
                     altitude               = t.locationAltitude.safe(),
                     speed                  = t.speed.safe(),
-                    power                  = t.enginePower.safe(),
+                    power                  = t.enginePower.toDouble(),
                     soc                    = (overrideSoc ?: t.soc).safe(),
                     odometer               = (overrideOdometer ?: t.odometer).safe(),
                     batteryTemp            = t.batteryTempAvg.safe(),
@@ -1069,9 +1069,9 @@ class TripRepository private constructor(context: Context) {
 
         val updated = trip.copy(
             maxSpeed           = maxOf(trip.maxSpeed, t.speed),
-            maxPower           = maxOf(trip.maxPower, t.enginePower),
+            maxPower           = maxOf(trip.maxPower, t.enginePower.toDouble()),
             maxRegenPower      = if (t.isRegenerating)
-                                     minOf(trip.maxRegenPower, t.enginePower)
+                                     minOf(trip.maxRegenPower, t.enginePower.toDouble())
                                  else trip.maxRegenPower,
             minSoc             = minOf(trip.minSoc, t.soc),
             avgBatteryTemp     = if (batteryTempSamples > 0) batteryTempSum / batteryTempSamples else trip.avgBatteryTemp,

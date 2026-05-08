@@ -38,6 +38,7 @@ private const val CLAMP_MAX = 120.0     // kWh/100km — clip outliers at extrem
 @Composable
 fun InstantConsumptionChart(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Only driving points with meaningful speed to avoid divide-by-zero noise
@@ -182,7 +183,7 @@ fun InstantConsumptionChart(
                 textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
             }
             nc.save(); nc.rotate(-90f, 18f, padT + chartH / 2f)
-            nc.drawText("kWh/100", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
+            nc.drawText(if (useImperial) "kWh/100mi" else "kWh/100km", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
 
             drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
 

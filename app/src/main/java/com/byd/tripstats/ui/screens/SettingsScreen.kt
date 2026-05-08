@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.connections.AbrpConnectionManager
 import com.byd.tripstats.connections.AbrpConnectionStore
 import com.byd.tripstats.connections.MqttConnectionManager
@@ -1132,6 +1133,7 @@ private fun AppPreferencesTab(
 ) {
     val scope = rememberCoroutineScope()
     val dashboardAnimationsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(initial = true)
+    val unitSystem by viewModel.unitSystem.collectAsState()
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol by viewModel.currencySymbol.collectAsState()
     val tripGoals by viewModel.tripGoals.collectAsState()
@@ -1221,6 +1223,72 @@ private fun AppPreferencesTab(
                     } else {
                         "Disabled: static energy flow rendering and reduced animation overhead on the main dashboard."
                     },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Units",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Choose how distances and speeds are displayed. Your vehicle's odometer and speed values come from the BMS and are already in the correct unit for your market.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { scope.launch { viewModel.saveUnitSystem(UnitSystem.METRIC) } },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (unitSystem == UnitSystem.METRIC)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (unitSystem == UnitSystem.METRIC)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text("Metric", fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = { scope.launch { viewModel.saveUnitSystem(UnitSystem.IMPERIAL) } },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (unitSystem == UnitSystem.IMPERIAL)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (unitSystem == UnitSystem.IMPERIAL)
+                                MaterialTheme.colorScheme.onPrimary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text("Imperial", fontWeight = FontWeight.Bold)
+                    }
+                }
+                Text(
+                    if (unitSystem == UnitSystem.IMPERIAL)
+                        "Imperial: miles, mph, kWh/100mi"
+                    else
+                        "Metric: km, km/h, kWh/100km",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -2263,7 +2331,7 @@ private fun CoreTelemetryCard(telemetry: VehicleTelemetry?) {
                 SettingsDetailRow("Gear", telemetry.gear)
                 SettingsDetailRow("Speed", "%.1f km/h".format(telemetry.speed))
                 SettingsDetailRow("Odometer", "%.1f km".format(telemetry.odometer))
-                SettingsDetailRow("Engine power", "%.1f kW".format(telemetry.enginePower))
+                SettingsDetailRow("Engine power", "${telemetry.enginePower} kW")
                 SettingsDetailRow("Total discharge", "%.1f".format(telemetry.totalDischarge))
                 SettingsDetailRow("Charging", "%.1f kW".format(telemetry.chargingPower))
                 SettingsDetailRow("Electric range", "${telemetry.electricDrivingRangeKm} km")
@@ -2381,7 +2449,41 @@ private fun AboutTab(viewModel: DashboardViewModel) {
 
     var easterEggClicks by remember { mutableStateOf(0) }
     var licenseClicks by remember { mutableStateOf(0) }
+    var showChangelogDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    if (showChangelogDialog) {
+        val changelogText = remember {
+            runCatching {
+                context.assets.open("changelog.md").bufferedReader().readText()
+            }.getOrDefault("Changelog not available.")
+        }
+        AlertDialog(
+            onDismissRequest = { showChangelogDialog = false },
+            containerColor   = MaterialTheme.colorScheme.surfaceVariant,
+            title = {
+                Text("Changelog", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text  = changelogText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChangelogDialog = false }) { Text("Close") }
+            }
+        )
+    }
 
     val hasBackgroundLocation = ContextCompat.checkSelfPermission(
         context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
@@ -2403,7 +2505,7 @@ private fun AboutTab(viewModel: DashboardViewModel) {
             Column(modifier = Modifier.padding(16.dp)) {
                 SettingsDetailRow("App",       "BYD Trip Stats")
                 SettingsDetailRow("Version",   com.byd.tripstats.BuildConfig.VERSION_NAME)
-                SettingsDetailRow("Changelog", "What's new", url = "https://github.com/angoikon/byd-trip-stats/blob/main/CHANGELOG.md")
+                SettingsDetailRow("Changelog", "What's new", onClick = { showChangelogDialog = true }, showClickIndicator = true)
                 SettingsDetailRow("Author",    "Angelos Oikonomou (angoikon)")
                 SettingsDetailRow(
                     label = "Platform",
@@ -3141,10 +3243,11 @@ private fun SettingsGroupLabel(
 
 @Composable
 private fun SettingsDetailRow(
-    label: String, 
-    value: String, 
+    label: String,
+    value: String,
     url: String? = null,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    showClickIndicator: Boolean = false
 ) {
     val context = LocalContext.current
     val hiddenClickInteractionSource = remember { MutableInteractionSource() }
@@ -3153,14 +3256,17 @@ private fun SettingsDetailRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .then(
-                if (url != null) Modifier.clickable {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                } else if (onClick != null) Modifier.clickable(
-                    interactionSource = hiddenClickInteractionSource,
-                    indication = null
-                ) {
-                    onClick()
-                } else Modifier
+                when {
+                    url != null -> Modifier.clickable {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                    onClick != null && showClickIndicator -> Modifier.clickable { onClick() }
+                    onClick != null -> Modifier.clickable(
+                        interactionSource = hiddenClickInteractionSource,
+                        indication = null
+                    ) { onClick() }
+                    else -> Modifier
+                }
             ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically
@@ -3172,17 +3278,28 @@ private fun SettingsDetailRow(
                 value,
                 style      = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color      = if (url != null) MaterialTheme.colorScheme.primary
+                color      = if (url != null || showClickIndicator) MaterialTheme.colorScheme.primary
                              else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (url != null) {
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
-                    contentDescription = "Open link",
-                    tint               = MaterialTheme.colorScheme.primary,
-                    modifier           = Modifier.size(14.dp)
-                )
+            when {
+                url != null -> {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = "Open link",
+                        tint               = MaterialTheme.colorScheme.primary,
+                        modifier           = Modifier.size(14.dp)
+                    )
+                }
+                showClickIndicator -> {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint               = MaterialTheme.colorScheme.primary,
+                        modifier           = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }

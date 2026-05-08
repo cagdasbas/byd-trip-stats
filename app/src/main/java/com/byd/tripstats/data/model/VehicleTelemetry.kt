@@ -16,7 +16,7 @@ data class VehicleTelemetry(
         @SerialName("speed") val speed: Double,
         @SerialName("gear") val gear: String,
         @SerialName("odometer") val odometer: Double,
-        @SerialName("engine_power") val enginePower: Double,
+        @SerialName("engine_power") val enginePower: Int = 0,
         @SerialName("total_discharge") val totalDischarge: Double,
         /** BYD PHM average consumption rate (kWh/100km). Null if the statistic device hasn't reported it. */
         @SerialName("total_elec_con_phm") val totalElecConPHM: Double? = null,
@@ -145,7 +145,7 @@ data class VehicleTelemetry(
                 carOn > 0 ||
                         gear in listOf("D", "R") ||
                         speed > 2.0 ||
-                        enginePower > 5.0
+                        enginePower > 5
 
     val isAwake: Boolean
         get() = carOn == 1
@@ -158,7 +158,7 @@ data class VehicleTelemetry(
 
     val isRegenerating: Boolean
         // -1.0 kW threshold filters out sensor noise at standstill.
-        get() = enginePower < -1.0
+        get() = enginePower < -1
 
     val isDriving: Boolean
         get() = gear in listOf("D", "R")

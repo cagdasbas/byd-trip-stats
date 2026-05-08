@@ -93,7 +93,7 @@ class AbrpConnectionManager(context: Context) {
         payload.put("soc", telemetry.soc)
         payload.put("power", when {
             telemetry.isCharging && telemetry.chargingPower > 0.0 -> -telemetry.chargingPower
-            abs(telemetry.enginePower) > 0.1 -> telemetry.enginePower
+            telemetry.enginePower != 0 -> telemetry.enginePower.toDouble()
             else -> 0.0
         })
         payload.put("speed", telemetry.locationGpsSpeed?.takeIf { it > 0.1 } ?: telemetry.speed)

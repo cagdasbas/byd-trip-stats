@@ -30,6 +30,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripFilterState
@@ -49,6 +55,7 @@ fun TripHistoryScreen(
     val displayMetrics by viewModel.tripDisplayMetrics.collectAsState()
     val monthlyCosts   by viewModel.monthlyCosts.collectAsState()
     val currencySymbol by viewModel.currencySymbol.collectAsState()
+    val unitSystem     by viewModel.unitSystem.collectAsState()
     val sortField     by viewModel.sortField.collectAsState()
     val sortOrder     by viewModel.sortOrder.collectAsState()
     val filterState   by viewModel.filterState.collectAsState()
@@ -230,6 +237,7 @@ fun TripHistoryScreen(
                         regenEfficiencyPct = metrics?.regenEfficiencyPct,
                         tripCost = metrics?.tripCost,
                         currencySymbol = currencySymbol,
+                        unitSystem = unitSystem,
                         isSelected = selectedTrips.contains(trip.id),
                         selectionMode = selectionMode,
                         isActive = trip.isActive,
@@ -325,9 +333,10 @@ fun TripHistoryScreen(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ) {
             FilterSheetContent(
-                current   = filterState,
-                onApply   = { viewModel.setFilter(it); showFilterSheet = false },
-                onClear   = { viewModel.clearFilters(); showFilterSheet = false }
+                current     = filterState,
+                unitSystem  = unitSystem,
+                onApply     = { viewModel.setFilter(it); showFilterSheet = false },
+                onClear     = { viewModel.clearFilters(); showFilterSheet = false }
             )
         }
     }
@@ -414,6 +423,7 @@ private fun SortSheetContent(
 @Composable
 private fun FilterSheetContent(
     current: TripFilterState,
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     onApply: (TripFilterState) -> Unit,
     onClear: () -> Unit
 ) {
@@ -441,11 +451,11 @@ private fun FilterSheetContent(
     ) {
         Text("Filter trips", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-        FilterRangeRow("Distance (km)",           distMin,  distMax)  { a, b -> distMin  = a; distMax  = b }
-        FilterRangeRow("Duration (min)",           durMin,   durMax)   { a, b -> durMin   = a; durMax   = b }
-        FilterRangeRow("Avg Consumption (kWh/100km)", consMin,  consMax)  { a, b -> consMin  = a; consMax  = b }
-        FilterRangeRow("Regen Efficiency (%)",     regenMin, regenMax) { a, b -> regenMin = a; regenMax = b }
-        FilterRangeRow("Max Speed (km/h)",         speedMin, speedMax) { a, b -> speedMin = a; speedMax = b }
+        FilterRangeRow("Distance (${unitSystem.distanceUnit})", distMin, distMax) { a, b -> distMin = a; distMax = b }
+        FilterRangeRow("Duration (min)",                    durMin,  durMax)  { a, b -> durMin  = a; durMax  = b }
+        FilterRangeRow("Avg Consumption (${unitSystem.consumptionUnit})", consMin, consMax) { a, b -> consMin = a; consMax = b }
+        FilterRangeRow("Regen Efficiency (%)",              regenMin, regenMax) { a, b -> regenMin = a; regenMax = b }
+        FilterRangeRow("Max Speed (${unitSystem.speedUnit})", speedMin, speedMax) { a, b -> speedMin = a; speedMax = b }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -523,6 +533,7 @@ fun TripItem(
     regenEfficiencyPct: Double?,
     tripCost: Double? = null,
     currencySymbol: String = "€",
+    unitSystem: UnitSystem = UnitSystem.METRIC,
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
     isActive: Boolean = false,
@@ -642,7 +653,7 @@ fun TripItem(
                     icon = Icons.Filled.Route,
                     label = "Distance",
                     iconTint = MaterialTheme.colorScheme.secondary,
-                    value = "${String.format("%.1f", trip.distance ?: 0.0)} km",
+                    value = "${String.format("%.1f", unitSystem.convertDistance(trip.distance ?: 0.0))} ${unitSystem.distanceUnit}",
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
@@ -656,7 +667,7 @@ fun TripItem(
                     icon = Icons.Filled.Eco,
                     label = "Avg Consumption",
                     value = trip.efficiency
-                        ?.let { "${String.format("%.1f", it)} kWh/100" } ?: "—",
+                        ?.let { "${String.format("%.1f", unitSystem.convertEfficiency(it))} kWh/100${unitSystem.distanceUnit}" } ?: "—",
                     iconTint = RegenGreen,
                     modifier = Modifier.weight(1f)
                 )
@@ -709,14 +720,14 @@ fun TripItem(
                     icon = Icons.Filled.Speed,
                     label = "Avg Speed",
                     iconTint = BydEcoTealDim,
-                    value = if (avgSpeedKmh != null) "$avgSpeedKmh km/h" else "—",
+                    value = if (avgSpeedKmh != null) "$avgSpeedKmh ${unitSystem.speedUnit}" else "—",
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
                     label = "Max Speed",
                     iconTint = BydErrorRed,
-                    value = "${trip.maxSpeed.toInt()} km/h",
+                    value = "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}",
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(

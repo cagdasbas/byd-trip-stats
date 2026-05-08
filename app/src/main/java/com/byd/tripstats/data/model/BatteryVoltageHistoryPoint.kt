@@ -7,5 +7,6 @@ data class BatteryVoltageHistoryPoint(
     val timestamp: Long,
     val battery12vVoltage: Double,
     val batteryTotalVoltage: Int,
-    val isChargingSample: Boolean
+    val isChargingSample: Boolean,
+    val soc: Double = 0.0
 )

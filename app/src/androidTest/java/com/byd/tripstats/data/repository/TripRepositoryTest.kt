@@ -62,7 +62,7 @@ class TripRepositoryTest {
         gear: String = "D",
         speed: Double = 10.0,
         odometer: Double = 1000.0
-    ) = telemetry(gear = gear, speed = speed, enginePower = 10.0, carOn = 2, odometer = odometer)
+    ) = telemetry(gear = gear, speed = speed, enginePower = 10, carOn = 2, odometer = odometer)
 
     @Test fun initiallyNotInTrip() {
         assertFalse(repo.isInTrip.value)
@@ -107,7 +107,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 0.0,
-                enginePower = 0.0,
+                enginePower = 0,
                 carOn = 2,
                 odometer = 1000.0   // same odometer — no movement signal
             )
@@ -140,7 +140,7 @@ class TripRepositoryTest {
         Thread.sleep(SETTLE)
         assertTrue(repo.isInTrip.value)
 
-        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0.0, carOn = 0, battery12vVoltage = 12.4))
+        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0, carOn = 0, battery12vVoltage = 12.4))
         Thread.sleep(SETTLE)
 
         assertTrue("Trip should remain active during a brief engine-off stop", repo.isInTrip.value)
@@ -153,7 +153,7 @@ class TripRepositoryTest {
         Thread.sleep(SETTLE)
         assertTrue(repo.isInTrip.value)
 
-        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0.0, carOn = 0, battery12vVoltage = 13.7))
+        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0, carOn = 0, battery12vVoltage = 13.7))
         Thread.sleep(SETTLE)
         assertTrue("Trip should remain active during the continuation window", repo.isInTrip.value)
 
@@ -162,7 +162,7 @@ class TripRepositoryTest {
             it.setLong(repo, System.currentTimeMillis() - 31L * 60L * 1000L)
         }
 
-        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0.0, carOn = 0, battery12vVoltage = 13.7))
+        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0, carOn = 0, battery12vVoltage = 13.7))
         Thread.sleep(SETTLE_LONG)
 
         assertFalse("High 12V alone must not keep an engine-off trip alive forever", repo.isInTrip.value)
@@ -179,7 +179,7 @@ class TripRepositoryTest {
         Thread.sleep(SETTLE)
         assertTrue(repo.isInTrip.value)
 
-        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0.0, carOn = 0, battery12vVoltage = 12.4))
+        repo.processTelemetry(telemetry(gear = "P", speed = 0.0, enginePower = 0, carOn = 0, battery12vVoltage = 12.4))
         Thread.sleep(SETTLE)
         assertTrue(repo.isInTrip.value)
 
@@ -187,7 +187,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "P",
                 speed = 0.0,
-                enginePower = 0.0,
+                enginePower = 0,
                 carOn = 0,
                 carLocked = 1,
                 battery12vVoltage = 12.4
@@ -253,7 +253,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 36.0,
-                enginePower = 20.0,
+                enginePower = 20,
                 carOn = 2,
                 odometer = 1000.6,
                 totalDischarge = 500.5,
@@ -283,7 +283,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 50.0,
-                enginePower = 50.0,
+                enginePower = 50,
                 carOn = 2,
                 odometer = 1000.0,
                 totalDischarge = 500.0
@@ -298,7 +298,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 50.0,
-                enginePower = 50.0,
+                enginePower = 50,
                 carOn = 2,
                 odometer = 1001.0,
                 totalDischarge = 500.5
@@ -325,7 +325,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 60.0,
-                enginePower = 12.0,
+                enginePower = 12,
                 carOn = 2,
                 odometer = 1000.0,
                 totalDischarge = 500.0
@@ -340,7 +340,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 60.0,
-                enginePower = 12.0,
+                enginePower = 12,
                 carOn = 2,
                 odometer = 1006.0,
                 totalDischarge = 501.0
@@ -420,13 +420,13 @@ class TripRepositoryTest {
 
         repo.processTelemetry(telemetry(gear = "P", speed = 0.0, carOn = 1, odometer = 1000.0))
         Thread.sleep(SETTLE)
-        repo.processTelemetry(telemetry(gear = "D", speed = 10.0, enginePower = 10.0, carOn = 2, odometer = 1000.1))
+        repo.processTelemetry(telemetry(gear = "D", speed = 10.0, enginePower = 10, carOn = 2, odometer = 1000.1))
         Thread.sleep(SETTLE)
         repo.processTelemetry(
             telemetry(
                 gear = "D",
                 speed = 16.0,
-                enginePower = 18.0,
+                enginePower = 18,
                 carOn = 2,
                 odometer = 1000.2,
                 socPanel = 79,
@@ -460,7 +460,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 10.0,
-                enginePower = 10.0,
+                enginePower = 10,
                 carOn = 2,
                 odometer = 1000.0,
                 batteryPackTemp = 0.0,
@@ -474,7 +474,7 @@ class TripRepositoryTest {
             telemetry(
                 gear = "D",
                 speed = 18.0,
-                enginePower = 16.0,
+                enginePower = 16,
                 carOn = 2,
                 odometer = 1000.2,
                 batteryPackTemp = 28.0,

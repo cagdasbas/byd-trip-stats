@@ -28,6 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.isImperial
+import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import org.osmdroid.config.Configuration
@@ -66,6 +73,7 @@ fun TripCompareSheet(
     val compareData    by viewModel.compareDataPoints.collectAsState()
     val displayMetrics by viewModel.tripDisplayMetrics.collectAsState()
     val compareStats    = remember(trips) { viewModel.getCompareStats(trips.map { it.id }) }
+    val unitSystem     by viewModel.unitSystem.collectAsState()
 
     var selectedTab  by remember { mutableIntStateOf(0) }
     val tabs = listOf("Summary", "Charts", "Routes")
@@ -173,9 +181,9 @@ fun TripCompareSheet(
             //                weight alone is not sufficient during that pass).
             Box(modifier = Modifier.weight(1f).clipToBounds()) {
                 when (selectedTab) {
-                    0 -> CompareSummaryTab(trips, displayMetrics, compareStats, visibleTrips)
-                    1 -> CompareChartsTab(trips, compareData, visibleTrips)
-                    2 -> CompareRoutesTab(trips, compareStats, visibleTrips)
+                    0 -> CompareSummaryTab(trips, displayMetrics, compareStats, visibleTrips, unitSystem)
+                    1 -> CompareChartsTab(trips, compareData, visibleTrips, unitSystem)
+                    2 -> CompareRoutesTab(trips, compareStats, visibleTrips, unitSystem)
                 }
             }
         }
@@ -189,7 +197,8 @@ private fun CompareSummaryTab(
     trips         : List<TripEntity>,
     displayMetrics: Map<Long, DashboardViewModel.TripDisplayMetrics>,
     compareStats  : List<com.byd.tripstats.data.local.entity.TripStatsEntity>,
-    visibleTrips  : Set<Int>
+    visibleTrips  : Set<Int>,
+    unitSystem    : UnitSystem = UnitSystem.METRIC
 ) {
     val statsById = compareStats.associateBy { it.tripId }
 
@@ -207,22 +216,22 @@ private fun CompareSummaryTab(
 
     val rows = listOf(
         MetricRow("Distance",
-            trips.map { "%.1f km".format(it.distance ?: 0.0) },
+            trips.map { "%.1f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it.distance ?: 0.0)) },
             bestIndices(trips.map { it.distance }, false)),
         MetricRow("Duration",
             trips.map { formatDurationCompare(it.duration ?: 0L) },
             bestIndices(trips.map { it.duration?.toDouble() }, false)),
         MetricRow("Consumption",
-            trips.map { "%.1f kWh/100".format(it.efficiency ?: 0.0) },
+            trips.map { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it.efficiency ?: 0.0)) },
             bestIndices(trips.map { it.efficiency }, true)),
         MetricRow("Energy used",
             trips.map { "%.2f kWh".format(it.energyConsumed ?: 0.0) },
             bestIndices(trips.map { it.energyConsumed }, true)),
         MetricRow("Max speed",
-            trips.map { "${it.maxSpeed.toInt()} km/h" },
+            trips.map { "${it.maxSpeed.toInt()} ${unitSystem.speedUnit}" },
             bestIndices(trips.map { it.maxSpeed }, false)),
         MetricRow("Avg speed",
-            trips.map { displayMetrics[it.id]?.avgSpeedKmh?.let { v -> "$v km/h" } ?: "—" },
+            trips.map { displayMetrics[it.id]?.avgSpeedKmh?.let { v -> "$v ${unitSystem.speedUnit}" } ?: "—" },
             bestIndices(trips.map { displayMetrics[it.id]?.avgSpeedKmh?.toDouble() }, false)),
         MetricRow("SoC start→end",
             trips.map { "${it.startSoc.toInt()}% → ${it.endSoc?.toInt() ?: "—"}%" },
@@ -328,7 +337,8 @@ private enum class CompareChartType(
 private fun CompareChartsTab(
     trips       : List<TripEntity>,
     compareData : Map<Long, List<TripDataPointEntity>>,
-    visibleTrips: Set<Int>
+    visibleTrips: Set<Int>,
+    unitSystem  : UnitSystem = UnitSystem.METRIC
 ) {
     if (trips.any { it.id !in compareData }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -372,7 +382,11 @@ private fun CompareChartsTab(
                         series = normalised.mapIndexed { i, pts ->
                             Triple(pts, tripColor(i), i in visibleTrips)
                         },
-                        yAxisLabel    = chartType.yAxisLabel,
+                        yAxisLabel    = when (chartType) {
+                            CompareChartType.SPEED              -> unitSystem.speedUnit
+                            CompareChartType.ENERGY_CONSUMPTION -> unitSystem.consumptionUnit
+                            else                                -> chartType.yAxisLabel
+                        },
                         yFloor        = chartType.yFloor,
                         valueSelector = { pt ->
                             when (chartType) {
@@ -516,7 +530,8 @@ private fun OverlaidLineChart(
 private fun CompareRoutesTab(
     trips       : List<TripEntity>,
     compareStats: List<com.byd.tripstats.data.local.entity.TripStatsEntity>,
-    visibleTrips: Set<Int>
+    visibleTrips: Set<Int>,
+    unitSystem  : UnitSystem = UnitSystem.METRIC
 ) {
     val statsById    = compareStats.associateBy { it.tripId }
     val routesByTrip = trips.mapIndexedNotNull { i, trip ->
@@ -646,14 +661,14 @@ private fun CompareRoutesTab(
                         )
                         // Distance
                         Text(
-                            "%.1f km".format(trip.distance ?: 0.0),
+                            "%.1f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(trip.distance ?: 0.0)),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (hidden) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                             else MaterialTheme.colorScheme.onSurface
                         )
                         // Efficiency
                         Text(
-                            trip.efficiency?.let { "%.1f kWh/100".format(it) } ?: "—",
+                            trip.efficiency?.let { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it)) } ?: "—",
                             style = MaterialTheme.typography.bodySmall,
                             color = if (hidden) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                             else MaterialTheme.colorScheme.onSurface
