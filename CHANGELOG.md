@@ -6,6 +6,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.2.0] - 2026-May-08
+
+### Added
+
+- **Imperial / Metric unit system** — users can now choose between Metric (km, km/h, kWh/100km) and Imperial (mi, mph, kWh/100mi) in Settings → Preferences. The default is determined by the device locale (UK → Imperial, all others → Metric) and can be changed at any time with a two-button selector; the active choice is highlighted in the primary colour. The preference persists across restarts.
+  - Odometer and speed values are telemetry-sourced and already arrive in the correct unit for the vehicle's market (BYD UK cars report miles and mph natively), so no conversion is applied to those — only the unit label changes.
+  - Calculated distances (trip distance, monthly totals, range projection) and efficiencies (kWh/100km → kWh/100mi) are converted at display time; stored data always remains in metric.
+  - The unit system is respected across the Dashboard, Trip History, Trip Detail, Trip Compare, Trip Goals, Seasonal Analysis, and all charts (Speed, Instant Consumption, Consumption history, Range Projection).
+- **Live trip stats in the Trip Tracking card** — while a trip is being recorded, the card shows a real-time centre column: elapsed time (HH:MM:SS, continuous — does not pause during brief car-off stops within the 30-minute resume window), average speed, total energy used (kWh), and average consumption (kWh/100km or kWh/100mi). The card stays at a fixed height; the stats appear between the gear/status section on the left and the Auto toggle/Stop button on the right. All values respect the active unit system.
+- **SoC overlay on the 12V / HV battery history chart** — the 48-hour battery monitoring dialog now overlays the HV State of Charge as a dashed purple line on a dedicated right-hand axis (0–100 %), making it easy to correlate 12V drain events with HV top-up cycles. SoC is sampled and persisted alongside the existing voltage readings. The dialog title was updated to "HV / 12V Batteries - Last 48 Hours" to reflect that both battery systems are now shown.
+- **BYD Tang EV support** — the pure-electric Tang (AWD, 108.8 kWh Blade LFP, 530 km WLTP) is now available as a selectable BEV profile alongside the existing Tang DM-i.
+- **In-app changelog viewer** — tapping "Changelog / What's new" in Settings → About now opens a scrollable in-app dialog instead of launching the browser.
+
+### Changed
+
+- **`enginePower` type corrected to `Int`** — the BMS reports motor power as a whole-number kW value; the model field was previously widened to `Double` unnecessarily. Decimal precision is only meaningful for `chargingPower`, which originates from a separate telemetry path and remains `Double`. All redundant `.toInt()` / `.toDouble()` conversions and the now-unreachable `.isFinite()` guard have been removed.
+- **Off-state keepalive redesigned** — the redundant in-service 3-minute MCU wake loop has been removed; only the alarm-based `OffStateKeepaliveReceiver` remains. Its interval has been increased from 4 minutes to 90 minutes, allowing the MCU to genuinely sleep between pokes (~75 min idle per cycle) and significantly reducing overnight 12V / HV standby drain. `POWER_CONNECTED` remains the primary wake-up trigger for charging detection, so a charge session started by plugging in is detected immediately; the 90-minute alarm is a fallback backstop only. During active off-state charging sessions, WiFi is kept alive via a targeted keepalive every 10 minutes so that charging telemetry is not interrupted when the car is off.
+- **Service self-stops when idle** — after the car has been off and not charging for 5 minutes, the telemetry service stops itself and releases the CPU wake lock, allowing the infotainment to enter deep sleep. This eliminates the overnight HV→12V DC-DC cycling that was observed as a steady SoC drain while parked. The 90-minute alarm restarts the service briefly for a periodic snapshot, then the self-stop fires again. Charging sessions are unaffected: the service stays alive for the full duration of any active charge.
+- **Idle poll interval extended to 5 minutes** — when the car is off and not charging, the telemetry loop now ticks every 5 minutes instead of every 30 seconds, reducing unnecessary CPU wake-ups and repository calls. The AC/slow-charging case retains 30-second polling for SoC granularity. The MQTT settings hint has been updated to reflect the new publish cadence: driving at the configured interval, charging every 30 s, idle: service sleeps (no publish).
+- **SCREEN_OFF keepalive removed** — the dynamically registered `SCREEN_OFF` receiver that called `McuWakeHelper.keepAlive()` on every screen-off event has been removed. It was firing at the exact moment the system tried to sleep, resetting the MCU WiFi countdown and preventing deep sleep. WiFi continuity during charging is now handled solely by the targeted 10-minute keepalive in the telemetry loop.
+- **12V history chart Y-axis fixed** — the voltage axis is now always 12.0–14.0 V (previously 11.0–14.0 V). The SoC right-hand axis ticks were updated from five labels (0/25/50/75/100 %) to three (33/66/100 %) to match the three voltage gridlines.
+
+### Fixed
+
+- **BYD M6 cell count** — Now the number of cells is correct, which means SoH will be calculated correctly
+- **12V chart crosshair showing `%.2f` literally** — the 12V voltage value in the crosshair tooltip was not being formatted; it now correctly displays the numeric value (e.g. `13.70 V`).
+
+---
+
 ## [2.1.1] - 2026-May-06
 
 ### Added
