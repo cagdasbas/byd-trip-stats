@@ -133,9 +133,10 @@
             </intent-filter>
         </receiver>
 
-        <!-- Off-state keepalive: 4-minute alarm chain after ACC_OFF.
-             Survives process death — AlarmManager wakes the process to
-             run MCU keepalive even after the OS kills our PID. -->
+        <!-- Off-state keepalive: 90-minute fallback alarm chain after ACC_OFF.
+             POWER_CONNECTED is the primary wake-up for charging detection;
+             this alarm is a backstop so a missed charge session is at most
+             90 min late. Survives process death via AlarmManager RTC_WAKEUP. -->
         <receiver
             android:name=".receiver.OffStateKeepaliveReceiver"
             android:exported="false">

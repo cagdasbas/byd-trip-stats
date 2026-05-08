@@ -1455,20 +1455,41 @@ fun TripControls(
                     }
                 }
 
-                // Center: live stats
-                Column(
+                // Center: live stats — adaptive 1×4 or 2×2 grid depending on available width
+                BoxWithConstraints(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        LiveTripStat(label = "TIME",        value = elapsedStr,                                             unit = "")
-                        LiveTripStat(label = "AVG SPEED",   value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit)
-                        LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh")
-                        LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit)
+                    if (maxWidth >= 190.dp) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            LiveTripStat(label = "TIME",        value = elapsedStr,                                             unit = "")
+                            LiveTripStat(label = "AVG SPEED",   value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit)
+                            LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh")
+                            LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit)
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                LiveTripStat(label = "TIME",      value = elapsedStr,                                             unit = "")
+                                LiveTripStat(label = "AVG SPEED", value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                LiveTripStat(label = "ENERGY USED",        value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh")
+                                LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit)
+                            }
+                        }
                     }
                 }
 
@@ -1935,7 +1956,7 @@ private fun Battery12vHistoryChart(
     val historyWindowMs = 48L * 60L * 60L * 1000L
     val tickStepMs = 6L * 60L * 60L * 1000L
     val startMs = nowMs - historyWindowMs
-    val minVoltage = 11.0
+    val minVoltage = 12.0
     val maxVoltage = 14.0
     val chartColor = BatteryBlue
     val socColor   = Color(0xFFBA68C8)
@@ -1955,7 +1976,7 @@ private fun Battery12vHistoryChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("12V voltage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("12V / SOC chart", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
                         drawLine(chartColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 4f, cap = StrokeCap.Round)
@@ -2007,8 +2028,8 @@ private fun Battery12vHistoryChart(
                 fun yOfSoc(pct: Double): Float =
                     padT + chartH - (pct / 100.0).toFloat() * chartH
 
-                listOf(14.0, 13.0, 12.0, 11.0).forEachIndexed { index, value ->
-                    val y = padT + chartH * index / 3f
+                listOf(14.0, 13.0, 12.0).forEachIndexed { index, value ->
+                    val y = padT + chartH * index / 2f
                     drawLine(gridColor, Offset(padL, y), Offset(size.width - padR, y), 1f)
                     labelPaint.textAlign = android.graphics.Paint.Align.RIGHT
                     nc.drawText("%.1f".format(value), padL - 8f, y + 7f, labelPaint)
@@ -2021,7 +2042,7 @@ private fun Battery12vHistoryChart(
                     textSize = 19f
                     textAlign = android.graphics.Paint.Align.LEFT
                 }
-                for (tick in listOf(0, 25, 50, 75, 100)) {
+                for (tick in listOf(33, 66, 100)) {
                     val y = yOfSoc(tick.toDouble())
                     if (y in padT..(padT + chartH)) {
                         nc.drawText("$tick%", size.width - padR + 6f, y + 7f, socAxisPaint)
@@ -2112,7 +2133,7 @@ private fun Battery12vHistoryChart(
                             padR = padR,
                             padT = padT,
                             chartH = chartH,
-                            line1 = "12V: %.2f V${if (closest.soc > 0.0) "  |  SoC: ${"%.1f".format(closest.soc)}%" else ""}",
+                            line1 = "12V: ${"%.2f".format(closest.battery12vVoltage)} V${if (closest.soc > 0.0) "  |  SoC: ${"%.1f".format(closest.soc)}%" else ""}",
                             line2 = if (closest.isChargingSample) "charging sample" else "drive/live sample",
                             line3 = timeFormatter.format(Date(closest.timestamp)),
                             accentColor = chartColor

@@ -959,7 +959,7 @@ private fun ConnectionsTab() {
                                 label = { Text("Publish interval (seconds)") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("While driving: every ${mqttIntervalInput.ifBlank { "1" }} s · Car off: every 30 s", style = MaterialTheme.typography.bodySmall) },
+                                supportingText = { Text("Driving: every ${mqttIntervalInput.ifBlank { "1" }} s  ·  Charging: every 30 s  ·  Idle: service sleeps (no publish)", style = MaterialTheme.typography.bodySmall) },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

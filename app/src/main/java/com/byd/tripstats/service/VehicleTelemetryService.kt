@@ -106,8 +106,6 @@ class VehicleTelemetryService : Service() {
     private var mqttConnectionManager: MqttConnectionManager? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
-    private var screenOffReceiver: android.content.BroadcastReceiver? = null
-    private var mcuWakeJob: kotlinx.coroutines.Job? = null
     private var intentionalStop = false
     private var notificationStartedAtWallClock: Long = 0L
     @Volatile
@@ -162,8 +160,6 @@ class VehicleTelemetryService : Service() {
         createNotificationChannel()
         acquireWakeLock()
         acquireLocationSubscription()
-        registerScreenOffReceiver()
-        startMcuWakeLoop()
         vehicleDataSource = BydVehicleDataSource(this)
         vehicleDataSource.start()
     }
@@ -253,8 +249,6 @@ class VehicleTelemetryService : Service() {
         telemetryLoopActive = false
         telemetryLoopStarting = false
         releaseLocationSubscription()
-        mcuWakeJob?.cancel()
-        unregisterScreenOffReceiver()
         wakeLock?.release()
         wifiLock?.release()
         serviceScope.cancel()
@@ -358,14 +352,20 @@ class VehicleTelemetryService : Service() {
                 // null on first boot resolves to 0 ms (immediate first poll).
                 var lastTelemetry: VehicleTelemetry? = null
                 var lastLoopTime = SystemClock.elapsedRealtime()
+                var lastChargingKeepaliveMs = 0L
+                // Tracks when the car was last confirmed on or charging.
+                // 0L = car is active (or first tick not yet received).
+                // Non-zero = elapsedRealtime() when we first saw off+not-charging.
+                var carOffSinceMs = 0L
                 while (true) {
                     val msSinceLastEvent = SystemClock.elapsedRealtime() - vehicleDataSource.lastFeatureEventElapsedMs
                     val pollIntervalMs = when {
                         lastTelemetry == null -> 0L
                         lastTelemetry.isCarOn -> 1_000L
                         lastTelemetry.isCharging && lastTelemetry.chargingPower > 23.0 -> 1_000L
-                        msSinceLastEvent < 60_000L -> 5_000L  // car awake (recent SDK event) but not driving
-                        else -> 30_000L
+                        lastTelemetry.isCharging -> 30_000L      // AC/slow charging: 30s for SoC granularity
+                        msSinceLastEvent < 60_000L -> 5_000L     // car awake (recent SDK event) but not driving
+                        else -> 5 * 60 * 1000L                   // car off, not charging: 5 min
                     }
                     delay(pollIntervalMs)
 
@@ -393,7 +393,41 @@ class VehicleTelemetryService : Service() {
                         abrpConnectionManager?.onTelemetry(telemetry, carConfig, serviceScope)
                         mqttConnectionManager?.onTelemetry(telemetry, serviceScope)
 
+                        // Keep WiFi alive during charging while the car is off.
+                        // Without this, the MCU cuts WiFi ~15 min after ACC_OFF and
+                        // charging telemetry is lost until the 90-min fallback alarm fires.
+                        // Throttled to once per 10 min — well within the ~15 min WiFi window.
+                        if (telemetry.isCharging && !telemetry.isCarOn) {
+                            val nowMs = SystemClock.elapsedRealtime()
+                            if (nowMs - lastChargingKeepaliveMs >= 10 * 60 * 1000L) {
+                                lastChargingKeepaliveMs = nowMs
+                                try {
+                                    McuWakeHelper.keepAlive(applicationContext)
+                                    Log.d(TAG, "MCU keepalive during off-state charging")
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "MCU keepalive during charging failed: ${e.message}")
+                                }
+                            }
+                        }
+
                         _telemetryCount.value = _telemetryCount.value + 1
+
+                        // Self-stop when car is off and not charging.
+                        // Releasing the wake lock lets the infotainment CPU enter deep
+                        // sleep, which stops the DC-DC cycling that drains the HV pack.
+                        // The 90-min OffStateKeepaliveReceiver alarm restarts the service
+                        // periodically to record a snapshot and then stops it again.
+                        if (!telemetry.isCarOn && !telemetry.isCharging) {
+                            if (carOffSinceMs == 0L) {
+                                carOffSinceMs = SystemClock.elapsedRealtime()
+                            } else if (SystemClock.elapsedRealtime() - carOffSinceMs >= 5 * 60 * 1000L) {
+                                Log.i(TAG, "Car off and not charging for 5 min — releasing wake lock and stopping service")
+                                stopSelf()
+                                return@launch
+                            }
+                        } else {
+                            carOffSinceMs = 0L
+                        }
                     } catch (t: Throwable) {
                         Log.e(TAG, "Error in telemetry loop tick", t)
                     }
@@ -471,69 +505,6 @@ class VehicleTelemetryService : Service() {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Unable to acquire Wi-Fi lock", e)
-        }
-    }
-
-    // ── ScreenOffReceiver ─────────────────────────────────────────────────────
-    // SCREEN_OFF cannot be registered in the manifest — must be dynamic.
-    // When the screen turns off (car goes to sleep) we re-kick the MCU to
-    // prevent it cutting WiFi power after its ~10-15 min countdown expires.
-    private fun registerScreenOffReceiver() {
-        if (screenOffReceiver != null) return
-        screenOffReceiver = object : android.content.BroadcastReceiver() {
-            override fun onReceive(ctx: android.content.Context, intent: android.content.Intent) {
-                if (intent.action == android.content.Intent.ACTION_SCREEN_OFF) {
-                    Log.i(TAG, "SCREEN_OFF — triggering MCU keepalive")
-                    serviceScope.launch { McuWakeHelper.keepAlive(applicationContext) }
-                }
-            }
-        }
-        registerReceiver(
-            screenOffReceiver,
-            android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_OFF)
-        )
-        Log.i(TAG, "ScreenOffReceiver registered")
-    }
-
-    private fun unregisterScreenOffReceiver() {
-        screenOffReceiver?.let {
-            runCatching { unregisterReceiver(it) }
-            screenOffReceiver = null
-        }
-    }
-
-    // ── MCU wake loop ──────────────────────────────────────────────────────────
-    // Periodically pokes the BYD MCU when the car is off to reset its WiFi
-    // power-cut countdown (~15 min). Interval is 3 min so the MCU is touched
-    // at t=0, 3, 6, 9, 12 min — safely within the window even if one call is
-    // a no-op while the MCU is still transitioning to sleep state.
-    private fun startMcuWakeLoop() {
-        mcuWakeJob?.cancel()
-        mcuWakeJob = serviceScope.launch {
-            // Poke immediately at startup so the countdown is reset as soon as
-            // the service launches, before the first periodic interval expires.
-            try {
-                val status = McuWakeHelper.getMcuStatus(applicationContext)
-                Log.i(TAG, "MCU wake loop (initial): status=$status")
-                McuWakeHelper.keepAlive(applicationContext)
-            } catch (e: Exception) {
-                Log.w(TAG, "MCU wake loop (initial) error: ${e.message}")
-            }
-
-            while (true) {
-                kotlinx.coroutines.delay(3 * 60 * 1000L) // every 3 minutes
-                try {
-                    val status = McuWakeHelper.getMcuStatus(applicationContext)
-                    if (status != 1) { // not ACTIVE
-                        Log.i(TAG, "MCU wake loop: status=$status, keeping alive")
-                        McuWakeHelper.keepAlive(applicationContext)
-                    } else {
-                        Log.d(TAG, "MCU wake loop: status=ACTIVE, no keepalive needed")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "MCU wake loop error: ${e.message}")
-                }
-            }
         }
     }
 

@@ -236,7 +236,7 @@ object CarCatalog {
         frontTyrePressureBar = 2.5,
         rearTyrePressureBar = 2.5,
         frontMotorRatedKw = 100,
-        cellCount = 184,  // 71.8 kWh @ ~589V → 184S LFP (estimate, same pack as Seal U Comfort)
+        cellCount = 132,  // 71.8 kWh @ ~422V → 132S LFP (estimate)
         cdA = 0.868       // Cd 0.33 × A ~2.63 m² (1.81 × 1.69 × 0.86)
     )
 

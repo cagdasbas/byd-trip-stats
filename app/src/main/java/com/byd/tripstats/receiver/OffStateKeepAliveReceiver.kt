@@ -87,11 +87,14 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
         private const val WAKE_TAG = "bydstats:offstate_keepalive"
         private const val WAKE_LOCK_TIMEOUT_MS = 15_000L
 
-        // 4 minutes — shorter than the MCU's ~10-15 min WiFi-cut timer
-        private const val INTERVAL_MS = 4 * 60 * 1000L
+        // 90 minutes — lets the MCU sleep between pokes (WiFi cuts after ~15 min,
+        // system genuinely idles for ~75 min per cycle). POWER_CONNECTED is the
+        // primary wake-up for charging; this alarm is just a fallback so a missed
+        // charge session is at most 90 min late rather than never detected.
+        private const val INTERVAL_MS = 90 * 60 * 1000L
 
-        // Backup alarm fires this many ms after the primary. If the primary
-        // alarm is dropped, the backup re-seeds the chain.
+        // Backup fires 5 min after the primary. At 90 min cadence, if the primary
+        // alarm is dropped by the OS the backup re-seeds the chain before the next cycle.
         private const val BACKUP_OFFSET_MS = 5 * 60 * 1000L
 
         private val REQUEST_CODE = ACTION.hashCode()
