@@ -6,6 +6,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.3.0] - 2026-May-10
+
+### Added
+
+- **Delete local backups from within the app** — each entry in the Local Backup list now has a delete button (trash icon). Tapping it shows a confirmation dialog then permanently removes the file from all locations (Downloads, internal ADB copy) in a single operation.
+- **BYD Atto 2 Boost** — 51.1 kWh Blade LFP (100S estimated), FWD, 130 kW, 344 km WLTP.
+- **BYD M6 Standard 120kW** — 55.4 kWh Blade LFP (102S), DC charging 89 kW.
+- **BYD M6 Superior 150kW** — 71.8 kWh Blade LFP (132S), DC charging 115 kW. The existing M6 Superior entry has been renamed to "BYD M6 Superior 100kW" to distinguish the two; its stored ID is unchanged so existing car selections are preserved.
+- **BYD Seal 6 Premium 95kW** — 56.64 kWh Blade LFP (118S, 150Ah × 377.6V), FWD, DC charging 103 kW, 425 km WLTC.
+- **BYD Seal 6 Premium 160kW** — same 56.64 kWh pack (118S), RWD, 160 kW rear motor.
+- **Distance shows no decimals in split-screen mode** — the Distance power metric no longer displays a digit after the decimal (e.g., "12.3") when the app resides in split-screen. Integer format is used to avoid crowding.
+- **Added AUD (Australian Dollar) currency option** — the electricity cost tariff now supports A$ in addition to €, £, and $.
+
+### Changed
+
+- **Battery temperature removed from Battery stat card** — the value is unreliable across firmwares. Cars without a valid battery temp source (e.g. Seal Excellence) were displaying firmware sentinel values (186÷3=62°C, 195÷3=65°C, etc.) that could not be reliably distinguished from real readings without a stable ambient reference. The data continues to be recorded and displayed in the charging detail chart where it is more trustworthy.
+- **rawJson no longer duplicates dedicated column data** — 25 fields already persisted in typed DB columns (soc, speed, gear, latitude, longitude, altitude, tyre pressures, tyre temperatures, cell voltages, battery total voltage, 12V voltage, soh, engine speeds, electric range, soc panel) have been removed from the per-point JSON blob. New data points are ~700 bytes smaller per row (~33% reduction). Fields that have no dedicated column (drive\_mode, regen\_mode, car\_on, statistic\_\*, instrument temps, bodywork diagnostics, etc.) are retained.
+
+### Fixed
+
+- **Battery cell temperature from statistic device auto-detects the encoding** — the BYD SDK returns `cellTAvg` / `cellTMin` / `cellTMax` in one of two encodings depending on firmware: direct °C on some firmwares, 1/3 °C units on others. Applying the wrong interpretation produced either an underread (e.g., 11.5°C when ambient was 32°C) or an overread (e.g., 62°C when ambient was 25°C). The fix uses the in-car ambient temperature as a reference and picks the interpretation whose deviation from ambient is physically plausible (within ~30°C parked/driving, ~50°C during DC fast charging).
+- **Battery temperature sentinels suppressed when ambient is unavailable** — `resolveStatisticTempCelsius` was returning the divided value (raw ÷ 3) even when no ambient reference was available to validate it. Firmware sentinels like 186 (→ 186÷3=62°C) passed through undetected if the instrument device had not yet reported outdoor temperature. The function now returns null until ambient is known.
+- **Service self-stop tripwire no longer fires on fresh start** — `lastFeatureEventElapsedMs` defaults to 0, which previously made the "SDK silent for 10 minutes" check evaluate to true immediately on first launch (any uptime exceeded the threshold before any SDK events arrived). The service would self-stop before SDK devices could register, blocking all telemetry until the user physically drove the car. The tripwire now requires at least one real SDK event before the silence threshold is evaluated.
+- **Off-state idle no longer thrashes the service overnight** — three independent periodic restart sources (`ServiceWatchdogWorker` 15-min, `ServiceRestarterJobService` periodic 15-min, and `ServiceRestartReceiver` boot-action kicks) were re-starting the telemetry service throughout the night, undoing the carOff+notCharging self-stop and keeping the wake lock + WiFi lock held for ~33% of the overnight period. A new persistent `ServiceIdleState` flag is set when the service self-stops; every periodic restart source now reads the flag and skips the restart while idle. `BootReceiver` no longer re-arms restart kicks on `ACC_OFF` / `POWER_DISCONNECTED`. The off-state wake-lock duty cycle drops from ~33% to ~5%, eliminating the overnight 12V drain.
+- **Service idle self-stop now truly stops the service** — the previous implementation called `stopSelf()` but did not set `intentionalStop = true`, causing `onDestroy` to immediately reschedule a restart via `scheduleSelfRestart`. The service was effectively cycling: stop → restart → 5 min → stop → restart, running all night and continuously publishing MQTT snapshots. Setting `intentionalStop = true` before `stopSelf()` breaks the loop; the service stays stopped until the next 90-minute alarm fires intentionally.
+- **MQTT idle publish cadence corrected** — as a consequence of the above fix, MQTT now publishes a single snapshot every ~90 minutes while the car is off and idle (from the `OffStateKeepaliveReceiver` alarm), rather than every 5 minutes from the unintended restart loop. The MQTT settings hint has been updated to reflect this: "Idle: snapshot every ~90 min".
+- **BYD SDK temperature sentinel values unconditionally rejected** — `resolveStatisticTempCelsius` now rejects raw values of 195 (`TEMPERATURE_INVALID`) and -60 (`TEMPERATURE_MIN`) before any ambient comparison logic. Previously these sentinel values could pass through when no ambient reference was yet available, producing spurious readings such as 65°C (195 ÷ 3) on the Seal Excellence firmware.
+- **Live trip tracking card consumption matches finalized trip stats** — the energy counter in the trip tracking card now uses the battery discharge counter delta (`currentTotalDischarge − sessionStartTotalDischarge`), the same source used by finalized trip statistics. The previous motor power integration approach excluded AC, 12V auxiliary, and other non-motor loads, causing a systematic under-read of 10–20% when climate control was active.
+- **Live trip tracking card average speed matches finalized trip stats** — average speed is now derived from the pure odometer delta (`currentOdometer − sessionStartOdometer`), matching the `endOdometer − startOdometer` formula used by finalized trips. The integration-based distance estimate is retained as a fallback only when the odometer has not yet advanced.
+- **Backup deletion for "Download (file)" entries now works on Android 10+** — backups created by older app versions that wrote directly to the filesystem had no MediaStore record, so `File.delete()` and MediaStore-by-name lookups both silently failed. The deletion logic now follows a 4-step escalation: direct `File.delete()` → MediaStore lookup by file path (`DATA` column) → MediaStore lookup by display name → insert the file into MediaStore to gain ownership, then delete via the returned content URI.
+
+### Maintenance
+
+- **User-triggered "Trim database" action** in the Local Backup screen (new "Maintenance" section). Replaces the earlier auto-compaction-on-startup approach so the user runs it at their convenience and gets explicit feedback. Five phases run sequentially with live progress:
+  - **A. Strip redundant rawJson fields** from every row in `trip_data_points` and `charging_data_points` (the 25 keys already persisted as typed columns).
+  - **B. Clear rawJson** to `{}` for trip and charging points older than **45 days** — the diagnostic payload is no longer needed for historical data and recovers the largest amount of space.
+  - **C. Downsample old trip points to 1 row per minute** for trips older than **60 days**. The native sampling rate of ~1 row per 30 s is preserved for recent trips; older trips keep `MIN(id)` per `(tripId, minute)` bucket. Distance, energy, and time-series shape remain accurate; chart smoothness is slightly reduced for very old trips.
+  - **D. Delete charging data points for AC sessions older than 45 days.** AC vs DC is inferred from `charging_sessions.peakKw < 25 kW`; DC fast-charging sessions are kept entirely (rare and interesting to review). The session summary row (kWh added, peak kW, duration, etc.) is preserved for both.
+  - **E. VACUUM via raw SQLite** — the telemetry service is briefly stopped, Room is closed, and `PRAGMA wal_checkpoint(TRUNCATE)` + `VACUUM` are run on a direct SQLite connection (the database file would otherwise stay locked by Room's connection pool, leaving freed pages unreclaimed). The app then auto-restarts so Room reopens cleanly — same pattern used after a database restore.
+  - The result and timestamp are persisted across app restarts; the section header always shows "Last trimmed: …" with a one-line summary of the rows affected. Logged with tag `DatabaseTrimmer`. Expected to recover the bulk of the 500 MB+ accumulation since v2.1.0.
+
+---
+
 ## [2.2.0] - 2026-May-08
 
 ### Added
