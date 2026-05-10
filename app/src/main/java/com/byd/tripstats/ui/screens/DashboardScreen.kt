@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import android.content.SharedPreferences
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -104,6 +105,7 @@ fun DashboardScreen(
     val autoTripDetection by viewModel.autoTripDetection.collectAsState()
     val tripDataPoints by viewModel.tripDataPoints.collectAsState()
     val liveDistanceKm by viewModel.liveDistanceKm.collectAsState()
+    val liveOdometerDistanceKm by viewModel.liveOdometerDistanceKm.collectAsState()
     val liveSegmentDistanceKm by viewModel.liveSegmentDistanceKm.collectAsState()
     val liveSessionStartMs by viewModel.liveSessionStartMs.collectAsState()
     val liveAccumulatedKwh by viewModel.liveAccumulatedKwh.collectAsState()
@@ -237,6 +239,7 @@ fun DashboardScreen(
                 widthSizeClass = widthSizeClass,
                 sessionDistanceKm = liveSegmentDistanceKm,
                 tripDistanceKm = liveDistanceKm,
+                liveOdometerDistanceKm = liveOdometerDistanceKm,
                 liveSessionStartMs = liveSessionStartMs,
                 liveAccumulatedKwh = liveAccumulatedKwh,
                 modifier = Modifier.padding(paddingValues)
@@ -361,6 +364,7 @@ fun DashboardContent(
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
     sessionDistanceKm: Double = 0.0,
     tripDistanceKm: Double = 0.0,
+    liveOdometerDistanceKm: Double = 0.0,
     liveSessionStartMs: Long? = null,
     liveAccumulatedKwh: Double = 0.0,
 ) {
@@ -373,7 +377,7 @@ fun DashboardContent(
     val styledModifier = modifier.background(MaterialTheme.colorScheme.background)
 
     // Expanded  (>840 dp) → full landscape: side-by-side 85/15 — original layout
-    // Medium    (600–840dp) → split-screen landscape or large tablet portrait: side-by-side 70/30
+    // Medium    (600–840dp) → split-screen landscape or large tablet portrait: side-by-side 72/28
     // Compact   (<600 dp) → split-screen portrait or phone portrait: stacked vertically
     when (widthSizeClass) {
         WindowWidthSizeClass.Compact -> {
@@ -440,7 +444,7 @@ fun DashboardContent(
                 // Left column - Energy Flow Diagram
                 Column(
                     modifier = Modifier
-                        .weight(0.70f)
+                        .weight(0.72f)
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -471,6 +475,7 @@ fun DashboardContent(
                         onToggleAutoDetection = onToggleAutoDetection,
                         liveSessionStartMs = liveSessionStartMs,
                         liveDistanceKm = tripDistanceKm,
+                        liveOdometerDistanceKm = liveOdometerDistanceKm,
                         liveAccumulatedKwh = liveAccumulatedKwh,
                         unitSystem = unitSystem,
                         modifier = Modifier.fillMaxWidth()
@@ -479,7 +484,7 @@ fun DashboardContent(
 
                 Column(
                     modifier = Modifier
-                        .weight(0.30f)
+                        .weight(0.28f)
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -536,6 +541,7 @@ fun DashboardContent(
                         onToggleAutoDetection = onToggleAutoDetection,
                         liveSessionStartMs = liveSessionStartMs,
                         liveDistanceKm = tripDistanceKm,
+                        liveOdometerDistanceKm = liveOdometerDistanceKm,
                         liveAccumulatedKwh = liveAccumulatedKwh,
                         unitSystem = unitSystem,
                         modifier = Modifier.fillMaxWidth()
@@ -576,13 +582,17 @@ fun DashboardContent(
  * @param cumulativeKm The total cumulative distance in kilometers.
  * @return A formatted string representing the distance(s) to display.
  */
-private fun formatDistanceDisplay(segmentKm: Double, cumulativeKm: Double): String {
-    val segment = segmentKm.coerceAtLeast(0.0).toInt() // Convert to Int here
-    val cumulative = cumulativeKm.coerceAtLeast(0.0).toInt() // Convert to Int here
+private fun formatDistanceDisplay(segmentKm: Double, cumulativeKm: Double, showDecimal: Boolean = false): String {
+    val segRaw = segmentKm.coerceAtLeast(0.0)
+    val cumRaw = cumulativeKm.coerceAtLeast(0.0)
+    val segment = segRaw.toInt()
+    val cumulative = cumRaw.toInt()
     return if (cumulative > 0 && abs(segment - cumulative) >= 1) {
-        "$segment, ($cumulative)"
+        if (showDecimal) "%.1f, (%.1f)".format(segRaw, cumRaw)
+        else "$segment, ($cumulative)"
     } else {
-        "${maxOf(segment, cumulative)}"
+        if (showDecimal) "%.1f".format(maxOf(segRaw, cumRaw))
+        else "${maxOf(segment, cumulative)}"
     }
 }
 
@@ -619,6 +629,8 @@ fun EnergyFlowDiagram(
     val isRegenerating = telemetry.isRegenerating
     val isCharging = telemetry.isCharging
     val hasActiveEnergyFlow = abs(power) > 1.0 || isCharging
+    // In multi-window/split-screen the app's window is narrower; skip decimal to avoid crowding.
+    val isFullScreen = LocalConfiguration.current.screenWidthDp >= 840
 
     // Two independent expanded states
     var consumptionExpanded by remember { mutableStateOf(false) }
@@ -931,7 +943,7 @@ fun EnergyFlowDiagram(
                     )
                     PowerMetric(
                         label = "Distance",
-                        value = formatDistanceDisplay(sessionDistanceKm, tripDistanceKm),
+                        value = formatDistanceDisplay(sessionDistanceKm, tripDistanceKm, isFullScreen),
                         unit = distanceUnit,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -1253,6 +1265,7 @@ fun TripControls(
     onToggleAutoDetection: () -> Unit,
     liveSessionStartMs: Long? = null,
     liveDistanceKm: Double = 0.0,
+    liveOdometerDistanceKm: Double = 0.0,
     liveAccumulatedKwh: Double = 0.0,
     unitSystem: UnitSystem = UnitSystem.METRIC,
     modifier: Modifier = Modifier
@@ -1416,8 +1429,12 @@ fun TripControls(
             val elapsedStr = "%02d:%02d:%02d".format(elapsedH, elapsedM, elapsedS)
 
             val distKm = liveDistanceKm
+            // Prefer the pure odometer delta for avg speed — matches the formula the
+            // finalized trip stats use (endOdometer - startOdometer / duration).
+            // Fall back to the integration-based liveDistanceKm only when odometer is stale.
+            val speedDistKm = liveOdometerDistanceKm.takeIf { it > 0.0 } ?: distKm
             val avgSpeedDisplay = if (elapsedMs > 10_000L) {
-                unitSystem.convertDistance(distKm) / (elapsedMs / 3_600_000.0)
+                unitSystem.convertDistance(speedDistKm) / (elapsedMs / 3_600_000.0)
             } else 0.0
             val kwhPer100km = if (distKm > 0.5) (liveAccumulatedKwh / distKm) * 100.0 else 0.0
             val effDisplay  = unitSystem.convertEfficiency(kwhPer100km)
@@ -1610,28 +1627,31 @@ fun VehicleStats(
         // Allow up to 110% for the estimated path since the remaining-energy estimator
         // can slightly exceed 100% on a fully healthy pack.
         val sohDisplay: String = run {
-            val directSoh = vehicleSnapshot?.statisticBatterySoh
+            val statSoh = vehicleSnapshot?.statisticBatterySoh
                 ?: telemetry.statisticBatterySoh
             val pct = when {
-                directSoh != null && directSoh in 50.0..110.0 ->
-                    String.format("%.1f%%", directSoh)
+                statSoh != null && statSoh in 50.0..110.0 ->
+                    String.format("%.1f%%", statSoh)
                 telemetry.soh in 1..110 ->
                     String.format("%.1f%%", telemetry.soh.toDouble())
                 else -> "—"
             }
-            "SoH: $pct"
+            // Source tag: "stat" = statistic-feature read, "BMS" = direct device getter,
+            // "~cap" = capacity estimate, "~nrg" = remaining-energy estimate.
+            val src = when {
+                statSoh != null && statSoh in 50.0..110.0 -> "stat"
+                !telemetry.sohEstimated && telemetry.soh in 1..110 -> "BMS"
+                telemetry.soh in 1..110 -> "~est"
+                else -> ""
+            }
+            if (pct == "—") "SoH: —" else "SoH: $pct${if (src.isNotEmpty()) " ($src)" else ""}"
         }
-        val batteryTempSubtitle: String = run {
-            val temp = telemetry.batteryTempAvg.takeIf { it > 0.0 }
-            if (temp != null) "Temp: ${String.format("%.1f", temp)} °C" else null
-        } ?: ""
         StatCard(
             title    = "Battery",
             value    = sohDisplay,
             icon     = Icons.Filled.BatteryChargingFull,
             color    = BatteryBlue,
             compact  = fillHeight,
-            subtitle = batteryTempSubtitle.ifEmpty { null },
             modifier = cardMod,
             onClick  = onNavigateToBatteryDegradation
         )
@@ -1976,7 +1996,7 @@ private fun Battery12vHistoryChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("12V / SOC chart", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("12V / SOC chart (reconstruction due to offline sparse data)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
                         drawLine(chartColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 4f, cap = StrokeCap.Round)

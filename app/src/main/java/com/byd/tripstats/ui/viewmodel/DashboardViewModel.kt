@@ -601,7 +601,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _activeRangeModel = MutableStateFlow(RangeModel.BASELINE)
     val activeRangeModel: StateFlow<RangeModel> = _activeRangeModel.asStateFlow()
 
+    // Odometer-only trip distance (no integration fallback). Used for avg speed display
+    // to match the formula the finalized trip stats will use (endOdometer - startOdometer).
+    private val _liveOdometerDistanceKm = MutableStateFlow(0.0)
+    val liveOdometerDistanceKm: StateFlow<Double> = _liveOdometerDistanceKm.asStateFlow()
+
     private var liveSessionStartOdometer: Double? = null
+    private var liveSessionStartTotalDischarge: Double = 0.0
     private var segmentStartOdometer: Double? = null
     private var lastTelemetryTimeMs: Long?    = null
     private var lastBinOdo:          Double?  = null
@@ -737,7 +743,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         if (isFirstTripStart) {
             integratedDistanceKm = 0.0
             accumulatedEnergyWh = 0.0
+            liveSessionStartTotalDischarge = telemetry.totalDischarge
             _liveAccumulatedKwh.value = 0.0
+            _liveOdometerDistanceKm.value = 0.0
             smoothedWhPerKm = null
             energySamples.clear()
             liveSpeedBins.clear()
@@ -770,6 +778,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun clearLiveDriveRuntime(keepPoints: Boolean) {
         liveSessionStartOdometer = null
+        liveSessionStartTotalDischarge = 0.0
         segmentStartOdometer = null
         lastTelemetryTimeMs = null
         lastBinOdo = null
@@ -777,6 +786,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         integratedSegmentDistanceKm = 0.0
         accumulatedEnergyWh = 0.0
         _liveAccumulatedKwh.value = 0.0
+        _liveOdometerDistanceKm.value = 0.0
         smoothedWhPerKm = null
         energySamples.clear()
         liveSpeedBins.clear()
@@ -965,7 +975,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val distKm = currentDistanceKm
                     _liveDistanceKm.value = distKm
                     _liveSegmentDistanceKm.value = currentSegmentDistanceKm
-                    _liveAccumulatedKwh.value = accumulatedEnergyWh / 1000.0
+                    // Use discharge counter delta (same source as finalized trip stats) so
+                    // the live consumption display matches what will be stored in the trip.
+                    val dischargeKwh = (telemetry.totalDischarge - liveSessionStartTotalDischarge)
+                        .coerceAtLeast(0.0)
+                    _liveAccumulatedKwh.value = dischargeKwh
+                    // Pure odometer delta — used for avg speed display to match finalized stats.
+                    _liveOdometerDistanceKm.value =
+                        (telemetry.odometer - (liveSessionStartOdometer ?: telemetry.odometer))
+                            .coerceAtLeast(0.0)
 
                     val lastDist = _tripDataPoints.value.lastOrNull()?.distanceKm ?: distKm
                     if (distKm - lastDist < SAMPLE_INTERVAL_KM) {
@@ -974,7 +992,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         return@collect
                     }
 
-                    energySamples.add(EnergySample(distKm, accumulatedEnergyWh))
+                    // Energy samples use discharge counter so they're consistent with restored trips.
+                    energySamples.add(EnergySample(distKm, dischargeKwh * 1000.0))
                     val windowFloor = distKm - ROLLING_WINDOW_KM
                     while (energySamples.size > 1 && energySamples[0].distanceKm < windowFloor) {
                         energySamples.removeAt(0)
@@ -1169,13 +1188,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 integratedSegmentDistanceKm = _liveSegmentDistanceKm.value
 
                 _liveSessionStartMs.value = trip.startTime
+                liveSessionStartTotalDischarge = trip.startTotalDischarge
+                _liveOdometerDistanceKm.value = odometerCumulative
 
                 // Reconstruct accumulated energy from the last data point if possible
                 val lastPoint = dataPoints.lastOrNull()
                 accumulatedEnergyWh = if (lastPoint != null) {
                     (lastPoint.totalDischarge - trip.startTotalDischarge).coerceAtLeast(0.0) * 1000.0
                 } else 0.0
-                _liveAccumulatedKwh.value = accumulatedEnergyWh / 1000.0
+                _liveAccumulatedKwh.value = (lastPoint?.totalDischarge
+                    ?.let { (it - trip.startTotalDischarge).coerceAtLeast(0.0) }
+                    ?: 0.0)
 
                 // Reconstruct energy samples for the rolling window
                 energySamples.clear()

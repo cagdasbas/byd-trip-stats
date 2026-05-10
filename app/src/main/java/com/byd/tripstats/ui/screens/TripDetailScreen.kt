@@ -779,6 +779,7 @@ fun TripOverviewTab(
     if (showChargingCostDialog) {
         AlertDialog(
             onDismissRequest = { showChargingCostDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = { Text("Custom DC charging cost", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

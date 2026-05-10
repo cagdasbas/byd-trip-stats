@@ -140,7 +140,9 @@ class ChargingRepositoryTest {
 
         assertNull("Session should be closed", repo.activeSessionId.value)
         assertFalse(repo.isCharging.value)
-        assertFalse(repo.getAllSessions().first().first().isActive)
+        // The session ran for ~400ms with zero SoC delta, so the micro-session guard
+        // deletes it rather than persisting it. State reset is the key invariant here.
+        assertTrue("Micro-session should be cleaned up", repo.getAllSessions().first().isEmpty())
     }
 
     @Test fun carOffPacketKeepsSessionOpenWhenStillCharging() = runBlocking {

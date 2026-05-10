@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.PersistableBundle
 import android.util.Log
+import com.byd.tripstats.util.ServiceIdleState
 import java.util.concurrent.TimeUnit
 
 /**
@@ -18,6 +19,11 @@ class ServiceRestarterJobService : JobService() {
 
     override fun onStartJob(params: JobParameters): Boolean {
         val reason = params.extras.getString(EXTRA_REASON) ?: "unknown"
+        if (ServiceIdleState.isStayingIdle(applicationContext)) {
+            Log.i(TAG, "JobService skipped — service in off-state idle (jobId=${params.jobId} reason=$reason)")
+            jobFinished(params, false)
+            return false
+        }
         Log.i(TAG, "JobService fired: jobId=${params.jobId} reason=$reason")
         return try {
             VehicleTelemetryService.start(applicationContext)
@@ -106,6 +112,15 @@ class ServiceRestarterJobService : JobService() {
             }.onFailure { error ->
                 Log.e(TAG, "Failed to schedule jobId=$jobId ($reason)", error)
             }
+        }
+
+        fun cancelPeriodic(context: Context) {
+            runCatching {
+                val scheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler
+                    ?: return
+                scheduler.cancel(PERIODIC_JOB_ID)
+                Log.i(TAG, "Cancelled periodic JobService (jobId=$PERIODIC_JOB_ID, off-state idle)")
+            }.onFailure { Log.w(TAG, "cancelPeriodic failed: ${it.message}") }
         }
     }
 }

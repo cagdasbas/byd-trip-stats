@@ -10,6 +10,8 @@ import com.byd.tripstats.util.McuWakeHelper
 import com.byd.tripstats.util.RtDispatch
 import com.byd.tripstats.util.RtInProcessPatches
 import com.byd.tripstats.util.RtShellPatches
+import com.byd.tripstats.util.ServiceIdleState
+import com.byd.tripstats.worker.ServiceWatchdogWorker
 import com.byd.tripstats.receiver.OffStateKeepaliveReceiver
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CoroutineScope
@@ -86,34 +88,48 @@ class BootReceiver : BroadcastReceiver() {
                 }
             }
 
-            // On ACC_OFF, run the best-effort off-state keepalive immediately.
-            // Done on a background thread — onReceive() must return quickly.
-            if (action == "com.byd.action.ACC_OFF" || action == "com.byd.accmode.ACC_MODE_CHANGED") {
-                // goAsync() keeps the process alive for the duration of keepAlive().
-                // A bare daemon thread has no process binding — Android can kill it
-                // before the helper finishes.
-                val pending = goAsync()
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        withTimeout(10_000L) {
-                            McuWakeHelper.keepAlive(appContext)
+            // ── ACC_OFF / POWER_DISCONNECTED: idle path, no restart re-arming ──
+            // Schedule the 90-min off-state keepalive chain and send one MCU
+            // keepalive — but do NOT start the service or schedule any periodic
+            // restart sources. The existing service (if still running from the
+            // trip) will detect carOff+notCharging and self-stop after 5 min.
+            // Re-arming restart kicks here would defeat that self-stop and
+            // burn the 12V battery overnight.
+            val isOffEvent = action == "com.byd.action.ACC_OFF" ||
+                action == "com.byd.accmode.ACC_MODE_CHANGED" ||
+                action == Intent.ACTION_POWER_DISCONNECTED
+            if (isOffEvent) {
+                if (action == "com.byd.action.ACC_OFF" || action == "com.byd.accmode.ACC_MODE_CHANGED") {
+                    val pending = goAsync()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            withTimeout(10_000L) {
+                                McuWakeHelper.keepAlive(appContext)
+                            }
+                            Log.i(TAG, "MCU keepalive sent on $action")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "MCU keepalive failed/timed out on $action: ${e.message}")
+                        } finally {
+                            pending.finish()
                         }
-                        Log.i(TAG, "MCU keepalive sent on $action")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "MCU keepalive failed/timed out on $action: ${e.message}")
-                    } finally {
-                        pending.finish()
                     }
+                    // Off-state keepalive chain — survives process death
+                    OffStateKeepaliveReceiver.schedule(appContext, iteration = 0)
                 }
-                // Start the 4-minute alarm chain — survives process death
-                OffStateKeepaliveReceiver.schedule(appContext, iteration = 0)
+                Log.i(TAG, "Off-event $action — skipping service start and restart re-arm")
+                return
             }
-            // Cancel the keepalive chain when ACC comes back on
+
+            // ── ACC_ON / IGN_ON / POWER_CONNECTED / boot actions: real start ──
+            // Cancel the off-state keepalive chain (we're back online) and clear
+            // the staying_idle flag so periodic restart sources resume.
             if (action == "com.byd.action.ACC_ON" || action == "com.byd.action.IGN_ON") {
                 OffStateKeepaliveReceiver.cancel(appContext)
             }
+            ServiceIdleState.setStayingIdle(appContext, false)
 
             VehicleTelemetryService.start(appContext)
+            ServiceWatchdogWorker.schedule(appContext)
             // Kick at 15s and 45s for fast service readiness.
             ServiceRestartReceiver.schedule(appContext, delayMs = 15_000L, reason = "boot:$action")
             ServiceRestartReceiver.schedule(appContext, delayMs = 45_000L, reason = "boot-followup:$action")

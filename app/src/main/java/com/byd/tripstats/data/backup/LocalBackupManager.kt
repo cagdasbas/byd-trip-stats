@@ -1,5 +1,7 @@
 package com.byd.tripstats.data.backup
 
+import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
@@ -251,6 +253,173 @@ class LocalBackupManager private constructor(private val context: Context) {
         }
     }
 
+
+    /**
+     * Deletes ALL representations of a backup with the same filename and refreshes the list.
+     * A single backup is often stored in multiple locations (MediaStore, private dir, filesystem),
+     * so we collect every entry sharing the name before deleting to avoid a second-tap requirement.
+     */
+    suspend fun deleteBackup(backup: BackupFile) = withContext(Dispatchers.IO) {
+        // Collect all entries with the same name across all sources before deleting any,
+        // because scanLocalBackups() deduplicates by name in the visible list.
+        val allRepresentations = buildAllRepresentationsFor(backup.name)
+        for (entry in allRepresentations) {
+            try {
+                val deleted = if (entry.uri.scheme == "content") {
+                    context.contentResolver.delete(entry.uri, null, null) > 0
+                } else {
+                    val path = entry.uri.path
+                    if (path != null) deleteFilesystemFile(path, entry.name) else false
+                }
+                if (deleted) Log.i(TAG, "Deleted backup [${entry.source}]: ${entry.name}")
+                else Log.w(TAG, "Delete returned false [${entry.source}]: ${entry.name}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete backup [${entry.source}]: ${entry.name}", e)
+            }
+        }
+        scanLocalBackups()
+    }
+
+    /**
+     * Returns every known representation (MediaStore, private dir, filesystem) for a given filename.
+     */
+    private fun buildAllRepresentationsFor(name: String): List<BackupFile> {
+        val results = mutableListOf<BackupFile>()
+
+        // MediaStore
+        try {
+            val resolver = context.contentResolver
+            val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME,
+                MediaStore.Downloads.SIZE, MediaStore.Downloads.DATE_MODIFIED)
+            val selection = "${MediaStore.Downloads.DISPLAY_NAME} = ?"
+            resolver.query(collection, projection, selection, arrayOf(name),
+                null)?.use { cursor ->
+                val idCol   = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DISPLAY_NAME)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.SIZE)
+                val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Downloads.DATE_MODIFIED)
+                while (cursor.moveToNext()) {
+                    results.add(BackupFile(
+                        name         = cursor.getString(nameCol),
+                        uri          = android.content.ContentUris.withAppendedId(collection, cursor.getLong(idCol)),
+                        sizeBytes    = cursor.getLong(sizeCol),
+                        dateModified = cursor.getLong(dateCol) * 1000L,
+                        source       = "Downloads"
+                    ))
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "MediaStore lookup for delete failed: ${e.message}")
+        }
+
+        // Private app dir
+        try {
+            val f = java.io.File(java.io.File(context.filesDir, PRIVATE_BACKUP_DIR), name)
+            if (f.exists()) results.add(BackupFile(name = f.name, uri = android.net.Uri.fromFile(f),
+                sizeBytes = f.length(), dateModified = f.lastModified(), source = "Internal (ADB)"))
+        } catch (e: Exception) {
+            Log.w(TAG, "Private dir lookup for delete failed: ${e.message}")
+        }
+
+        // Public Download/BydTripStats/ filesystem
+        try {
+            val base = Environment.getExternalStorageDirectory()
+            listOf("$BYD_DOWNLOAD_DIR/$BACKUP_SUBFOLDER", "Downloads/$BACKUP_SUBFOLDER").forEach { rel ->
+                val f = java.io.File(base, "$rel/$name")
+                if (f.exists() && results.none { it.uri == android.net.Uri.fromFile(f) }) {
+                    results.add(BackupFile(name = f.name, uri = android.net.Uri.fromFile(f),
+                        sizeBytes = f.length(), dateModified = f.lastModified(), source = "Download (file)"))
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Filesystem lookup for delete failed: ${e.message}")
+        }
+
+        return results
+    }
+
+    /**
+     * Deletes a file that lives in the public external storage (file:// URI) using a
+     * four-step escalation strategy for Android 10 (requestLegacyExternalStorage):
+     *
+     *  1. File.delete() — works when the app has legacy write access.
+     *  2. MediaStore lookup by DATA path — finds the record even after package UID changes.
+     *  3. MediaStore lookup by DISPLAY_NAME — broader fallback.
+     *  4. Insert the file into MediaStore to gain ownership, then delete via the new URI.
+     *     This handles files that were never registered (created by old app versions that
+     *     wrote directly to the filesystem without going through MediaStore).
+     */
+    private fun deleteFilesystemFile(path: String, name: String): Boolean {
+        // Step 1: direct File.delete (works in legacy storage mode if WRITE permission active)
+        if (java.io.File(path).delete()) {
+            Log.i(TAG, "deleteFilesystemFile: File.delete() succeeded for $name")
+            return true
+        }
+
+        val resolver = context.contentResolver
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+
+        // Step 2: find existing MediaStore entry by exact file path
+        try {
+            resolver.query(
+                collection,
+                arrayOf(MediaStore.Downloads._ID),
+                "${MediaStore.MediaColumns.DATA} = ?",
+                arrayOf(path), null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
+                    if (resolver.delete(uri, null, null) > 0) {
+                        Log.i(TAG, "deleteFilesystemFile: MediaStore DATA delete succeeded for $name")
+                        return true
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteFilesystemFile: DATA lookup failed for $name: ${e.message}")
+        }
+
+        // Step 3: find existing MediaStore entry by display name
+        try {
+            resolver.query(
+                collection,
+                arrayOf(MediaStore.Downloads._ID),
+                "${MediaStore.Downloads.DISPLAY_NAME} = ?",
+                arrayOf(name), null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
+                    if (resolver.delete(uri, null, null) > 0) {
+                        Log.i(TAG, "deleteFilesystemFile: MediaStore DISPLAY_NAME delete succeeded for $name")
+                        return true
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteFilesystemFile: DISPLAY_NAME lookup failed for $name: ${e.message}")
+        }
+
+        // Step 4: file has no MediaStore record — insert one (gains ownership) then delete.
+        // This handles files created by older app versions that wrote directly to the filesystem.
+        try {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DATA, path)
+                put(MediaStore.Downloads.DISPLAY_NAME, name)
+                put(MediaStore.Downloads.MIME_TYPE, "application/octet-stream")
+            }
+            val insertedUri = resolver.insert(collection, values)
+            if (insertedUri != null && resolver.delete(insertedUri, null, null) > 0) {
+                Log.i(TAG, "deleteFilesystemFile: insert-then-delete succeeded for $name")
+                return true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteFilesystemFile: insert-then-delete failed for $name: ${e.message}")
+        }
+
+        Log.w(TAG, "deleteFilesystemFile: all strategies failed for $name at $path")
+        return false
+    }
 
     /** Scans the private app db_backup/ folder. No permissions needed. */
     private fun scanPrivateBackups(): List<BackupFile> {

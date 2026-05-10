@@ -126,6 +126,21 @@ object CarCatalog {
         cdA = 0.700       // estimate for compact SUV body
     )
 
+    val BYD_ATTO_2_BOOST = CarConfig(
+        id = "BYD_ATTO_2_BOOST",
+        displayName = "BYD Atto 2 Boost",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 51.1,
+        estimatedKerbMassKg = 1610.0,
+        wltpKm = 344,
+        referenceConsumptionKwhPer100km = 18.7,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 130,
+        cellCount = 100,  // estimate: interpolated between Active (94S) and Comfort (112S); 51.1 kWh @ ~320V → 100S LFP
+        cdA = 0.700       // estimate for compact SUV body
+    )
+
     val BYD_ATTO_2_COMFORT = CarConfig(
         id = "BYD_ATTO_2_COMFORT",
         displayName = "BYD Atto 2 Comfort",
@@ -225,9 +240,10 @@ object CarCatalog {
         cdA = 0.653       // Cd 0.29 × A 2.25 m² (estimate)
     )
 
-    val BYD_M6 = CarConfig(
+    // id kept as "BYD_M6" for backward-compatibility with stored user preferences
+    val BYD_M6_SUPERIOR_100KW = CarConfig(
         id = "BYD_M6",
-        displayName = "BYD M6",
+        displayName = "BYD M6 Superior 100kW",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 71.8,
         estimatedKerbMassKg = 1915.0,
@@ -236,8 +252,66 @@ object CarCatalog {
         frontTyrePressureBar = 2.5,
         rearTyrePressureBar = 2.5,
         frontMotorRatedKw = 100,
-        cellCount = 132,  // 71.8 kWh @ ~422V → 132S LFP (estimate)
+        cellCount = 132,  // confirmed: 170Ah × 422.4V = 71.8kWh → 422.4/3.2 = 132S Blade LFP
         cdA = 0.868       // Cd 0.33 × A ~2.63 m² (1.81 × 1.69 × 0.86)
+    )
+
+    val BYD_M6_SUPERIOR_150KW = CarConfig(
+        id = "BYD_M6_SUPERIOR_150KW",
+        displayName = "BYD M6 Superior 150kW",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 71.8,
+        estimatedKerbMassKg = 1925.0,
+        wltpKm = 420,
+        referenceConsumptionKwhPer100km = 17.1,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 150,
+        cellCount = 132,  // same 71.8kWh pack as Superior 100kW: 132S Blade LFP
+        cdA = 0.868
+    )
+
+    val BYD_M6_STANDARD_120KW = CarConfig(
+        id = "BYD_M6_STANDARD",
+        displayName = "BYD M6 Standard 120kW",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 55.4,
+        estimatedKerbMassKg = 1870.0,
+        wltpKm = 340,
+        referenceConsumptionKwhPer100km = 16.5,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 120,
+        cellCount = 102,  // estimate: 55.4kWh / (170Ah × 3.2V) ≈ 102S Blade LFP
+        cdA = 0.868
+    )
+
+    val BYD_SEAL_6_PREMIUM_95KW = CarConfig(
+        id = "BYD_SEAL_6_PREMIUM_95KW",
+        displayName = "BYD Seal 6 Premium 95kW",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 56.64,
+        estimatedKerbMassKg = 1750.0,
+        wltpKm = 425,               // WLTC figure; WLTP not published
+        referenceConsumptionKwhPer100km = 13.3,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 95,
+        cellCount = 118,  // confirmed: 150Ah × 377.6V = 56.64kWh → 377.6/3.2 = 118S Blade LFP
+    )
+
+    val BYD_SEAL_6_PREMIUM_160KW = CarConfig(
+        id = "BYD_SEAL_6_PREMIUM_160KW",
+        displayName = "BYD Seal 6 Premium 160kW",
+        drivetrain = Drivetrain.RWD,
+        batteryKwh = 56.64,
+        estimatedKerbMassKg = 1780.0,
+        wltpKm = 405,               // estimate; WLTP not published
+        referenceConsumptionKwhPer100km = 14.0,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        rearMotorRatedKw = 160,
+        cellCount = 118,  // same 56.64kWh pack as 95kW: 118S Blade LFP
     )
 
     val BYD_TANG_EV = CarConfig(
@@ -361,6 +435,7 @@ object CarCatalog {
         BYD_DOLPHIN_STANDARD,
         BYD_DOLPHIN_EXTENDED,
         BYD_ATTO_2_ACTIVE,
+        BYD_ATTO_2_BOOST,
         BYD_ATTO_2_COMFORT,
         BYD_ATTO_3,
         BYD_SEAL_U_COMFORT,
@@ -368,7 +443,11 @@ object CarCatalog {
         BYD_DOLPHIN_SURF_ACTIVE,
         BYD_DOLPHIN_SURF_BOOST,
         BYD_DOLPHIN_SURF_COMFORT,
-        BYD_M6,
+        BYD_M6_STANDARD_120KW,
+        BYD_M6_SUPERIOR_100KW,
+        BYD_M6_SUPERIOR_150KW,
+        BYD_SEAL_6_PREMIUM_95KW,
+        BYD_SEAL_6_PREMIUM_160KW,
         BYD_TANG_EV,
         BYD_SEAL_U_DM_I,
         BYD_SONG_PLUS_DM_I,
@@ -390,11 +469,12 @@ object CarCatalog {
     val groupedBev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(
         "BYD Seal" to listOf(BYD_SEAL_DYNAMIC_RWD, BYD_SEAL_PREMIUM_RWD, BYD_SEAL_EXCELLENCE),
         "BYD Dolphin" to listOf(BYD_DOLPHIN_STANDARD, BYD_DOLPHIN_EXTENDED),
-        "BYD Atto 2" to listOf(BYD_ATTO_2_ACTIVE, BYD_ATTO_2_COMFORT),
+        "BYD Atto 2" to listOf(BYD_ATTO_2_ACTIVE, BYD_ATTO_2_BOOST, BYD_ATTO_2_COMFORT),
         "BYD Atto 3" to listOf(BYD_ATTO_3),
         "BYD Seal U" to listOf(BYD_SEAL_U_COMFORT, BYD_SEAL_U_DESIGN),
         "BYD Seagull / Dolphin Surf" to listOf(BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),
-        "BYD M6" to listOf(BYD_M6),
+        "BYD M6" to listOf(BYD_M6_STANDARD_120KW, BYD_M6_SUPERIOR_100KW, BYD_M6_SUPERIOR_150KW),
+        "BYD Seal 6" to listOf(BYD_SEAL_6_PREMIUM_95KW, BYD_SEAL_6_PREMIUM_160KW),
         "BYD Tang" to listOf(BYD_TANG_EV),
     )
 

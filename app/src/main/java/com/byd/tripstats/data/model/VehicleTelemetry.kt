@@ -316,43 +316,23 @@ data class VehicleTelemetry(
      */
     fun toSchemaJson(isPhev: Boolean = false): String {
         val fields = buildList {
-            add(""""soc":$soc""")
-            add(""""speed":$speed""")
-            add(""""gear":"$gear"""")
-            add(""""odometer":$odometer""")
-            add(""""engine_power":$enginePower""")
-            add(""""total_discharge":$totalDischarge""")
-            add(""""battery_12v_voltage":$battery12vVoltage""")
+            // Fields omitted here are already persisted in dedicated DB columns:
+            // soc, speed, gear, odometer, enginePower (power), totalDischarge,
+            // battery12vVoltage, batteryCellVoltageMax/Min, batteryTotalVoltage, soh,
+            // engineSpeedFront/Rear, latitude, longitude, altitude, electricDrivingRangeKm,
+            // tyrePressure*, tyreTemp*, socPanel.
+            // Only non-column fields are stored in rawJson to avoid ~700 bytes/row duplication.
             add(""""battery_pack_temp":$batteryPackTemp""")
             add(""""battery_cell_temp_max":$batteryCellTempMax""")
-            add(""""battery_cell_voltage_max":$batteryCellVoltageMax""")
             add(""""battery_cell_temp_min":$batteryCellTempMin""")
-            add(""""battery_cell_voltage_min":$batteryCellVoltageMin""")
             if (currentDatetime.isNotBlank()) add(""""current_datetime":"$currentDatetime"""")
-            add(""""soh":$soh""")
             add(""""soh_estimated":$sohEstimated""")
-            add(""""location_altitude":$locationAltitude""")
             add(""""is_charging":$chargingActive""")
             add(""""charging_power":$chargingPower""")
-            add(""""engine_speed_front":$engineSpeedFront""")
-            add(""""location_latitude":$locationLatitude""")
-            add(""""location_longitude":$locationLongitude""")
             locationGpsSpeed?.let { add(""""location_gps_speed":$it""") }
             locationOrientation?.let { add(""""location_orientation":$it""") }
-            add(""""engine_speed_rear":$engineSpeedRear""")
             if (wifiSsid.isNotBlank()) add(""""wifi_ssid":"$wifiSsid"""")
-            add(""""battery_total_voltage":$batteryTotalVoltage""")
-            add(""""electric_driving_range_km":$electricDrivingRangeKm""")
             add(""""car_on":$carOn""")
-            add(""""tyre_pressure_left_front_psi":$tyrePressureLF""")
-            add(""""tyre_pressure_right_front_psi":$tyrePressureRF""")
-            add(""""tyre_pressure_left_rear_psi":$tyrePressureLR""")
-            add(""""tyre_pressure_right_rear_psi":$tyrePressureRR""")
-            add(""""tyre_temperature_left_front_c":$tyreTempLF""")
-            add(""""tyre_temperature_right_front_c":$tyreTempRF""")
-            add(""""tyre_temperature_left_rear_c":$tyreTempLR""")
-            add(""""tyre_temperature_right_rear_c":$tyreTempRR""")
-            add(""""soc_panel":$socPanel""")
             add(""""car_locked":$carLocked""")
             add(""""any_door_opened":$anyDoorOpened""")
             if (isPhev) add(""""fuel_percentage":$fuelPercentage""")

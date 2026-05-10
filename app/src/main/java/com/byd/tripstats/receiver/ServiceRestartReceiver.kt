@@ -9,15 +9,23 @@ import android.net.Uri
 import android.util.Log
 import com.byd.tripstats.service.ServiceRestarterJobService
 import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.util.ServiceIdleState
 
 /**
  * Lightweight restart bridge used when the foreground vehicle service is removed
  * from the recent-task stack or destroyed unexpectedly.
+ *
+ * Skips the restart while [ServiceIdleState.isStayingIdle] — pending restart
+ * alarms scheduled before the off-state self-stop must not undo it.
  */
 class ServiceRestartReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         Log.i(TAG, "Restart receiver fired: ${intent.action}")
+        if (ServiceIdleState.isStayingIdle(context.applicationContext)) {
+            Log.i(TAG, "Restart skipped — service in off-state idle")
+            return
+        }
         try {
             VehicleTelemetryService.start(context.applicationContext)
             ServiceRestarterJobService.schedulePeriodic(context.applicationContext, "alarm-restart")

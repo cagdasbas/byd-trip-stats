@@ -26,6 +26,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.byd.tripstats.util.McuWakeHelper
+import com.byd.tripstats.util.ServiceIdleState
+import com.byd.tripstats.worker.ServiceWatchdogWorker
 import kotlinx.coroutines.flow.collectLatest
 import com.byd.tripstats.MainActivity
 import com.byd.tripstats.R
@@ -172,6 +174,14 @@ class VehicleTelemetryService : Service() {
         telemetryLoopStarting = true
         Log.d(TAG, "onStartCommand — starting telemetry loop")
         intentionalStop = stopRequested
+        // We're starting up — clear the off-state idle flag and re-arm the
+        // periodic restart sources so they protect the service from process
+        // death during this session. Both schedule calls are idempotent:
+        // ServiceWatchdogWorker uses KEEP policy and JobScheduler ignores
+        // duplicate jobIds.
+        ServiceIdleState.setStayingIdle(applicationContext, false)
+        ServiceWatchdogWorker.schedule(applicationContext)
+        ServiceRestarterJobService.schedulePeriodic(applicationContext, "service-onStartCommand")
 
         // Declare both dataSync and location foreground service types.
         // The location type is what drives the OS to assign oom_adj=125 (PERCEPTIBLE)
@@ -414,14 +424,47 @@ class VehicleTelemetryService : Service() {
 
                         // Self-stop when car is off and not charging.
                         // Releasing the wake lock lets the infotainment CPU enter deep
-                        // sleep, which stops the DC-DC cycling that drains the HV pack.
-                        // The 90-min OffStateKeepaliveReceiver alarm restarts the service
-                        // periodically to record a snapshot and then stops it again.
-                        if (!telemetry.isCarOn && !telemetry.isCharging) {
+                        // sleep, stopping the DC-DC cycling that drains the HV pack.
+                        // intentionalStop=true prevents onDestroy from calling
+                        // scheduleSelfRestart — without it, START_STICKY causes an
+                        // infinite restart loop that defeats the purpose of stopping.
+                        //
+                        // Stale-data tripwire: if the SDK has fired at least once but
+                        // then gone silent for 10 min, the car is definitively asleep
+                        // regardless of what cached values say. This catches stuck
+                        // `enginePower` / `chargingPower` / `gear` readings that would
+                        // otherwise keep `isCarOn` or `isCharging` true forever after
+                        // key-off.
+                        //
+                        // The `> 0L` guard is critical: a fresh service start has
+                        // lastFeatureEventElapsedMs == 0, which would make
+                        // msSinceLastEvent = full device uptime (huge) and trip
+                        // immediately — killing the service before the SDK has a
+                        // chance to register devices and emit its first event.
+                        val sdkSilent = vehicleDataSource.lastFeatureEventElapsedMs > 0L &&
+                                msSinceLastEvent > 10 * 60 * 1000L
+                        val effectivelyOff = (!telemetry.isCarOn && !telemetry.isCharging) ||
+                                (sdkSilent && !telemetry.isCharging)
+                        if (effectivelyOff) {
                             if (carOffSinceMs == 0L) {
                                 carOffSinceMs = SystemClock.elapsedRealtime()
+                                if (sdkSilent && telemetry.isCarOn) {
+                                    Log.w(TAG, "Self-stop tripwire: SDK silent ${msSinceLastEvent}ms but isCarOn=true " +
+                                            "(gear=${telemetry.gear} enginePower=${telemetry.enginePower} " +
+                                            "chargingPower=${telemetry.chargingPower}) — treating as off")
+                                }
                             } else if (SystemClock.elapsedRealtime() - carOffSinceMs >= 5 * 60 * 1000L) {
                                 Log.i(TAG, "Car off and not charging for 5 min — releasing wake lock and stopping service")
+                                // Set the off-state idle flag and tear down all
+                                // periodic restart sources before stopping.
+                                // Without this, ServiceWatchdogWorker (15-min)
+                                // and ServiceRestarterJobService periodic
+                                // (15-min) re-start the service on their next
+                                // tick — burning the 12V battery overnight.
+                                ServiceIdleState.setStayingIdle(applicationContext, true)
+                                ServiceWatchdogWorker.cancel(applicationContext)
+                                ServiceRestarterJobService.cancelPeriodic(applicationContext)
+                                intentionalStop = true
                                 stopSelf()
                                 return@launch
                             }

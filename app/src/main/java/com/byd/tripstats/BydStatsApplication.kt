@@ -10,6 +10,7 @@ import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.util.RtDispatch
 import com.byd.tripstats.util.RtInProcessPatches
 import com.byd.tripstats.util.RtShellPatches
+import com.byd.tripstats.util.ServiceIdleState
 import com.byd.tripstats.worker.DatabaseMaintenanceWorker
 import com.byd.tripstats.worker.ServiceWatchdogWorker
 import kotlin.concurrent.thread
@@ -40,10 +41,19 @@ class BydStatsApplication : Application(), Configuration.Provider {
         applyStartupSafeguards()
         applyRuntimePatches()
         DatabaseMaintenanceWorker.schedule(this)
-        ServiceWatchdogWorker.schedule(this)
-        ServiceRestarterJobService.schedulePeriodic(this, "application-start")
         VehicleCompatibilityProbe.initialize(this)
-        startTelemetryService()
+        // If the service self-stopped due to off-state idle, skip re-arming the
+        // periodic restart sources and skip auto-starting the service. The
+        // process may have been recreated by an alarm/job firing — letting
+        // those fire and silently no-op (they also check the flag) is
+        // preferable to immediately re-acquiring the wake lock.
+        if (ServiceIdleState.isStayingIdle(this)) {
+            Log.i(TAG, "Off-state idle detected — skipping watchdog/JobService scheduling and service auto-start")
+        } else {
+            ServiceWatchdogWorker.schedule(this)
+            ServiceRestarterJobService.schedulePeriodic(this, "application-start")
+            startTelemetryService()
+        }
     }
 
     private fun applyStartupSafeguards() {

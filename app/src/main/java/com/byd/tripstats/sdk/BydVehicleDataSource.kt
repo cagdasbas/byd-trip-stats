@@ -50,7 +50,9 @@ private const val VEHICLE_STATE_CACHE = "vehicle_state_cache"
 // Bump this when the persisted value mapping changes so stale cached values are cleared.
 // v2: remapped an auxiliary housing sensor away from cellTempMin.
 // v3: persist last confirmed drive/regen modes so weak startup samples do not regress the UI.
-private const val STAT_CACHE_VERSION = 5
+// v6: ambient-heuristic temperature fix — cached temps written by the old raw-only path may be
+//     wrong (e.g. raw=62 stored as 62°C instead of 62÷3≈20.7°C on Seal Excellence firmware).
+private const val STAT_CACHE_VERSION = 7
 private const val DIRECT_CHARGING_POWER_TIMEOUT_MS = 4_000L
 private const val DRIVE_MODE_UNKNOWN = 0
 
@@ -426,6 +428,82 @@ class BydVehicleDataSource(context: Context) {
     private val appContext = context.applicationContext
 
     private val runtimeScale01: Double by lazy { RuntimeExtensionBridge.doubleValue("d01", 3.0) }
+
+    /**
+     * Resolves a raw cellTAvg/cellTMin/cellTMax/cellTAux value from the
+     * statistic feature set into a Celsius temperature.
+     *
+     * The BYD SDK returns these values in one of two encodings depending on
+     * firmware:
+     *   - Direct °C (raw=34.5 means 34.5°C). Observed on some firmwares.
+     *   - 1/3 °C units (raw=62 means ~20.7°C). Observed on the Seal Excellence
+     *     and any firmware whose private extension provides d01=3.0 with this
+     *     signal path.
+     *
+     * Both interpretations often fall in the physically plausible -30..80°C
+     * range, so the raw value alone cannot disambiguate. We use the in-car
+     * ambient temperature as a reference: battery temp is normally within
+     * ~25°C of ambient when parked or driving, and within ~50°C during DC
+     * fast charging. Pick the interpretation that fits.
+     *
+     * Returns null if neither interpretation is physically plausible.
+     */
+    /**
+     * Validates a directly-returned battery pack temperature (already in °C, no encoding).
+     * Rejects values that are implausibly far from ambient — filters invalid firmware sentinels
+     * (e.g. BYD BMS returns 66°C when data is unavailable, which is 39°C above a 27°C ambient).
+     */
+    private fun validatePackTemp(raw: Double?): Double? {
+        if (raw == null || !raw.isFinite() || raw !in -40.0..120.0) return null
+        val snap = _vehicleSnapshot.value
+        val ambient = snap.instrumentOutCarTemperature?.toDouble() ?: return raw
+        val isFastCharging = snap.isChargingActive && snap.chargingPower > 20.0
+        val maxDev = if (isFastCharging) 55.0 else 35.0
+        return if (abs(raw - ambient) <= maxDev) raw else null
+    }
+
+    private fun resolveStatisticTempCelsius(rawValue: Double): Double? {
+        if (!rawValue.isFinite()) return null
+        // BYD SDK sentinel values — reject unconditionally regardless of ambient.
+        // TEMPERATURE_INVALID = 195 (Instrument SDK constant); TEMPERATURE_MIN = -60.
+        if (rawValue == 195.0 || rawValue == -60.0) return null
+        val raw = rawValue
+        val divided = raw / runtimeScale01
+        val rawPlausible = raw in -30.0..80.0
+        val dividedPlausible = divided in -30.0..80.0
+
+        if (!rawPlausible && !dividedPlausible) return null
+
+        val snap = _vehicleSnapshot.value
+        val ambient = snap.instrumentOutCarTemperature?.toDouble()
+        val isFastCharging = snap.isChargingActive && snap.chargingPower > 20.0
+        val maxAcceptableDeviation = if (isFastCharging) 50.0 else 30.0
+
+        if (!rawPlausible) {
+            // raw is outside physical range → treat as ÷d01-encoded.
+            // Validate divided against ambient to reject invalid protocol sentinels
+            // (e.g. Seal Excellence 0x44700020 sends 195="not available" → 195÷3=65°C).
+            // Without ambient we cannot verify the decoded value, so return null rather
+            // than risking a sentinel like 186÷3=62°C appearing as a real temperature.
+            if (ambient == null) return null
+            return if (abs(divided - ambient) <= maxAcceptableDeviation) divided else null
+        }
+        if (!dividedPlausible) return raw
+
+        // Both raw and divided are in the plausible range — use ambient to pick.
+        if (ambient == null) return raw  // No ambient reference — prefer raw (direct °C)
+
+        val rawDiff = abs(raw - ambient)
+        val dividedDiff = abs(divided - ambient)
+        return when {
+            // Raw is within an expected deviation from ambient — trust it as direct °C
+            rawDiff <= maxAcceptableDeviation -> raw
+            // Raw is way off but divided fits much better — apply the d01 divisor
+            dividedDiff < rawDiff -> divided
+            // Both are off; raw is the more direct interpretation
+            else -> raw
+        }
+    }
     private val chargingEventIds: Map<String, Int> by lazy {
         RuntimeExtensionBridge.labeledIntGroup("l01")
     }
@@ -1627,9 +1705,15 @@ class BydVehicleDataSource(context: Context) {
                         "battery"    to batteryDevice,
                         "bms"        to bmsDevice,
                         "motor"      to motorDevice,
+                        "sensor"     to sensorDevice,
                     )
                     VehicleCompatibilityProbe.recordPhevSection(probeDevices)
                     VehicleCompatibilityProbe.recordTemperatureSection(probeDevices)
+                    // Re-dump statistic and instrument devices so the probe captures all
+                    // no-arg getter values even when enabled after the initial registration.
+                    statisticDevice?.let  { dumpForCompatProbe("statistic",  it) }
+                    instrumentDevice?.let { dumpForCompatProbe("instrument", it) }
+                    sensorDevice?.let     { dumpForCompatProbe("sensor",     it) }
                 }
             }
 
@@ -1745,7 +1829,7 @@ class BydVehicleDataSource(context: Context) {
         try {
             val state = invokeIntGetter(device, *runtimeMethodNames("m32"))
             val power = invokeDoubleGetter(device, *runtimeMethodNames("m33"))
-            val batteryTemp = invokeDoubleGetter(device, *runtimeMethodNames("m36"))
+            val batteryTemp = validatePackTemp(invokeDoubleGetter(device, *runtimeMethodNames("m36")))
             val soh = invokeIntGetter(device, *runtimeMethodNames("m35"))
             val totalVoltage = invokeIntGetter(device, *runtimeMethodNames("m37"))
             val voltage12v = invokeDoubleGetter(device, *runtimeMethodNames("m38"))
@@ -2028,8 +2112,7 @@ class BydVehicleDataSource(context: Context) {
             // Cell temperatures
             val cellTempMax = invokeIntGetter(device, *runtimeMethodNames("m39"))
             val cellTempMin = invokeIntGetter(device, *runtimeMethodNames("m40"))
-            val packTemp = invokeNumericDoubleGetter(device, *runtimeMethodNames("m36"))
-                ?.takeIf { it.isFinite() && it in -40.0..120.0 }
+            val packTemp = validatePackTemp(invokeNumericDoubleGetter(device, *runtimeMethodNames("m36")))
             // Cell voltages
             val cellVoltMax = invokeDoubleGetter(device, *runtimeMethodNames("m41"))
             val cellVoltMin = invokeDoubleGetter(device, *runtimeMethodNames("m42"))
@@ -2376,11 +2459,33 @@ class BydVehicleDataSource(context: Context) {
         val voltageCandidates = listOfNotNull(v10, v20, v30, v38)
         val vMin = v10 ?: voltageCandidates.minOrNull()
         val vMax = v30 ?: v38 ?: voltageCandidates.takeIf { it.size >= 2 }?.maxOrNull()
-        val tMin = cellTMin?.toDouble()?.let { if (it in -1000.0..1000.0) it / runtimeScale01 else null }
+        val tMin = cellTMin?.toDouble()?.let { resolveStatisticTempCelsius(it) }
         val tMax: Double? = null
-        val tAvg = cellTAvg?.toDouble()?.let { if (it in -1000.0..1000.0) it / runtimeScale01 else null }
-        val tAux = cellTAuxSensor?.toDouble()?.let { if (it in -1000.0..1000.0) it / runtimeScale01 else null }
-        val tCandidate = cellTCandidate?.toDouble()?.let { if (it in -1000.0..1000.0) it / runtimeScale01 else null }
+        val tAvg = cellTAvg?.toDouble()?.let { resolveStatisticTempCelsius(it) }
+        val tAux = cellTAuxSensor?.toDouble()?.let { resolveStatisticTempCelsius(it) }
+        val tCandidate = cellTCandidate?.toDouble()?.let { resolveStatisticTempCelsius(it) }
+
+        // Direct named-getter fallback: for firmwares where the statistic device does not
+        // surface temperature via feature-ID events or polls (e.g. Seal Excellence), try
+        // common reflection-based getter names directly on the device object.
+        val tAvgFromGetter = if (tAvg == null && tAux == null && tMin == null) {
+            val raw = invokeNumericDoubleGetter(
+                device,
+                "getBatteryTemperature", "getTemperatureValue", "getBatteryTempValue",
+                "getCellTemperatureAvg", "getCellTempAvg", "getBatteryAvgTemperature",
+                "getBmsCellTemperature", "getHvBatteryTemperature", "getBmsBatteryTemp",
+                "getAvgTemperature", "getTemperature", "getBatCellTempAvg",
+                "getBmsTemperature", "getCellAvgTemp", "getHvBatteryTemp"
+            )
+            raw?.let { r ->
+                resolveStatisticTempCelsius(r).also { resolved ->
+                    if (resolved != null) {
+                        Log.i(TAG, "🌡️ statistic direct-getter temperature: raw=$r → ${String.format("%.1f", resolved)}°C")
+                    }
+                }
+            }
+        } else null
+        val effectiveTAvg = tAvg ?: tAvgFromGetter
         val soh = sohRaw?.let { decodeStatisticPercentRaw(it) }?.takeIf { it in 50.0..110.0 }
         val socB = socBmsRaw?.let {
             decodeStatisticPercentRaw(it, _vehicleSnapshot.value.statisticElecPercentageValue ?: _instrumentBatteryPercent.value)
@@ -2390,14 +2495,14 @@ class BydVehicleDataSource(context: Context) {
         }
         val availPower = availPowerRaw?.toDouble()?.let { if (it in -1000.0..5000.0) it / 10.0 else null }
 
-        if (vMin != null || vMax != null || tMin != null || tAvg != null || tMax != null || soh != null || socB != null || socPanel != null || availPower != null) {
+        if (vMin != null || vMax != null || tMin != null || effectiveTAvg != null || tMax != null || soh != null || socB != null || socPanel != null || availPower != null) {
             if (vMin != null) _statisticCellVoltageMin.value = vMin
             if (vMax != null) _statisticCellVoltageMax.value = vMax
             if (tMin != null) {
-                val avg = tAvg ?: _statisticCellTempAvg.value
+                val avg = effectiveTAvg ?: _statisticCellTempAvg.value
                 if (avg == null || tMin <= avg) _statisticCellTempMin.value = tMin
             }
-            if (tAvg != null) _statisticCellTempAvg.value = tAvg
+            if (effectiveTAvg != null) _statisticCellTempAvg.value = effectiveTAvg
             if (tMax != null) _statisticCellTempMax.value = tMax
             if (soh != null) _statisticBatterySoh.value = soh
             if (socB != null) _statisticSocBms.value = socB
@@ -2419,7 +2524,7 @@ class BydVehicleDataSource(context: Context) {
             publishSnapshot()
             logInfoIfChanged(
                 "statisticPoll",
-                "🔬 poll: cellVMin=$vMin cellVMax=$vMax cellTMin=$tMin cellTAvg=$tAvg cellTMax=$tMax " +
+                "🔬 poll: cellVMin=$vMin cellVMax=$vMax cellTMin=$tMin cellTAvg=$effectiveTAvg cellTMax=$tMax " +
                     "cellTAux=$tAux cellTCandidate=$tCandidate " +
                     "sohRaw=$sohRaw soh=$soh socBms=$socB socPanel=$socPanel availPower=$availPower"
             )
@@ -2429,7 +2534,7 @@ class BydVehicleDataSource(context: Context) {
             )
             logInfoIfChanged(
                 "statisticTempValues",
-                "🔬 statistic temp values: aux=$tAux min=$tMin soc=$socB value=$tCandidate avg=$tAvg"
+                "🔬 statistic temp values: aux=$tAux min=$tMin soc=$socB value=$tCandidate avg=$effectiveTAvg"
             )
         } else {
             // All mapped values returned null — BMS likely in low-power mode.
@@ -2919,23 +3024,32 @@ class BydVehicleDataSource(context: Context) {
             val cellVMin = cellV10 ?: voltageCandidates.minOrNull()
             val cellVMax = cellV30 ?: cellV38 ?: voltageCandidates.takeIf { it.size >= 2 }?.maxOrNull()
             // Auxiliary housing/coolant sensor decoded for logging only.
-            val cellTAux = cellTAuxRaw?.let { v ->
-                val d = v.toDouble()
-                if (d in -1000.0..1000.0) d / runtimeScale01 else null
-            }
-            val cellTMin = cellTMinRaw?.let { v ->
-                val d = v.toDouble()
-                if (d in -1000.0..1000.0) d / runtimeScale01 else null
-            }
-            val cellT30 = cellT30Raw?.let { v ->
-                val d = v.toDouble()
-                if (d in -1000.0..1000.0) d / runtimeScale01 else null
-            }
+            val cellTAux = cellTAuxRaw?.let { v -> resolveStatisticTempCelsius(v.toDouble()) }
+            val cellTMin = cellTMinRaw?.let { v -> resolveStatisticTempCelsius(v.toDouble()) }
+            val cellT30 = cellT30Raw?.let { v -> resolveStatisticTempCelsius(v.toDouble()) }
             val cellTMax: Double? = null
-            val cellTAvg = cellTAvgRaw?.let { v ->
-                val d = v.toDouble()
-                if (d in -1000.0..1000.0) d / runtimeScale01 else null
-            }
+            val cellTAvg = cellTAvgRaw?.let { v -> resolveStatisticTempCelsius(v.toDouble()) }
+
+            // Direct named-getter fallback when feature-ID polls return no temperature data.
+            val cellTAvgFromGetter = if (cellTAvg == null && cellTAux == null && cellTMin == null) {
+                val raw = invokeNumericDoubleGetter(
+                    device,
+                    "getBatteryTemperature", "getTemperatureValue", "getBatteryTempValue",
+                    "getCellTemperatureAvg", "getCellTempAvg", "getBatteryAvgTemperature",
+                    "getBmsCellTemperature", "getHvBatteryTemperature", "getBmsBatteryTemp",
+                    "getAvgTemperature", "getTemperature", "getBatCellTempAvg",
+                    "getBmsTemperature", "getCellAvgTemp", "getHvBatteryTemp"
+                )
+                raw?.let { r ->
+                    resolveStatisticTempCelsius(r).also { resolved ->
+                        if (resolved != null) {
+                            Log.i(TAG, "🌡️ statistic direct-getter temperature: raw=$r → ${String.format("%.1f", resolved)}°C")
+                        }
+                    }
+                }
+            } else null
+            val effectiveCellTAvg = cellTAvg ?: cellTAvgFromGetter
+
             val socBmsFrom447 = socBmsRaw?.let { v ->
                 decodeStatisticPercentRaw(v, elecPercentage ?: _instrumentBatteryPercent.value)
             }?.takeIf { it in 0.0..100.0 }
@@ -2958,10 +3072,10 @@ class BydVehicleDataSource(context: Context) {
             if (cellVMin != null) _statisticCellVoltageMin.value = cellVMin
             if (cellVMax != null) _statisticCellVoltageMax.value = cellVMax
             if (cellTMin != null) {
-                val avg = cellTAvg ?: _statisticCellTempAvg.value
+                val avg = effectiveCellTAvg ?: _statisticCellTempAvg.value
                 if (avg == null || cellTMin <= avg) _statisticCellTempMin.value = cellTMin
             }
-            if (cellTAvg != null) _statisticCellTempAvg.value = cellTAvg
+            if (effectiveCellTAvg != null) _statisticCellTempAvg.value = effectiveCellTAvg
             if (cellTMax != null) _statisticCellTempMax.value = cellTMax
             if (soh != null) _statisticBatterySoh.value = soh
             if (socBms != null) _statisticSocBms.value = socBms
@@ -3004,7 +3118,7 @@ class BydVehicleDataSource(context: Context) {
                 ) {
                     "🔬 statistic snapshot values: " +
                         "aux=$cellTAux cellTMin=${cellTMin?.let { String.format("%.1f", it) }} " +
-                        "cellTAvg=${cellTAvg?.let { String.format("%.1f", it) }} " +
+                        "cellTAvg=${effectiveCellTAvg?.let { String.format("%.1f", it) }} " +
                         "socBms=$socBmsFrom447 cellTValue=$cellT30 " +
                         "sohRaw=$sohRaw decodedSoh=$soh socPanel=$socPanelCandidate " +
                         "remainPow=$remainingBatteryPowerBms"
@@ -3327,8 +3441,7 @@ class BydVehicleDataSource(context: Context) {
             temperature?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(sensorTemperatureValue = it) }
 
             // Read extra sensor values — battery temp and voltage sensors.
-            val batteryTemp    = invokeNumericDoubleGetter(device, *m51["batteryTemp"].orEmpty().toTypedArray())
-                ?.takeIf { it.isFinite() && it in -40.0..120.0 }
+            val batteryTemp    = validatePackTemp(invokeNumericDoubleGetter(device, *m51["batteryTemp"].orEmpty().toTypedArray()))
             val ambientTemp    = invokeNumericDoubleGetter(device, *m51["ambientTemp"].orEmpty().toTypedArray())
                 ?.takeIf { it.isFinite() && it in -50.0..80.0 }
             val cabinTemp      = invokeNumericDoubleGetter(device, *m51["cabinTemp"].orEmpty().toTypedArray())
@@ -3478,6 +3591,43 @@ class BydVehicleDataSource(context: Context) {
             Log.i(TAG, "🌡️ Climate indexed: [0]=$indexedLeftTemp [1]=$indexedRightTemp " +
                 "all=${indexedTemps.map { (i,v) -> "[$i]=$v" }}")
 
+            // ── getTemprature(area) wide sweep ────────────────────────────────
+            // The BYD SDK declares getTemprature(int area) with named area constants
+            // (e.g. TEMPERATURE_MAIN_DRIVER) whose numeric values are not in our
+            // headers. Sweep a wide range and log every non-zero result with raw +
+            // candidate scalings (÷1, ÷10, ÷3) so we can spot the cabin sensor by
+            // comparing against ambient and the real cabin temperature on a drive.
+            // Probe results are surfaced into probeValues as `cabintemp_probe_area_N`
+            // so they appear in the JSON snapshot for offline review.
+            val cabinProbeRaw = linkedMapOf<String, Double>()
+            for (area in 0..31) {
+                val rawInt = try {
+                    invokeIndexedIntGetter(device, area, "getTemprature", "getTemperature")
+                } catch (_: Throwable) { null }
+                val rawDouble = try {
+                    invokeIndexedDoubleGetter(device, area, "getTemprature", "getTemperature")
+                } catch (_: Throwable) { null }
+                val raw = rawInt?.toDouble() ?: rawDouble
+                if (raw != null && raw != 0.0 && raw.isFinite() && abs(raw) < 100_000.0) {
+                    cabinProbeRaw["area_$area"] = raw
+                }
+            }
+            if (cabinProbeRaw.isNotEmpty()) {
+                val pretty = cabinProbeRaw.entries.joinToString(" ") { (k, v) ->
+                    val rawStr = if (v == v.toLong().toDouble()) v.toLong().toString() else "%.2f".format(v)
+                    val d10 = "%.1f".format(v / 10.0)
+                    val d3  = "%.1f".format(v / 3.0)
+                    "$k=$rawStr(/1=${"%.1f".format(v)} /10=$d10 /3=$d3)"
+                }
+                Log.i(TAG, "🌡️ getTemprature(area) sweep: $pretty")
+                updateDiagnosticProbeValues(
+                    source = "climate-cabintemp-area-sweep",
+                    values = cabinProbeRaw.mapKeys { (k, _) -> "cabintemp_probe_$k" }
+                )
+            } else {
+                Log.i(TAG, "🌡️ getTemprature(area) sweep: no non-zero results from area 0..31")
+            }
+
             val ambientTemp = invokeNumericDoubleGetter(
                 device,
                 "getAmbientTemperature", "getOutsideTemp"
@@ -3507,10 +3657,10 @@ class BydVehicleDataSource(context: Context) {
                 }
             }
 
-            val subBatteryTemp = invokeNumericDoubleGetter(
+            val subBatteryTemp = validatePackTemp(invokeNumericDoubleGetter(
                 device,
                 "getAcSubBatteryTemperature", "getSubBatteryTemperature", "getBatterySubTemperature"
-            )?.takeIf { it.isFinite() && it in -40.0..120.0 }
+            ))
 
             // cabinTemp = named getters (likely null on Climate device)
             // Keep the firmware spelling for compatibility.
@@ -3729,8 +3879,7 @@ class BydVehicleDataSource(context: Context) {
             }?.invoke(manager) ?: return
             dumpForCompatProbe("vem-vehicleInfo", vehicleInfo)
 
-            val batteryTemp = invokeNumericDoubleGetter(vehicleInfo, "getBatteryTempCelsius")
-                ?.takeIf { it.isFinite() && it in -40.0..120.0 }
+            val batteryTemp = validatePackTemp(invokeNumericDoubleGetter(vehicleInfo, "getBatteryTempCelsius"))
             val externalTemp = invokeNumericDoubleGetter(vehicleInfo, "getExternalTempCelsius")
                 ?.takeIf { it.isFinite() && it in -50.0..80.0 }
             val hvacStatus = invokeIntGetter(vehicleInfo, "getHvacStatusValue")
@@ -4067,6 +4216,23 @@ class BydVehicleDataSource(context: Context) {
                         "$key=${String.format("%.3f", value)}"
                     }
                 )
+                // Apply the first plausible SoH reading from the instrument device.
+                // This is the path used by some firmware variants that expose SoH via
+                // InstrumentDevice (e.g. getSOH, getBatterySOH) rather than through the
+                // charging or battery device — the most likely reason direct-BMS reads
+                // fail (method 1) while the instrument exposes it regardless of charge state.
+                val instrumentSoh = instrumentSohValues.values
+                    .firstOrNull { it.isFinite() && it in 50.0..110.0 }
+                    ?.toInt()
+                if (instrumentSoh != null) {
+                    val prev = _vehicleSnapshot.value
+                    if (prev.batterySoh == null || prev.sohEstimated) {
+                        _batterySoh.value = instrumentSoh
+                        _vehicleSnapshot.update { it.copy(batterySoh = instrumentSoh, sohEstimated = false) }
+                        publishSnapshot()
+                        Log.i(TAG, "✅ SOH from InstrumentDevice: $instrumentSoh%")
+                    }
+                }
             }
 
         } catch (t: Throwable) {
@@ -4345,9 +4511,9 @@ class BydVehicleDataSource(context: Context) {
             batteryTotalVoltage = _vehicleSnapshot.value.batteryTotalVoltage,
             battery12vVoltage = _battery12vVoltage.value
                 ?: _vehicleSnapshot.value.battery12vVoltage,
-            batteryPackTemp = _vehicleSnapshot.value.batteryPackTemp,
-            batteryCellTempMax = _vehicleSnapshot.value.batteryCellTempMax,
-            batteryCellTempMin = _vehicleSnapshot.value.batteryCellTempMin,
+            batteryPackTemp = validatePackTemp(_vehicleSnapshot.value.batteryPackTemp),
+            batteryCellTempMax = validatePackTemp(_vehicleSnapshot.value.batteryCellTempMax?.toDouble())?.toInt(),
+            batteryCellTempMin = validatePackTemp(_vehicleSnapshot.value.batteryCellTempMin?.toDouble())?.toInt(),
             batteryCellVoltageMax = _vehicleSnapshot.value.batteryCellVoltageMax,
             batteryCellVoltageMin = _vehicleSnapshot.value.batteryCellVoltageMin,
             carLocked = _vehicleSnapshot.value.carLocked,
@@ -4370,9 +4536,9 @@ class BydVehicleDataSource(context: Context) {
             statisticBatteryCurrent = _statisticBatteryCurrent.value,
             statisticCellVoltageMin = _statisticCellVoltageMin.value,
             statisticCellVoltageMax = _statisticCellVoltageMax.value,
-            statisticCellTempMin    = _statisticCellTempMin.value,
-            statisticCellTempMax    = _statisticCellTempMax.value,
-            statisticCellTempAvg    = _statisticCellTempAvg.value,
+            statisticCellTempMin    = validatePackTemp(_statisticCellTempMin.value),
+            statisticCellTempMax    = validatePackTemp(_statisticCellTempMax.value),
+            statisticCellTempAvg    = validatePackTemp(_statisticCellTempAvg.value),
             statisticBatterySoh     = _statisticBatterySoh.value,
             statisticSocBms         = _statisticSocBms.value,
             statisticAvailPower     = _statisticAvailPower.value,
@@ -5741,24 +5907,28 @@ class BydVehicleDataSource(context: Context) {
             sdf["batteryCurrent"] -> if (v in 10.0..200000.0) _statisticBatteryCurrent.value  = v / 100.0  else matched = false
             // Auxiliary temperature sensor; intentionally ignored for cell temps.
             sdf["auxHousingTemp"] -> matched = false
-            sdf["cellTMin"] -> if (v in -1000.0..1000.0) {
-                val candidate = v / runtimeScale01
-                val avg = _statisticCellTempAvg.value
-                // 0x44700020 returns a non-minimum probe on some firmware (observed > avg on Seal Excellence).
-                // Only accept the value when it is physically valid (≤ avg, or avg unknown).
-                if (avg == null || candidate <= avg) _statisticCellTempMin.value = candidate
-            } else matched = false
+            sdf["cellTMin"] -> {
+                val resolved = resolveStatisticTempCelsius(v)
+                if (resolved != null) {
+                    val avg = _statisticCellTempAvg.value
+                    // 0x44700020 returns a non-minimum probe on some firmware (observed > avg on Seal Excellence).
+                    // Only accept the value when it is physically valid (≤ avg, or avg unknown).
+                    if (avg == null || resolved <= avg) _statisticCellTempMin.value = resolved
+                } else matched = false
+            }
             sdf["socBms"] -> {
                 val decoded = decodeStatisticPercentRaw(v.toInt(), _vehicleSnapshot.value.statisticElecPercentageValue ?: _instrumentBatteryPercent.value)
                 if (decoded != null) _statisticSocBms.value = decoded else matched = false
             }
-            sdf["cellTAvg"] -> if (v in -1000.0..1000.0) {
-                val newAvg = v / runtimeScale01
-                _statisticCellTempAvg.value = newAvg
-                // Evict a stale cellTMin that now exceeds the freshly-arrived avg.
-                val storedMin = _statisticCellTempMin.value
-                if (storedMin != null && storedMin > newAvg) _statisticCellTempMin.value = null
-            } else matched = false
+            sdf["cellTAvg"] -> {
+                val resolved = resolveStatisticTempCelsius(v)
+                if (resolved != null) {
+                    _statisticCellTempAvg.value = resolved
+                    // Evict a stale cellTMin that now exceeds the freshly-arrived avg.
+                    val storedMin = _statisticCellTempMin.value
+                    if (storedMin != null && storedMin > resolved) _statisticCellTempMin.value = null
+                } else matched = false
+            }
             sdf["soh"] -> {
                 val decoded = decodeStatisticPercentRaw(v.toInt())?.takeIf { it in 50.0..110.0 }
                 if (decoded != null) _statisticBatterySoh.value = decoded else matched = false

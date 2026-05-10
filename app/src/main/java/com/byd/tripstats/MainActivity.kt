@@ -115,6 +115,7 @@ class MainActivity : ComponentActivity() {
                     if (showAutostartReminder.value) {
                         AlertDialog(
                             onDismissRequest = { dismissAutostartReminder() },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             title = { Text("⚠️ Action Required — Autostart") },
                             text = {
                                 Text(
@@ -171,6 +172,7 @@ class MainActivity : ComponentActivity() {
 
                             AlertDialog(
                                 onDismissRequest = { if (!busy) showSetupRequired.value = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 title = { Text(dialogTitle) },
                                 text = {
                                     Column {

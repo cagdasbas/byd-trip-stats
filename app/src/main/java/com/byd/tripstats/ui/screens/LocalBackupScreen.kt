@@ -1,9 +1,14 @@
 package com.byd.tripstats.ui.screens
 
+import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +32,8 @@ import com.byd.tripstats.data.backup.LocalBackupManager
 import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
+import com.byd.tripstats.worker.DatabaseTrimmer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -58,7 +65,22 @@ fun LocalBackupScreen(
     val telegramBusy = telegramState is TelegramManager.TelegramState.InProgress
 
     var restoreTarget by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
+    var deleteTarget  by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
+    var pendingDeleteAfterPermission by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
     var telegramRestoreTarget by remember { mutableStateOf<TelegramManager.TelegramBackupFile?>(null) }
+
+    // Request WRITE_EXTERNAL_STORAGE at runtime for Android 10 (declared in manifest
+    // with maxSdkVersion=29). Without it, File.delete() fails for filesystem-only
+    // backups created by previous installations that lost MediaStore ownership.
+    val writePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val pending = pendingDeleteAfterPermission
+        pendingDeleteAfterPermission = null
+        if (granted && pending != null) {
+            scope.launch { manager.deleteBackup(pending) }
+        }
+    }
     // Hoisted out of item{} so it survives LazyColumn recycling
     var tokenInput by remember { mutableStateOf("") }
     LaunchedEffect(telegramConfig) {
@@ -242,12 +264,18 @@ fun LocalBackupScreen(
                             BackupListItem(
                                 backup    = backup,
                                 enabled   = !isBusy,
-                                onRestore = { restoreTarget = backup }
+                                onRestore = { restoreTarget = backup },
+                                onDelete  = { deleteTarget  = backup },
                             )
                         }
                     }
                 }
                 }
+            }
+
+            // ── MAINTENANCE group ─────────────────────────────────────────────
+            item {
+                DatabaseTrimSection(scope = scope, isBusy = isBusy)
             }
 
             // ── TELEGRAM group ────────────────────────────────────────────────
@@ -687,6 +715,34 @@ fun LocalBackupScreen(
             onDismiss = { restoreTarget = null }
         )
     }
+
+    deleteTarget?.let { backup ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Delete backup?") },
+            text  = { Text("\"${backup.name}\" will be permanently deleted.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val b = backup
+                    deleteTarget = null
+                    val needsWritePermission = b.uri.scheme == "file" &&
+                        ContextCompat.checkSelfPermission(
+                            context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                        ) != PackageManager.PERMISSION_GRANTED
+                    if (needsWritePermission) {
+                        pendingDeleteAfterPermission = b
+                        writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    } else {
+                        scope.launch { manager.deleteBackup(b) }
+                    }
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Cancel") }
+            }
+        )
+    }
 }
 }
 
@@ -804,7 +860,8 @@ private fun StatusBanner(
 private fun BackupListItem(
     backup: LocalBackupManager.BackupFile,
     enabled: Boolean,
-    onRestore: () -> Unit
+    onRestore: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val dateFmt = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
     val sizeMb  = if (backup.sizeBytes < 1_048_576L)
@@ -837,6 +894,13 @@ private fun BackupListItem(
             }
         }
         TextButton(onClick = onRestore, enabled = enabled) { Text("Restore") }
+        IconButton(onClick = onDelete, enabled = enabled) {
+            Icon(
+                Icons.Filled.DeleteOutline, "Delete backup",
+                modifier = Modifier.size(20.dp),
+                tint     = MaterialTheme.colorScheme.error
+            )
+        }
     }
 }
 
@@ -910,4 +974,165 @@ private fun RestoreConfirmDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+@Composable
+private fun DatabaseTrimSection(
+    scope: kotlinx.coroutines.CoroutineScope,
+    isBusy: Boolean,
+) {
+    val context = LocalContext.current
+    val trimState by DatabaseTrimmer.state.collectAsState()
+    var lastRun by remember { mutableStateOf(DatabaseTrimmer.getLastRun(context)) }
+    var showConfirm by remember { mutableStateOf(false) }
+
+    // Refresh last-run when a Success state arrives so the label updates immediately.
+    LaunchedEffect(trimState) {
+        if (trimState is DatabaseTrimmer.State.Success) {
+            lastRun = DatabaseTrimmer.getLastRun(context)
+        }
+    }
+
+    // Auto-restart after VACUUM completes — Room was closed to allow VACUUM, so
+    // the process must restart for the schema to reopen cleanly.
+    LaunchedEffect(trimState) {
+        val s = trimState
+        if (s is DatabaseTrimmer.State.Success && s.restartRequired) {
+            delay(3000)
+            val launchIntent = context.packageManager
+                .getLaunchIntentForPackage(context.packageName)
+                ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            if (launchIntent != null) {
+                val pending = PendingIntent.getActivity(
+                    context, 2, launchIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                val alarm = context.getSystemService(AlarmManager::class.java)
+                alarm.set(AlarmManager.RTC, System.currentTimeMillis() + 500L, pending)
+            }
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }
+    }
+
+    val running = trimState is DatabaseTrimmer.State.InProgress
+    val dateFmt = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
+
+    GroupSection(title = "Maintenance", icon = Icons.Filled.CleaningServices) {
+        SectionCard(title = "Trim database", icon = Icons.Filled.CleaningServices) {
+            Text(
+                "Removes diagnostic data and downsamples old recordings to free up space:\n" +
+                "  • Strips redundant fields from every data point.\n" +
+                "  • Clears full-detail diagnostic payloads for trips and charging older than 45 days.\n" +
+                "  • Downsamples trip points older than 60 days to one sample per minute.\n" +
+                "  • Deletes second-by-second AC charging history older than 45 days (DC fast-charging history is preserved).\n" +
+                "  • Reclaims freed space (VACUUM).\n\n" +
+                "Trip summaries, statistics, charging session totals, and all DC charging detail are not affected.\n" +
+                "It should be run when no trip/charging recording session in order not to disrupt that session",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // Last-run info
+            val lastRunText = lastRun?.let { "Last trimmed: ${dateFmt.format(Date(it.timestamp))}" }
+                ?: "Never trimmed."
+            Text(
+                lastRunText,
+                style      = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color      = MaterialTheme.colorScheme.onSurface
+            )
+            lastRun?.let {
+                Text(
+                    it.summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Status banner during/after run
+            when (val s = trimState) {
+                is DatabaseTrimmer.State.InProgress -> StatusBanner(
+                    text    = s.phase,
+                    color   = MaterialTheme.colorScheme.primaryContainer,
+                    icon    = Icons.Filled.HourglassTop,
+                    loading = true
+                )
+                is DatabaseTrimmer.State.Success -> StatusBanner(
+                    text      = if (s.restartRequired)
+                        "Trim complete — app will restart in a few seconds to finalise space reclaim."
+                    else
+                        "Trim complete. (VACUUM was skipped; restart the app later to reclaim space.)",
+                    color     = RegenGreen.copy(alpha = 0.15f),
+                    icon      = Icons.Filled.CheckCircle,
+                    iconTint  = RegenGreen,
+                    onDismiss = if (s.restartRequired) null else ({ DatabaseTrimmer.resetState() })
+                )
+                is DatabaseTrimmer.State.Error -> StatusBanner(
+                    text      = "Trim failed: ${s.message}",
+                    color     = MaterialTheme.colorScheme.errorContainer,
+                    icon      = Icons.Filled.Error,
+                    iconTint  = MaterialTheme.colorScheme.error,
+                    onDismiss = { DatabaseTrimmer.resetState() }
+                )
+                else -> {}
+            }
+
+            if (trimState !is DatabaseTrimmer.State.Idle) Spacer(Modifier.height(8.dp))
+
+            Button(
+                onClick  = { showConfirm = true },
+                enabled  = !running && !isBusy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (running) {
+                    CircularProgressIndicator(
+                        modifier    = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color       = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(Icons.Filled.CleaningServices, null, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(if (running) "Trimming…" else "Trim database now")
+            }
+        }
+    }
+
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            icon = {
+                Icon(Icons.Filled.CleaningServices, null,
+                    tint     = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp))
+            },
+            title = { Text("Trim database?", fontWeight = FontWeight.Bold) },
+            text  = {
+                Text(
+                    "Diagnostic data for trips older than 45 days will be cleared, trip points " +
+                    "older than 60 days will be downsampled to one per minute, and per-second AC " +
+                    "charging history older than 45 days will be deleted. DC charging history is " +
+                    "preserved.\n\n" +
+                    "Trip summaries, statistics and charging session totals are not affected.\n\n" +
+                    "Once the rows are processed the telemetry service is briefly stopped, the " +
+                    "database is vacuumed to reclaim disk space, and the app will close and reopen " +
+                    "automatically. Total time: ~1–2 minutes on a large database."
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showConfirm = false
+                    scope.launch(Dispatchers.IO) { DatabaseTrimmer.trim(context) }
+                }) { Text("Trim now") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
