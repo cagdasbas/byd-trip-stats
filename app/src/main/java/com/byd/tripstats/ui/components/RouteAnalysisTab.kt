@@ -69,7 +69,7 @@ fun RouteAnalysisTab(
             useImperial = useImperial
         )
         WaypointsCard(dataPoints)
-        RouteSegmentsCard(dataPoints)
+        RouteSegmentsCard(dataPoints, useImperial)
         EnergyHeatmapCard(dataPoints)
         TripTimelineCard(dataPoints)
     }
@@ -126,9 +126,9 @@ private fun ModeInsightsCard(
             trip = trip
         )
     }
-    val insights: List<String> = remember(driveSummaries, regenSummaries) {
+    val insights: List<String> = remember(driveSummaries, regenSummaries, useImperial) {
         buildList {
-            compareDriveModes(driveSummaries)?.let(::add)
+            compareDriveModes(driveSummaries, useImperial)?.let(::add)
             compareRegenModes(regenSummaries)?.let(::add)
         }
     }
@@ -426,7 +426,7 @@ private fun buildModeSummaries(
         .sortedByDescending { it.distanceKm }
 }
 
-private fun compareDriveModes(summaries: List<ModeSummary>): String? {
+private fun compareDriveModes(summaries: List<ModeSummary>, useImperial: Boolean = false): String? {
     val eco = summaries.firstOrNull { it.label == "Eco" && it.distanceKm >= 1.0 }
     val normal = summaries.firstOrNull { it.label == "Normal" && it.distanceKm >= 1.0 }
     val sport = summaries.firstOrNull { it.label == "Sport" && it.distanceKm >= 1.0 }
@@ -445,7 +445,9 @@ private fun compareDriveModes(summaries: List<ModeSummary>): String? {
     ) {
         val delta = sport.consumptionKwhPer100Km - normal.consumptionKwhPer100Km
         if (delta > 1.0) {
-            return "Sport used ${String.format("%.1f", delta)} kWh/100km more than Normal over comparable segments in this trip."
+            val deltaDisplay = if (useImperial) delta / 0.621371 else delta
+            val unit = if (useImperial) "kWh/100mi" else "kWh/100km"
+            return "Sport used ${String.format("%.1f", deltaDisplay)} $unit more than Normal over comparable segments in this trip."
         }
     }
     return null
@@ -527,9 +529,11 @@ private fun WaypointItem(
 // ── Route Segments ────────────────────────────────────────────────────────────
 
 @Composable
-private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>) {
+private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>, useImperial: Boolean = false) {
     val segmentSize = (dataPoints.size / 5).coerceAtLeast(1)
     val segments    = dataPoints.chunked(segmentSize).take(5)
+    val speedFactor = if (useImperial) 0.621371 else 1.0
+    val speedUnit   = if (useImperial) "mph" else "km/h"
 
     Card(
         modifier = Modifier.fillMaxWidth().then(cardBorder),
@@ -553,7 +557,8 @@ private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>) {
                 SegmentItem(
                     segmentNumber = index + 1,
                     timeRange     = "$startTime – $endTime",
-                    avgSpeed      = avgSpeed.toInt(),
+                    avgSpeed      = (avgSpeed * speedFactor).toInt(),
+                    speedUnit     = speedUnit,
                     avgPower      = avgPower.toInt(),
                     socChange     = socChange
                 )
@@ -571,6 +576,7 @@ private fun SegmentItem(
     segmentNumber: Int,
     timeRange: String,
     avgSpeed: Int,
+    speedUnit: String = "km/h",
     avgPower: Int,
     socChange: Double
 ) {
@@ -598,7 +604,7 @@ private fun SegmentItem(
             )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(text = "$avgSpeed km/h", style = MaterialTheme.typography.bodySmall)
+            Text(text = "$avgSpeed $speedUnit", style = MaterialTheme.typography.bodySmall)
             Text(
                 text = "${abs(avgPower)} kW",
                 style = MaterialTheme.typography.bodySmall,

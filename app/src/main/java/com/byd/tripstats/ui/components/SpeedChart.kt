@@ -51,6 +51,11 @@ fun SpeedChart(
     val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
     val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
     val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
+    val speedUnit = if (useImperial) "mph" else "km/h"
+    val values = remember(dataPoints, useImperial) {
+        val factor = if (useImperial) 0.621371f else 1f
+        dataPoints.map { (it.speed * factor).toFloat() }
+    }
 
     Canvas(modifier = modifier.fillMaxSize().pointerInput(Unit) {
         awaitEachGesture {
@@ -64,7 +69,6 @@ fun SpeedChart(
         val padL = 80f; val padR = 16f; val padT = 16f; val padB = 40f
         val chartW = w - padL - padR; val chartH = h - padT - padB
         val nc = drawContext.canvas.nativeCanvas
-        val values = dataPoints.map { it.speed.toFloat() }
         val rawMax = values.max().coerceAtLeast(10f)
         val yStep = when {
             rawMax < 60f -> 10.0; rawMax < 120f -> 20.0; rawMax < 200f -> 25.0; else -> 50.0
@@ -202,7 +206,7 @@ fun SpeedChart(
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(values[idx]), w = w,
                     padL = padL, padR = padR, padT = padT, chartH = chartH,
-                    line1 = "%.1f km/h".format(values[idx]),
+                    line1 = "%.1f $speedUnit".format(values[idx]),
                     line2 = if (modeStr.isNotEmpty()) modeStr else realTime,
                     line3 = if (modeStr.isNotEmpty()) "$realTime  $durationStr" else durationStr,
                     accentColor = dotColor

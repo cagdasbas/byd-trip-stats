@@ -28,10 +28,13 @@ import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.config.Drivetrain
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.isImperial
 import com.byd.tripstats.ui.components.drawCrosshair
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.max
+
+private const val KM_TO_MI = 0.621371f
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
@@ -60,6 +63,8 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
     val prefs = remember { PreferencesManager(context.applicationContext) }
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
     val car = selectedCar ?: return
+    val unitSystem by prefs.unitSystem.collectAsState(initial = prefs.getCachedUnitSystem())
+    val useImperial = unitSystem.isImperial
     var selectedDriveMode by remember { mutableStateOf(DriveModeFilter.ALL) }
     var selectedRegenMode by remember { mutableStateOf(RegenModeFilter.ALL) }
     val filteredDataPoints = remember(dataPoints, selectedDriveMode, selectedRegenMode) {
@@ -93,20 +98,23 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             )
         }
 
+        val consUnit  = if (useImperial) "kWh/100mi" else "kWh/100km"
+        val speedUnit = if (useImperial) "mph" else "km/h"
+
         // 1. Power vs Speed — the classic EV motor operating map
         HeatmapCard(
             title    = "Power vs Speed",
             subtitle = "Motor output at each speed — shows where the car actually operates"
         ) {
-            PowerVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            PowerVsSpeedHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 2. Instantaneous consumption vs speed — where efficiency is good or poor
         HeatmapCard(
             title    = "Consumption vs Speed",
-            subtitle = "Instantaneous efficiency (kWh/100km) across the speed range"
+            subtitle = "Instantaneous efficiency ($consUnit) across the speed range"
         ) {
-            ConsumptionVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            ConsumptionVsSpeedHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 3. Regen power vs speed — how much energy is recovered during braking
@@ -114,7 +122,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Regen Power vs Speed",
             subtitle = "Regenerative braking strength by speed band"
         ) {
-            RegenVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            RegenVsSpeedHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 4. Motor RPM vs speed — powertrain operating envelope
@@ -133,6 +141,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             RpmVsSpeedHeatmap(
                 dataPoints = filteredDataPoints,
                 drivetrain = car.drivetrain,
+                useImperial = useImperial,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -150,7 +159,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Acceleration vs Speed",
             subtitle = "Where the driver accelerates hard or coasts — lower is more efficient"
         ) {
-            AccelerationVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            AccelerationVsSpeedHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 7. SOC vs Instantaneous Consumption — battery state effect on efficiency
@@ -158,7 +167,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "SOC vs Consumption",
             subtitle = "Whether efficiency changes at low or high charge states"
         ) {
-            SocVsConsumptionHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            SocVsConsumptionHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 8. Time of Day vs Speed — traffic pattern map
@@ -166,7 +175,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Time of Day vs Speed",
             subtitle = "When and how fast you drive — reveals rush-hour congestion patterns"
         ) {
-            TimeOfDayVsSpeedHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            TimeOfDayVsSpeedHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 9. Altitude Gradient vs Consumption — topography cost
@@ -174,7 +183,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Gradient vs Consumption",
             subtitle = "How slope affects energy — regen visible in negative-gradient band"
         ) {
-            GradientVsConsumptionHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            GradientVsConsumptionHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 10. Front RPM vs Rear RPM — AWD torque split
@@ -192,7 +201,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Tyre Pressure vs Consumption",
             subtitle = "Whether higher pressure measurably improves efficiency on your car"
         ) {
-            TyrePressureVsConsumptionHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            TyrePressureVsConsumptionHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 12. SOC vs Regen Efficiency
@@ -208,7 +217,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Speed vs Battery Temperature",
             subtitle = "Motorway thermal load vs stop-start urban — cleaner than Power vs Temp"
         ) {
-            SpeedVsBatteryTempHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            SpeedVsBatteryTempHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
         }
 
         // 14. Cell Voltage Spread vs SOC — pack health diagnostic
@@ -259,16 +268,18 @@ private fun <T> ModeFilterRow(
 @Composable
 private fun PowerVsSpeedHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sf    = if (useImperial) KM_TO_MI else 1f
+    val xMin  = 0f;    val xMax = 160f * sf   // km/h or mph
+    val yMin  = -100f; val yMax = 300f         // kW (unchanged)
     val xBins = 16; val yBins = 14
-    val xMin  = 0f;   val xMax = 160f   // km/h
-    val yMin  = -100f; val yMax = 300f  // kW  (negative = regen)
 
-    val cells = remember(dataPoints) {
+    val cells = remember(dataPoints, useImperial) {
         buildGrid(
             points = dataPoints.mapNotNull { p ->
-                val spd = p.speed.toFloat().takeIf { it >= 0f } ?: return@mapNotNull null
+                val spd = (p.speed * sf).toFloat().takeIf { it >= 0f } ?: return@mapNotNull null
                 val pwr = p.power.toFloat()
                 spd to pwr
             },
@@ -281,7 +292,7 @@ private fun PowerVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (km/h)",
+        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
         yAxisLabel = "Power (kW)",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
@@ -291,20 +302,22 @@ private fun PowerVsSpeedHeatmap(
 @Composable
 private fun ConsumptionVsSpeedHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    // Instantaneous consumption = power (kW) / speed (km/h) × 100 → kWh/100km
+    val sf    = if (useImperial) KM_TO_MI else 1f
+    val cf    = if (useImperial) 1f / KM_TO_MI else 1f  // kWh/100km → kWh/100mi
     val xBins = 14; val yBins = 14
-    val xMin  = 5f;   val xMax = 160f  // km/h  (skip near-zero to avoid artefacts)
-    val yMin  = -60f; val yMax = 80f   // kWh/100km  (negative = regen)
+    val xMin  = 5f * sf;   val xMax = 160f * sf
+    val yMin  = -60f * cf; val yMax = 80f * cf
 
-    val cells = remember(dataPoints) {
+    val cells = remember(dataPoints, useImperial) {
         buildGrid(
             points = dataPoints.mapNotNull { p ->
                 val spd = p.speed.toFloat().takeIf { it >= 5f } ?: return@mapNotNull null
                 val pwr = p.power.toFloat()
-                val consumption = pwr / spd * 100f
-                spd to consumption
+                val consumption = (pwr / spd * 100f) * cf
+                (spd * sf) to consumption
             },
             xMin = xMin, xMax = xMax, xBins = xBins,
             yMin = yMin, yMax = yMax, yBins = yBins
@@ -315,8 +328,8 @@ private fun ConsumptionVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (km/h)",
-        yAxisLabel = "kWh / 100 km",
+        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
+        yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -325,15 +338,17 @@ private fun ConsumptionVsSpeedHeatmap(
 @Composable
 private fun RegenVsSpeedHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sf    = if (useImperial) KM_TO_MI else 1f
     val xBins = 14; val yBins = 12
-    val xMin  = 0f; val xMax = 140f   // km/h
-    val yMin  = 0f; val yMax = 120f   // kW (magnitude — we only keep regen samples)
+    val xMin  = 0f; val xMax = 140f * sf
+    val yMin  = 0f; val yMax = 120f   // kW (unchanged)
 
-    val regenPoints = remember(dataPoints) {
+    val regenPoints = remember(dataPoints, useImperial) {
         dataPoints.mapNotNull { p ->
-            val spd = p.speed.toFloat().takeIf { it >= 0f } ?: return@mapNotNull null
+            val spd = (p.speed * sf).toFloat().takeIf { it >= 0f } ?: return@mapNotNull null
             val pwr = p.power.toFloat().takeIf { it < 0f } ?: return@mapNotNull null
             spd to abs(pwr)
         }
@@ -358,7 +373,7 @@ private fun RegenVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (km/h)",
+        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
         yAxisLabel = "Regen Power (kW)",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
@@ -369,15 +384,17 @@ private fun RegenVsSpeedHeatmap(
 private fun RpmVsSpeedHeatmap(
     dataPoints: List<TripDataPointEntity>,
     drivetrain: Drivetrain,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sf    = if (useImperial) KM_TO_MI else 1f
     val xBins = 14; val yBins = 12
-    val xMin  = 0f;    val xMax = 160f    // km/h
-    val yMin  = 0f;    val yMax = 14000f  // RPM
+    val xMin  = 0f;    val xMax = 160f * sf
+    val yMin  = 0f;    val yMax = 14000f  // RPM (unchanged)
 
-    val rpmPoints = remember(dataPoints, drivetrain) {
+    val rpmPoints = remember(dataPoints, drivetrain, useImperial) {
         dataPoints.mapNotNull { p ->
-            val spd = p.speed.toFloat().takeIf { it >= 0f } ?: return@mapNotNull null
+            val spd = (p.speed * sf).toFloat().takeIf { it >= 0f } ?: return@mapNotNull null
 
             val rpm = when (drivetrain) {
                 Drivetrain.FWD -> p.engineSpeedFront.toFloat()
@@ -411,7 +428,7 @@ private fun RpmVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins, transform = ::fmtRpm),
-        xAxisLabel = "Speed (km/h)",
+        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
         yAxisLabel = when (drivetrain) {
             Drivetrain.FWD -> "Front Motor RPM"
             Drivetrain.RWD -> "Rear Motor RPM"
@@ -631,19 +648,21 @@ private fun Heatmap2D(
 @Composable
 private fun AccelerationVsSpeedHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sf    = if (useImperial) KM_TO_MI else 1f
     val xBins = 16; val yBins = 16
-    val xMin  = 0f;  val xMax = 160f   // km/h
-    val yMin  = -8f; val yMax =   8f   // km/h per second
+    val xMin  = 0f;    val xMax = 160f * sf
+    val yMin  = -8f * sf; val yMax = 8f * sf   // speed/s → same conversion factor
 
     // Derive acceleration from consecutive point pairs; skip telemetry gaps > 30 s
-    val accelPoints = remember(dataPoints) {
+    val accelPoints = remember(dataPoints, useImperial) {
         dataPoints.zipWithNext { a, b ->
             val dtSec = (b.timestamp - a.timestamp) / 1000.0
             if (dtSec < 0.5 || dtSec > 30.0) return@zipWithNext null
-            val accel    = ((b.speed - a.speed) / dtSec).toFloat()
-            val midSpeed = ((a.speed + b.speed) / 2.0).toFloat()
+            val accel    = (((b.speed - a.speed) / dtSec) * sf).toFloat()
+            val midSpeed = (((a.speed + b.speed) / 2.0) * sf).toFloat()
             midSpeed to accel
         }.filterNotNull()
     }
@@ -667,8 +686,8 @@ private fun AccelerationVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins, "%.1f"),
-        xAxisLabel = "Speed (km/h)",
-        yAxisLabel = "Accel (km/h/s)",
+        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
+        yAxisLabel = "Accel (${if (useImperial) "mph/s" else "km/h/s"})",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         yValueFmt  = { "%.1f".format(it) },
         modifier   = modifier
@@ -680,19 +699,21 @@ private fun AccelerationVsSpeedHeatmap(
 @Composable
 private fun SocVsConsumptionHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val cf    = if (useImperial) 1f / KM_TO_MI else 1f
     val xBins = 20; val yBins = 16
-    val xMin  = 0f;  val xMax = 100f   // SOC %
-    val yMin  = 0f;  val yMax =  80f   // kWh/100km (traction only)
+    val xMin  = 0f;  val xMax = 100f        // SOC % (unchanged)
+    val yMin  = 0f;  val yMax = 80f * cf
 
     // Only count forward-drive samples (speed > 10, positive power) to avoid
     // regen and idle noise skewing the distribution
-    val consPoints = remember(dataPoints) {
+    val consPoints = remember(dataPoints, useImperial) {
         dataPoints.mapNotNull { p ->
             val spd = p.speed.toFloat().takeIf { it > 10f } ?: return@mapNotNull null
             val pwr = p.power.toFloat().takeIf { it > 0f } ?: return@mapNotNull null
-            val cons = pwr / spd * 100f
+            val cons = (pwr / spd * 100f) * cf
             if (cons > yMax) return@mapNotNull null
             p.soc.toFloat() to cons
         }
@@ -718,7 +739,7 @@ private fun SocVsConsumptionHeatmap(
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
         xAxisLabel = "SOC (%)",
-        yAxisLabel = "kWh / 100 km",
+        yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -729,19 +750,21 @@ private fun SocVsConsumptionHeatmap(
 @Composable
 private fun TimeOfDayVsSpeedHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sf    = if (useImperial) KM_TO_MI else 1f
     val xBins = 24; val yBins = 16
-    val xMin  = 0f;  val xMax =  24f   // hour 0–23
-    val yMin  = 0f;  val yMax = 160f   // km/h
+    val xMin  = 0f;  val xMax = 24f         // hour 0–23 (unchanged)
+    val yMin  = 0f;  val yMax = 160f * sf
 
-    val timePoints = remember(dataPoints) {
+    val timePoints = remember(dataPoints, useImperial) {
         val cal = java.util.Calendar.getInstance()
         dataPoints.mapNotNull { dp ->
             if (dp.speed <= 0.0) return@mapNotNull null
             cal.timeInMillis = dp.timestamp
             val hour = cal.get(java.util.Calendar.HOUR_OF_DAY).toFloat()
-            hour to dp.speed.toFloat()
+            hour to (dp.speed * sf).toFloat()
         }
     }
 
@@ -765,7 +788,7 @@ private fun TimeOfDayVsSpeedHeatmap(
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
         xAxisLabel = "Hour of day",
-        yAxisLabel = "Speed (km/h)",
+        yAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -776,22 +799,24 @@ private fun TimeOfDayVsSpeedHeatmap(
 @Composable
 private fun GradientVsConsumptionHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val cf    = if (useImperial) 1f / KM_TO_MI else 1f
     val xBins = 20; val yBins = 20
-    val xMin  = -10f; val xMax = 10f   // road gradient %
-    val yMin  = -30f; val yMax = 80f   // kWh/100km (negative = net regen)
+    val xMin  = -10f; val xMax = 10f         // road gradient % (unchanged)
+    val yMin  = -30f * cf; val yMax = 80f * cf
 
-    val gradPoints = remember(dataPoints) {
+    val gradPoints = remember(dataPoints, useImperial) {
         dataPoints.zipWithNext { a, b ->
             val dtSec = (b.timestamp - a.timestamp) / 1000.0
             if (dtSec < 0.5 || dtSec > 30.0) return@zipWithNext null
             if (a.speed < 5.0) return@zipWithNext null
             val distanceKm = segmentDistanceKm(a, b, dtSec)
             if (distanceKm < 0.001f) return@zipWithNext null
-            val dAlt     = (b.altitude - a.altitude).toFloat()   // metres
-            val gradient = (dAlt / (distanceKm * 1000f)) * 100f  // rise/run %
-            val cons     = (a.power / a.speed * 100.0).toFloat() // kWh/100km
+            val dAlt     = (b.altitude - a.altitude).toFloat()
+            val gradient = (dAlt / (distanceKm * 1000f)) * 100f
+            val cons     = ((a.power / a.speed * 100.0) * cf).toFloat()
             if (gradient < xMin || gradient > xMax) return@zipWithNext null
             if (cons     < yMin || cons     > yMax) return@zipWithNext null
             gradient to cons
@@ -818,7 +843,7 @@ private fun GradientVsConsumptionHeatmap(
         xLabels    = axisLabels(xMin, xMax, xBins, "%.0f"),
         yLabels    = axisLabels(yMin, yMax, yBins),
         xAxisLabel = "Gradient (%)",
-        yAxisLabel = "kWh / 100 km",
+        yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -877,19 +902,21 @@ private fun FrontVsRearRpmHeatmap(
 @Composable
 private fun TyrePressureVsConsumptionHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val cf    = if (useImperial) 1f / KM_TO_MI else 1f
     val xBins = 16; val yBins = 14
-    val xMin  = 28f; val xMax = 46f   // PSI — typical EV range incl. cold/warm
-    val yMin  =  0f; val yMax = 60f   // kWh/100 km (traction only)
+    val xMin  = 28f; val xMax = 46f    // PSI (unchanged)
+    val yMin  =  0f; val yMax = 60f * cf
 
     // Average all 4 wheel pressures per point for a single representative value.
     // Only keep traction samples (speed > 10, positive power) to avoid regen noise.
-    val points = remember(dataPoints) {
+    val points = remember(dataPoints, useImperial) {
         dataPoints.mapNotNull { p ->
             val spd  = p.speed.toFloat().takeIf { it > 10f } ?: return@mapNotNull null
             val pwr  = p.power.toFloat().takeIf { it > 0f }  ?: return@mapNotNull null
-            val cons = pwr / spd * 100f
+            val cons = (pwr / spd * 100f) * cf
             if (cons > yMax) return@mapNotNull null
             // Average the 4 wheels; skip if all are 0 (not yet recorded)
             val lf = p.tyrePressureLF.toFloat()
@@ -920,7 +947,7 @@ private fun TyrePressureVsConsumptionHeatmap(
         xLabels    = axisLabels(xMin, xMax, xBins, "%.0f"),
         yLabels    = axisLabels(yMin, yMax, yBins),
         xAxisLabel = "Avg Tyre Pressure (PSI)",
-        yAxisLabel = "kWh / 100 km",
+        yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -974,16 +1001,18 @@ private fun SocVsRegenHeatmap(
 @Composable
 private fun SpeedVsBatteryTempHeatmap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sf    = if (useImperial) KM_TO_MI else 1f
     val xBins = 16; val yBins = 14
-    val xMin  =  0f; val xMax = 160f  // km/h
-    val yMin  = 10f; val yMax =  50f  // °C
+    val xMin  = 0f;  val xMax = 160f * sf
+    val yMin  = 10f; val yMax = 50f   // °C (unchanged)
 
-    val points = remember(dataPoints) {
+    val points = remember(dataPoints, useImperial) {
         dataPoints.mapNotNull { p ->
             val temp = p.batteryTemp.toFloat().takeIf { it > 0f } ?: return@mapNotNull null
-            p.speed.toFloat() to temp
+            (p.speed * sf).toFloat() to temp
         }
     }
 
@@ -1004,7 +1033,7 @@ private fun SpeedVsBatteryTempHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (km/h)",
+        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
         yAxisLabel = "Battery Temp (°C)",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier

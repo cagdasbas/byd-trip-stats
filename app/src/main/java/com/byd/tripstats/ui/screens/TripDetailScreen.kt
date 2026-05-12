@@ -52,6 +52,7 @@ import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.convertSpeed
 import com.byd.tripstats.data.preferences.isImperial
 import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.ui.theme.*
@@ -184,7 +185,7 @@ fun TripDetailScreen(
                         )
                         1 -> TripChartsTab(dataPoints = dataPoints, useImperial = unitSystem.isImperial)
                         2 -> TripHeatmapsTab(dataPoints = dataPoints)
-                        3 -> TripRouteTab(dataPoints = dataPoints)
+                        3 -> TripRouteTab(dataPoints = dataPoints, useImperial = unitSystem.isImperial)
                         4 -> RouteAnalysisTab(
                             trip = trip,
                             dataPoints = dataPoints,
@@ -202,9 +203,8 @@ fun TripDetailScreen(
         ExportDialog(
             trip = capturedTrip,
             dataPoints = capturedPoints,
-            onDismiss = { 
-                dialogData = null  // Clear snapshot on dismiss
-            }
+            onDismiss = { dialogData = null },
+            unitSystem = unitSystem
         )
     }
 }
@@ -213,7 +213,8 @@ fun TripDetailScreen(
 fun ExportDialog(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
     dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    unitSystem: UnitSystem = UnitSystem.METRIC
 ) {
     // Capture stable references
     val context          = androidx.compose.ui.platform.LocalContext.current
@@ -230,7 +231,7 @@ fun ExportDialog(
                 // ── Clipboard ─────────────────────────────────────────────────
                 OutlinedButton(
                     onClick = {
-                        copyTripSummaryToClipboard(context, stableTrip)
+                        copyTripSummaryToClipboard(context, stableTrip, unitSystem)
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -285,20 +286,21 @@ fun ExportDialog(
 // Copy summary to clipboard
 fun copyTripSummaryToClipboard(
     context: android.content.Context,
-    trip: com.byd.tripstats.data.local.entity.TripEntity
+    trip: com.byd.tripstats.data.local.entity.TripEntity,
+    unitSystem: UnitSystem = UnitSystem.METRIC
 ) {
     val summary = buildString {
         appendLine("🚗 BYD Trip Stats")
         appendLine("")
         appendLine("📅 Date: ${formatTimestamp(trip.startTime)}")
-        appendLine("🛣️ Distance: ${String.format("%.1f", trip.distance ?: 0.0)} km")
+        appendLine("🛣️ Distance: ${String.format("%.1f", unitSystem.convertDistance(trip.distance ?: 0.0))} ${unitSystem.distanceUnit}")
         appendLine("⏱️ Duration: ${formatDuration(trip.duration ?: 0)}")
         appendLine("⚡ Energy: ${String.format("%.2f", trip.energyConsumed ?: 0.0)} kWh")
-        appendLine("🌿 Consumption: ${String.format("%.1f", trip.efficiency ?: 0.0)} kWh/100km")
+        appendLine("🌿 Consumption: ${String.format("%.1f", unitSystem.convertEfficiency(trip.efficiency ?: 0.0))} ${unitSystem.consumptionUnit}")
         appendLine("🔋 SOC: ${String.format("%.1f", trip.startSoc)}% → ${String.format("%.1f", trip.endSoc ?: 0.0)}%")
         appendLine("⚡ Max Power: ${trip.maxPower.toInt()} kW")
         appendLine("🔋 Max Regen: ${kotlin.math.abs(trip.maxRegenPower).toInt()} kW")
-        appendLine("🏎️ Max Speed: ${trip.maxSpeed.toInt()} km/h")
+        appendLine("🏎️ Max Speed: ${unitSystem.convertSpeed(trip.maxSpeed).toInt()} ${unitSystem.speedUnit}")
     }
     
     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -1267,7 +1269,8 @@ private fun ModeRecordingHint(missingDriveMode: Boolean, missingRegenMode: Boole
 
 @Composable
 fun TripRouteTab(
-    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>
+    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
+    useImperial: Boolean = false
 ) {
     Card(
         modifier = Modifier
@@ -1279,6 +1282,7 @@ fun TripRouteTab(
     ) {
         OsmRouteMap(
             dataPoints = dataPoints,
+            useImperial = useImperial,
             modifier = Modifier.fillMaxSize()
         )
     }

@@ -2926,10 +2926,10 @@ private data class FaqEntry(val question: String, val answer: String, val url: S
 private fun buildFaqList(): List<FaqEntry> = listOf(
 
     FaqEntry(
-        "Contrary to older version, I no longer need the Electro app?",
+        "Contrary to older versions, is it true that I no longer need the Electro app?",
         "Correct. BYD Trip Stats works as a standalone app on supported vehicles, so " +
         "trip recording and charging sessions work without Electro.\n\n" +
-        "Electro is still a useful companion app for owners who want its own dashboards or " +
+        "Electro is still a useful companion app for owners who want its own " +
         "features, but it is no longer required for BYD Trip Stats to function."
     ),
 
@@ -2939,15 +2939,6 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "entirely on-device.\n\n" +
         "Internet is only needed for optional features such as app update checks, opening web " +
         "links, MQTT / ABRP integration and Telegram backups if you enable them."
-    ),
-
-    FaqEntry(
-        "Why is no live data appearing?",
-        "Work through this checklist:\n\n" +
-        "1. Open the app once after the car boots so Android can bind the telemetry service\n" +
-        "2. Make sure Location permission is granted if you want GPS points in trips\n" +
-        "3. Check that BYD's Disable Autostart app is not blocking BYD Trip Stats from autostarting\n" +
-        "4. Wait a few seconds after a head-unit restart for the car services to come up\n"
     ),
 
     FaqEntry(
@@ -2961,16 +2952,6 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "2. Cycle through each drive mode (Eco / Normal / Sport) once\n\n" +
         "The app will immediately pick up both values and start recording them with every trip data point. " +
         "You only need to do this once — after that, changing modes during normal driving keeps everything in sync."
-    ),
-
-    FaqEntry(
-        "Trips are not being detected automatically",
-        "Auto-detection watches the gear position in the live telemetry stream:\n\n" +
-        "• Trip starts when gear changes to D or R\n" +
-        "• Trip ends when gear returns to P\n\n" +
-        "If trips are not starting, confirm the dashboard is receiving live vehicle telemetry. " +
-        "Also verify that auto-detection is enabled. A manual start/stop override is available " +
-        "on the dashboard for edge cases."
     ),
 
     FaqEntry(
@@ -3031,7 +3012,7 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "• Failed attempts are retried with exponential backoff before giving up until the next window\n\n" +
         "The 'Last auto-backup' timestamp in the Telegram section confirms when the most recent run completed.\n\n" +
         "To stop: tap Disconnect bot. This cancels the schedule and clears saved credentials. " +
-        "Your previous backups in Telegram and the registry file in Download are unaffected."
+        "Your previous backups in Telegram and the registry file in Download are unaffected. Backups up to 50MB of database per file"
     ),
 
     FaqEntry(
@@ -3049,7 +3030,8 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
         "Will this drain my 12V battery?",
         "No meaningful impact. In an EV the 12V battery is continuously trickle-charged from " +
         "the high-voltage pack. BYD Trip Stats only keeps a lightweight foreground service alive " +
-        "to read telemetry and write local trip data."
+        "to read telemetry and write local trip data. If the car is offline, it is used for recording " +
+        "charging sessions and 12V/HV curves - you can also disable this feature if you don't want it"
     ),
 
     FaqEntry(
@@ -3071,8 +3053,8 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
 
     FaqEntry(
         "Where can I get help, request a feature or report a bug?",
-        "Check the README.md file, open an issue on GitHub or visit the discord server — tap the link below.\n\n" +
-        "Include your BYD model and the steps to reproduce the problem. ",
+        "Check the README.md file at my Github, open an issue there or visit the discord server — tap the link below.\n\n" +
+        "Don't forget to include your BYD model and the steps to reproduce the problem. ",
         url = "https://discord.gg/pf8TjjTce9"
     )
 )

@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.isImperial
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -59,6 +61,7 @@ private fun categoryColor(cat: Int): Int = when (cat) {
 @Composable
 fun OsmRouteMap(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (dataPoints.isEmpty()) {
@@ -121,6 +124,7 @@ fun OsmRouteMap(
 
         // Floating speed legend — bottom-left corner
         SpeedLegend(
+            useImperial = useImperial,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(10.dp)
@@ -246,7 +250,7 @@ private fun createCircleMarker(
 // ── Speed legend (Compose overlay) ───────────────────────────────────────────
 
 @Composable
-private fun SpeedLegend(modifier: Modifier = Modifier) {
+private fun SpeedLegend(useImperial: Boolean = false, modifier: Modifier = Modifier) {
     Card(
         modifier  = modifier,
         shape     = RoundedCornerShape(8.dp),
@@ -265,9 +269,9 @@ private fun SpeedLegend(modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold,
                 fontSize   = 11.sp
             )
-            LegendDot(Color(0xFF2196F3), "Free flow  (≥ 80 km/h)")
-            LegendDot(Color(0xFFFF9800), "Light traffic  (40–80 km/h)")
-            LegendDot(Color(0xFFE53935), "Heavy traffic  (< 40 km/h)")
+            LegendDot(Color(0xFF2196F3), if (useImperial) "Free flow  (≥ 50 mph)" else "Free flow  (≥ 80 km/h)")
+            LegendDot(Color(0xFFFF9800), if (useImperial) "Light traffic  (25–50 mph)" else "Light traffic  (40–80 km/h)")
+            LegendDot(Color(0xFFE53935), if (useImperial) "Heavy traffic  (< 25 mph)" else "Heavy traffic  (< 40 km/h)")
         }
     }
 }
