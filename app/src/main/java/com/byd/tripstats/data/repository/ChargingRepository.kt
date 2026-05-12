@@ -63,9 +63,10 @@ class ChargingRepository private constructor(context: Context) {
     private var activeSession: ChargingSessionEntity? = null
     private var lastChargingSeenAtMs: Long = 0L
 
-    /** Prevents reconstruction from running more than once per service lifecycle. */
+    /** Prevents reconstruction from running more than once per car wake-up cycle. */
     private var reconstructionAttempted = false
     private var activeSessionRecoveryAttempted = false
+    private var wasCarOn = false
 
     private data class ShutdownState(
         val soc: Double,
@@ -89,13 +90,31 @@ class ChargingRepository private constructor(context: Context) {
         sessionDao.getDataPointsForSessionSync(sessionId)
 
     fun onTelemetry(telemetry: VehicleTelemetry, carConfig: CarConfig?) {
+        // Detect off→on transition. When the service survives across a car sleep/wake
+        // cycle (keepServiceAliveWhenOff=true), reconstructionAttempted stays true from
+        // the previous wake-up. Reset it here so every car wake-up gets one attempt,
+        // which is required to catch off-state charging that happened while the service
+        // was continuously alive.
+        if (telemetry.isCarOn && !wasCarOn && reconstructionAttempted) {
+            Log.i(TAG, "Car transitioned off→on — resetting reconstruction guard for new wake-up")
+            reconstructionAttempted = false
+        }
+        wasCarOn = telemetry.isCarOn
+
         val previousShutdownState =
             if (telemetry.isCarOn && !reconstructionAttempted) readShutdownState() else null
 
         // Persist only while the car is on. Off-state packets would overwrite the
         // pre-sleep baseline as SoC climbs during an off-state charge, making the
         // subsequent wake-up delta zero and dropping the reconstructed session.
-        if (telemetry.isCarOn) {
+        //
+        // On the very first car-on packet of each wake cycle (reconstructionAttempted = false),
+        // we defer persisting until AFTER the reconstruction coroutine runs. Persisting
+        // immediately would overwrite the pre-charge SoC with the post-charge value if the
+        // process is killed mid-reconstruction (e.g. an app update installed while the car is
+        // waking up), making the next start's SoC delta zero and silently dropping the session.
+        // Subsequent packets (reconstructionAttempted = true) persist synchronously as before.
+        if (telemetry.isCarOn && reconstructionAttempted) {
             persistShutdownState(telemetry)
         }
 
@@ -119,6 +138,9 @@ class ChargingRepository private constructor(context: Context) {
                     } else {
                         Log.i(TAG, "Live car-off charging data exists — skipping reconstruction")
                     }
+                    // Persist after reconstruction so a mid-reconstruction process restart
+                    // (e.g. app update) can still reconstruct from the original pre-charge SoC.
+                    persistShutdownState(telemetry)
                 }
                 handleRealTimeCharging(telemetry, carConfig)
             } else if (telemetry.isCharging) {

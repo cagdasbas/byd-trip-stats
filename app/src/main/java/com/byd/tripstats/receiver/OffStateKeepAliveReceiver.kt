@@ -19,7 +19,7 @@ import kotlinx.coroutines.withTimeout
 /**
  * Dedicated off-state keepalive receiver.
  *
- * Fires every [INTERVAL_MS] (4 minutes) after ACC_OFF to:
+ * Fires every [INTERVAL_MS] (90 minutes) after ACC_OFF to:
  *   1. Call McuWakeHelper.keepAlive() — resets the MCU WiFi-cut countdown
  *   2. Start VehicleTelemetryService — reviving it samples BMS/charging state
  *      once per tick, so charging sessions that begin while the car is off

@@ -411,19 +411,30 @@ class VehicleTelemetryService : Service() {
                         abrpConnectionManager?.onTelemetry(telemetry, carConfig, serviceScope)
                         mqttConnectionManager?.onTelemetry(telemetry, serviceScope)
 
-                        // Keep WiFi alive during charging while the car is off.
-                        // Without this, the MCU cuts WiFi ~15 min after ACC_OFF and
-                        // charging telemetry is lost until the 90-min fallback alarm fires.
-                        // Throttled to once per 10 min — well within the ~15 min WiFi window.
-                        if (telemetry.isCharging && !telemetry.isCarOn) {
+                        // Keep WiFi alive while the car is off and a charger gun is present
+                        // or the charger is actively working. Without this, the MCU cuts WiFi
+                        // ~15 min after ACC_OFF and charging telemetry + MQTT are lost.
+                        //
+                        // We use the BMS-level chargerWorkState and chargingGunState from
+                        // AbsBYDAutoChargingListener (gateway-driven, survives IVI deep sleep)
+                        // rather than telemetry.isCharging, which is derived from direct power
+                        // readings that go stale when the car is in deep sleep. This keeps WiFi
+                        // alive throughout an off-state charge while still allowing the MCU to
+                        // enter deeper sleep during normal unconnected overnight parking.
+                        //
+                        // Throttled to once per 10 min — well within the ~15 min WiFi cut window.
+                        val snap = vehicleDataSource.vehicleSnapshot.value
+                        val chargingGunPresent = snap.chargingGunState != 0
+                        val chargerWorking = snap.chargerWorkState != 0
+                        if (!telemetry.isCarOn && (telemetry.isCharging || chargingGunPresent || chargerWorking)) {
                             val nowMs = SystemClock.elapsedRealtime()
                             if (nowMs - lastChargingKeepaliveMs >= 10 * 60 * 1000L) {
                                 lastChargingKeepaliveMs = nowMs
                                 try {
                                     McuWakeHelper.keepAlive(applicationContext)
-                                    Log.d(TAG, "MCU keepalive during off-state charging")
+                                    Log.d(TAG, "MCU keepalive sent (gun=$chargingGunPresent work=$chargerWorking charging=${telemetry.isCharging})")
                                 } catch (e: Exception) {
-                                    Log.w(TAG, "MCU keepalive during charging failed: ${e.message}")
+                                    Log.w(TAG, "MCU keepalive failed: ${e.message}")
                                 }
                             }
                         }
