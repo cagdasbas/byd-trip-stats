@@ -187,7 +187,8 @@ fun TripDetailScreen(
                         3 -> TripRouteTab(dataPoints = dataPoints)
                         4 -> RouteAnalysisTab(
                             trip = trip,
-                            dataPoints = dataPoints
+                            dataPoints = dataPoints,
+                            useImperial = unitSystem.isImperial
                         )
                     }
                 }

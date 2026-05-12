@@ -22,6 +22,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
+import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -35,6 +40,7 @@ import kotlin.math.abs
 fun RouteAnalysisTab(
     trip: TripEntity? = null,
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     if (dataPoints.isEmpty()) {
@@ -59,7 +65,8 @@ fun RouteAnalysisTab(
     ) {
         ModeInsightsCard(
             dataPoints = dataPoints,
-            trip = trip
+            trip = trip,
+            useImperial = useImperial
         )
         WaypointsCard(dataPoints)
         RouteSegmentsCard(dataPoints)
@@ -102,7 +109,8 @@ internal data class ModeSummary(
 @Composable
 private fun ModeInsightsCard(
     dataPoints: List<TripDataPointEntity>,
-    trip: TripEntity?
+    trip: TripEntity?,
+    useImperial: Boolean = false
 ) {
     if (!hasTripModeData(dataPoints)) return
 
@@ -174,14 +182,14 @@ private fun ModeInsightsCard(
             if (driveSummaries.isNotEmpty()) {
                 Text("Drive mode usage", fontWeight = FontWeight.SemiBold)
                 driveSummaries.forEach { summary: ModeSummary ->
-                    ModeSummaryRow(summary)
+                    ModeSummaryRow(summary, useImperial)
                 }
             }
 
             if (regenSummaries.isNotEmpty()) {
                 Text("Regen mode usage", fontWeight = FontWeight.SemiBold)
                 regenSummaries.forEach { summary: ModeSummary ->
-                    ModeSummaryRow(summary)
+                    ModeSummaryRow(summary, useImperial)
                 }
             }
         }
@@ -249,7 +257,8 @@ private fun ModeStackedBar(
 }
 
 @Composable
-private fun ModeSummaryRow(summary: ModeSummary) {
+private fun ModeSummaryRow(summary: ModeSummary, useImperial: Boolean = false) {
+    val unitSystem = if (useImperial) UnitSystem.IMPERIAL else UnitSystem.METRIC
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -274,7 +283,7 @@ private fun ModeSummaryRow(summary: ModeSummary) {
             Column {
                 Text(summary.label, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "${String.format("%.1f", summary.distanceKm)} km • ${String.format("%.0f", summary.distanceSharePct)}% of mode-attributed trip",
+                    text = "${String.format("%.1f", unitSystem.convertDistance(summary.distanceKm))} ${unitSystem.distanceUnit} • ${String.format("%.0f", summary.distanceSharePct)}% of mode-attributed trip",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -282,7 +291,7 @@ private fun ModeSummaryRow(summary: ModeSummary) {
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = summary.consumptionKwhPer100Km?.let { "${String.format("%.1f", it)} kWh/100km" } ?: "—",
+                text = summary.consumptionKwhPer100Km?.let { "${String.format("%.1f", unitSystem.convertEfficiency(it))} ${unitSystem.consumptionUnit}" } ?: "—",
                 style = MaterialTheme.typography.bodySmall
             )
             Text(

@@ -163,6 +163,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _updateDownloadProgress = MutableStateFlow<Int?>(null)
     val downloadProgress: StateFlow<Int?> = _updateDownloadProgress.asStateFlow()
 
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
     /**
      * True only when it is safe to install an update:
      *   - Car is parked (gear == P or no telemetry)
@@ -553,12 +556,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val odometerDistanceKm = anchorOdometerKm
                 ?.let { (odometerKm - it).coerceAtLeast(0.0) }
             return when {
-                isUsableJourneyDistance(journeyDistanceKm) && odometerDistanceKm != null ->
-                    maxOf(journeyDistanceKm!!, odometerDistanceKm)
-                isUsableJourneyDistance(journeyDistanceKm) ->
-                    journeyDistanceKm!!
                 odometerDistanceKm != null ->
                     odometerDistanceKm
+                isUsableJourneyDistance(journeyDistanceKm) ->
+                    journeyDistanceKm!!
                 else -> 0.0
             }
         }
@@ -690,29 +691,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         )
 
     private fun currentLiveSegmentDistanceKm(telemetry: VehicleTelemetry): Double {
-        // Segment distance must use only the odometer delta from the segment anchor.
-        // journeyDistanceKm reflects the full trip so far, not the current engine-on
-        // segment — using it here causes the segment counter to jump to the full trip
-        // distance on the first tick after the car restarts.
         val anchor = segmentStartOdometer ?: return 0.0
-        val odometerDelta = (telemetry.odometer - anchor).coerceAtLeast(0.0)
-        // When the segment anchor coincides with the live-session anchor we're in
-        // the no-off-cycle case — segment must numerically equal cumulative.
-        // currentLiveSessionDistanceKm uses max(journey, odoDelta), so if journey
-        // has advanced slightly faster than the odometer (rounding between the
-        // two counters) the session value leads by a few dozen meters. Apply the
-        // same max here so formatDistanceDisplay doesn't flicker into "seg (cum)".
-        // After an engine-off cycle segmentStartOdometer is reset to a later
-        // anchor — the equality check fails and we fall back to odometer-only,
-        // preserving Case 3's "seg < cum" behaviour.
-        val sessionAnchor = liveSessionStartOdometer
-        if (sessionAnchor != null && anchor == sessionAnchor) {
-            val journey = journeyDistanceKm(telemetry)
-            if (isUsableJourneyDistance(journey)) {
-                return maxOf(odometerDelta, journey!!)
-            }
-        }
-        return odometerDelta
+        return (telemetry.odometer - anchor).coerceAtLeast(0.0)
     }
 
     private fun beginLiveDriveSession(
@@ -950,13 +930,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val previousDistanceKm = _liveDistanceKm.value
                     val currentDistanceKm = maxOf(
                         previousDistanceKm,
-                        currentLiveSessionDistanceKm(telemetry),
-                        integratedDistanceKm
+                        currentLiveSessionDistanceKm(telemetry)
                     )
                     val currentSegmentDistanceKm = maxOf(
                         _liveSegmentDistanceKm.value,
-                        currentLiveSegmentDistanceKm(telemetry),
-                        integratedSegmentDistanceKm
+                        currentLiveSegmentDistanceKm(telemetry)
                     )
                     val prevOdo = lastBinOdo
                     if (prevOdo != null && deltaEnergyWh > 0.0) {
@@ -1109,7 +1087,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun ensureUpdateCheckStarted() {
         if (!updateCheckStarted.compareAndSet(false, true)) return
         viewModelScope.launch(Dispatchers.IO) {
+            _isCheckingUpdate.value = true
             updateRepository.checkForUpdate(BuildConfig.VERSION_NAME)
+            _isCheckingUpdate.value = false
+        }
+    }
+
+    fun checkForUpdateManually() {
+        if (_isCheckingUpdate.value) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _isCheckingUpdate.value = true
+            updateRepository.checkForUpdate(BuildConfig.VERSION_NAME)
+            _isCheckingUpdate.value = false
         }
     }
 

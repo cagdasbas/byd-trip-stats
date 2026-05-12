@@ -49,6 +49,7 @@ import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.convertSpeed
 import com.byd.tripstats.data.preferences.isImperial
 import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.R
@@ -919,7 +920,7 @@ fun EnergyFlowDiagram(
                     )
                     PowerMetric(
                         label = "Speed",
-                        value = "${telemetry.speed.toInt()}",
+                        value = "${unitSystem.convertSpeed(telemetry.speed.toDouble()).toInt()}",
                         unit = speedUnit,
                         color = BydEcoTealDim
                     )
@@ -943,7 +944,7 @@ fun EnergyFlowDiagram(
                     )
                     PowerMetric(
                         label = "Distance",
-                        value = formatDistanceDisplay(sessionDistanceKm, tripDistanceKm, isFullScreen),
+                        value = formatDistanceDisplay(unitSystem.convertDistance(sessionDistanceKm), unitSystem.convertDistance(tripDistanceKm), isFullScreen),
                         unit = distanceUnit,
                         color = MaterialTheme.colorScheme.secondary
                     )
@@ -1237,19 +1238,29 @@ fun PowerMetric(
 }
 
 @Composable
-private fun LiveTripStat(label: String, value: String, unit: String) {
+private fun LiveTripStat(label: String, value: String, unit: String, isFullScreen: Boolean = false) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+        Text(
+            label,
+            style = if (isFullScreen) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = if (isFullScreen) 11.sp else 9.sp
+        )
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, style = MaterialTheme.typography.titleSmall,
+            Text(
+                value,
+                style = if (isFullScreen) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface)
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (unit.isNotEmpty()) {
                 Spacer(Modifier.width(2.dp))
-                Text(unit, style = MaterialTheme.typography.labelSmall,
+                Text(
+                    unit,
+                    style = if (isFullScreen) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 1.dp))
+                    modifier = Modifier.padding(bottom = 1.dp)
+                )
             }
         }
     }
@@ -1270,6 +1281,7 @@ fun TripControls(
     unitSystem: UnitSystem = UnitSystem.METRIC,
     modifier: Modifier = Modifier
 ) {
+    val isFullScreen = LocalConfiguration.current.screenWidthDp >= 840
     var showStopConfirmDialog by remember { mutableStateOf(false) }
 
     // ── Stop recording confirmation ────────────────────────────────────────────
@@ -1442,7 +1454,7 @@ fun TripControls(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
+                    .height(if (isFullScreen) 120.dp else 100.dp)
                     .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1482,10 +1494,10 @@ fun TripControls(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            LiveTripStat(label = "TIME",        value = elapsedStr,                                             unit = "")
-                            LiveTripStat(label = "AVG SPEED",   value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit)
-                            LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh")
-                            LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit)
+                            LiveTripStat(label = "TIME",        value = elapsedStr,                                             unit = "",                        isFullScreen = isFullScreen)
+                            LiveTripStat(label = "AVG SPEED",   value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit,       isFullScreen = isFullScreen)
+                            LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh",                     isFullScreen = isFullScreen)
+                            LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit, isFullScreen = isFullScreen)
                         }
                     } else {
                         Column(
@@ -1496,15 +1508,15 @@ fun TripControls(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                LiveTripStat(label = "TIME",      value = elapsedStr,                                             unit = "")
-                                LiveTripStat(label = "AVG SPEED", value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit)
+                                LiveTripStat(label = "TIME",      value = elapsedStr,                                             unit = "",                  isFullScreen = isFullScreen)
+                                LiveTripStat(label = "AVG SPEED", value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit, isFullScreen = isFullScreen)
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                LiveTripStat(label = "ENERGY USED",        value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh")
-                                LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit)
+                                LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh",                     isFullScreen = isFullScreen)
+                                LiveTripStat(label = "CONSUMPTION",  value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit, isFullScreen = isFullScreen)
                             }
                         }
                     }
@@ -1979,7 +1991,7 @@ private fun Battery12vHistoryChart(
     val minVoltage = 12.0
     val maxVoltage = 14.0
     val chartColor = BatteryBlue
-    val socColor   = Color(0xFFBA68C8)
+    val socColor   = MotorViolet
     val chargeColor = RegenGreen.copy(alpha = 0.12f)
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.16f)
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
@@ -1996,7 +2008,7 @@ private fun Battery12vHistoryChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("12V / SOC chart (reconstruction due to offline sparse data)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("12V / SOC chart (If offline mode, values are reconstructed)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
                         drawLine(chartColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 4f, cap = StrokeCap.Round)

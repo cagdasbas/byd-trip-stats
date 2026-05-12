@@ -771,16 +771,19 @@ class TripRepository private constructor(context: Context) {
         else
             trip.avgBatteryTemp
 
-        // End-odometer resolution: take the maximum of every candidate so a fresh
-        // telemetry read never loses ground to a stale DB point or vice-versa.
-        // tripBestDistanceKm covers the case where car is offline
-        // on resume and all odometer reads are 0 while the car is actually driving.
-        val odoCandidates = listOfNotNull(
-            endTelemetry?.odometer?.takeIf { it > trip.startOdometer },
-            endPointFallback?.odometer?.takeIf { it > trip.startOdometer },
-            (trip.startOdometer + tripBestDistanceKm).takeIf { tripBestDistanceKm > 0.0 }
-        )
-        val resolvedEndOdometer = overrideOdometer ?: odoCandidates.maxOrNull() ?: trip.startOdometer
+        // End-odometer resolution: prefer the raw odometer reading when it advanced
+        // past the trip start — this matches what the instrument cluster shows.
+        // tripBestDistanceKm (speed-integration) is only a fallback for the car-offline
+        // case where the odometer returns 0 for several ticks after a resume.
+        val resolvedEndOdometer = when {
+            overrideOdometer != null -> overrideOdometer
+            endTelemetry?.odometer?.let { it > trip.startOdometer } == true ->
+                endTelemetry.odometer
+            else -> listOfNotNull(
+                endPointFallback?.odometer?.takeIf { it > trip.startOdometer },
+                (trip.startOdometer + tripBestDistanceKm).takeIf { tripBestDistanceKm > 0.0 }
+            ).maxOrNull() ?: trip.startOdometer
+        }
 
         // Guard totalDischarge fallbacks against stale 0 reads (car
         // offline path). Energy consumed is computed as end - start, so a 0 here

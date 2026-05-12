@@ -25,8 +25,10 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import com.byd.tripstats.util.DiagLog
 import com.byd.tripstats.util.McuWakeHelper
 import com.byd.tripstats.util.ServiceIdleState
+import com.byd.tripstats.receiver.OffStateKeepaliveReceiver
 import com.byd.tripstats.worker.ServiceWatchdogWorker
 import kotlinx.coroutines.flow.collectLatest
 import com.byd.tripstats.MainActivity
@@ -157,7 +159,7 @@ class VehicleTelemetryService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Service created")
+        DiagLog.event(applicationContext, TAG, "onCreate")
         notificationStartedAtWallClock = System.currentTimeMillis()
         createNotificationChannel()
         acquireWakeLock()
@@ -254,7 +256,10 @@ class VehicleTelemetryService : Service() {
     }
 
     override fun onDestroy() {
-        Log.e(TAG, "Service destroyed — stopRequested=$stopRequested intentionalStop=$intentionalStop")
+        DiagLog.event(
+            applicationContext, TAG,
+            "onDestroy stopRequested=$stopRequested intentionalStop=$intentionalStop",
+        )
         telemetryLoopJob?.cancel()
         telemetryLoopActive = false
         telemetryLoopStarting = false
@@ -367,6 +372,9 @@ class VehicleTelemetryService : Service() {
                 // 0L = car is active (or first tick not yet received).
                 // Non-zero = elapsedRealtime() when we first saw off+not-charging.
                 var carOffSinceMs = 0L
+                // One-shot log gate for the "keepServiceAliveWhenOff" skip — otherwise
+                // we'd write a diag.log line every 5 min of car-off.
+                var loggedKeepAliveSkip = false
                 while (true) {
                     val msSinceLastEvent = SystemClock.elapsedRealtime() - vehicleDataSource.lastFeatureEventElapsedMs
                     val pollIntervalMs = when {
@@ -448,13 +456,30 @@ class VehicleTelemetryService : Service() {
                         if (effectivelyOff) {
                             if (carOffSinceMs == 0L) {
                                 carOffSinceMs = SystemClock.elapsedRealtime()
+                                loggedKeepAliveSkip = false
                                 if (sdkSilent && telemetry.isCarOn) {
                                     Log.w(TAG, "Self-stop tripwire: SDK silent ${msSinceLastEvent}ms but isCarOn=true " +
                                             "(gear=${telemetry.gear} enginePower=${telemetry.enginePower} " +
                                             "chargingPower=${telemetry.chargingPower}) — treating as off")
                                 }
                             } else if (SystemClock.elapsedRealtime() - carOffSinceMs >= 5 * 60 * 1000L) {
-                                Log.i(TAG, "Car off and not charging for 5 min — releasing wake lock and stopping service")
+                                val keepAlive = PreferencesManager(applicationContext)
+                                    .getCachedKeepServiceAliveWhenOff()
+                                if (keepAlive) {
+                                    if (!loggedKeepAliveSkip) {
+                                        DiagLog.event(
+                                            applicationContext, TAG,
+                                            "self-stop skipped — keepServiceAliveWhenOff=true (continuous-sampling mode)",
+                                        )
+                                        loggedKeepAliveSkip = true
+                                    }
+                                    // Fall through to next loop iteration without stopping.
+                                    // The 5-min timer stays armed; an off→on transition resets it.
+                                } else {
+                                DiagLog.event(
+                                    applicationContext, TAG,
+                                    "self-stop: car off + not charging for 5 min — arming keepalive and stopping",
+                                )
                                 // Set the off-state idle flag and tear down all
                                 // periodic restart sources before stopping.
                                 // Without this, ServiceWatchdogWorker (15-min)
@@ -464,12 +489,29 @@ class VehicleTelemetryService : Service() {
                                 ServiceIdleState.setStayingIdle(applicationContext, true)
                                 ServiceWatchdogWorker.cancel(applicationContext)
                                 ServiceRestarterJobService.cancelPeriodic(applicationContext)
+                                // Defensive: arm the off-state keepalive chain HERE,
+                                // not just from BootReceiver on ACC_OFF. The DiLink
+                                // firmware does not reliably broadcast ACC_OFF on
+                                // every car-off transition (e.g. remote-off, sleep
+                                // timeout). Scheduling at the moment we observe
+                                // carOff+notCharging from telemetry guarantees the
+                                // chain is armed regardless of which broadcast did
+                                // or didn't fire. setExactAndAllowWhileIdle is
+                                // upsert-safe, so this is a no-op if BootReceiver
+                                // already scheduled it.
+                                OffStateKeepaliveReceiver.schedule(
+                                    applicationContext,
+                                    iteration = 0,
+                                    source = "service-self-stop",
+                                )
                                 intentionalStop = true
                                 stopSelf()
                                 return@launch
+                                }
                             }
                         } else {
                             carOffSinceMs = 0L
+                            loggedKeepAliveSkip = false
                         }
                     } catch (t: Throwable) {
                         Log.e(TAG, "Error in telemetry loop tick", t)

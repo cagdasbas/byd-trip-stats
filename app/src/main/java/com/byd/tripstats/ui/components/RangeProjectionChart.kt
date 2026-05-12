@@ -183,6 +183,12 @@ fun RangeProjectionChart(
                 verticalAlignment = Alignment.Bottom
             ) {
                 Column {
+                    // BMS-sourced values (currentBms, currentProjected, deltaKm) already
+                    // arrive in the car's native unit — UK-market BMSes report in miles
+                    // natively, so no conversion is applied here, only the unit label.
+                    // wltpKm is from the catalog which is always metric — convert it.
+                    val distUnit = if (useImperial) "mi" else "km"
+                    val wltpDisplay = if (useImperial) (wltpKm * 0.621371).toInt() else wltpKm.toInt()
                     if (!isStabilised && activeRangeModel == DashboardViewModel.RangeModel.BASELINE) {
                         Text(
                             text  = "Calibrating…",
@@ -190,13 +196,13 @@ fun RangeProjectionChart(
                             color = textColor.copy(alpha = 0.5f)
                         )
                         Text(
-                            text  = "BMS: ${"%.0f".format(currentBms)} km (collecting data)",
+                            text  = "BMS: ${"%.0f".format(currentBms)} $distUnit (collecting data)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else if (isSaturated) {
                         Text(
-                            text  = "≥ ${wltpKm.toInt()} km projected (WLTP limit)",
+                            text  = "≥ $wltpDisplay $distUnit projected (WLTP limit)",
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = textColor.copy(alpha = 0.7f)
                         )
@@ -207,13 +213,13 @@ fun RangeProjectionChart(
                         )
                     } else {
                         Text(
-                            text  = "%.0f km projected range".format(currentProjected),
+                            text  = "%.0f $distUnit projected range".format(currentProjected),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = textColor
                         )
                         val sign = if (beating) "+" else ""
                         Text(
-                            text  = "$sign${"%.0f".format(deltaKm)} km vs BMS estimate",
+                            text  = "$sign${"%.0f".format(deltaKm)} $distUnit vs BMS estimate",
                             style = MaterialTheme.typography.bodySmall,
                             color = accentColor
                         )

@@ -26,6 +26,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 private val SELECTED_CAR_ID             = stringPreferencesKey("selected_car_id")
 private val LAST_SEEN_VERSION_CODE       = intPreferencesKey("last_seen_version_code")
 private val DASHBOARD_ANIMATIONS_ENABLED = booleanPreferencesKey("dashboard_animations_enabled")
+private val KEEP_SERVICE_ALIVE_WHEN_OFF  = booleanPreferencesKey("keep_service_alive_when_off")
 private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_price_per_kwh")
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
 private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms")
@@ -80,6 +81,26 @@ class PreferencesManager(private val context: Context) {
     suspend fun saveDashboardAnimationsEnabled(enabled: Boolean) {
         context.dataStore.edit { it[DASHBOARD_ANIMATIONS_ENABLED] = enabled }
         cache.edit().putBoolean("animations_enabled", enabled).apply()
+    }
+
+    // ── Keep service alive when off ───────────────────────────────────────────
+    // When true, the telemetry service does NOT self-stop after carOff+notCharging.
+    // Benefits: continuous 12V/SoC sampling, ADB-over-WiFi stays reachable without
+    // remote-waking the car. Cost: small additional wake-lock/WiFi-lock load on
+    // top of the BYD stock-process drain (which is the dominant component).
+    // Defaulting to true: real-world data shows our app's contribution to off-state
+    // drain is within measurement noise vs. the BYD GPS/telematics baseline, and
+    // the convenience win is large.
+    val keepServiceAliveWhenOff: Flow<Boolean> = context.dataStore.data
+        .map { it[KEEP_SERVICE_ALIVE_WHEN_OFF] ?: true }
+        .onEach { cache.edit().putBoolean("keep_service_alive_when_off", it).apply() }
+
+    fun getCachedKeepServiceAliveWhenOff(): Boolean =
+        cache.getBoolean("keep_service_alive_when_off", true)
+
+    suspend fun saveKeepServiceAliveWhenOff(enabled: Boolean) {
+        context.dataStore.edit { it[KEEP_SERVICE_ALIVE_WHEN_OFF] = enabled }
+        cache.edit().putBoolean("keep_service_alive_when_off", enabled).apply()
     }
 
     // ── Electricity cost ──────────────────────────────────────────────────────

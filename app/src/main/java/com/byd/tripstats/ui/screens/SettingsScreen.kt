@@ -63,6 +63,10 @@ import androidx.core.content.ContextCompat
 import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.UnitSystem
+import com.byd.tripstats.data.preferences.convertDistance
+import com.byd.tripstats.data.preferences.convertEfficiency
+import com.byd.tripstats.data.preferences.distanceUnit
+import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.connections.AbrpConnectionManager
 import com.byd.tripstats.connections.AbrpConnectionStore
 import com.byd.tripstats.connections.MqttConnectionManager
@@ -1133,6 +1137,7 @@ private fun AppPreferencesTab(
 ) {
     val scope = rememberCoroutineScope()
     val dashboardAnimationsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(initial = true)
+    val keepServiceAliveWhenOff by preferencesManager.keepServiceAliveWhenOff.collectAsState(initial = true)
     val unitSystem by viewModel.unitSystem.collectAsState()
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol by viewModel.currencySymbol.collectAsState()
@@ -1223,6 +1228,72 @@ private fun AppPreferencesTab(
                         "Enabled: richer visuals, with a bit more rendering work on the dashboard."
                     } else {
                         "Disabled: static energy flow rendering and reduced animation overhead on the main dashboard."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "Keep service alive when car is off",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "When enabled, the telemetry service keeps running after the car is parked instead of self-stopping. " +
+                                "Gives you continuous 12V/SoC samples in the battery history chart and keeps ADB-over-WiFi reachable without remote-waking the car.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = keepServiceAliveWhenOff,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                preferencesManager.saveKeepServiceAliveWhenOff(enabled)
+                            }
+                        },
+                        thumbContent = if (!keepServiceAliveWhenOff) {
+                            {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .background(ToggleUncheckedTrack, CircleShape)
+                                )
+                            }
+                        } else null,
+                        colors = SwitchDefaults.colors(
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = ToggleUncheckedTrack,
+                            uncheckedBorderColor = ToggleUncheckedTrack
+                        )
+                    )
+                }
+
+                Text(
+                    if (keepServiceAliveWhenOff) {
+                        "Enabled: service runs 24/7. Small additional load on top of the BYD stock background drain, which is the dominant factor anyway."
+                    } else {
+                        "Disabled: service self-stops after 5 min of car-off, then a 90 min keepalive briefly wakes it for a snapshot. Lower drain at the cost of sparse off-state samples and no always-on ADB."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1341,28 +1412,28 @@ private fun AppPreferencesTab(
                 )
                 Text(
                     "Consumption goal: ${
-                        tripGoals.targetConsumptionKwhPer100km?.let { "%.1f kWh/100km".format(it) } ?: "Not set"
+                        tripGoals.targetConsumptionKwhPer100km?.let { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it)) } ?: "Not set"
                     }",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     "Monthly distance goal: ${
-                        tripGoals.targetDistanceKmPerMonth?.let { "%.0f km".format(it) } ?: "Not set"
+                        tripGoals.targetDistanceKmPerMonth?.let { "%.0f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it)) } ?: "Not set"
                     }",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     "Best consumption: ${
-                        personalBests.bestConsumption?.let { "%.1f kWh/100km".format(it) } ?: "—"
+                        personalBests.bestConsumption?.let { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it)) } ?: "—"
                     }",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     "Best distance: ${
-                        personalBests.bestDistance?.let { "%.1f km".format(it) } ?: "—"
+                        personalBests.bestDistance?.let { "%.1f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it)) } ?: "—"
                     }",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2443,10 +2514,11 @@ private fun BackupSummaryCard(
 
 @Composable
 private fun AboutTab(viewModel: DashboardViewModel) {
-    val updateInfo       by viewModel.updateInfo.collectAsState()
-    val downloadProgress by viewModel.downloadProgress.collectAsState()
-    val downloadedApk    by viewModel.downloadedApk.collectAsState()
-    val canInstallNow    by viewModel.canInstallNow.collectAsState()
+    val updateInfo        by viewModel.updateInfo.collectAsState()
+    val downloadProgress  by viewModel.downloadProgress.collectAsState()
+    val downloadedApk     by viewModel.downloadedApk.collectAsState()
+    val canInstallNow     by viewModel.canInstallNow.collectAsState()
+    val isCheckingUpdate  by viewModel.isCheckingUpdate.collectAsState()
 
     var easterEggClicks by remember { mutableStateOf(0) }
     var licenseClicks by remember { mutableStateOf(0) }
@@ -2571,9 +2643,11 @@ private fun AboutTab(viewModel: DashboardViewModel) {
             downloadProgress = downloadProgress,
             downloadedApk    = downloadedApk,
             canInstallNow    = canInstallNow,
+            isChecking       = isCheckingUpdate,
             onDownload       = { viewModel.downloadUpdate() },
             onInstall        = { viewModel.installUpdate() },
-            onCancel         = { viewModel.cancelDownload() }
+            onCancel         = { viewModel.cancelDownload() },
+            onCheckNow       = { viewModel.checkForUpdateManually() }
         )
 
         HorizontalDivider()
@@ -2593,9 +2667,11 @@ private fun UpdateCard(
     downloadProgress: Int?,
     downloadedApk   : java.io.File?,
     canInstallNow   : Boolean,
+    isChecking      : Boolean = false,
     onDownload      : () -> Unit,
     onInstall       : () -> Unit,
-    onCancel        : () -> Unit
+    onCancel        : () -> Unit,
+    onCheckNow      : () -> Unit = {}
 ) {
     val isDownloading = downloadProgress != null && downloadProgress in 0..99
     val isReady       = downloadedApk != null && downloadProgress == 100
@@ -2606,12 +2682,29 @@ private fun UpdateCard(
             colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Row(
-                modifier              = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier              = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Icon(Icons.Filled.CheckCircle, null, tint = RegenGreen, modifier = Modifier.size(20.dp))
-                Text("App is up to date", style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    if (isChecking) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.CheckCircle, null, tint = RegenGreen, modifier = Modifier.size(20.dp))
+                    }
+                    Text(
+                        if (isChecking) "Checking for updates…" else "App is up to date",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                if (!isChecking) {
+                    TextButton(onClick = onCheckNow, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                        Text("Check now", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
         return

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.byd.tripstats.service.ServiceRestarterJobService
 import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.util.DiagLog
 import com.byd.tripstats.util.McuWakeHelper
 import com.byd.tripstats.util.RtDispatch
 import com.byd.tripstats.util.RtInProcessPatches
@@ -65,7 +66,7 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
 
-        Log.i(TAG, "Boot/start trigger received: action=$action")
+        DiagLog.event(context.applicationContext, TAG, "onReceive action=$action")
         try {
             val appContext = context.applicationContext
 
@@ -114,9 +115,9 @@ class BootReceiver : BroadcastReceiver() {
                         }
                     }
                     // Off-state keepalive chain — survives process death
-                    OffStateKeepaliveReceiver.schedule(appContext, iteration = 0)
+                    OffStateKeepaliveReceiver.schedule(appContext, iteration = 0, source = "boot:$action")
                 }
-                Log.i(TAG, "Off-event $action — skipping service start and restart re-arm")
+                DiagLog.event(appContext, TAG, "off-event $action — skipping service start and restart re-arm")
                 return
             }
 
@@ -126,6 +127,7 @@ class BootReceiver : BroadcastReceiver() {
             if (action == "com.byd.action.ACC_ON" || action == "com.byd.action.IGN_ON") {
                 OffStateKeepaliveReceiver.cancel(appContext)
             }
+            DiagLog.event(appContext, TAG, "on-event $action — clearing idle flag, starting service")
             ServiceIdleState.setStayingIdle(appContext, false)
 
             VehicleTelemetryService.start(appContext)

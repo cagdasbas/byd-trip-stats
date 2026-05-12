@@ -234,8 +234,8 @@ fun InstantConsumptionChart(
                     drawCrosshair(
                         cx = xOf(idx), cy = yOf(rawValues[idx]), w = w,
                         padL = padL, padR = padR, padT = padT, chartH = chartH,
-                        line1 = "Instant: %.1f kWh/100".format(rawValues[idx]),
-                        line2 = "Avg(5pt): %.1f kWh/100  |  %.0f km/h".format(
+                        line1 = "Instant: %.1f ${if (useImperial) "kWh/100mi" else "kWh/100km"}".format(rawValues[idx]),
+                        line2 = "Avg(5pt): %.1f ${if (useImperial) "kWh/100mi" else "kWh/100km"}  |  %.0f ${if (useImperial) "mph" else "km/h"}".format(
                             avgValues[idx], drivingPoints[idx].speed),
                         line3 = "${(secs / 60).toInt()}m ${(secs % 60).toInt()}s  $clockTime",
                         accentColor = avgColor

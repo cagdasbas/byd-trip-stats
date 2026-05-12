@@ -28,14 +28,14 @@ class DashboardViewModelDistanceTest {
     }
 
     @Test
-    fun `resolveLiveSessionDistanceKm prefers non-zero journey mileage when it exceeds odometer delta`() {
+    fun `resolveLiveSessionDistanceKm uses odometer delta when anchor is present, ignoring journey mileage`() {
         val distance = DashboardViewModel.resolveLiveSessionDistanceKm(
             odometerKm = 12345.6,
             anchorOdometerKm = 12340.1,
             journeyDistanceKm = 6.2
         )
 
-        assertEquals(6.2, distance, 0.0001)
+        assertEquals(5.5, distance, 0.0001)
     }
 
     @Test

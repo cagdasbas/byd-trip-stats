@@ -10,6 +10,7 @@ import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.util.RtDispatch
 import com.byd.tripstats.util.RtInProcessPatches
 import com.byd.tripstats.util.RtShellPatches
+import com.byd.tripstats.util.DiagLog
 import com.byd.tripstats.util.ServiceIdleState
 import com.byd.tripstats.worker.DatabaseMaintenanceWorker
 import com.byd.tripstats.worker.ServiceWatchdogWorker
@@ -47,8 +48,15 @@ class BydStatsApplication : Application(), Configuration.Provider {
         // process may have been recreated by an alarm/job firing — letting
         // those fire and silently no-op (they also check the flag) is
         // preferable to immediately re-acquiring the wake lock.
-        if (ServiceIdleState.isStayingIdle(this)) {
-            Log.i(TAG, "Off-state idle detected — skipping watchdog/JobService scheduling and service auto-start")
+        val idle = ServiceIdleState.isStayingIdle(this)
+        DiagLog.event(
+            this, TAG,
+            "Application.onCreate pid=${android.os.Process.myPid()} stayingIdle=$idle",
+        )
+        if (idle) {
+            // Off-state idle: skip auto-starting the service so we don't undo
+            // the self-stop. The process may have been recreated by an alarm
+            // or job firing — those will also see the flag and no-op.
         } else {
             ServiceWatchdogWorker.schedule(this)
             ServiceRestarterJobService.schedulePeriodic(this, "application-start")

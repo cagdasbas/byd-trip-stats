@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.PowerManager
 import android.util.Log
 import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.util.DiagLog
 import com.byd.tripstats.util.McuWakeHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,9 +43,8 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val iteration = intent.getIntExtra(EXTRA_ITERATION, 0)
-        Log.i(TAG, "Off-state keepalive fired (iteration=$iteration)")
-
         val appContext = context.applicationContext
+        DiagLog.event(appContext, TAG, "fired iteration=$iteration data=${intent.data}")
 
         // Acquire a partial wake lock for the duration of the async work.
         // AlarmManager.RTC_WAKEUP holds a wake lock only until onReceive()
@@ -62,7 +62,7 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
         } catch (e: Exception) {
             Log.w(TAG, "Service start error: ${e.message}")
         }
-        schedule(appContext, iteration + 1)
+        schedule(appContext, iteration + 1, source = "self-reschedule")
 
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
@@ -118,9 +118,12 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(context, BACKUP_REQUEST_CODE, intent, flags)
         }
 
-        fun schedule(context: Context, iteration: Int = 0) {
+        fun schedule(context: Context, iteration: Int = 0, source: String = "unknown") {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-                ?: return
+                ?: run {
+                    DiagLog.event(context, TAG, "schedule failed — AlarmManager unavailable (source=$source)")
+                    return
+                }
             val now = System.currentTimeMillis()
 
             pendingIntent(
@@ -128,7 +131,6 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )?.let { pi ->
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, now + INTERVAL_MS, pi)
-                Log.i(TAG, "Scheduled primary keepalive iteration=$iteration in ${INTERVAL_MS / 1000}s")
             }
 
             pendingIntentBackup(
@@ -140,7 +142,31 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
                     now + INTERVAL_MS + BACKUP_OFFSET_MS,
                     pi,
                 )
-                Log.i(TAG, "Scheduled backup keepalive iteration=$iteration in ${(INTERVAL_MS + BACKUP_OFFSET_MS) / 1000}s")
+            }
+            DiagLog.event(
+                context, TAG,
+                "scheduled iteration=$iteration source=$source " +
+                    "primary=+${INTERVAL_MS / 1000}s backup=+${(INTERVAL_MS + BACKUP_OFFSET_MS) / 1000}s",
+            )
+        }
+
+        /**
+         * Re-arm the keepalive chain only if no alarm is currently pending.
+         * Cheap probe: `FLAG_NO_CREATE` returns null when no matching PendingIntent
+         * exists, so we never accidentally upsert. Use this from any code path
+         * that may run while the car is off and we want belt-and-braces coverage
+         * without overwriting a healthy schedule.
+         */
+        fun ensureScheduled(context: Context, source: String) {
+            val existing = pendingIntent(
+                context, 0,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            )
+            if (existing == null) {
+                DiagLog.event(context, TAG, "ensureScheduled: alarm missing — arming (source=$source)")
+                schedule(context, iteration = 0, source = "ensure:$source")
+            } else {
+                DiagLog.event(context, TAG, "ensureScheduled: alarm present — no-op (source=$source)")
             }
         }
 
@@ -155,7 +181,7 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
                 context, 0,
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
             )?.let { alarmManager.cancel(it) }
-            Log.i(TAG, "Off-state keepalive chain cancelled")
+            DiagLog.event(context, TAG, "cancelled")
         }
     }
 }
