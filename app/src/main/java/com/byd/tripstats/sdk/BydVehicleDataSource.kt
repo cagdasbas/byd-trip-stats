@@ -5270,12 +5270,15 @@ class BydVehicleDataSource(context: Context) {
         val powerActive = hasFreshDirectChargingPower(nowElapsedMs)
         val recentCapacityActivity = lastChargingActivityElapsedMs != 0L &&
             nowElapsedMs - lastChargingActivityElapsedMs <= 3_000L
-        // chargerWorkState is set by AbsBYDAutoChargingListener.onChargerWorkStateChanged,
-        // which fires from BMS-level middleware independently of ignition state. This catches
-        // AC off-state charging where direct power readings are absent but the charger daemon
-        // is still actively reporting its work state.
-        val chargerWorking = _chargerWorkState.value > 0
-        return powerActive || recentCapacityActivity || chargerWorking
+        // chargingGunState is set by AbsBYDAutoChargingListener.onChargingGunStateChanged,
+        // which fires from BMS-level middleware independently of ignition state. The gun
+        // being physically present covers pre-charge negotiation, active charging, scheduled-
+        // charge wait (BATTERY_STATE_SCHEDULE), and post-charge while still plugged in.
+        // chargerWorkState is intentionally NOT used here: its FINISH and TERMINATE values
+        // are non-zero but indicate charging has ended, which would cause false positives
+        // after a completed session.
+        val gunPresent = _chargingGunState.value != 0
+        return powerActive || recentCapacityActivity || gunPresent
     }
 
     private fun hasFreshDirectChargingPower(nowElapsedMs: Long = SystemClock.elapsedRealtime()): Boolean {
