@@ -265,7 +265,8 @@ class ChargingRepositoryTest {
 
     @Test fun shutdownStatePersistsOnCarOnPackets() = runBlocking {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
-        // persistShutdownState is synchronous — read immediately after onTelemetry returns.
+        // On the first carOn packet, persistShutdownState runs inside the reconstruction
+        // coroutine (after the reconstruction check completes), so we must wait for it.
         repo.onTelemetry(
             telemetry(
                 gear = "P", speed = 0.0, enginePower = 0,
@@ -273,6 +274,7 @@ class ChargingRepositoryTest {
             ),
             car
         )
+        Thread.sleep(SETTLE)
         assertEquals(72.0f, repoPrefs().getFloat(KEY_SOC, -1f), 0.1f)
     }
 
