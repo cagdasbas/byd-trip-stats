@@ -589,7 +589,7 @@ private fun formatDistanceDisplay(segmentKm: Double, cumulativeKm: Double, showD
     val segment = segRaw.toInt()
     val cumulative = cumRaw.toInt()
     return if (cumulative > 0 && abs(segment - cumulative) >= 1) {
-        if (showDecimal) "%.1f, (%.1f)".format(segRaw, cumRaw)
+        if (showDecimal) "%.1f (%.1f)".format(segRaw, cumRaw)
         else "$segment, ($cumulative)"
     } else {
         if (showDecimal) "%.1f".format(maxOf(segRaw, cumRaw))

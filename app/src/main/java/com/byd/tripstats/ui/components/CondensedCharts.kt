@@ -25,10 +25,11 @@ fun CondensedEnergyChart(
 @Composable
 fun CondensedSpeedChart(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val condensed = remember(dataPoints) { condenseForSpeed(dataPoints) }
-    SpeedChart(dataPoints = condensed, modifier = modifier)
+    SpeedChart(dataPoints = condensed, useImperial = useImperial, modifier = modifier)
 }
 
 @Composable
@@ -155,8 +156,9 @@ fun CondensedTyrePressureChart(
 @Composable
 fun CondensedInstantConsumptionChart(
     dataPoints: List<TripDataPointEntity>,
+    useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // No condensing needed — InstantConsumptionChart already filters to driving points
-    InstantConsumptionChart(dataPoints = dataPoints, modifier = modifier)
+    InstantConsumptionChart(dataPoints = dataPoints, useImperial = useImperial, modifier = modifier)
 }

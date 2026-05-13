@@ -55,10 +55,14 @@ fun InstantConsumptionChart(
         return
     }
 
-    // Compute instant consumption (kWh/100km) and clamp outliers
-    val rawValues = remember(drivingPoints) {
+    // Compute instant consumption and clamp outliers.
+    // Formula gives kWh/100km (speed is always km/h in storage). For imperial,
+    // multiply by 1/0.621371 to convert to kWh/100mi.
+    val efficiencyFactor = if (useImperial) 1.0 / 0.621371 else 1.0
+    val clampMax = CLAMP_MAX * efficiencyFactor
+    val rawValues = remember(drivingPoints, useImperial) {
         drivingPoints.map { pt ->
-            (pt.power / pt.speed * 100.0).coerceIn(-CLAMP_MAX, CLAMP_MAX).toFloat()
+            (pt.power / pt.speed * 100.0 * efficiencyFactor).coerceIn(-clampMax, clampMax).toFloat()
         }
     }
 

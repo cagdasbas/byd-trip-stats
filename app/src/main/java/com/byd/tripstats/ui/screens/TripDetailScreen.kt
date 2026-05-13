@@ -874,6 +874,7 @@ fun TripChartsTab(
         ) {
             CondensedSpeedChart(
                 dataPoints = dataPoints,
+                useImperial = useImperial,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -970,6 +971,7 @@ fun TripChartsTab(
         ) {
             CondensedInstantConsumptionChart(
                 dataPoints = dataPoints,
+                useImperial = useImperial,
                 modifier = Modifier.fillMaxSize()
             )
         }
