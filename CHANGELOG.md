@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.4.0] - 2026-May-13
 
+> **What's new in a nutshell**
+>
+> This release is primarily a reliability and polish update. The biggest change is that the app now stays connected by default while the car is off — this means the battery history chart no longer has gaps, and charging sessions that happen while you're away from the car are now captured properly (including real-time data points and correct kWh totals). UK and other Imperial users get a comprehensive fix pass: speed, distance, and consumption values are now correctly converted throughout all charts and screens, not just the summary cards. There's also a "Check for updates" button if you don't want to wait for the next app restart, and trip stats are displayed larger when the app is in full-screen landscape.
+
 ### Added
 
 - **"Keep service alive when car is off" toggle** (Settings → Preferences, **default on**) — when enabled, the telemetry service no longer self-stops after the car has been off for 5 minutes. The benefits: the 48-hour HV/12V battery history chart receives continuous samples instead of long gaps; ADB-over-WiFi stays reachable without having to remote-wake the car first; trip-tracking responsiveness is unaffected by off-cycle restart latency. Real-world measurement since v2.3.0 shows the dominant overnight drain comes from stock BYD services (the GPS provider, Telenav ISA/ARP, and telematics heartbeat), not from BydTripStats. The v2.3.0 self-stop + off-state keepalive + periodic-restart-cancel code paths are all retained behind this toggle for users who specifically prefer the lower-churn behaviour.
