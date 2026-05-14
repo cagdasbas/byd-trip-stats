@@ -75,6 +75,7 @@ class TripRepository private constructor(context: Context) {
     private val prefs = context.getSharedPreferences("trip_prefs", Context.MODE_PRIVATE)
     private val telemetryCachePrefs = context.getSharedPreferences("telemetry_cache", Context.MODE_PRIVATE)
     private val telemetryJson = Json { ignoreUnknownKeys = true }
+    private val prefsManager = PreferencesManager(appContext)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -157,9 +158,11 @@ class TripRepository private constructor(context: Context) {
     private var carOffSinceMs: Long = 0L
 
     // Hard timeout after engine-off before the trip is automatically ended.
-    // 30 min covers highway toilet breaks, fuel stops, drive-through queues.
-    // If the engine comes back on within this window, the trip continues seamlessly.
-    private val CAR_OFF_TIMEOUT_MS = 30 * 60 * 1000L
+    // User-configurable in Settings → Preferences (default 30 min). Read from
+    // the synchronous SharedPreferences cache on every tick so a change applies
+    // to the current trip without having to restart the service.
+    private fun carOffTimeoutMs(): Long =
+        prefsManager.getCachedCarOffTimeoutMinutes() * 60_000L
 
     // ── Timing constants ──────────────────────────────────────────────────────
 
@@ -298,12 +301,12 @@ class TripRepository private constructor(context: Context) {
                 // Requirements:
                 //   • Engine on in P gear → keep recording (driver waiting/parked)
                 //   • Driver exits with engine on → keep recording
-                //   • Engine off, returns within 30 min → resume seamlessly
-                //   • Engine off > 30 min → end trip
+                //   • Engine off, returns within the configured window → resume seamlessly
+                //   • Engine off > configured window → end trip
                 // The current implementation is intentionally simple:
                 //   • first off packet starts a timer
                 //   • any on packet before timeout resumes the same trip
-                //   • off for longer than CAR_OFF_TIMEOUT_MS ends the trip
+                //   • off for longer than carOffTimeoutMs() ends the trip
                 // Always update min/max stats — the car can be moving while
                 // isCarOn is false in edge cases (slow speed, gear=P, etc.).
                 updateTripMetrics(t)
@@ -311,7 +314,7 @@ class TripRepository private constructor(context: Context) {
                 if (!t.isCarOn) {
                     if (carOffSinceMs == 0L) {
                         carOffSinceMs = resolveCarOffSince(now)
-                        Log.i(TAG, "Engine OFF — will end trip in ${CAR_OFF_TIMEOUT_MS / 60_000} min if not restarted")
+                        Log.i(TAG, "Engine OFF — will end trip in ${carOffTimeoutMs() / 60_000} min if not restarted")
 
                         // Persist the off-transition so recoverActiveTrip can preserve
                         // carOffSinceMs across process death. Without this, a process
@@ -341,9 +344,10 @@ class TripRepository private constructor(context: Context) {
                         }
                     }
                     val carOffDuration = now - carOffSinceMs
-                    if (carOffDuration > CAR_OFF_TIMEOUT_MS) {
+                    val timeoutMs = carOffTimeoutMs()
+                    if (carOffDuration > timeoutMs) {
                         Log.i(TAG, "Engine off for ${carOffDuration / 60_000} min → ending trip")
-                        doEndTrip(overrideEndTime = carOffSinceMs + CAR_OFF_TIMEOUT_MS)
+                        doEndTrip(overrideEndTime = carOffSinceMs + timeoutMs)
                     }
                     lastTelemetry     = t
                     lastTelemetryTime = now
@@ -399,9 +403,9 @@ class TripRepository private constructor(context: Context) {
                 // Gap check: if car is now on but there was a long unexplained
                 // telemetry gap (service crashed while car was driving), end the
                 // stale trip and let shouldAutoStart open a new one.
-                // Use CAR_OFF_TIMEOUT_MS so a normal stop+restart within 30 min
-                // is never falsely closed here.
-                if (lastTelemetryTime > 0 && now - lastTelemetryTime > CAR_OFF_TIMEOUT_MS) {
+                // Use carOffTimeoutMs() so a normal stop+restart within the configured
+                // window is never falsely closed here.
+                if (lastTelemetryTime > 0 && now - lastTelemetryTime > carOffTimeoutMs()) {
                     Log.w(TAG, "Long gap (${(now - lastTelemetryTime) / 60_000} min) while car on → ending stale trip")
                     doEndTrip(overrideEndTime = lastTelemetryTime)
                     // Re-evaluate this same packet for a new auto-start rather than
@@ -487,9 +491,10 @@ class TripRepository private constructor(context: Context) {
         val now = System.currentTimeMillis()
         if (carOffSinceMs > 0L) {
             val offDuration = now - carOffSinceMs
-            if (offDuration > CAR_OFF_TIMEOUT_MS) {
+            val timeoutMs = carOffTimeoutMs()
+            if (offDuration > timeoutMs) {
                 Log.w(TAG, "Watchdog: engine off for ${offDuration / 60_000} min → ending trip")
-                doEndTrip(overrideEndTime = carOffSinceMs + CAR_OFF_TIMEOUT_MS)
+                doEndTrip(overrideEndTime = carOffSinceMs + timeoutMs)
             }
             return
         }
@@ -517,9 +522,10 @@ class TripRepository private constructor(context: Context) {
         // Match TELEMETRY_TIMEOUT_MS exactly — a trip with a gap large enough
         // to trigger the in-loop timeout should be closed here upfront, not
         // resumed and then immediately closed on the first telemetry packet.
-        // A recovered trip is stale only if the gap exceeds CAR_OFF_TIMEOUT_MS.
-        // This matches the in-flight logic: engine-off for < 30 min = trip continues.
-        val STALE_THRESHOLD = CAR_OFF_TIMEOUT_MS
+        // A recovered trip is stale only if the gap exceeds the configured
+        // engine-off timeout. This matches the in-flight logic: engine-off
+        // for less than the timeout means the trip continues.
+        val STALE_THRESHOLD = carOffTimeoutMs()
         val storedOffSince = trailingStoredCarOffStart(dataPoints)
         val staleBecauseCarOff = storedOffSince != null && now - storedOffSince > STALE_THRESHOLD
 
@@ -565,7 +571,7 @@ class TripRepository private constructor(context: Context) {
             // Pass null rather than a stale zero so doEndTrip's fallback chain
             // lands on trip.startOdometer instead of storing a 0 endOdometer.
             doEndTrip(
-                overrideEndTime        = storedOffSince?.let { it + CAR_OFF_TIMEOUT_MS }
+                overrideEndTime        = storedOffSince?.let { it + carOffTimeoutMs() }
                                             ?: validPoint?.timestamp
                                             ?: lastPoint?.timestamp,
                 overrideOdometer       = validPoint?.odometer,
@@ -651,7 +657,7 @@ class TripRepository private constructor(context: Context) {
                     ((journeyKm / effectiveSpeedKmh) * 3_600_000.0).toLong()
                 }
         } else 0L
-        val clampedBackdateMs = backdateMs.coerceAtMost(CAR_OFF_TIMEOUT_MS)
+        val clampedBackdateMs = backdateMs.coerceAtMost(carOffTimeoutMs())
         val startTime = now - clampedBackdateMs
 
         val startBatteryTemp = validBatteryTemp(telemetry.batteryTempAvg)
@@ -825,6 +831,18 @@ class TripRepository private constructor(context: Context) {
             )
         )
 
+        // Drop trips shorter than the user-configured minimum. Done before stats
+        // calculation to skip the (now wasted) compute. Threshold 0.0 disables.
+        val tripDistanceKm = (resolvedEndOdometer - trip.startOdometer).coerceAtLeast(0.0)
+        val minTripKm = prefsManager.getCachedMinTripDistanceKm()
+        if (minTripKm > 0.0 && tripDistanceKm < minTripKm) {
+            Log.i(TAG, "Trip $tripId distance ${"%.2f".format(tripDistanceKm)} km " +
+                "< min ${"%.2f".format(minTripKm)} km → discarding")
+            deleteTrip(tripId)
+            resetTripState()
+            return
+        }
+
         try {
             calculateTripStats(tripId)
         } catch (e: Exception) {
@@ -994,7 +1012,7 @@ class TripRepository private constructor(context: Context) {
         overrideSoc: Double? = null,
     ) {
         try {
-            val isPhevSample = PreferencesManager(appContext).getCachedSelectedCarConfig()?.isPhev ?: false
+            val isPhevSample = prefsManager.getCachedSelectedCarConfig()?.isPhev ?: false
 
             // Guard against NaN/Infinity values that would either crash the JSON
             // encoder or produce an invalid rawJson that Room rejects.

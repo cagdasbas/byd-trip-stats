@@ -61,12 +61,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.byd.tripstats.adb.AdbPermissionManager
+import com.byd.tripstats.data.preferences.DEFAULT_CAR_OFF_TIMEOUT_MINUTES
+import com.byd.tripstats.data.preferences.DEFAULT_MIN_TRIP_DISTANCE_KM
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
 import com.byd.tripstats.data.preferences.consumptionUnit
+import com.byd.tripstats.data.preferences.toKilometers
 import com.byd.tripstats.connections.AbrpConnectionManager
 import com.byd.tripstats.connections.AbrpConnectionStore
 import com.byd.tripstats.connections.MqttConnectionManager
@@ -1138,12 +1141,20 @@ private fun AppPreferencesTab(
     val scope = rememberCoroutineScope()
     val dashboardAnimationsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(initial = true)
     val keepServiceAliveWhenOff by preferencesManager.keepServiceAliveWhenOff.collectAsState(initial = true)
+    val carOffTimeoutMinutes by preferencesManager.carOffTimeoutMinutes.collectAsState(
+        initial = preferencesManager.getCachedCarOffTimeoutMinutes()
+    )
+    val minTripDistanceKm by preferencesManager.minTripDistanceKm.collectAsState(
+        initial = preferencesManager.getCachedMinTripDistanceKm()
+    )
     val unitSystem by viewModel.unitSystem.collectAsState()
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol by viewModel.currencySymbol.collectAsState()
     val tripGoals by viewModel.tripGoals.collectAsState()
     val personalBests by viewModel.personalBests.collectAsState()
     var showTariffDialog by remember { mutableStateOf(false) }
+    var showCarOffTimeoutDialog by remember { mutableStateOf(false) }
+    var showMinTripDistanceDialog by remember { mutableStateOf(false) }
     var priceInput by remember(electricityPrice) {
         mutableStateOf(if (electricityPrice > 0.0) "%.4f".format(electricityPrice) else "")
     }
@@ -1298,6 +1309,80 @@ private fun AppPreferencesTab(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Engine-off trip timeout",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "How long the trip stays open after the car turns off. If the car comes back on within this window the recording resumes seamlessly (same trip, a new segment appears along with the cumulative distance in parenthesis). Past the window the trip ends and the next drive starts a new one. Default is 30 minutes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Current: $carOffTimeoutMinutes min",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = { showCarOffTimeoutDialog = true }) {
+                    Icon(Icons.Filled.Timer, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Change timeout")
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Minimum trip distance",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Auto-discard trips shorter than this when they end (datapoints, segments and stats are removed too). Useful for filtering out moving the car a few meters in the driveway or very short distances. Set to 0 to disable.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Heads-up: discarded trips disappear from everything that reads the trip table — history list, weekly/monthly/yearly consumption charts, monthly distance and energy totals, seasonal analysis, and the SoH degradation series. A high threshold over a quiet day means no point will be plotted for that day. The chart already ignores trips under 0.5 km, so only thresholds above that change the chart further.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    if (minTripDistanceKm > 0.0) {
+                        "Current: %.2f %s".format(
+                            unitSystem.convertDistance(minTripDistanceKm),
+                            unitSystem.distanceUnit
+                        )
+                    } else {
+                        "Current: disabled"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = { showMinTripDistanceDialog = true }) {
+                    Icon(Icons.Filled.Straighten, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (minTripDistanceKm > 0.0) "Change minimum" else "Set minimum")
+                }
             }
         }
 
@@ -1518,6 +1603,94 @@ private fun AppPreferencesTab(
             },
             dismissButton = {
                 TextButton(onClick = { showTariffDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showCarOffTimeoutDialog) {
+        var minutesInput by remember(carOffTimeoutMinutes) {
+            mutableStateOf(carOffTimeoutMinutes.toString())
+        }
+        AlertDialog(
+            onDismissRequest = { showCarOffTimeoutDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Engine-off trip timeout", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Trip stays open for this many minutes after the engine turns off. " +
+                            "Default is $DEFAULT_CAR_OFF_TIMEOUT_MINUTES min.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = minutesInput,
+                        onValueChange = { minutesInput = it.filter { c -> c.isDigit() } },
+                        label = { Text("Minutes") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val mins = minutesInput.toIntOrNull()?.coerceAtLeast(1)
+                            ?: DEFAULT_CAR_OFF_TIMEOUT_MINUTES
+                        scope.launch { preferencesManager.saveCarOffTimeoutMinutes(mins) }
+                        showCarOffTimeoutDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCarOffTimeoutDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showMinTripDistanceDialog) {
+        // Edit value in the user's display unit so the number they type matches
+        // the number shown on the card. Convert back to km for storage.
+        val initialDisplay = if (minTripDistanceKm > 0.0) {
+            "%.2f".format(unitSystem.convertDistance(minTripDistanceKm))
+        } else ""
+        var distanceInput by remember(minTripDistanceKm, unitSystem) {
+            mutableStateOf(initialDisplay)
+        }
+        AlertDialog(
+            onDismissRequest = { showMinTripDistanceDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Minimum trip distance", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Trips shorter than this are discarded when they end. Set to 0 (or leave empty) to keep every trip.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = distanceInput,
+                        onValueChange = { distanceInput = it },
+                        label = { Text("Distance (${unitSystem.distanceUnit})") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val displayValue = distanceInput.replace(',', '.').toDoubleOrNull() ?: 0.0
+                        val km = if (displayValue <= 0.0) 0.0 else unitSystem.toKilometers(displayValue)
+                        scope.launch { preferencesManager.saveMinTripDistanceKm(km) }
+                        showMinTripDistanceDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMinTripDistanceDialog = false }) { Text("Cancel") }
             }
         )
     }

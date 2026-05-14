@@ -8,6 +8,10 @@ private const val KM_TO_MI = 0.621371
 fun UnitSystem.convertDistance(km: Double): Double =
     if (this == UnitSystem.IMPERIAL) km * KM_TO_MI else km
 
+/** Inverse of [convertDistance]: takes a value expressed in the user's display unit (km or miles) and returns the equivalent in km for storage. */
+fun UnitSystem.toKilometers(distanceInDisplayUnit: Double): Double =
+    if (this == UnitSystem.IMPERIAL) distanceInDisplayUnit / KM_TO_MI else distanceInDisplayUnit
+
 /** Convert a speed in km/h to the display unit. GPS/SDK speed is always in km/h regardless of market. BMS-sourced odometer is excluded — use only for app-calculated or GPS speeds. */
 fun UnitSystem.convertSpeed(kmh: Double): Double =
     if (this == UnitSystem.IMPERIAL) kmh * KM_TO_MI else kmh

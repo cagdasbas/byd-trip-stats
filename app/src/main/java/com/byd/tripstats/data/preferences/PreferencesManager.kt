@@ -31,6 +31,11 @@ private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_pri
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
 private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms")
 private val UNIT_SYSTEM                  = stringPreferencesKey("unit_system")
+private val CAR_OFF_TIMEOUT_MINUTES      = intPreferencesKey("car_off_timeout_minutes")
+private val MIN_TRIP_DISTANCE_KM         = doublePreferencesKey("min_trip_distance_km")
+
+const val DEFAULT_CAR_OFF_TIMEOUT_MINUTES = 30
+const val DEFAULT_MIN_TRIP_DISTANCE_KM    = 0.0
 
 class PreferencesManager(private val context: Context) {
 
@@ -179,4 +184,43 @@ class PreferencesManager(private val context: Context) {
     private fun localeDefaultUnitSystem(): UnitSystem =
         if (Locale.getDefault().country.uppercase() == "GB") UnitSystem.IMPERIAL
         else UnitSystem.METRIC
+
+    // ── Engine-off timeout (trip auto-end) ────────────────────────────────────
+    // Minutes the trip stays open after the engine turns off. If the car comes
+    // back on within this window the trip resumes seamlessly; otherwise it is
+    // auto-ended. Read synchronously by TripRepository on every telemetry tick
+    // so the cache mirror must always be in sync with DataStore.
+
+    val carOffTimeoutMinutes: Flow<Int> = context.dataStore.data
+        .map { it[CAR_OFF_TIMEOUT_MINUTES] ?: DEFAULT_CAR_OFF_TIMEOUT_MINUTES }
+        .onEach { cache.edit().putInt("car_off_timeout_minutes", it).apply() }
+
+    fun getCachedCarOffTimeoutMinutes(): Int =
+        cache.getInt("car_off_timeout_minutes", DEFAULT_CAR_OFF_TIMEOUT_MINUTES)
+            .coerceAtLeast(1)
+
+    suspend fun saveCarOffTimeoutMinutes(minutes: Int) {
+        val clamped = minutes.coerceAtLeast(1)
+        context.dataStore.edit { it[CAR_OFF_TIMEOUT_MINUTES] = clamped }
+        cache.edit().putInt("car_off_timeout_minutes", clamped).apply()
+    }
+
+    // ── Minimum trip distance ─────────────────────────────────────────────────
+    // Trips shorter than this on auto-end are deleted (entity, datapoints,
+    // segments, stats). Stored in km; the UI converts to/from miles when the
+    // user has imperial units selected. 0.0 disables the filter.
+
+    val minTripDistanceKm: Flow<Double> = context.dataStore.data
+        .map { it[MIN_TRIP_DISTANCE_KM] ?: DEFAULT_MIN_TRIP_DISTANCE_KM }
+        .onEach { cache.edit().putFloat("min_trip_distance_km", it.toFloat()).apply() }
+
+    fun getCachedMinTripDistanceKm(): Double =
+        cache.getFloat("min_trip_distance_km", DEFAULT_MIN_TRIP_DISTANCE_KM.toFloat()).toDouble()
+            .coerceAtLeast(0.0)
+
+    suspend fun saveMinTripDistanceKm(km: Double) {
+        val clamped = km.coerceAtLeast(0.0)
+        context.dataStore.edit { it[MIN_TRIP_DISTANCE_KM] = clamped }
+        cache.edit().putFloat("min_trip_distance_km", clamped.toFloat()).apply()
+    }
 }
