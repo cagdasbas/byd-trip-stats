@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.4.1] - 2026-May-14
+
+### Added
+
+- **Battery temperature is back on the Battery card** — the stat card now shows the current battery temperature as a subtitle beneath the SoH percentage. This was removed in 2.3.0 because some cars were reporting wildly incorrect values; it's back now that the root cause has been fixed.
+
+### Fixed
+
+- **Battery temperature now shows a consistent, accurate value across all screens** — the Dashboard stat card, Trip Detail average, and Trip Detail min/max range now all agree with each other and reflect actual battery cell temperature (not a coolant-side probe that reads several °C lower).
+- **Battery temperature readings are more accurate on cars that report them in a non-standard encoding** — some firmwares report cell temperatures in a scaled format that, if decoded incorrectly, produces readings like 62°C instead of the correct ~21°C. The decoder now uses the min cell temp as a reference point to always pick the correct interpretation.
+- **Old trips with bad stored temperature averages now display sensibly** — for trips recorded before this fix, the average battery temperature shown in Trip Detail is now re-derived from the min/max cell range rather than the previously stored (potentially wrong) average.
+- **Battery temperature max is now shown in Trip Detail even when the car doesn't report it directly** — the max is estimated from the min and average, so you'll see a range like "20°C – 22°C" instead of just "20°C".
+
+---
+
 ## [2.4.0] - 2026-May-13
 
 > **What's new in a nutshell**

@@ -170,12 +170,22 @@ data class VehicleTelemetry(
         get() = gear == "P"
 
     val batteryTempAvg: Double
-        get() =
-                statisticCellTempAvg
-                        ?: batteryPackTemp.takeIf { it > 0.0 }
-                                ?: if (batteryCellTempMax > 0 || batteryCellTempMin > 0) {
-                            (batteryCellTempMax + batteryCellTempMin) / 2.0
-                        } else 0.0
+        get() {
+            // Source priority for the displayed battery temp:
+            //   1. Charging device cell range (m39/m40) — direct °C, no encoding ambiguity,
+            //      polled every fast tick whether charging or not. Surfaces here via
+            //      batteryCellTempMin/Max (which falls back to statistic cellTMin/Max when
+            //      the Charging device isn't registered yet).
+            //   2. Statistic device cellTAvg — used only when no cell range is available.
+            // batteryPackTemp is intentionally NOT consulted: m51 (Sensor device) appears
+            // to be a coolant probe, and m36 (Charging) reads several °C below cells under
+            // active battery cooling, both of which produce avgs inconsistent with the
+            // displayed cell range.
+            if (batteryCellTempMin > 0 && batteryCellTempMax > 0 && batteryCellTempMax >= batteryCellTempMin) {
+                return (batteryCellTempMax + batteryCellTempMin) / 2.0
+            }
+            return statisticCellTempAvg?.takeIf { it.isFinite() } ?: 0.0
+        }
 
     /**
      * Human-readable name for the operation/drive mode (Eco/Sport/Normal/Snow/Sand/Mud).

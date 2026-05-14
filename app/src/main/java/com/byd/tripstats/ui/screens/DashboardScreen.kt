@@ -1658,9 +1658,25 @@ fun VehicleStats(
             }
             if (pct == "—") "SoH: —" else "SoH: $pct${if (src.isNotEmpty()) " ($src)" else ""}"
         }
+        val batteryTempSubtitle: String? = run {
+            // Source priority matches VehicleTelemetry.batteryTempAvg: Charging device
+            // cell range first (m39/m40 via batteryCellTempMin/Max), then statistic cellTAvg.
+            // batteryPackTemp is intentionally excluded — see telemetry getter for rationale.
+            val cellMin = telemetry.batteryCellTempMin.toDouble().takeIf { it > 0.0 }
+                ?: vehicleSnapshot?.statisticCellTempMin
+            val cellMax = telemetry.batteryCellTempMax.toDouble().takeIf { it > 0.0 }
+                ?: vehicleSnapshot?.statisticCellTempMax
+            val avg = if (cellMin != null && cellMax != null && cellMax >= cellMin && (cellMax - cellMin) <= 25) {
+                (cellMin + cellMax) / 2.0
+            } else {
+                vehicleSnapshot?.statisticCellTempAvg
+            }
+            avg?.takeIf { it.isFinite() && it in -40.0..120.0 }?.let { "Temp: ${it.toInt()} °C" }
+        }
         StatCard(
             title    = "Battery",
             value    = sohDisplay,
+            subtitle = batteryTempSubtitle,
             icon     = Icons.Filled.BatteryChargingFull,
             color    = BatteryBlue,
             compact  = fillHeight,

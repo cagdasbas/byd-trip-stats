@@ -830,20 +830,30 @@ private fun tripBatteryTempRangeLabel(trip: TripEntity): String {
     fun isValidCellTemp(value: Int): Boolean = value in -40..120
     val min = trip.minBatteryCellTemp.takeIf(::isValidCellTemp)
     val max = trip.maxBatteryCellTemp.takeIf(::isValidCellTemp)
+    // Reject implausible pack spreads: cells across one pack stay within ~25°C even under
+    // fast charging. Historical trips with a corrupted max (e.g. firmware-scaled raw stored
+    // as °C) would otherwise display nonsense like "19°C - 62°C".
+    val rangeValid = min != null && max != null && max >= min && (max - min) <= 25
     return when {
-        min != null && max != null && max > min -> "${min}°C - ${max}°C"
-        min != null && max != null -> "${max}°C"
+        rangeValid -> "${min}°C - ${max}°C"
         min != null -> "${min}°C"
-        max != null -> "${max}°C"
+        max != null && max in -40..80 -> "${max}°C"
         else -> "-"
     }
 }
 
-private fun tripBatteryAvgTempLabel(trip: TripEntity): String =
-    trip.avgBatteryTemp
-        .takeIf { it.isFinite() && it in -40.0..120.0 }
-        ?.let { "${it.toInt()}°C" }
-        ?: "-"
+private fun tripBatteryAvgTempLabel(trip: TripEntity): String {
+    val min = trip.minBatteryCellTemp.takeIf { it in -40..120 }?.toDouble()
+    val max = trip.maxBatteryCellTemp.takeIf { it in -40..120 }?.toDouble()
+    // When a valid cell range exists, derive avg as its midpoint. Keeps the value
+    // consistent with the range shown above and sidesteps historical trips where the
+    // stored avg came from a coolant-side pack thermometer that disagreed with the cells.
+    if (min != null && max != null && max >= min && (max - min) <= 25) {
+        return "${((min + max) / 2.0).toInt()}°C"
+    }
+    val avg = trip.avgBatteryTemp.takeIf { it.isFinite() && it in -40.0..120.0 } ?: return "-"
+    return "${avg.toInt()}°C"
+}
 
 private fun formatKwh(value: Double): String =
     String.format("%.2f kWh", value)
