@@ -53,10 +53,9 @@ import com.byd.tripstats.data.preferences.convertSpeed
 import com.byd.tripstats.data.preferences.isImperial
 import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.R
-import com.byd.tripstats.ui.components.LiquidFillBattery
+import com.byd.tripstats.ui.components.CompactBattery
 import com.byd.tripstats.ui.components.RangeProjectionChart
 import com.byd.tripstats.ui.components.RangeDataPoint
-import com.byd.tripstats.ui.components.ConsumptionThumbnail
 import com.byd.tripstats.ui.components.ConsumptionChartExpanded
 import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
@@ -64,16 +63,9 @@ import com.byd.tripstats.ui.theme.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.imageResource
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
@@ -124,6 +116,16 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
     var showBattery12vDialog by remember { mutableStateOf(false) }
+    var consumptionExpanded by remember { mutableStateOf(false) }
+    var showTyreUnitDialog by remember { mutableStateOf(false) }
+    val tyrePrefs: SharedPreferences = remember { context.getSharedPreferences("tyre_unit_prefs", 0) }
+    var tyreUnit by remember {
+        mutableStateOf(
+            TyrePressureUnit.entries.getOrElse(
+                tyrePrefs.getInt("unit", TyrePressureUnit.BAR.ordinal)
+            ) { TyrePressureUnit.BAR }
+        )
+    }
 
     val carCategories = remember {
         listOf(
@@ -171,7 +173,25 @@ fun DashboardScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    IconButton(onClick = onNavigateToCharging) {
+                        CompactBattery(
+                            soc = telemetry?.soc?.toFloat() ?: 0f,
+                            isCharging = telemetry?.isCharging ?: false
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    IconButton(onClick = { consumptionExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.BarChart,
+                            contentDescription = "Consumption Charts",
+                            tint = RegenGreen,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(
@@ -182,7 +202,10 @@ fun DashboardScreen(
                         )
                     }
 
+                    Spacer(modifier = Modifier.width(12.dp))
+
                     BadgedBox(
+                        modifier = Modifier.padding(end = 8.dp),
                         badge = {
                             if (updateInfo != null) {
                                 Badge(containerColor = AccelerationOrange) {
@@ -234,9 +257,12 @@ fun DashboardScreen(
                 onStartTrip = { viewModel.startManualTrip() },
                 onEndTrip = { viewModel.endManualTrip() },
                 onToggleAutoDetection = { viewModel.toggleAutoTripDetection() },
-                onNavigateToCharging = onNavigateToCharging,
                 onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                 onShowBattery12vHistory = { showBattery12vDialog = true },
+                consumptionExpanded = consumptionExpanded,
+                onConsumptionClose = { consumptionExpanded = false },
+                tyreUnit = tyreUnit,
+                onShowTyreDialog = { showTyreUnitDialog = true },
                 widthSizeClass = widthSizeClass,
                 sessionDistanceKm = liveSegmentDistanceKm,
                 tripDistanceKm = liveDistanceKm,
@@ -267,69 +293,16 @@ fun DashboardScreen(
                 Text("Select car")
             },
             text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    carCategories.forEach { (categoryTitle, groups) ->
-                        Text(
-                            text = categoryTitle,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        HorizontalDivider()
-
-                        groups.forEach { (groupTitle, cars) ->
-                            Text(
-                                text = groupTitle,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
-
-                            cars.forEach { car ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            scope.launch {
-                                                prefs.saveSelectedCar(car.id)
-                                            }
-                                            showCarSelectionDialog = false
-                                        }
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = selectedCar?.id == car.id,
-                                        onClick = {
-                                            scope.launch {
-                                                prefs.saveSelectedCar(car.id)
-                                            }
-                                            showCarSelectionDialog = false
-                                        }
-                                    )
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    Column {
-                                        Text(
-                                            text = car.displayName,
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-
-                                        val rangeLabel = if (car.isPhev) "EV range" else "WLTP"
-                                        Text(
-                                            text = "$rangeLabel: ${car.wltpKm} km",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    CarSelectionPicker(
+                        categories = carCategories,
+                        selectedCarId = selectedCar?.id,
+                        onCarSelected = { car ->
+                            scope.launch { prefs.saveSelectedCar(car.id) }
+                            showCarSelectionDialog = false
+                        },
+                        compact = true
+                    )
                 }
             },
             confirmButton = {},
@@ -339,6 +312,53 @@ fun DashboardScreen(
                 ) {
                     Text("Cancel")
                 }
+            }
+        )
+    }
+
+    if (showTyreUnitDialog) {
+        AlertDialog(
+            onDismissRequest = { showTyreUnitDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Tyre Pressure Unit") },
+            text = {
+                Column {
+                    TyrePressureUnit.entries.forEach { u ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    tyreUnit = u
+                                    tyrePrefs.edit().putInt("unit", u.ordinal).apply()
+                                    showTyreUnitDialog = false
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = tyreUnit == u,
+                                onClick = {
+                                    tyreUnit = u
+                                    tyrePrefs.edit().putInt("unit", u.ordinal).apply()
+                                    showTyreUnitDialog = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = when (u) {
+                                    TyrePressureUnit.BAR -> "Bar  (default, e.g. 2.6)"
+                                    TyrePressureUnit.PSI -> "PSI  (e.g. 37.7)"
+                                    TyrePressureUnit.KPA -> "kPa  (e.g. 260)"
+                                },
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTyreUnitDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -359,9 +379,12 @@ fun DashboardContent(
     onStartTrip: () -> Unit,
     onEndTrip: () -> Unit,
     onToggleAutoDetection: () -> Unit,
-    onNavigateToCharging: () -> Unit = {},
     onNavigateToBatteryDegradation: () -> Unit = {},
     onShowBattery12vHistory: () -> Unit = {},
+    consumptionExpanded: Boolean = false,
+    onConsumptionClose: () -> Unit = {},
+    tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
+    onShowTyreDialog: () -> Unit = {},
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
     sessionDistanceKm: Double = 0.0,
     tripDistanceKm: Double = 0.0,
@@ -397,7 +420,9 @@ fun DashboardContent(
                     vehicleSnapshot = vehicleSnapshot,
                     modifier  = Modifier.fillMaxWidth(),
                     onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
-                    onShowBattery12vHistory = onShowBattery12vHistory
+                    onShowBattery12vHistory = onShowBattery12vHistory,
+                    tyreUnit = tyreUnit,
+                    onShowTyreDialog = onShowTyreDialog
                 )
 
                 // Energy flow / range card
@@ -409,6 +434,8 @@ fun DashboardContent(
                     yearlyEfficiency = yearlyEfficiency,
                     sessionDistanceKm = sessionDistanceKm,
                     tripDistanceKm = tripDistanceKm,
+                    consumptionExpanded = consumptionExpanded,
+                    onConsumptionClose = onConsumptionClose,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 320.dp)
@@ -457,7 +484,8 @@ fun DashboardContent(
                         yearlyEfficiency = yearlyEfficiency,
                         sessionDistanceKm = sessionDistanceKm,
                         tripDistanceKm = tripDistanceKm,
-                        onNavigateToCharging = onNavigateToCharging,
+                        consumptionExpanded = consumptionExpanded,
+                        onConsumptionClose = onConsumptionClose,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -495,7 +523,9 @@ fun DashboardContent(
                         modifier   = Modifier.fillMaxWidth(),
                         fillHeight = true,
                         onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
-                        onShowBattery12vHistory = onShowBattery12vHistory
+                        onShowBattery12vHistory = onShowBattery12vHistory,
+                        tyreUnit = tyreUnit,
+                        onShowTyreDialog = onShowTyreDialog
                     )
                 }
             }
@@ -523,7 +553,8 @@ fun DashboardContent(
                         yearlyEfficiency = yearlyEfficiency,
                         sessionDistanceKm = sessionDistanceKm,
                         tripDistanceKm = tripDistanceKm,
-                        onNavigateToCharging = onNavigateToCharging,
+                        consumptionExpanded = consumptionExpanded,
+                        onConsumptionClose = onConsumptionClose,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -562,7 +593,9 @@ fun DashboardContent(
                         modifier   = Modifier.fillMaxWidth(),
                         fillHeight = true,
                         onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
-                        onShowBattery12vHistory = onShowBattery12vHistory
+                        onShowBattery12vHistory = onShowBattery12vHistory,
+                        tyreUnit = tyreUnit,
+                        onShowTyreDialog = onShowTyreDialog
                     )
                 }
             }
@@ -619,7 +652,8 @@ fun EnergyFlowDiagram(
     yearlyEfficiency: List<DashboardViewModel.DailyEfficiency>,
     sessionDistanceKm: Double = 0.0,
     tripDistanceKm: Double = 0.0,
-    onNavigateToCharging: () -> Unit = {},
+    consumptionExpanded: Boolean = false,
+    onConsumptionClose: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val power = if (telemetry.isCharging && telemetry.chargingPower > 0.1) {
@@ -629,257 +663,37 @@ fun EnergyFlowDiagram(
     }
     val isRegenerating = telemetry.isRegenerating
     val isCharging = telemetry.isCharging
-    val hasActiveEnergyFlow = abs(power) > 1.0 || isCharging
     // In multi-window/split-screen the app's window is narrower; skip decimal to avoid crowding.
     val isFullScreen = LocalConfiguration.current.screenWidthDp >= 840
 
-    // Two independent expanded states
-    var consumptionExpanded by remember { mutableStateOf(false) }
-    var rangeFlipped   by remember { mutableStateOf(false) }
-
-    // Tyre pressure unit — persisted in SharedPreferences
     val context = LocalContext.current
-    val tyrePrefs: SharedPreferences = remember {
-        context.getSharedPreferences("tyre_unit_prefs", 0)
-    }
     val appPrefs = remember { PreferencesManager(context.applicationContext) }
-    val dashboardAnimationsEnabled by appPrefs.dashboardAnimationsEnabled
-        .collectAsState(initial = appPrefs.getCachedAnimationsEnabled())
-    var tyreUnit by remember {
-        mutableStateOf(
-            TyrePressureUnit.entries.getOrElse(
-                tyrePrefs.getInt("unit", TyrePressureUnit.BAR.ordinal)
-            ) { TyrePressureUnit.BAR }
-        )
-    }
-    var showTyreUnitDialog by remember { mutableStateOf(false) }
-
-
-    val rotation by animateFloatAsState(
-        targetValue = if (rangeFlipped) 180f else 0f,
-        animationSpec = if (dashboardAnimationsEnabled) {
-            tween(
-                durationMillis = 650, // Slightly longer duration adds visual "weight"
-                easing = FastOutSlowInEasing
-            )
-        } else {
-            snap()
-        },
-        label = "range_flip"
-    )
-    val isRangeBack = rotation > 90f
-
-    // Flow animation — Animatable + LaunchedEffect so the coroutine is
-    // cancelled automatically when isResumed turns false, stopping the loop
-    // with zero CPU overhead. infiniteTransition.animateFloat can't be used
-    // here because its animationSpec is typed InfiniteRepeatableSpec<T> and
-    // won't accept snap() for the non-resumed branch.
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
-    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-
-    val flowOffsetAnim = remember { Animatable(0f) }
-    LaunchedEffect(isResumed, dashboardAnimationsEnabled, hasActiveEnergyFlow) {
-        if (dashboardAnimationsEnabled && isResumed && hasActiveEnergyFlow) {
-            while (true) {
-                delay(50L)  // 20fps
-                val next = (flowOffsetAnim.value + 0.05f) % 1f
-                flowOffsetAnim.snapTo(next)
-            }
-        }
-        // Coroutine cancelled when isResumed = false — freezes in place
-    }
-    val flowOffset = if (dashboardAnimationsEnabled && hasActiveEnergyFlow) flowOffsetAnim.value else 0f
-
-    // Load as ImageBitmap
-    val awdBitmap = ImageBitmap.imageResource(id = R.drawable.awd)
 
     val unitSystem by appPrefs.unitSystem.collectAsState(initial = appPrefs.getCachedUnitSystem())
     val distanceUnit = unitSystem.distanceUnit
     val speedUnit = unitSystem.speedUnit
 
     Card(
-        modifier = modifier
-            .clipToBounds()
-            .graphicsLayer {
-                rotationY = rotation
-                cameraDistance = 48f * density
-            },
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        if (isRangeBack) {
-            // ── Back face: full-size range projection chart ───────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        rotationY = 180f
-                        cameraDistance = 48f * density
-                        compositingStrategy = CompositingStrategy.Offscreen
-                    }
-                    .clickable { rangeFlipped = false }
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = "Range Projection",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                )
-                RangeProjectionChart(
-                    dataPoints = tripDataPoints,
-                    liveSoc = telemetry.soc,
-                    liveElectricRangeKm = telemetry.electricDrivingRangeKm,
-                    useImperial = unitSystem.isImperial,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        } else if (consumptionExpanded) {
+        if (consumptionExpanded) {
             // ── Expanded consumption chart (tabbed: 7d / 30d / 12m) ───────────
             ConsumptionChartExpanded(
                 weeklyData  = weeklyEfficiency,
                 monthlyData = monthlyEfficiency,
                 yearlyData  = yearlyEfficiency,
-                onClose     = { consumptionExpanded = false },
+                onClose     = onConsumptionClose,
                 modifier    = Modifier.fillMaxSize()
             )
         } else {
-            // ── Normal front face ─────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                     .padding(12.dp)
             ) {
-                // Energy flow row — visualization + thumbnail side by side
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp),
-                    // contentAlignment = Alignment.TopCenter
-                ) {
-                    EnergyFlowCanvas(
-                        power = power,
-                        isRegenerating = isRegenerating,
-                        isCharging = isCharging,
-                        flowOffset = { flowOffset },
-                        animationsEnabled = dashboardAnimationsEnabled
-                    )
-
-                    // Animated liquid fill battery — tap to open charging history
-                    LiquidFillBattery(
-                        soc = telemetry.soc.toFloat(),
-                        isCharging = isCharging,
-                        animationsEnabled = dashboardAnimationsEnabled,
-                        width = 60.dp,
-                        height = 100.dp,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(start = 16.dp)
-                            .clickable { onNavigateToCharging() }
-                    )
-
-                    // AWD drivetrain with tyre pressures
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 12.dp)
-                    ) {
-                        // AWD Image — tap to change pressure unit
-                        Image(
-                            bitmap = awdBitmap,
-                            contentDescription = "AWD drivetrain — tap to change pressure unit",
-                            modifier = Modifier
-                                .size(90.dp)
-                                .clickable { showTyreUnitDialog = true },
-                            contentScale = ContentScale.Fit,
-                            filterQuality = FilterQuality.High
-                        )
-
-                        // Tyre Pressure Overlays
-                        // Left Front (recommended: 2.6 bar)
-                        TyrePressureIndicator(
-                            pressure = telemetry.tyrePressureLF,
-                            tempC = telemetry.tyreTempLF.takeIf { it > 0 },
-                            unit = tyreUnit,
-                            isFront = true,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .offset(x = (-24).dp, y = (-12).dp)
-                        )
-
-                        // Right Front (recommended: 2.6 bar)
-                        TyrePressureIndicator(
-                            pressure = telemetry.tyrePressureRF,
-                            tempC = telemetry.tyreTempRF.takeIf { it > 0 },
-                            unit = tyreUnit,
-                            isFront = true,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 26.dp, y = (-12).dp)
-                        )
-
-                        // Left Rear (recommended: 2.9 bar)
-                        TyrePressureIndicator(
-                            pressure = telemetry.tyrePressureLR,
-                            tempC = telemetry.tyreTempLR.takeIf { it > 0 },
-                            unit = tyreUnit,
-                            isFront = false,
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .offset(x = (-24).dp, y = (14).dp)
-                        )
-
-                        // Right Rear (recommended: 2.9 bar)
-                        TyrePressureIndicator(
-                            pressure = telemetry.tyrePressureRR,
-                            tempC = telemetry.tyreTempRR.takeIf { it > 0 },
-                            unit = tyreUnit,
-                            isFront = false,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .offset(x = 26.dp, y = (14).dp)
-                        )
-                    }
-
-                    // Consumption charts thumbnail — tap to open tabbed chart
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .width(120.dp)
-                            .fillMaxHeight()
-                            .background(
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .clickable { consumptionExpanded = true }
-                            .padding(4.dp)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                shape = RoundedCornerShape(8.dp)
-                            ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "consumption charts",
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        ConsumptionThumbnail(
-                            data = monthlyEfficiency,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                        )
-                    }
-                }
-
                 // Range Projection Chart — tap to flip to expanded view
                 Box(modifier = Modifier
                     .fillMaxWidth()
@@ -890,9 +704,7 @@ fun EnergyFlowDiagram(
                         liveSoc = telemetry.soc,
                         liveElectricRangeKm = telemetry.electricDrivingRangeKm,
                         useImperial = unitSystem.isImperial,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable { rangeFlipped = true }
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
@@ -936,7 +748,7 @@ fun EnergyFlowDiagram(
                             val projected = tripDataPoints.lastOrNull()?.projectedRangeKm
                             val bms = telemetry.electricDrivingRangeKm
                             if (projected != null && projected.toInt() < bms) formatDistanceValue(projected) else formatDistanceValue(
-                                bms.toDouble()
+                                bms.toDouble() // TODO: Perhaps show always the projected range but be cautious because it might skyrocket
                             )
                         },
                         unit = distanceUnit,
@@ -951,54 +763,6 @@ fun EnergyFlowDiagram(
                 }
             }
         }
-    }
-
-    // ── Tyre pressure unit selection dialog ──────────────────────────────────
-    if (showTyreUnitDialog) {
-        AlertDialog(
-            onDismissRequest = { showTyreUnitDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Tyre Pressure Unit") },
-            text = {
-                Column {
-                    TyrePressureUnit.entries.forEach { u ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    tyreUnit = u
-                                    tyrePrefs.edit().putInt("unit", u.ordinal).apply()
-                                    showTyreUnitDialog = false
-                                }
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = tyreUnit == u,
-                                onClick = {
-                                    tyreUnit = u
-                                    tyrePrefs.edit().putInt("unit", u.ordinal).apply()
-                                    showTyreUnitDialog = false
-                                }
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = when (u) {
-                                    TyrePressureUnit.BAR -> "Bar  (default, e.g. 2.6)"
-                                    TyrePressureUnit.PSI -> "PSI  (e.g. 37.7)"
-                                    TyrePressureUnit.KPA -> "kPa  (e.g. 260)"
-                                },
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {},
-            dismissButton = {
-                TextButton(onClick = { showTyreUnitDialog = false }) { Text("Cancel") }
-            }
-        )
     }
 
 }
@@ -1030,6 +794,7 @@ private fun TyrePressureUnit.formatValue(psi: Double): String {
         TyrePressureUnit.KPA -> String.format("%.0f", psi.toDisplayPressure(this))
     }
 }
+
 
 @Composable
 fun TyrePressureIndicator(
@@ -1393,14 +1158,22 @@ fun TripControls(
             )
         }
 
-        val gearColor = when (telemetry.gear) {
-            "R"  -> AccelerationOrange
-            else -> if (isInTrip) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+        // BYD auto-shifts to P whenever the car stops (e.g. at a traffic light).
+        // During an active trip that auto-P is not a deliberate park, so we display
+        // a neutral stop indicator instead of "P" to avoid confusing the user.
+        val autoParkedInTrip = isInTrip && telemetry.gear == "P"
+        val displayGear = if (autoParkedInTrip) "·" else telemetry.gear
+
+        val gearColor = when {
+            telemetry.gear == "R"  -> AccelerationOrange
+            autoParkedInTrip       -> MaterialTheme.colorScheme.onSurfaceVariant
+            isInTrip               -> MaterialTheme.colorScheme.primary
+            else                   -> MaterialTheme.colorScheme.onSurfaceVariant
         }
         val statusText = when {
             isInTrip && telemetry.speed > 0.5              -> "Driving"
             isInTrip && telemetry.gear in listOf("D", "R") -> "Ready"
+            autoParkedInTrip                               -> "Stopped"
             isInTrip                                        -> "Trip in Progress"
             telemetry.gear == "D"                           -> "Ready to Drive"
             telemetry.gear == "R"                           -> "Reverse"
@@ -1472,7 +1245,7 @@ fun TripControls(
                         Surface(modifier = Modifier.size(28.dp), shape = CircleShape, color = gearColor) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Text(
-                                    text = telemetry.gear,
+                                    text = displayGear,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -1617,7 +1390,9 @@ fun VehicleStats(
     /** true in side-by-side layouts: cards share available height via weight(1f), no scroll */
     fillHeight: Boolean = false,
     onNavigateToBatteryDegradation: () -> Unit = {},
-    onShowBattery12vHistory: () -> Unit = {}
+    onShowBattery12vHistory: () -> Unit = {},
+    tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
+    onShowTyreDialog: () -> Unit = {}
 ) {
     val context     = LocalContext.current
     val prefs       = remember { PreferencesManager(context.applicationContext) }
@@ -1634,6 +1409,8 @@ fun VehicleStats(
     ) {
         // weight(1f) is a ColumnScope extension — must be declared inside the Column lambda
         val cardMod = if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth()
+        val smallCardMod = if (fillHeight) Modifier.fillMaxWidth().weight(0.75f) else Modifier.fillMaxWidth()
+        val tyreCardMod = if (fillHeight) Modifier.fillMaxWidth().weight(1.0f) else Modifier.fillMaxWidth()
         // SOH: use the higher-fidelity source if available,
         // otherwise fall back to the estimated Int from toTelemetry() (also 1 decimal).
         // Allow up to 110% for the estimated path since the remaining-energy estimator
@@ -1761,11 +1538,7 @@ fun VehicleStats(
             Drivetrain.FWD -> StatCard(
                 title    = "Front Motor",
                 value    = frontMotorRpm?.let { "$it RPM" } ?: "0 RPM",
-                subtitle = if (motorsAreSpinning) {
-                    "${telemetry.enginePower} kW"
-                } else {
-                    "0 kW"
-                },
+                subtitle = "${telemetry.enginePower} kW",
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1774,11 +1547,7 @@ fun VehicleStats(
             Drivetrain.RWD -> StatCard(
                 title    = "Rear Motor",
                 value    = rearMotorRpm?.let { "$it RPM" } ?: "0 RPM",
-                subtitle = if (motorsAreSpinning) {
-                    "${telemetry.enginePower} kW"
-                } else {
-                    "0 kW"
-                },
+                subtitle = "${telemetry.enginePower} kW",
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1796,15 +1565,11 @@ fun VehicleStats(
                         else -> null
                     }
                 }
+                val kwLine = "${telemetry.enginePower} kW"
                 StatCard(
                     title    = "Front / Rear Motors",
                     value    = "${frontMotorRpm ?: "0"} / ${rearMotorRpm ?: "0"} RPM",
-                    subtitle = if (motorsAreSpinning) {
-                        val kwLine = "${telemetry.enginePower} kW"
-                        if (drivetrainLabel != null) "$drivetrainLabel · $kwLine" else kwLine
-                    } else {
-                        drivetrainLabel ?: "0 kW"
-                    },
+                    subtitle = if (drivetrainLabel != null) "$drivetrainLabel · $kwLine" else kwLine,
                     iconRes  = R.drawable.ic_motor_axle,
                     color    = BydElectricBlue,
                     compact  = fillHeight,
@@ -1831,13 +1596,21 @@ fun VehicleStats(
             modifier = cardMod
         )
 
+        TyreStatCard(
+            telemetry = telemetry,
+            tyreUnit  = tyreUnit,
+            compact   = fillHeight,
+            modifier  = tyreCardMod,
+            onClick   = onShowTyreDialog
+        )
+
         StatCard(
             title    = "Odometer",
             value    = "${String.format("%.1f", telemetry.odometer)} $distanceUnit",
             icon     = Icons.Filled.Speed,
             color    = MaterialTheme.colorScheme.primary,
             compact  = fillHeight,
-            modifier = cardMod
+            modifier = smallCardMod
         )
         StatCard(
             title    = "Total Discharge",
@@ -1854,7 +1627,7 @@ fun VehicleStats(
             icon     = Icons.Filled.ElectricalServices,
             color    = AccelerationOrange,
             compact  = fillHeight,
-            modifier = cardMod
+            modifier = smallCardMod
         )
     }
 }
@@ -2272,6 +2045,109 @@ fun StatCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TyreStatCard(
+    telemetry: VehicleTelemetry,
+    tyreUnit: TyrePressureUnit,
+    compact: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
+    val pad = 8.dp
+    val iconSize = if (compact) 22.dp else 26.dp
+    val spacerW = 8.dp
+    val cellSpacing = 4.dp
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(pad),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.TireRepair,
+                contentDescription = null,
+                tint = BydElectricBlue,
+                modifier = Modifier.size(iconSize)
+            )
+            Spacer(modifier = Modifier.width(spacerW))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(cellSpacing)
+                ) {
+                    TyreCell("FL", telemetry.tyreTempLF.takeIf { it > 0 }, telemetry.tyrePressureLF, tyreUnit, modifier = Modifier.weight(1f))
+                    TyreCell("FR", telemetry.tyreTempRF.takeIf { it > 0 }, telemetry.tyrePressureRF, tyreUnit, modifier = Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(cellSpacing))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(cellSpacing)
+                ) {
+                    TyreCell("RL", telemetry.tyreTempLR.takeIf { it > 0 }, telemetry.tyrePressureLR, tyreUnit, modifier = Modifier.weight(1f))
+                    TyreCell("RR", telemetry.tyreTempRR.takeIf { it > 0 }, telemetry.tyrePressureRR, tyreUnit, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TyreCell(
+    label: String,
+    tempC: Int?,
+    pressurePsi: Double,
+    unit: TyrePressureUnit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            if (tempC != null) {
+                Text(
+                    text = "${tempC}°",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = RegenGreen,
+                    maxLines = 1
+                )
+            }
+            Text(
+                text = unit.formatValue(pressurePsi),
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }

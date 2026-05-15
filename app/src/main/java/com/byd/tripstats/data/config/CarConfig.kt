@@ -346,6 +346,41 @@ object CarCatalog {
         phevUsableBatteryKwh = 15.2
     )
 
+    val BYD_SEAL_U_DM_I_COMFORT = CarConfig(
+        id = "BYD_SEAL_U_DM_I_COMFORT",
+        displayName = "BYD Seal U DM-i Comfort",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 27.3,
+        estimatedKerbMassKg = 2210.0,
+        wltpKm = 125,           // EV-only WLTP range
+        referenceConsumptionKwhPer100km = 19.5,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.9,
+        frontMotorRatedKw = 145,
+        cellCount = 144,        // 27.3 kWh @ ~461V → 144S LFP (estimate)
+        cdA = 0.925,            // Cd 0.34 × A 2.72 m² (same body as DM-i FWD)
+        isPhev = true,
+        phevUsableBatteryKwh = 26.6
+    )
+
+    val BYD_SEAL_U_DM_I_DESIGN_AWD = CarConfig(
+        id = "BYD_SEAL_U_DM_I_DESIGN_AWD",
+        displayName = "BYD Seal U DM-i Design AWD",
+        drivetrain = Drivetrain.AWD,
+        batteryKwh = 18.3,
+        estimatedKerbMassKg = 2100.0,
+        wltpKm = 70,            // EV-only WLTP range
+        referenceConsumptionKwhPer100km = 20.0,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.9,
+        frontMotorRatedKw = 150,
+        rearMotorRatedKw = 120,
+        cellCount = 96,         // 18.3 kWh @ ~307V → 96S LFP (same pack as FWD)
+        cdA = 0.870,            // Cd 0.32 × A 2.72 m²
+        isPhev = true,
+        phevUsableBatteryKwh = 15.2
+    )
+
     val BYD_SONG_PLUS_DM_I = CarConfig(
         id = "BYD_SONG_PLUS_DM_I",
         displayName = "BYD Song Plus DM-i",
@@ -450,6 +485,8 @@ object CarCatalog {
         BYD_SEAL_6_PREMIUM_160KW,
         BYD_TANG_EV,
         BYD_SEAL_U_DM_I,
+        BYD_SEAL_U_DM_I_COMFORT,
+        BYD_SEAL_U_DM_I_DESIGN_AWD,
         BYD_SONG_PLUS_DM_I,
         BYD_HAN_DM_I,
         BYD_TANG_DM_I,
@@ -479,7 +516,7 @@ object CarCatalog {
     )
 
     val groupedPhev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(
-        "BYD Seal U DM-i" to listOf(BYD_SEAL_U_DM_I),
+        "BYD Seal U DM-i" to listOf(BYD_SEAL_U_DM_I, BYD_SEAL_U_DM_I_COMFORT, BYD_SEAL_U_DM_I_DESIGN_AWD),
         "BYD Song Plus DM-i" to listOf(BYD_SONG_PLUS_DM_I),
         "BYD Han DM-i" to listOf(BYD_HAN_DM_I),
         "BYD Tang DM-i" to listOf(BYD_TANG_DM_I),

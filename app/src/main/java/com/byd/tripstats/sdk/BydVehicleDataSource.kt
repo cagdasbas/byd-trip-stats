@@ -429,6 +429,19 @@ class BydVehicleDataSource(context: Context) {
 
     private val runtimeScale01: Double by lazy { RuntimeExtensionBridge.doubleValue("d01", 3.0) }
 
+    // Battery-temp encoding lock. The BYD SDK reports cell temps in either direct °C
+    // or 1/d01-scaled °C, and the encoding varies across firmwares (Seal Excellence
+    // uses scaled, most others use direct). The decoder normally disambiguates using
+    // the statistic cell temp as an anchor — but on app startup, before the statistic
+    // device has reported anything, the only fallback is ambient temperature, which is
+    // an unreliable tie-breaker when cells are warmer than ambient (driving/charging)
+    // or cooler than ambient (active cooling). To avoid overrating/underrating, we
+    // lock the encoding the first time the anchor path produces a clear winner. All
+    // later decodes use the lock directly, bypassing the ambient guess.
+    private enum class TempEncoding { DIRECT, DIVIDED }
+    @Volatile private var lockedPackTempEncoding: TempEncoding? = null
+    @Volatile private var lockedStatisticTempEncoding: TempEncoding? = null
+
     /**
      * Resolves a raw cellTAvg/cellTMin/cellTMax/cellTAux value from the
      * statistic feature set into a Celsius temperature.
@@ -493,7 +506,23 @@ class BydVehicleDataSource(context: Context) {
             val rawDelta = if (rawPlausible) abs(raw - anchor) else Double.MAX_VALUE
             val dividedDelta = if (dividedPlausible) abs(divided - anchor) else Double.MAX_VALUE
             if (rawDelta > maxDelta && dividedDelta > maxDelta) return null
-            return if (rawDelta <= dividedDelta) raw else divided
+            val pickRaw = rawDelta <= dividedDelta
+            // Lock the encoding when the choice is unambiguous (≥ 5°C margin between
+            // the two interpretations). Later decodes — including ones from devices
+            // that fire before the statistic anchor is available on a fresh wake —
+            // use the lock instead of guessing from ambient.
+            if (abs(rawDelta - dividedDelta) >= 5.0) {
+                lockedPackTempEncoding = if (pickRaw) TempEncoding.DIRECT else TempEncoding.DIVIDED
+            }
+            return if (pickRaw) raw else divided
+        }
+
+        // No anchor, but the firmware's encoding is already known — apply it directly.
+        lockedPackTempEncoding?.let { enc ->
+            return when (enc) {
+                TempEncoding.DIRECT -> if (rawPlausible) raw else null
+                TempEncoding.DIVIDED -> if (dividedPlausible) divided else null
+            }
         }
 
         val snap = _vehicleSnapshot.value
@@ -501,10 +530,9 @@ class BydVehicleDataSource(context: Context) {
         val isFastCharging = snap.isChargingActive && snap.chargingPower > 20.0
         val maxDev = if (isFastCharging) 55.0 else 35.0
 
-        if (ambient == null) {
-            // No reference at all — accept raw if plausible, else fall back to divided.
-            return if (rawPlausible) raw else divided
-        }
+        // No anchor, no lock, no ambient — every interpretation is a guess. Return null
+        // and wait for one of the three to arrive rather than risk an over/underrate.
+        if (ambient == null) return null
         if (!rawPlausible) {
             return if (abs(divided - ambient) <= maxDev) divided else null
         }
@@ -514,9 +542,23 @@ class BydVehicleDataSource(context: Context) {
 
         val rawDiff = abs(raw - ambient)
         val dividedDiff = abs(divided - ambient)
+        val rawFits = rawDiff <= maxDev
+        val dividedFits = dividedDiff <= maxDev
+        // When both interpretations fit ambient, only commit when one is clearly
+        // closer (≥ 5°C). A coin-flip tie-breaker between e.g. "20°C cell" and
+        // "60°C cell" is exactly the over/underrate failure mode we want to avoid;
+        // a transient null reading is the lesser evil.
+        if (rawFits && dividedFits) {
+            val margin = 5.0
+            return when {
+                dividedDiff + margin < rawDiff -> divided
+                rawDiff + margin < dividedDiff -> raw
+                else -> null
+            }
+        }
         return when {
-            rawDiff <= maxDev && rawDiff <= dividedDiff -> raw
-            dividedDiff <= maxDev -> divided
+            rawFits -> raw
+            dividedFits -> divided
             else -> null
         }
     }
@@ -556,7 +598,23 @@ class BydVehicleDataSource(context: Context) {
             val rawDelta = if (rawPlausible) abs(raw - anchorTemp) else Double.MAX_VALUE
             val dividedDelta = if (dividedPlausible) abs(divided - anchorTemp) else Double.MAX_VALUE
             if (rawDelta > maxDeltaFromAnchor && dividedDelta > maxDeltaFromAnchor) return null
-            return if (rawDelta <= dividedDelta) raw else divided
+            val pickRaw = rawDelta <= dividedDelta
+            // Lock the encoding when the choice is unambiguous so anchor-less decodes
+            // (cellTMin without a sibling, anything on a fresh wake) don't fall back to
+            // ambient guessing — which is what would mis-rate cells warmer or cooler
+            // than ambient.
+            if (abs(rawDelta - dividedDelta) >= 5.0) {
+                lockedStatisticTempEncoding = if (pickRaw) TempEncoding.DIRECT else TempEncoding.DIVIDED
+            }
+            return if (pickRaw) raw else divided
+        }
+
+        // No anchor, but the firmware's encoding is already known — apply it directly.
+        lockedStatisticTempEncoding?.let { enc ->
+            return when (enc) {
+                TempEncoding.DIRECT -> if (rawPlausible) raw else null
+                TempEncoding.DIVIDED -> if (dividedPlausible) divided else null
+            }
         }
 
         val snap = _vehicleSnapshot.value
@@ -568,24 +626,37 @@ class BydVehicleDataSource(context: Context) {
             // raw is outside physical range → treat as ÷d01-encoded.
             // Validate divided against ambient to reject invalid protocol sentinels
             // (e.g. Seal Excellence 0x44700020 sends 195="not available" → 195÷3=65°C).
-            // Without ambient we cannot verify the decoded value, so return null rather
-            // than risking a sentinel like 186÷3=62°C appearing as a real temperature.
             if (ambient == null) return null
             return if (abs(divided - ambient) <= maxAcceptableDeviation) divided else null
         }
-        if (!dividedPlausible) return raw
+        if (!dividedPlausible) {
+            if (ambient == null) return raw
+            return if (abs(raw - ambient) <= maxAcceptableDeviation) raw else null
+        }
 
-        // Both raw and divided are in the plausible range — use ambient to pick.
-        if (ambient == null) return raw  // No ambient reference — prefer raw (direct °C)
+        // Both raw and divided are in the plausible range. Without ambient we have
+        // no basis to pick — return null and wait for one to arrive rather than
+        // commit to a guess that could over/underrate by tens of degrees.
+        if (ambient == null) return null
 
         val rawDiff = abs(raw - ambient)
         val dividedDiff = abs(divided - ambient)
-        // Pick whichever interpretation sits closer to ambient. The previous rule
-        // ("raw wins if within deviation") mis-picked raw for under/overreport firmwares
-        // where divided was substantially closer. Reject when neither fits.
+        val rawFits = rawDiff <= maxAcceptableDeviation
+        val dividedFits = dividedDiff <= maxAcceptableDeviation
+        // Both interpretations fit — require a clear winner (≥ 5°C) to commit.
+        // Tie-breakers between two similarly-close values are exactly where the
+        // over/underrate failure mode shows up.
+        if (rawFits && dividedFits) {
+            val margin = 5.0
+            return when {
+                dividedDiff + margin < rawDiff -> divided
+                rawDiff + margin < dividedDiff -> raw
+                else -> null
+            }
+        }
         return when {
-            rawDiff <= maxAcceptableDeviation && rawDiff <= dividedDiff -> raw
-            dividedDiff <= maxAcceptableDeviation -> divided
+            rawFits -> raw
+            dividedFits -> divided
             else -> null
         }
     }
@@ -1918,8 +1989,13 @@ class BydVehicleDataSource(context: Context) {
             val soh = invokeIntGetter(device, *runtimeMethodNames("m35"))
             val totalVoltage = invokeIntGetter(device, *runtimeMethodNames("m37"))
             val voltage12v = invokeDoubleGetter(device, *runtimeMethodNames("m38"))
-            val cellTempMax = invokeIntGetter(device, *runtimeMethodNames("m39"))
-            val cellTempMin = invokeIntGetter(device, *runtimeMethodNames("m40"))
+            // m39/m40 are direct °C on most firmwares but 1/d01 °C on some (e.g. Seal Excellence
+            // returns raw 68 = 22.7°C with d01=3). decodePackTempCelsius picks the right
+            // interpretation using the statistic cell temp / ambient as a reference. 0 is the
+            // BMS-uninitialized sentinel — filtering it out preserves the last good reading
+            // instead of letting it overwrite real values on every quiet poll.
+            val cellTempMax = decodePackTempCelsius(invokeIntGetter(device, *runtimeMethodNames("m39"))?.toDouble()?.takeIf { it > 0.0 })?.toInt()
+            val cellTempMin = decodePackTempCelsius(invokeIntGetter(device, *runtimeMethodNames("m40"))?.toDouble()?.takeIf { it > 0.0 })?.toInt()
             val cellVoltMax = invokeDoubleGetter(device, *runtimeMethodNames("m41"))
             val cellVoltMin = invokeDoubleGetter(device, *runtimeMethodNames("m42"))
             val sohDelta = readSohDeltaValue(device)
@@ -1957,6 +2033,9 @@ class BydVehicleDataSource(context: Context) {
                 _batterySoh.value = effectiveSoh ?: _batterySoh.value
                 _batteryTotalVoltage.value = totalVoltage ?: _batteryTotalVoltage.value
                 _battery12vVoltage.value = voltage12v ?: _battery12vVoltage.value
+                // cellTempMax/Min are pre-decoded above (decodePackTempCelsius). null here means
+                // the BMS reading was missing, zero, or a known sentinel — preserve the last
+                // good value instead of overwriting it.
                 _batteryCellTempMax.value = cellTempMax ?: _batteryCellTempMax.value
                 _batteryCellTempMin.value = cellTempMin ?: _batteryCellTempMin.value
                 _batteryCellVoltageMax.value = cellVoltMax ?: _batteryCellVoltageMax.value
@@ -2194,9 +2273,11 @@ class BydVehicleDataSource(context: Context) {
             val totalVoltage = invokeIntGetter(device, *runtimeMethodNames("m37"))
             // 12V auxiliary battery voltage
             val voltage12v = invokeDoubleGetter(device, *runtimeMethodNames("m38"))
-            // Cell temperatures
-            val cellTempMax = invokeIntGetter(device, *runtimeMethodNames("m39"))
-            val cellTempMin = invokeIntGetter(device, *runtimeMethodNames("m40"))
+            // Cell temperatures — decoded via decodePackTempCelsius to handle the
+            // direct-°C vs ÷d01-°C encoding ambiguity present on some firmwares.
+            // 0 is filtered as the BMS-uninitialized sentinel.
+            val cellTempMax = decodePackTempCelsius(invokeIntGetter(device, *runtimeMethodNames("m39"))?.toDouble()?.takeIf { it > 0.0 })?.toInt()
+            val cellTempMin = decodePackTempCelsius(invokeIntGetter(device, *runtimeMethodNames("m40"))?.toDouble()?.takeIf { it > 0.0 })?.toInt()
             val packTemp = decodePackTempCelsius(invokeNumericDoubleGetter(device, *runtimeMethodNames("m36")))
             // Cell voltages
             val cellVoltMax = invokeDoubleGetter(device, *runtimeMethodNames("m41"))
@@ -2211,6 +2292,8 @@ class BydVehicleDataSource(context: Context) {
             _batteryTotalVoltage.value = totalVoltage ?: _batteryTotalVoltage.value
             _battery12vVoltage.value = voltage12v ?: _battery12vVoltage.value
             packTemp?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(batteryPackTemp = it) }
+            // cellTempMax/Min are pre-decoded above; null means the BMS gave us nothing usable
+            // — preserve the last good value rather than zeroing the displayed range.
             _batteryCellTempMax.value = cellTempMax ?: _batteryCellTempMax.value
             _batteryCellTempMin.value = cellTempMin ?: _batteryCellTempMin.value
             _batteryCellVoltageMax.value = cellVoltMax ?: _batteryCellVoltageMax.value
@@ -4607,8 +4690,10 @@ class BydVehicleDataSource(context: Context) {
             battery12vVoltage = _battery12vVoltage.value
                 ?: _vehicleSnapshot.value.battery12vVoltage,
             batteryPackTemp = validatePackTemp(_vehicleSnapshot.value.batteryPackTemp),
-            batteryCellTempMax = validatePackTemp(_vehicleSnapshot.value.batteryCellTempMax?.toDouble())?.toInt(),
-            batteryCellTempMin = validatePackTemp(_vehicleSnapshot.value.batteryCellTempMin?.toDouble())?.toInt(),
+            // Cell temps are already decoded (via decodePackTempCelsius) and sentinel-filtered
+            // at the write sites in logChargingSnapshot / logBatterySnapshot — pass through.
+            batteryCellTempMax = _vehicleSnapshot.value.batteryCellTempMax,
+            batteryCellTempMin = _vehicleSnapshot.value.batteryCellTempMin,
             batteryCellVoltageMax = _vehicleSnapshot.value.batteryCellVoltageMax,
             batteryCellVoltageMin = _vehicleSnapshot.value.batteryCellVoltageMin,
             carLocked = _vehicleSnapshot.value.carLocked,

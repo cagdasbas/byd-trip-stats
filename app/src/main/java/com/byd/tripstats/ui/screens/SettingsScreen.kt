@@ -1139,7 +1139,6 @@ private fun AppPreferencesTab(
     onNavigateToTripGoals: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val dashboardAnimationsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(initial = true)
     val keepServiceAliveWhenOff by preferencesManager.keepServiceAliveWhenOff.collectAsState(initial = true)
     val carOffTimeoutMinutes by preferencesManager.carOffTimeoutMinutes.collectAsState(
         initial = preferencesManager.getCachedCarOffTimeoutMinutes()
@@ -1179,72 +1178,6 @@ private fun AppPreferencesTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         SectionHeader(icon = Icons.Filled.Tune, title = "Preferences")
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            "Dashboard animations",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Toggle the animated energy flow, liquid battery effects, and other motion-heavy dashboard transitions.\n " +
-                            "When using those, expect CPU to reach 100% (up from 20%).",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = dashboardAnimationsEnabled,
-                        onCheckedChange = { enabled ->
-                            scope.launch {
-                                preferencesManager.saveDashboardAnimationsEnabled(enabled)
-                            }
-                        },
-                        thumbContent = if (!dashboardAnimationsEnabled) {
-                            {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .background(ToggleUncheckedTrack, CircleShape)
-                                )
-                            }
-                        } else null,
-                        colors = SwitchDefaults.colors(
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = ToggleUncheckedTrack,
-                            uncheckedBorderColor = ToggleUncheckedTrack
-                        )
-                    )
-                }
-
-                Text(
-                    if (dashboardAnimationsEnabled) {
-                        "Enabled: richer visuals, with a bit more rendering work on the dashboard."
-                    } else {
-                        "Disabled: static energy flow rendering and reduced animation overhead on the main dashboard."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),

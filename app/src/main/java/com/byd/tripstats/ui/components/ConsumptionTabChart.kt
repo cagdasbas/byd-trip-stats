@@ -225,7 +225,7 @@ fun ConsumptionChartExpanded(
             selectedDurationAverage?.let { avg ->
                 ConsumptionLegendItem(
                     color = RegenGreen.copy(alpha = 0.9f),
-                    label = "Selected duration avg (${String.format("%.1f", avg)} ${unitSystem.consumptionUnit})"
+                    label = "Your duration avg (${String.format("%.1f", avg)} ${unitSystem.consumptionUnit})"
                 )
             }
             referenceConsumptionKwhPer100km?.let { avg ->
