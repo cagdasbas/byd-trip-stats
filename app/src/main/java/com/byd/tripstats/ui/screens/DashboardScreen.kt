@@ -8,9 +8,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -54,13 +51,21 @@ import com.byd.tripstats.data.preferences.isImperial
 import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.R
 import com.byd.tripstats.ui.components.CompactBattery
+import com.byd.tripstats.ui.components.LiquidFillBattery
 import com.byd.tripstats.ui.components.RangeProjectionChart
 import com.byd.tripstats.ui.components.RangeDataPoint
+import com.byd.tripstats.ui.components.ConsumptionThumbnail
 import com.byd.tripstats.ui.components.ConsumptionChartExpanded
 import com.byd.tripstats.ui.components.drawCrosshair
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.imageResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.theme.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
@@ -113,6 +118,8 @@ fun DashboardScreen(
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context.applicationContext) }
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
+    val dashboardIconsEnabled by prefs.dashboardAnimationsEnabled
+        .collectAsState(initial = prefs.getCachedAnimationsEnabled())
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
     var showBattery12vDialog by remember { mutableStateOf(false) }
@@ -139,25 +146,34 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.byd_logo),
+                            contentDescription = "BYD",
+                            modifier = Modifier.height(28.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            text = "BYD trip stats",
+                            text = "trip stats",
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
 
                         selectedCar?.let { car ->
-                            Spacer(modifier = Modifier.width(16.dp))
-                            TextButton(
-                                onClick = { showCarSelectionDialog = true },
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Text(
-                                    text = "(${car.displayName})",
-                                    color = BatteryBlue,
-                                    fontSize = 20.sp,
-                                    maxLines = 1
-                                )
-                            }
+                            VerticalDivider(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .height(24.dp),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f)
+                            )
+                            Text(
+                                text = car.displayName.uppercase(),
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                modifier = Modifier.clickable { showCarSelectionDialog = true }
+                            )
                         }
                     }
                 },
@@ -173,25 +189,27 @@ fun DashboardScreen(
                         }
                     }
 
-                    IconButton(onClick = onNavigateToCharging) {
-                        CompactBattery(
-                            soc = telemetry?.soc?.toFloat() ?: 0f,
-                            isCharging = telemetry?.isCharging ?: false
-                        )
+                    if (!dashboardIconsEnabled) {
+                        IconButton(onClick = onNavigateToCharging) {
+                            CompactBattery(
+                                soc = telemetry?.soc?.toFloat() ?: 0f,
+                                isCharging = telemetry?.isCharging ?: false
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        IconButton(onClick = { consumptionExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.BarChart,
+                                contentDescription = "Consumption Charts",
+                                tint = RegenGreen,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
                     }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    IconButton(onClick = { consumptionExpanded = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.BarChart,
-                            contentDescription = "Consumption Charts",
-                            tint = RegenGreen,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
 
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(
@@ -260,9 +278,12 @@ fun DashboardScreen(
                 onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                 onShowBattery12vHistory = { showBattery12vDialog = true },
                 consumptionExpanded = consumptionExpanded,
+                onConsumptionExpand = { consumptionExpanded = true },
                 onConsumptionClose = { consumptionExpanded = false },
                 tyreUnit = tyreUnit,
                 onShowTyreDialog = { showTyreUnitDialog = true },
+                dashboardIconsEnabled = dashboardIconsEnabled,
+                onNavigateToCharging = onNavigateToCharging,
                 widthSizeClass = widthSizeClass,
                 sessionDistanceKm = liveSegmentDistanceKm,
                 tripDistanceKm = liveDistanceKm,
@@ -382,9 +403,12 @@ fun DashboardContent(
     onNavigateToBatteryDegradation: () -> Unit = {},
     onShowBattery12vHistory: () -> Unit = {},
     consumptionExpanded: Boolean = false,
+    onConsumptionExpand: () -> Unit = {},
     onConsumptionClose: () -> Unit = {},
     tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
     onShowTyreDialog: () -> Unit = {},
+    dashboardIconsEnabled: Boolean = true,
+    onNavigateToCharging: () -> Unit = {},
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
     sessionDistanceKm: Double = 0.0,
     tripDistanceKm: Double = 0.0,
@@ -422,7 +446,8 @@ fun DashboardContent(
                     onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                     onShowBattery12vHistory = onShowBattery12vHistory,
                     tyreUnit = tyreUnit,
-                    onShowTyreDialog = onShowTyreDialog
+                    onShowTyreDialog = onShowTyreDialog,
+                    dashboardIconsEnabled = dashboardIconsEnabled
                 )
 
                 // Energy flow / range card
@@ -435,7 +460,12 @@ fun DashboardContent(
                     sessionDistanceKm = sessionDistanceKm,
                     tripDistanceKm = tripDistanceKm,
                     consumptionExpanded = consumptionExpanded,
+                    onConsumptionExpand = onConsumptionExpand,
                     onConsumptionClose = onConsumptionClose,
+                    dashboardIconsEnabled = dashboardIconsEnabled,
+                    onNavigateToCharging = onNavigateToCharging,
+                    onShowTyreDialog = onShowTyreDialog,
+                    tyreUnit = tyreUnit,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 320.dp)
@@ -485,7 +515,12 @@ fun DashboardContent(
                         sessionDistanceKm = sessionDistanceKm,
                         tripDistanceKm = tripDistanceKm,
                         consumptionExpanded = consumptionExpanded,
+                        onConsumptionExpand = onConsumptionExpand,
                         onConsumptionClose = onConsumptionClose,
+                        dashboardIconsEnabled = dashboardIconsEnabled,
+                        onNavigateToCharging = onNavigateToCharging,
+                        onShowTyreDialog = onShowTyreDialog,
+                        tyreUnit = tyreUnit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -525,7 +560,8 @@ fun DashboardContent(
                         onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                         onShowBattery12vHistory = onShowBattery12vHistory,
                         tyreUnit = tyreUnit,
-                        onShowTyreDialog = onShowTyreDialog
+                        onShowTyreDialog = onShowTyreDialog,
+                        dashboardIconsEnabled = dashboardIconsEnabled
                     )
                 }
             }
@@ -554,7 +590,12 @@ fun DashboardContent(
                         sessionDistanceKm = sessionDistanceKm,
                         tripDistanceKm = tripDistanceKm,
                         consumptionExpanded = consumptionExpanded,
+                        onConsumptionExpand = onConsumptionExpand,
                         onConsumptionClose = onConsumptionClose,
+                        dashboardIconsEnabled = dashboardIconsEnabled,
+                        onNavigateToCharging = onNavigateToCharging,
+                        onShowTyreDialog = onShowTyreDialog,
+                        tyreUnit = tyreUnit,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -595,7 +636,8 @@ fun DashboardContent(
                         onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
                         onShowBattery12vHistory = onShowBattery12vHistory,
                         tyreUnit = tyreUnit,
-                        onShowTyreDialog = onShowTyreDialog
+                        onShowTyreDialog = onShowTyreDialog,
+                        dashboardIconsEnabled = dashboardIconsEnabled
                     )
                 }
             }
@@ -653,7 +695,12 @@ fun EnergyFlowDiagram(
     sessionDistanceKm: Double = 0.0,
     tripDistanceKm: Double = 0.0,
     consumptionExpanded: Boolean = false,
+    onConsumptionExpand: () -> Unit = {},
     onConsumptionClose: () -> Unit = {},
+    dashboardIconsEnabled: Boolean = true,
+    onNavigateToCharging: () -> Unit = {},
+    onShowTyreDialog: () -> Unit = {},
+    tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
     modifier: Modifier = Modifier
 ) {
     val power = if (telemetry.isCharging && telemetry.chargingPower > 0.1) {
@@ -663,6 +710,7 @@ fun EnergyFlowDiagram(
     }
     val isRegenerating = telemetry.isRegenerating
     val isCharging = telemetry.isCharging
+    val hasActiveEnergyFlow = abs(power) > 1.0 || isCharging
     // In multi-window/split-screen the app's window is narrower; skip decimal to avoid crowding.
     val isFullScreen = LocalConfiguration.current.screenWidthDp >= 840
 
@@ -672,6 +720,26 @@ fun EnergyFlowDiagram(
     val unitSystem by appPrefs.unitSystem.collectAsState(initial = appPrefs.getCachedUnitSystem())
     val distanceUnit = unitSystem.distanceUnit
     val speedUnit = unitSystem.speedUnit
+
+    // Energy-flow row animation — only runs when icons section is enabled and visible.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val flowOffsetAnim = remember { Animatable(0f) }
+    LaunchedEffect(isResumed, dashboardIconsEnabled, hasActiveEnergyFlow) {
+        if (dashboardIconsEnabled && isResumed && hasActiveEnergyFlow) {
+            while (true) {
+                delay(50L)  // 20fps
+                val next = (flowOffsetAnim.value + 0.05f) % 1f
+                flowOffsetAnim.snapTo(next)
+            }
+        }
+    }
+    val flowOffset = if (dashboardIconsEnabled && hasActiveEnergyFlow) flowOffsetAnim.value else 0f
+
+    val awdBitmap: ImageBitmap? = if (dashboardIconsEnabled) {
+        ImageBitmap.imageResource(id = R.drawable.awd)
+    } else null
 
     Card(
         modifier = modifier,
@@ -694,7 +762,126 @@ fun EnergyFlowDiagram(
                     .fillMaxSize()
                     .padding(12.dp)
             ) {
-                // Range Projection Chart — tap to flip to expanded view
+                if (dashboardIconsEnabled && awdBitmap != null) {
+                    // ── Icons row: battery + AWD/tyres + consumption thumbnail ─────
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp)
+                    ) {
+                        EnergyFlowCanvas(
+                            power = power,
+                            isRegenerating = isRegenerating,
+                            isCharging = isCharging,
+                            flowOffset = { flowOffset },
+                            animationsEnabled = true
+                        )
+
+                        LiquidFillBattery(
+                            soc = telemetry.soc.toFloat(),
+                            isCharging = isCharging,
+                            animationsEnabled = true,
+                            width = 60.dp,
+                            height = 100.dp,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(start = 16.dp)
+                                .clickable { onNavigateToCharging() }
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 12.dp)
+                        ) {
+                            Image(
+                                bitmap = awdBitmap,
+                                contentDescription = "AWD drivetrain — tap to change pressure unit",
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .clickable { onShowTyreDialog() },
+                                contentScale = ContentScale.Fit,
+                                filterQuality = FilterQuality.High
+                            )
+
+                            TyrePressureIndicator(
+                                pressure = telemetry.tyrePressureLF,
+                                tempC = telemetry.tyreTempLF.takeIf { it > 0 },
+                                unit = tyreUnit,
+                                isFront = true,
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .offset(x = (-24).dp, y = (-12).dp)
+                            )
+
+                            TyrePressureIndicator(
+                                pressure = telemetry.tyrePressureRF,
+                                tempC = telemetry.tyreTempRF.takeIf { it > 0 },
+                                unit = tyreUnit,
+                                isFront = true,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 26.dp, y = (-12).dp)
+                            )
+
+                            TyrePressureIndicator(
+                                pressure = telemetry.tyrePressureLR,
+                                tempC = telemetry.tyreTempLR.takeIf { it > 0 },
+                                unit = tyreUnit,
+                                isFront = false,
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .offset(x = (-24).dp, y = (14).dp)
+                            )
+
+                            TyrePressureIndicator(
+                                pressure = telemetry.tyrePressureRR,
+                                tempC = telemetry.tyreTempRR.takeIf { it > 0 },
+                                unit = tyreUnit,
+                                isFront = false,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 26.dp, y = (14).dp)
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .width(120.dp)
+                                .fillMaxHeight()
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onConsumptionExpand() }
+                                .padding(4.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(8.dp)
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "consumption charts",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            ConsumptionThumbnail(
+                                data = monthlyEfficiency,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            )
+                        }
+                    }
+                }
+
+                // Range Projection Chart
                 Box(modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -1046,7 +1233,6 @@ fun TripControls(
     unitSystem: UnitSystem = UnitSystem.METRIC,
     modifier: Modifier = Modifier
 ) {
-    val isFullScreen = LocalConfiguration.current.screenWidthDp >= 840
     var showStopConfirmDialog by remember { mutableStateOf(false) }
 
     // ── Stop recording confirmation ────────────────────────────────────────────
@@ -1097,8 +1283,9 @@ fun TripControls(
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             ),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1159,10 +1346,9 @@ fun TripControls(
         }
 
         // BYD auto-shifts to P whenever the car stops (e.g. at a traffic light).
-        // During an active trip that auto-P is not a deliberate park, so we display
-        // a neutral stop indicator instead of "P" to avoid confusing the user.
+        // During an active trip that auto-P is not a deliberate park, so the
+        // statusText below maps it to "Stopped" rather than "Trip in Progress".
         val autoParkedInTrip = isInTrip && telemetry.gear == "P"
-        val displayGear = if (autoParkedInTrip) "·" else telemetry.gear
 
         val gearColor = when {
             telemetry.gear == "R"  -> AccelerationOrange
@@ -1182,201 +1368,261 @@ fun TripControls(
             else                                            -> "Waiting for Trip..."
         }
 
+        val autoLabel: @Composable () -> Unit = {
+            Text(text = "Auto", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        }
+        val autoSwitch: @Composable () -> Unit = {
+            Switch(
+                checked = autoTripDetection,
+                onCheckedChange = { enabled ->
+                    if (!enabled) showManualWarning = true
+                    else onToggleAutoDetection()
+                },
+                thumbContent = if (!autoTripDetection) {
+                    {
+                        Box(modifier = Modifier.size(12.dp).background(ToggleUncheckedTrack, CircleShape))
+                    }
+                } else null,
+                colors = SwitchDefaults.colors(
+                    uncheckedThumbColor  = Color.White,
+                    uncheckedTrackColor  = ToggleUncheckedTrack,
+                    uncheckedBorderColor = ToggleUncheckedTrack
+                )
+            )
+        }
         val autoToggle: @Composable () -> Unit = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Auto", style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.width(12.dp))
-                Switch(
-                    checked = autoTripDetection,
-                    onCheckedChange = { enabled ->
-                        if (!enabled) showManualWarning = true
-                        else onToggleAutoDetection()
-                    },
-                    thumbContent = if (!autoTripDetection) {
-                        {
-                            Box(modifier = Modifier.size(12.dp).background(ToggleUncheckedTrack, CircleShape))
-                        }
-                    } else null,
-                    colors = SwitchDefaults.colors(
-                        uncheckedThumbColor  = Color.White,
-                        uncheckedTrackColor  = ToggleUncheckedTrack,
-                        uncheckedBorderColor = ToggleUncheckedTrack
-                    )
+                autoLabel()
+                Spacer(modifier = Modifier.width(6.dp))
+                autoSwitch()
+            }
+        }
+
+        // ── ALT 2 — DENSE: single horizontal row, button + titles + stats + auto ───
+        val elapsedH   = elapsedMs / 3_600_000L
+        val elapsedM   = (elapsedMs % 3_600_000L) / 60_000L
+        val elapsedS   = (elapsedMs % 60_000L) / 1000L
+        val elapsedStr = "%02d:%02d:%02d".format(elapsedH, elapsedM, elapsedS)
+
+        val distKm = liveDistanceKm
+        // Prefer the pure odometer delta for avg speed — matches the formula the
+        // finalized trip stats use (endOdometer - startOdometer / duration).
+        val speedDistKm = liveOdometerDistanceKm.takeIf { it > 0.0 } ?: distKm
+        val avgSpeedDisplay = if (elapsedMs > 10_000L) {
+            unitSystem.convertDistance(speedDistKm) / (elapsedMs / 3_600_000.0)
+        } else 0.0
+        val kwhPer100km = if (distKm > 0.5) (liveAccumulatedKwh / distKm) * 100.0 else 0.0
+        val effDisplay  = unitSystem.convertEfficiency(kwhPer100km)
+
+        // Record is disabled while auto-detection is on (auto handles starting trips itself).
+        val recordDisabled = !isInTrip && autoTripDetection
+
+        // The actual card width — not screenWidthDp — drives the 4-col vs 2×2 choice.
+        // On a tablet in side-by-side layout, the screen is wide but the card itself
+        // sits in the left pane and may only be ~700dp.
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // Both branches key off the *card's* measured width, not the device's
+        // screenWidthDp — in split-screen / multi-window the total screen is wide
+        // but this card may only be ~500dp.
+        val isWideCard   = maxWidth >= 840.dp
+        val isNarrowCard = maxWidth < 720.dp
+        // The narrow-card-in-trip layout sizes itself naturally; this height
+        // applies only to the single-row arrangements below.
+        val cardHeight = if (isWideCard) 80.dp else 64.dp
+
+        val recordStopButton: @Composable (compact: Boolean) -> Unit = { compact ->
+            Button(
+                onClick = {
+                    if (isInTrip) showStopConfirmDialog = true else onStartTrip()
+                },
+                enabled = !recordDisabled,
+                shape = RoundedCornerShape(50),
+                contentPadding = if (compact) {
+                    PaddingValues(start = 8.dp, end = 10.dp, top = 4.dp, bottom = 4.dp)
+                } else {
+                    PaddingValues(start = 12.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isInTrip) BydErrorRed else BydElectricAzure,
+                    contentColor = Color.White,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Icon(
+                    imageVector = if (isInTrip) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (compact) 11.dp else 14.dp)
+                )
+                Spacer(modifier = Modifier.width(if (compact) 4.dp else 6.dp))
+                Text(
+                    text = if (isInTrip) "Stop" else "Record",
+                    fontSize = if (compact) 11.sp else 14.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        if (isInTrip) {
-            // ── 3-column in-trip layout (fixed 100dp, no animation) ─────────
-            val elapsedH   = elapsedMs / 3_600_000L
-            val elapsedM   = (elapsedMs % 3_600_000L) / 60_000L
-            val elapsedS   = (elapsedMs % 60_000L) / 1000L
-            val elapsedStr = "%02d:%02d:%02d".format(elapsedH, elapsedM, elapsedS)
-
-            val distKm = liveDistanceKm
-            // Prefer the pure odometer delta for avg speed — matches the formula the
-            // finalized trip stats use (endOdometer - startOdometer / duration).
-            // Fall back to the integration-based liveDistanceKm only when odometer is stale.
-            val speedDistKm = liveOdometerDistanceKm.takeIf { it > 0.0 } ?: distKm
-            val avgSpeedDisplay = if (elapsedMs > 10_000L) {
-                unitSystem.convertDistance(speedDistKm) / (elapsedMs / 3_600_000.0)
-            } else 0.0
-            val kwhPer100km = if (distKm > 0.5) (liveAccumulatedKwh / distKm) * 100.0 else 0.0
-            val effDisplay  = unitSystem.convertEfficiency(kwhPer100km)
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isFullScreen) 120.dp else 100.dp)
-                    .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: "Trip Tracking" title above; gear circle + status below
-                Column(
-                    modifier = Modifier.fillMaxHeight(),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Trip Tracking",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+        val titles: @Composable () -> Unit = {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = "Trip Tracking",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(gearColor, CircleShape)
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(modifier = Modifier.size(28.dp), shape = CircleShape, color = gearColor) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                Text(
-                                    text = displayGear,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                    }
-                }
-
-                // Center: live stats — adaptive 1×4 or 2×2 grid depending on available width
-                BoxWithConstraints(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (maxWidth >= 190.dp) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            LiveTripStat(label = "TIME",        value = elapsedStr,                                             unit = "",                        isFullScreen = isFullScreen)
-                            LiveTripStat(label = "AVG SPEED",   value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit,       isFullScreen = isFullScreen)
-                            LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh",                     isFullScreen = isFullScreen)
-                            LiveTripStat(label = "CONSUMPTION", value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit, isFullScreen = isFullScreen)
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                LiveTripStat(label = "TIME",      value = elapsedStr,                                             unit = "",                  isFullScreen = isFullScreen)
-                                LiveTripStat(label = "AVG SPEED", value = "%.0f".format(avgSpeedDisplay),                        unit = unitSystem.speedUnit, isFullScreen = isFullScreen)
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                LiveTripStat(label = "ENERGY USED", value = "%.1f".format(liveAccumulatedKwh),                     unit = "kWh",                     isFullScreen = isFullScreen)
-                                LiveTripStat(label = "CONSUMPTION",  value = if (effDisplay > 0) "%.1f".format(effDisplay) else "—", unit = unitSystem.consumptionUnit, isFullScreen = isFullScreen)
-                            }
-                        }
-                    }
-                }
-
-                // Right: Auto toggle above; Stop button below
-                Column(
-                    modifier = Modifier.fillMaxHeight().padding(start = 4.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                    horizontalAlignment = Alignment.End
-                ) {
-                    autoToggle()
-                    Button(
-                        onClick = { showStopConfirmDialog = true },
-                        modifier = Modifier.width(100.dp).height(36.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = BydErrorRed)
-                    ) {
-                        Icon(Icons.Filled.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Stop", fontSize = 14.sp)
-                    }
+                    Spacer(modifier = Modifier.width(5.dp))
+                    val subtitle = if (isInTrip) statusText
+                                   else "${telemetry.gear} · $statusText"
+                    Text(
+                        text = subtitle,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-        } else {
-            // ── Original 2-row stacked layout (not in trip, fixed 100dp) ────
+        }
+
+        if (isNarrowCard && isInTrip) {
+            // Split-screen layout, stacked vertically so the stat values get
+            // their own bands. 4 rows top-to-bottom:
+            //   1) titles (left) | "Auto" text (right)
+            //   2) TIME / AVG
+            //   3) ENERGY / CONS
+            //   4) Stop button (left) | Auto switch (right)
+            // Two horizontal rows of 5 equal-weight cells. The middle cell
+            // is left intentionally empty so AVG / CONS push further right
+            // and don't crowd TIME / ENERGY.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(100.dp)
-                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(30.dp).padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Trip Tracking",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    autoToggle()
+                    Box(modifier = Modifier.weight(1f)) { titles() }
+                    Box(modifier = Modifier.weight(1f)) {
+                        DenseStat("TIME", elapsedStr, "")
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Box(modifier = Modifier.weight(1f)) {
+                        DenseStat("AVG", "%.0f".format(avgSpeedDisplay), unitSystem.speedUnit)
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd
+                    ) { autoLabel() }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        color = Color.Transparent,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(modifier = Modifier.size(28.dp), shape = CircleShape, color = gearColor) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text(
-                                        text = telemetry.gear,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(text = statusText, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-                        }
+                    Box(modifier = Modifier.weight(1f)) { recordStopButton(true) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        DenseStat("ENERGY", "%.1f".format(liveAccumulatedKwh), "kWh")
                     }
-
-                    if (!autoTripDetection) {
-                        Button(
-                            onClick = onStartTrip,
-                            modifier = Modifier.width(120.dp).fillMaxHeight(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                        ) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = "Record", fontSize = 15.sp)
-                        }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Box(modifier = Modifier.weight(1f)) {
+                        DenseStat(
+                            "CONS.",
+                            if (effDisplay > 0) "%.1f".format(effDisplay) else "—",
+                            unitSystem.consumptionUnit
+                        )
                     }
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd
+                    ) { autoSwitch() }
                 }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(cardHeight)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                recordStopButton(false)
+                titles()
+
+                if (isInTrip) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        DenseStat("TIME", elapsedStr, "")
+                        DenseStat("AVG", "%.0f".format(avgSpeedDisplay), unitSystem.speedUnit)
+                        DenseStat("ENERGY", "%.1f".format(liveAccumulatedKwh), "kWh")
+                        DenseStat(
+                            "CONS.",
+                            if (effDisplay > 0) "%.1f".format(effDisplay) else "—",
+                            unitSystem.consumptionUnit
+                        )
+                    }
+                } else {
+                    Text(
+                        text = if (autoTripDetection)
+                            "Auto detection will start a trip when you drive"
+                        else
+                            "Press Record to begin manual tracking",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                autoToggle()
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun DenseStat(label: String, value: String, unit: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = value,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+            if (unit.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = unit,
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 1.dp),
+                    maxLines = 1
+                )
             }
         }
     }
@@ -1392,7 +1638,8 @@ fun VehicleStats(
     onNavigateToBatteryDegradation: () -> Unit = {},
     onShowBattery12vHistory: () -> Unit = {},
     tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
-    onShowTyreDialog: () -> Unit = {}
+    onShowTyreDialog: () -> Unit = {},
+    dashboardIconsEnabled: Boolean = true
 ) {
     val context     = LocalContext.current
     val prefs       = remember { PreferencesManager(context.applicationContext) }
@@ -1596,13 +1843,15 @@ fun VehicleStats(
             modifier = cardMod
         )
 
-        TyreStatCard(
-            telemetry = telemetry,
-            tyreUnit  = tyreUnit,
-            compact   = fillHeight,
-            modifier  = tyreCardMod,
-            onClick   = onShowTyreDialog
-        )
+        if (!dashboardIconsEnabled) {
+            TyreStatCard(
+                telemetry = telemetry,
+                tyreUnit  = tyreUnit,
+                compact   = fillHeight,
+                modifier  = tyreCardMod,
+                onClick   = onShowTyreDialog
+            )
+        }
 
         StatCard(
             title    = "Odometer",

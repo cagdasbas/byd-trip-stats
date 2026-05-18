@@ -41,7 +41,7 @@ object CarCatalog {
 
     val BYD_SEAL_DYNAMIC_RWD = CarConfig(
         id = "BYD_SEAL_DYNAMIC",
-        displayName = "BYD Seal Dynamic",
+        displayName = "Seal Dynamic",
         drivetrain = Drivetrain.RWD,
         batteryKwh = 61.4,
         estimatedKerbMassKg = 2045.0,
@@ -55,7 +55,7 @@ object CarCatalog {
 
     val BYD_SEAL_PREMIUM_RWD = CarConfig(
         id = "BYD_SEAL_PREMIUM",
-        displayName = "BYD Seal Premium",
+        displayName = "Seal Premium",
         drivetrain = Drivetrain.RWD,
         batteryKwh = 82.5,
         estimatedKerbMassKg = 2130.0,
@@ -69,7 +69,7 @@ object CarCatalog {
 
     val BYD_SEAL_EXCELLENCE = CarConfig(
         id = "BYD_SEAL_EXCELLENCE",
-        displayName = "BYD Seal Excellence",
+        displayName = "Seal Excellence",
         drivetrain = Drivetrain.AWD,
         batteryKwh = 82.5,
         estimatedKerbMassKg = 2260.0,
@@ -85,7 +85,7 @@ object CarCatalog {
 
     val BYD_DOLPHIN_STANDARD = CarConfig(
         id = "BYD_DOLPHIN_STANDARD",
-        displayName = "BYD Dolphin Active / Boost",
+        displayName = "Dolphin Active / Boost",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 44.9,
         estimatedKerbMassKg = 1650.0,
@@ -99,7 +99,7 @@ object CarCatalog {
 
     val BYD_DOLPHIN_EXTENDED = CarConfig(
         id = "BYD_DOLPHIN_EXTENDED",
-        displayName = "BYD Dolphin Extended / Comfort / Design",
+        displayName = "Dolphin Extended / Comfort / Design",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 60.4,
         estimatedKerbMassKg = 1733.0,
@@ -113,7 +113,7 @@ object CarCatalog {
 
     val BYD_ATTO_2_ACTIVE = CarConfig(
         id = "BYD_ATTO_2_ACTIVE",
-        displayName = "BYD Atto 2 Active",
+        displayName = "Atto 2 Active",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 45.1,
         estimatedKerbMassKg = 1570.0,
@@ -128,7 +128,7 @@ object CarCatalog {
 
     val BYD_ATTO_2_BOOST = CarConfig(
         id = "BYD_ATTO_2_BOOST",
-        displayName = "BYD Atto 2 Boost",
+        displayName = "Atto 2 Boost",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 51.1,
         estimatedKerbMassKg = 1610.0,
@@ -143,7 +143,7 @@ object CarCatalog {
 
     val BYD_ATTO_2_COMFORT = CarConfig(
         id = "BYD_ATTO_2_COMFORT",
-        displayName = "BYD Atto 2 Comfort",
+        displayName = "Atto 2 Comfort",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 64.8,
         estimatedKerbMassKg = 1720.0,
@@ -158,7 +158,7 @@ object CarCatalog {
 
     val BYD_ATTO_3 = CarConfig(
         id = "BYD_ATTO_3",
-        displayName = "BYD Atto 3",
+        displayName = "Atto 3",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 60.4,
         estimatedKerbMassKg = 1825.0,
@@ -172,7 +172,7 @@ object CarCatalog {
 
     val BYD_SEAL_U_COMFORT = CarConfig(
         id = "BYD_SEAL_U_COMFORT",
-        displayName = "BYD Seal U Comfort",
+        displayName = "Seal U Comfort",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 71.8,
         estimatedKerbMassKg = 2095.0,
@@ -186,7 +186,7 @@ object CarCatalog {
 
     val BYD_SEAL_U_DESIGN = CarConfig(
         id = "BYD_SEAL_U_DESIGN",
-        displayName = "BYD Seal U Design",
+        displayName = "Seal U Design",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 87.0,
         estimatedKerbMassKg = 2222.0,
@@ -200,7 +200,7 @@ object CarCatalog {
 
     val BYD_DOLPHIN_SURF_ACTIVE = CarConfig(
         id = "BYD_DOLPHIN_SURF_ACTIVE",
-        displayName = "BYD Seagull / Dolphin Surf Active",
+        displayName = "Seagull / Dolphin Surf Active",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 30.0,
         estimatedKerbMassKg = 1294.0,
@@ -214,7 +214,7 @@ object CarCatalog {
 
     val BYD_DOLPHIN_SURF_BOOST = CarConfig(
         id = "BYD_DOLPHIN_SURF_BOOST",
-        displayName = "BYD Seagull / Dolphin Surf Boost",
+        displayName = "Seagull / Dolphin Surf Boost",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 43.2,
         estimatedKerbMassKg = 1370.0,
@@ -228,7 +228,7 @@ object CarCatalog {
 
     val BYD_DOLPHIN_SURF_COMFORT = CarConfig(
         id = "BYD_DOLPHIN_SURF_COMFORT",
-        displayName = "BYD Seagull / Dolphin Surf Comfort",
+        displayName = "Seagull / Dolphin Surf Comfort",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 43.2,
         estimatedKerbMassKg = 1390.0,
@@ -243,7 +243,7 @@ object CarCatalog {
     // id kept as "BYD_M6" for backward-compatibility with stored user preferences
     val BYD_M6_SUPERIOR_100KW = CarConfig(
         id = "BYD_M6",
-        displayName = "BYD M6 Superior 100kW",
+        displayName = "M6 Superior 100kW",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 71.8,
         estimatedKerbMassKg = 1915.0,
@@ -258,7 +258,7 @@ object CarCatalog {
 
     val BYD_M6_SUPERIOR_150KW = CarConfig(
         id = "BYD_M6_SUPERIOR_150KW",
-        displayName = "BYD M6 Superior 150kW",
+        displayName = "M6 Superior 150kW",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 71.8,
         estimatedKerbMassKg = 1925.0,
@@ -273,7 +273,7 @@ object CarCatalog {
 
     val BYD_M6_STANDARD_120KW = CarConfig(
         id = "BYD_M6_STANDARD",
-        displayName = "BYD M6 Standard 120kW",
+        displayName = "M6 Standard 120kW",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 55.4,
         estimatedKerbMassKg = 1870.0,
@@ -288,7 +288,7 @@ object CarCatalog {
 
     val BYD_SEAL_6_PREMIUM_95KW = CarConfig(
         id = "BYD_SEAL_6_PREMIUM_95KW",
-        displayName = "BYD Seal 6 Premium 95kW",
+        displayName = "Seal 6 Premium 95kW",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 56.64,
         estimatedKerbMassKg = 1750.0,
@@ -302,7 +302,7 @@ object CarCatalog {
 
     val BYD_SEAL_6_PREMIUM_160KW = CarConfig(
         id = "BYD_SEAL_6_PREMIUM_160KW",
-        displayName = "BYD Seal 6 Premium 160kW",
+        displayName = "Seal 6 Premium 160kW",
         drivetrain = Drivetrain.RWD,
         batteryKwh = 56.64,
         estimatedKerbMassKg = 1780.0,
@@ -316,7 +316,7 @@ object CarCatalog {
 
     val BYD_TANG_EV = CarConfig(
         id = "BYD_TANG_EV",
-        displayName = "BYD Tang EV",
+        displayName = "Tang EV",
         drivetrain = Drivetrain.AWD,
         batteryKwh = 108.8,
         estimatedKerbMassKg = 2635.0,
@@ -332,7 +332,7 @@ object CarCatalog {
 
     val BYD_SEAL_U_DM_I = CarConfig(
         id = "BYD_SEAL_U_DM_I",
-        displayName = "BYD Seal U DM-i",
+        displayName = "Seal U DM-i",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 18.3,
         estimatedKerbMassKg = 2140.0,
@@ -348,7 +348,7 @@ object CarCatalog {
 
     val BYD_SEAL_U_DM_I_COMFORT = CarConfig(
         id = "BYD_SEAL_U_DM_I_COMFORT",
-        displayName = "BYD Seal U DM-i Comfort",
+        displayName = "Seal U DM-i Comfort",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 27.3,
         estimatedKerbMassKg = 2210.0,
@@ -365,7 +365,7 @@ object CarCatalog {
 
     val BYD_SEAL_U_DM_I_DESIGN_AWD = CarConfig(
         id = "BYD_SEAL_U_DM_I_DESIGN_AWD",
-        displayName = "BYD Seal U DM-i Design AWD",
+        displayName = "Seal U DM-i Design AWD",
         drivetrain = Drivetrain.AWD,
         batteryKwh = 18.3,
         estimatedKerbMassKg = 2100.0,
@@ -383,7 +383,7 @@ object CarCatalog {
 
     val BYD_SONG_PLUS_DM_I = CarConfig(
         id = "BYD_SONG_PLUS_DM_I",
-        displayName = "BYD Song Plus DM-i",
+        displayName = "Song Plus DM-i",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 18.3,
         estimatedKerbMassKg = 1880.0,
@@ -391,7 +391,7 @@ object CarCatalog {
         referenceConsumptionKwhPer100km = 16.0,
         frontTyrePressureBar = 2.4,
         rearTyrePressureBar = 2.4,
-        cellCount = 96,         // 18.3 kWh @ ~307V → 96S LFP
+        cellCount = 144,        // 18.3 kWh Blade pack — might be 144S configuration
         cdA = 0.774,            // Cd 0.29 × A 2.67 m²
         isPhev = true,
         phevUsableBatteryKwh = 15.2
@@ -399,7 +399,7 @@ object CarCatalog {
 
     val BYD_HAN_DM_I = CarConfig(
         id = "BYD_HAN_DM_I",
-        displayName = "BYD Han DM-i",
+        displayName = "Han DM-i",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 37.5,
         estimatedKerbMassKg = 2065.0,
@@ -415,7 +415,7 @@ object CarCatalog {
 
     val BYD_TANG_DM_I = CarConfig(
         id = "BYD_TANG_DM_I",
-        displayName = "BYD Tang DM-i",
+        displayName = "Tang DM-i",
         drivetrain = Drivetrain.AWD,
         batteryKwh = 49.0,
         estimatedKerbMassKg = 2690.0,
@@ -431,9 +431,78 @@ object CarCatalog {
         phevUsableBatteryKwh = 44.0
     )
 
+    // ── BYD Sealion 6 — international branding of the Song Plus platform ──────
+    // DM-i variants: 18.3 kWh Blade LFP (96S), 1.5L Atkinson ICE + electric motor(s).
+    // BEV variants: Song Plus EV / Song L EV exported as Sealion 6 EV in some markets.
+
+    val BYD_SEALION_6_DMI_PREMIUM = CarConfig(
+        id = "BYD_SEALION_6_DMI_PREMIUM",
+        displayName = "Sealion 6 DM-i Premium",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 18.3,
+        estimatedKerbMassKg = 1880.0,
+        wltpKm = 92,            // EV-only WLTP range
+        referenceConsumptionKwhPer100km = 17.5,
+        frontTyrePressureBar = 2.4,
+        rearTyrePressureBar = 2.4,
+        frontMotorRatedKw = 160,
+        cellCount = 144,        // 18.3 kWh Blade pack — might be 144S configuration
+        cdA = 0.774,            // Cd 0.29 × A 2.67 m² (shared Song Plus body)
+        isPhev = true,
+        phevUsableBatteryKwh = 15.2
+    )
+
+    val BYD_SEALION_6_DMI_PERFORMANCE = CarConfig(
+        id = "BYD_SEALION_6_DMI_PERFORMANCE",
+        displayName = "Sealion 6 DM-i Performance AWD",
+        drivetrain = Drivetrain.AWD,
+        batteryKwh = 18.3,
+        estimatedKerbMassKg = 2010.0,
+        wltpKm = 80,            // EV-only WLTP range
+        referenceConsumptionKwhPer100km = 18.5,
+        frontTyrePressureBar = 2.4,
+        rearTyrePressureBar = 2.4,
+        frontMotorRatedKw = 160,
+        rearMotorRatedKw = 150,
+        cellCount = 144,        // 18.3 kWh Blade pack — might be 144S configuration (shared with FWD)
+        cdA = 0.774,            // Cd 0.29 × A 2.67 m²
+        isPhev = true,
+        phevUsableBatteryKwh = 15.2
+    )
+
+    val BYD_SEALION_6_EV_STANDARD = CarConfig(
+        id = "BYD_SEALION_6_EV_STANDARD",
+        displayName = "Sealion 6 EV Standard",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 71.8,
+        estimatedKerbMassKg = 1950.0,
+        wltpKm = 430,           // ~520 km CLTC → ~430 km WLTP (estimate)
+        referenceConsumptionKwhPer100km = 17.5,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 150,
+        cellCount = 144,        // Sealion 6 BEV pack — might be 144S configuration (matches DM-i sibling)
+        cdA = 0.774             // Cd 0.29 × A 2.67 m² (shared body)
+    )
+
+    val BYD_SEALION_6_EV_EXTENDED = CarConfig(
+        id = "BYD_SEALION_6_EV_EXTENDED",
+        displayName = "Sealion 6 EV Extended",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 87.04,
+        estimatedKerbMassKg = 2020.0,
+        wltpKm = 510,           // ~605 km CLTC → ~510 km WLTP (estimate)
+        referenceConsumptionKwhPer100km = 17.8,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 150,
+        cellCount = 144,        // Sealion 6 BEV pack — might be 144S configuration (shared with Standard)
+        cdA = 0.774             // Cd 0.29 × A 2.67 m²
+    )
+
     val BYD_SEALION_5_DMI_COMFORT = CarConfig(
         id = "BYD_SEALION_5_DMI_COMFORT",
-        displayName = "BYD Seal 5 / Sealion 5 DM-i Comfort",
+        displayName = "Seal 5 / Sealion 5 DM-i Comfort",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 15.0,
         estimatedKerbMassKg = 1700.0,
@@ -449,7 +518,7 @@ object CarCatalog {
 
     val BYD_SEALION_5_DMI_DESIGN = CarConfig(
         id = "BYD_SEALION_5_DMI_DESIGN",
-        displayName = "BYD Seal 5 / Sealion 5 DM-i Design",
+        displayName = "Seal 5 / Sealion 5 DM-i Design",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 21.5,
         estimatedKerbMassKg = 1785.0,
@@ -492,6 +561,10 @@ object CarCatalog {
         BYD_TANG_DM_I,
         BYD_SEALION_5_DMI_COMFORT,
         BYD_SEALION_5_DMI_DESIGN,
+        BYD_SEALION_6_DMI_PREMIUM,
+        BYD_SEALION_6_DMI_PERFORMANCE,
+        BYD_SEALION_6_EV_STANDARD,
+        BYD_SEALION_6_EV_EXTENDED,
     )
 
     fun fromId(id: String?): CarConfig? {
@@ -512,6 +585,7 @@ object CarCatalog {
         "BYD Seagull / Dolphin Surf" to listOf(BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),
         "BYD M6" to listOf(BYD_M6_STANDARD_120KW, BYD_M6_SUPERIOR_100KW, BYD_M6_SUPERIOR_150KW),
         "BYD Seal 6" to listOf(BYD_SEAL_6_PREMIUM_95KW, BYD_SEAL_6_PREMIUM_160KW),
+        "BYD Sealion 6" to listOf(BYD_SEALION_6_EV_STANDARD, BYD_SEALION_6_EV_EXTENDED),
         "BYD Tang" to listOf(BYD_TANG_EV),
     )
 
@@ -521,5 +595,6 @@ object CarCatalog {
         "BYD Han DM-i" to listOf(BYD_HAN_DM_I),
         "BYD Tang DM-i" to listOf(BYD_TANG_DM_I),
         "BYD Seal 5 / Sealion 5 DM-i" to listOf(BYD_SEALION_5_DMI_COMFORT, BYD_SEALION_5_DMI_DESIGN),
+        "BYD Sealion 6 DM-i" to listOf(BYD_SEALION_6_DMI_PREMIUM, BYD_SEALION_6_DMI_PERFORMANCE),
     )
 }

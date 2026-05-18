@@ -6,7 +6,7 @@ data class AbrpConnectionConfig(
     val enabled: Boolean = false,
     val userToken: String = "",
     val apiKey: String = "",
-    val uploadIntervalSeconds: Int = 5,
+    val uploadIntervalSeconds: Int = 30,
     val lastStatus: String = "Not configured",
     val lastUploadAtMs: Long = 0L,
 )
@@ -21,7 +21,7 @@ object AbrpConnectionStore {
     private const val KEY_LAST_UPLOAD_AT_MS = "last_upload_at_ms"
 
     const val DEFAULT_PUBLIC_API_KEY = "f5f2bc68-b7de-4c5a-8318-59219335370d"
-    private const val DEFAULT_INTERVAL_SECONDS = 5
+    private const val DEFAULT_INTERVAL_SECONDS = 30
 
     fun load(context: Context): AbrpConnectionConfig {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

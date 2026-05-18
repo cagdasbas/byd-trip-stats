@@ -1,7 +1,10 @@
 package com.byd.tripstats.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,18 +13,33 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
-import androidx.compose.ui.draw.clipToBounds
 import kotlin.math.roundToInt
+
+// ── Holographic palette ───────────────────────────────────────────────────────
+// Variant B (Holographic Sweep) from the design canvas: phosphor cyan for the
+// BMS "ghost" + grid, dark navy panel, neon green/amber accent stays driven by
+// the existing app theme (RegenGreen / AccelerationOrange) so it stays in sync
+// with the rest of the UI's good/bad colour language.
+private val HoloCyan       = Color(0xFF00E1FF)
+private val HoloPanelBg    = Color(0xFF0B1730)
+private val HoloPanelStroke = Color(0x14FFFFFF)   // inset hairline
 
 /**
  * Linearly interpolates the BMS range series at [targetDist] km.
@@ -156,11 +174,37 @@ fun RangeProjectionChart(
         val yMax = startBmsRange * 1.15
         val yMin = 0.0
 
-        // ── Theme colors ──────────────────────────────────────────────────────────
-        val bmsLineColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-        val gridLineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-        val axisColor     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-        val textColor     = MaterialTheme.colorScheme.onSurface
+        // ── Theme-aware holographic palette ───────────────────────────────────────
+        // The neon / phosphor look only reads well on a dark background. In
+        // light theme we degrade gracefully: blend the panel with the parent
+        // surface, swap cyan for the theme primary, drop the wide halo passes,
+        // and flip the chip / label backgrounds light.
+        val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
+        val textColor      = MaterialTheme.colorScheme.onSurface
+        val panelBg        = if (isDark) HoloPanelBg
+                             else        Color.Transparent
+        val panelStroke    = if (isDark) HoloPanelStroke
+                             else        MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+        val dotGridColor   = if (isDark) HoloCyan.copy(alpha = 0.18f)
+                             else        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        val gridLineColor  = if (isDark) Color.White.copy(alpha = 0.06f)
+                             else        MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)
+        val axisColor      = if (isDark) Color.White.copy(alpha = 0.45f)
+                             else        textColor.copy(alpha = 0.45f)
+        val labelTextColor = if (isDark) Color.White.copy(alpha = 0.7f)
+                             else        textColor.copy(alpha = 0.7f)
+        val xLabelColor    = if (isDark) Color.White.copy(alpha = 0.6f)
+                             else        textColor.copy(alpha = 0.6f)
+        val yAxisLabelColor= if (isDark) Color.White.copy(alpha = 0.55f)
+                             else        textColor.copy(alpha = 0.55f)
+        val bmsAccent      = if (isDark) HoloCyan
+                             else        MaterialTheme.colorScheme.primary
+        val chipSurface    = if (isDark) Color.Black.copy(alpha = 0.6f)
+                             else        MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+        val centerCoreColor= if (isDark) Color.White.copy(alpha = 0.85f)
+                             else        Color.Transparent       // white core would vanish on light bg
+        val surfaceColor   = MaterialTheme.colorScheme.surface
 
         // ── Header ────────────────────────────────────────────────────────────────
         Column(modifier = modifier.fillMaxSize()) {
@@ -190,11 +234,6 @@ fun RangeProjectionChart(
                     val distUnit = if (useImperial) "mi" else "km"
                     val wltpDisplay = if (useImperial) (wltpKm * 0.621371).toInt() else wltpKm.toInt()
                     if (!isStabilised && activeRangeModel == DashboardViewModel.RangeModel.BASELINE) {
-                        Text(
-                            text  = "Calibrating…",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = textColor.copy(alpha = 0.5f)
-                        )
                         Text(
                             text  = "BMS: ${"%.0f".format(currentBms)} $distUnit (collecting data)",
                             style = MaterialTheme.typography.bodySmall,
@@ -226,8 +265,30 @@ fun RangeProjectionChart(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                // Model badge stacked, right-aligned
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Right rail: holographic Δ chip + model badge
+                Column(horizontalAlignment = Alignment.End) {
+                    if (isStabilised && !isSaturated && projectedPoints.isNotEmpty()) {
+                        val sign = if (beating) "+" else ""
+                        val distUnit = if (useImperial) "mi" else "km"
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(chipSurface)
+                                .border(1.dp, accentColor, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text  = "Δ $sign${"%.1f".format(deltaKm)} $distUnit",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.5.sp
+                                ),
+                                color = accentColor
+                            )
+                        }
+                        Spacer(Modifier.height(3.dp))
+                    }
                     Text(
                         text  = modelLabel,
                         style = MaterialTheme.typography.labelSmall,
@@ -263,17 +324,48 @@ fun RangeProjectionChart(
                     return (padT + chartH * (1f - fraction)).toFloat()
                 }
 
+                // ── Holographic panel: theme-aware ground + inset hairline ────
+                if (panelBg != Color.Transparent) {
+                    drawRoundRect(
+                        color        = panelBg,
+                        topLeft      = Offset(padL, padT),
+                        size         = Size(chartW, chartH),
+                        cornerRadius = CornerRadius(6f, 6f)
+                    )
+                }
+                drawRoundRect(
+                    color        = panelStroke,
+                    topLeft      = Offset(padL, padT),
+                    size         = Size(chartW, chartH),
+                    cornerRadius = CornerRadius(6f, 6f),
+                    style        = Stroke(width = 1f)
+                )
+
+                // ── Phosphor dot grid — fills plot area ───────────────────────
+                val dotSpacing = 14f
+                run {
+                    var dy = padT + dotSpacing / 2f
+                    while (dy < padT + chartH) {
+                        var dx = padL + dotSpacing / 2f
+                        while (dx < padL + chartW) {
+                            drawCircle(dotGridColor, 0.9f, Offset(dx, dy))
+                            dx += dotSpacing
+                        }
+                        dy += dotSpacing
+                    }
+                }
+
                 // Paint objects — created once, reused across all draw calls
                 val labelPaint = android.graphics.Paint().apply {
-                    color = textColor.copy(alpha = 0.7f).toArgb()
+                    color = labelTextColor.toArgb()
                     textSize = 20f; textAlign = android.graphics.Paint.Align.RIGHT; isAntiAlias = true
                 }
                 val xLabelPaint = android.graphics.Paint().apply {
-                    color = textColor.copy(alpha = 0.6f).toArgb()
+                    color = xLabelColor.toArgb()
                     textSize = 19f; textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
                 }
                 val yAxisPaint = android.graphics.Paint().apply {
-                    color = textColor.copy(alpha = 0.55f).toArgb()
+                    color = yAxisLabelColor.toArgb()
                     textSize = 19f; textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
                 }
 
@@ -310,82 +402,163 @@ fun RangeProjectionChart(
                     nc.drawText("%.1f".format(dist), x, h - 4f, xLabelPaint)
                 }
 
-                if (bmsPoints.isNotEmpty()) {
+                if (bmsPoints.isNotEmpty() && bmsPoints.size >= 2) {
 
-                    // ── BMS reference line (gray dashed, always visible) ──────────
-                    if (bmsPoints.size >= 2) {
-                        val bmsPath = Path().apply {
-                            moveTo(xOf(bmsPoints.first().first), yOf(bmsPoints.first().second))
-                            bmsPoints.drop(1).forEach { (d, r) -> lineTo(xOf(d), yOf(r)) }
+                    // ── Confidence cone around BMS estimate ───────────────────
+                    // Widens with trip progress: ±4km at start, growing to ±32km
+                    // at trip end. Faint translucent cyan fill + dashed outline.
+                    run {
+                        val cone = Path()
+                        val firstD = bmsPoints.first().first
+                        val lastD  = bmsPoints.last().first.coerceAtLeast(firstD + 0.001)
+                        fun spreadAt(d: Double): Double {
+                            val frac = ((d - firstD) / (lastD - firstD)).coerceIn(0.0, 1.0)
+                            // Spread in km, scaled relative to the Y range so the cone
+                            // visually widens proportionally to the chart's vertical extent.
+                            return 4.0 + frac * 28.0
                         }
+                        cone.moveTo(xOf(firstD), yOf(bmsPoints.first().second + spreadAt(firstD)))
+                        bmsPoints.drop(1).forEach { (d, r) ->
+                            cone.lineTo(xOf(d), yOf(r + spreadAt(d)))
+                        }
+                        bmsPoints.reversed().forEach { (d, r) ->
+                            cone.lineTo(xOf(d), yOf(r - spreadAt(d)))
+                        }
+                        cone.close()
+                        drawPath(cone, bmsAccent.copy(alpha = if (isDark) 0.07f else 0.05f))
                         drawPath(
-                            path  = bmsPath,
-                            color = bmsLineColor,
+                            cone,
+                            color = bmsAccent.copy(alpha = if (isDark) 0.35f else 0.30f),
                             style = Stroke(
-                                width      = 2f,
-                                cap        = StrokeCap.Round,
-                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f))
+                                width = 0.8f,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(3f, 4f))
                             )
                         )
                     }
 
-                    // ── Projected line — only drawn once stabilised ───────────────
+                    // ── BMS reference line: phosphor ghost ────────────────────
+                    // Soft glow underneath (dark theme only — would muddy a
+                    // light surface), dashed bright stroke always.
+                    val bmsPath = Path().apply {
+                        moveTo(xOf(bmsPoints.first().first), yOf(bmsPoints.first().second))
+                        bmsPoints.drop(1).forEach { (d, r) -> lineTo(xOf(d), yOf(r)) }
+                    }
+                    if (isDark) {
+                        drawPath(
+                            bmsPath,
+                            color = bmsAccent.copy(alpha = 0.25f),
+                            style = Stroke(width = 6f, cap = StrokeCap.Round)
+                        )
+                    }
+                    drawPath(
+                        bmsPath,
+                        color = bmsAccent.copy(alpha = if (isDark) 0.75f else 0.85f),
+                        style = Stroke(
+                            width      = if (isDark) 1.4f else 1.8f,
+                            cap        = StrokeCap.Round,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f))
+                        )
+                    )
+
+                    // ── Projected line — only drawn once stabilised ───────────
                     if (projectedPoints.size >= 2) {
 
-                        // Clamp projected to WLTP_MAX for fill so it stays within chart bounds
-                        val cappedForFill = projectedPoints.map { (d, r) ->
-                            d to r.coerceAtMost(wltpKm.toDouble())
-                        }
-                        val fillPath = Path().apply {
-                            moveTo(xOf(cappedForFill.first().first), yOf(cappedForFill.first().second))
-                            cappedForFill.drop(1).forEach { (d, r) -> lineTo(xOf(d), yOf(r)) }
-                            cappedForFill.reversed().forEach { (d, _) ->
-                                lineTo(xOf(d), yOf(interpolateBmsAt(d, bmsPoints)))
+                        // Per-segment classification. Every consecutive pair of
+                        // projected points becomes one mini-segment, colored by
+                        // its starting point's relationship to the BMS line at
+                        // the same x: above BMS → RegenGreen, below → Acceleration-
+                        // Orange. A segment whose start exceeds WLTP is pinned to
+                        // the WLTP ceiling and drawn as dash-dot (calibration-
+                        // saturated). We collect into four shared Paths so the
+                        // multi-pass glow still runs only twice per color rather
+                        // than once per micro-segment.
+                        val greenLine  = Path()
+                        val orangeLine = Path()
+                        val greenFill  = Path()
+                        val orangeFill = Path()
+                        val saturatedLine = Path()
+                        var anyGreenLine = false
+                        var anyOrangeLine = false
+                        var anyGreenFill = false
+                        var anyOrangeFill = false
+                        var anySaturated = false
+
+                        projectedPoints.zipWithNext { a, b ->
+                            val (da, ra) = a
+                            val (db, rb) = b
+                            val xa = xOf(da); val xb = xOf(db)
+
+                            val saturatedA = ra > wltpKm
+                            val saturatedB = rb > wltpKm
+
+                            val capRa = ra.coerceAtMost(wltpKm.toDouble())
+                            val capRb = rb.coerceAtMost(wltpKm.toDouble())
+                            val yPa = yOf(capRa); val yPb = yOf(capRb)
+                            val bmsA = interpolateBmsAt(da, bmsPoints)
+                            val bmsB = interpolateBmsAt(db, bmsPoints)
+                            val yBa = yOf(bmsA);  val yBb = yOf(bmsB)
+
+                            if (saturatedA && saturatedB) {
+                                saturatedLine.moveTo(xa, yPa)
+                                saturatedLine.lineTo(xb, yPb)
+                                anySaturated = true
+                                return@zipWithNext
                             }
-                            close()
+
+                            val isGreen = capRa >= bmsA
+                            val linePath = if (isGreen) greenLine else orangeLine
+                            val fillPath = if (isGreen) greenFill else orangeFill
+                            linePath.moveTo(xa, yPa)
+                            linePath.lineTo(xb, yPb)
+                            if (isGreen) anyGreenLine = true else anyOrangeLine = true
+
+                            // Quad fill between the projected polyline and the BMS line
+                            // for this segment. Avoids the previous behaviour where the
+                            // whole area between projected and BMS was painted in a
+                            // single colour driven by only the latest point's comparison.
+                            fillPath.moveTo(xa, yPa)
+                            fillPath.lineTo(xb, yPb)
+                            fillPath.lineTo(xb, yBb)
+                            fillPath.lineTo(xa, yBa)
+                            fillPath.close()
+                            if (isGreen) anyGreenFill = true else anyOrangeFill = true
                         }
-                        val fillColor = if (beating) RegenGreen.copy(alpha = 0.15f)
-                                        else         AccelerationOrange.copy(alpha = 0.12f)
-                        drawPath(fillPath, fillColor)
 
-                        // ── Split projected into normal (≤ WLTP) and saturated (> WLTP) ──
-                        // Saturated segments are drawn as dash-dot at the chart ceiling to
-                        // signal the projection is unconstrained (e.g. very low speed at trip start).
-                        val normalPath     = Path()
-                        val saturatedPath  = Path()
-                        var normalStarted  = false
-                        var satStarted     = false
+                        if (anyGreenFill)  drawPath(greenFill,  RegenGreen.copy(alpha = 0.18f))
+                        if (anyOrangeFill) drawPath(orangeFill, AccelerationOrange.copy(alpha = 0.18f))
 
-                        projectedPoints.forEach { (d, r) ->
-                            val x = xOf(d)
-                            if (r <= wltpKm) {
-                                val y = yOf(r)
-                                if (!normalStarted) { normalPath.moveTo(x, y); normalStarted = true }
-                                else normalPath.lineTo(x, y)
-                                satStarted = false   // break saturated segment
-                            } else {
-                                // Pin Y to WLTP ceiling so the dash-dot appears at the top of the chart
-                                val y = yOf(wltpKm.toDouble())
-                                if (!satStarted) { saturatedPath.moveTo(x, y); satStarted = true }
-                                else saturatedPath.lineTo(x, y)
-                                normalStarted = false
+                        // Multi-pass glow per color. In light theme the wide outer
+                        // halos are skipped (they muddy on a light surface) and the
+                        // white centerline is skipped (invisible on light bg).
+                        fun drawGlowLine(path: Path, color: Color, hasContent: Boolean) {
+                            if (!hasContent) return
+                            if (isDark) {
+                                drawPath(path, color = color.copy(alpha = 0.18f),
+                                    style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                drawPath(path, color = color.copy(alpha = 0.45f),
+                                    style = Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                            }
+                            drawPath(path, color = color,
+                                style = Stroke(width = if (isDark) 2.6f else 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                            if (centerCoreColor.alpha > 0f) {
+                                drawPath(path, color = centerCoreColor,
+                                    style = Stroke(width = 0.9f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                             }
                         }
+                        drawGlowLine(greenLine,  RegenGreen,           anyGreenLine)
+                        drawGlowLine(orangeLine, AccelerationOrange,   anyOrangeLine)
 
-                        // Draw solid line for normal range
-                        if (normalStarted) {
+                        // Saturated (> WLTP) — dash-dot ceiling. A saturated
+                        // projection is by definition above the BMS estimate, so
+                        // the colour follows the "green = beating" rule.
+                        if (anySaturated) {
+                            if (isDark) {
+                                drawPath(saturatedLine, color = RegenGreen.copy(alpha = 0.25f),
+                                    style = Stroke(width = 8f, cap = StrokeCap.Round))
+                            }
                             drawPath(
-                                normalPath,
-                                color = accentColor,
-                                style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                            )
-                        }
-
-                        // Draw dash-dot for saturated (beyond WLTP) — dimmed to indicate uncertainty
-                        if (satStarted) {
-                            drawPath(
-                                saturatedPath,
-                                color = accentColor.copy(alpha = 0.45f),
+                                saturatedLine,
+                                color = RegenGreen.copy(alpha = if (isDark) 0.55f else 0.7f),
                                 style = Stroke(
                                     width      = 2f,
                                     cap        = StrokeCap.Round,
@@ -394,25 +567,96 @@ fun RangeProjectionChart(
                             )
                         }
 
-                        // Current position dot — use capped Y so it stays inside the chart
+                        // ── Head node + tape-measure delta callout ───────────
+                        // The leading edge of the projected curve is the hero:
+                        // a vertical "tape" between projected and BMS at that
+                        // x, with tick caps and a delta label box that floats
+                        // alongside.
                         val last  = projectedPoints.last()
-                        val dotX  = xOf(last.first)
-                        val dotY  = yOf(last.second.coerceAtMost(wltpKm.toDouble()))
-                        drawCircle(accentColor.copy(alpha = 0.25f), 18f, Offset(dotX, dotY))
-                        drawCircle(accentColor,                      8f,  Offset(dotX, dotY))
-                        drawCircle(Color.White,                      3f,  Offset(dotX, dotY))
+                        val leadX = xOf(last.first)
+                        val leadYa = yOf(last.second.coerceAtMost(wltpKm.toDouble()))
+                        val leadYb = yOf(interpolateBmsAt(last.first, bmsPoints))
+
+                        // Tape line + caps
+                        if (isDark) {
+                            drawLine(
+                                color = accentColor.copy(alpha = 0.35f),
+                                start = Offset(leadX, leadYa), end = Offset(leadX, leadYb),
+                                strokeWidth = 6f, cap = StrokeCap.Round
+                            )
+                        }
+                        drawLine(
+                            color = accentColor,
+                            start = Offset(leadX, leadYa), end = Offset(leadX, leadYb),
+                            strokeWidth = 1.5f, cap = StrokeCap.Round
+                        )
+                        drawLine(accentColor,
+                            start = Offset(leadX - 6f, leadYa), end = Offset(leadX + 6f, leadYa),
+                            strokeWidth = 1.5f)
+                        drawLine(bmsAccent,
+                            start = Offset(leadX - 6f, leadYb), end = Offset(leadX + 6f, leadYb),
+                            strokeWidth = 1.5f)
+                        // (The in-chart "Δ" text used to live here as a label box at
+                        // the leading edge, but it duplicated the chip rendered in the
+                        // top-right of the chart frame. Removed; the vertical tape
+                        // line + tick caps remain as the visual delta indicator.)
+
+                        // Head node: colored ring + concentric pulse rings
+                        // (static — animation would burn battery in-car; the
+                        // layered rings still read as "live"). Centre fill is
+                        // light-theme aware so the dot stays visible.
+                        if (isDark) {
+                            drawCircle(accentColor.copy(alpha = 0.25f), 14f, Offset(leadX, leadYa))
+                            drawCircle(accentColor.copy(alpha = 0.45f), 9f,  Offset(leadX, leadYa))
+                        } else {
+                            drawCircle(accentColor.copy(alpha = 0.20f), 11f, Offset(leadX, leadYa))
+                        }
+                        drawCircle(
+                            if (isDark) Color.White else surfaceColor,
+                            3.5f, Offset(leadX, leadYa)
+                        )
+                        drawCircle(accentColor, 3.5f, Offset(leadX, leadYa),
+                            style = Stroke(width = 1.4f))
                     }
 
                 } else {
-                    nc.drawText(
-                        "No trip data yet",
-                        padL + chartW / 2f,
-                        padT + chartH / 2f,
-                        android.graphics.Paint().apply {
-                            color = textColor.copy(alpha = 0.3f).toArgb()
-                            textSize = 28f; textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
-                        }
+                    // ── Empty state: corner brackets + SCANNING callout ───────
+                    val bracketLen = 14f
+                    val bracketColor = bmsAccent.copy(alpha = 0.7f)
+                    val corners = listOf(
+                        Triple(padL,          padT,          Pair( 1f,  1f)),
+                        Triple(padL + chartW, padT,          Pair(-1f,  1f)),
+                        Triple(padL,          padT + chartH, Pair( 1f, -1f)),
+                        Triple(padL + chartW, padT + chartH, Pair(-1f, -1f))
                     )
+                    corners.forEach { (cx, cy, signs) ->
+                        val (sx, sy) = signs
+                        drawLine(bracketColor,
+                            start = Offset(cx, cy), end = Offset(cx + bracketLen * sx, cy),
+                            strokeWidth = 1.4f)
+                        drawLine(bracketColor,
+                            start = Offset(cx, cy), end = Offset(cx, cy + bracketLen * sy),
+                            strokeWidth = 1.4f)
+                    }
+                    val scanPaint = android.graphics.Paint().apply {
+                        color = bmsAccent.toArgb()
+                        textSize = 30f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                        letterSpacing = 0.3f
+                        typeface = android.graphics.Typeface.MONOSPACE
+                    }
+                    val subPaint = android.graphics.Paint().apply {
+                        color = textColor.copy(alpha = 0.45f).toArgb()
+                        textSize = 18f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                        isAntiAlias = true
+                        typeface = android.graphics.Typeface.MONOSPACE
+                    }
+                    nc.drawText("SCANNING…",
+                        padL + chartW / 2f, padT + chartH / 2f - 4f, scanPaint)
+                    nc.drawText("acquiring telemetry · drive to begin",
+                        padL + chartW / 2f, padT + chartH / 2f + 22f, subPaint)
                 }
             }
 
@@ -426,7 +670,7 @@ fun RangeProjectionChart(
             ) {
                 Canvas(modifier = Modifier.size(20.dp, 3.dp)) {
                     drawLine(
-                        color = bmsLineColor, start = Offset(0f, size.height / 2),
+                        color = bmsAccent, start = Offset(0f, size.height / 2),
                         end = Offset(size.width, size.height / 2), strokeWidth = 3f,
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
                     )

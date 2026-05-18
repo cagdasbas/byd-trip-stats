@@ -21,9 +21,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.byd.tripstats.data.analysis.calculateTripEnergyBreakdown
+import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.byd.tripstats.ui.components.AltitudeChart
 import com.byd.tripstats.ui.components.CondensedAltitudeChart
 import com.byd.tripstats.ui.components.CondensedEnergyChart
@@ -221,6 +225,12 @@ fun ExportDialog(
     val stableTrip       = remember { trip }
     val stableDataPoints = remember { dataPoints.toList() }
 
+    val telegram         = remember { TelegramManager.getInstance(context) }
+    val telegramConfig   by telegram.config.collectAsState()
+    val telegramState    by telegram.state.collectAsState()
+    val telegramSending  = telegramState is TelegramManager.TelegramState.InProgress
+    val scope            = rememberCoroutineScope()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -273,6 +283,81 @@ fun ExportDialog(
                     Spacer(Modifier.width(8.dp))
                     Text("Save as JSON")
                 }
+
+                OutlinedButton(
+                    onClick = {
+                        saveTripAsHtml(context, stableTrip, stableDataPoints)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.Public, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Save as HTML viewer (double-click to open)")
+                }
+
+                HorizontalDivider()
+
+                // ── Telegram ──────────────────────────────────────────────────
+                Text(
+                    if (telegramConfig != null)
+                        "Send to Telegram bot (@${telegramConfig!!.botName}):"
+                    else
+                        "Send to Telegram bot (not configured — set up in Settings → Backup):",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedButton(
+                    onClick = {
+                        sendTripExportToTelegram(
+                            context, telegram, scope, stableTrip,
+                            format = "csv",
+                            content = buildTripCsv(stableDataPoints)
+                        )
+                        onDismiss()
+                    },
+                    enabled = telegramConfig != null && !telegramSending,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Send CSV to Telegram")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        sendTripExportToTelegram(
+                            context, telegram, scope, stableTrip,
+                            format = "json",
+                            content = buildTripJson(stableTrip, stableDataPoints)
+                        )
+                        onDismiss()
+                    },
+                    enabled = telegramConfig != null && !telegramSending,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Send JSON to Telegram")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        sendTripExportToTelegram(
+                            context, telegram, scope, stableTrip,
+                            format = "html",
+                            content = buildTripEmbeddedHtml(context, stableTrip, stableDataPoints)
+                        )
+                        onDismiss()
+                    },
+                    enabled = telegramConfig != null && !telegramSending,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Send HTML viewer to Telegram")
+                }
             }
         },
         confirmButton = {
@@ -320,12 +405,64 @@ fun copyTripSummaryToClipboard(
  * Uses MediaStore.Downloads (API 29+) — no WRITE_EXTERNAL_STORAGE permission needed.
  * The file will appear in Download and be accessible via any file manager on the device.
  */
+private val tripExportColumns = listOf(
+    "timestamp", "latitude", "longitude", "altitude",
+    "speed", "power", "soc",
+    "odometer", "batteryTemp", "totalDischarge",
+    "gear", "isRegenerating",
+    "engineSpeedFront", "engineSpeedRear",
+    "electricDrivingRangeKm",
+    "tyrePressureLF", "tyrePressureRF", "tyrePressureLR", "tyrePressureRR",
+    "soh",
+    "batteryTotalVoltage", "battery12vVoltage",
+    "batteryCellVoltageMax", "batteryCellVoltageMin",
+    "socPanel",
+    "tyreTempLF", "tyreTempRF", "tyreTempLR", "tyreTempRR",
+    "rawJson",
+)
+
+private fun csvEscape(value: Any?): String {
+    val s = value?.toString() ?: ""
+    return if (s.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) {
+        "\"${s.replace("\"", "\"\"")}\""
+    } else s
+}
+
+private fun jsonEscape(s: String): String = buildString {
+    for (c in s) when (c) {
+        '\\' -> append("\\\\")
+        '"'  -> append("\\\"")
+        '\n' -> append("\\n")
+        '\r' -> append("\\r")
+        '\t' -> append("\\t")
+        '\b' -> append("\\b")
+        '\u000C' -> append("\\f")
+        else -> if (c < ' ') append("\\u%04x".format(c.code)) else append(c)
+    }
+}
+
+private fun com.byd.tripstats.data.local.entity.TripDataPointEntity.exportValues(): List<Any> = listOf(
+    timestamp, latitude, longitude, altitude,
+    speed, power, soc,
+    odometer, batteryTemp, totalDischarge,
+    gear, isRegenerating,
+    engineSpeedFront, engineSpeedRear,
+    electricDrivingRangeKm,
+    tyrePressureLF, tyrePressureRF, tyrePressureLR, tyrePressureRR,
+    soh,
+    batteryTotalVoltage, battery12vVoltage,
+    batteryCellVoltageMax, batteryCellVoltageMin,
+    socPanel,
+    tyreTempLF, tyreTempRF, tyreTempLR, tyreTempRR,
+    rawJson,
+)
+
 fun buildTripCsv(
     dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>
 ): String = buildString {
-    appendLine("timestamp,latitude,longitude,altitude,speed,power,soc,odometer,batteryTemp,gear,engineSpeedFront,engineSpeedRear")
+    appendLine(tripExportColumns.joinToString(","))
     dataPoints.forEach { point ->
-        appendLine("${point.timestamp},${point.latitude},${point.longitude},${point.altitude},${point.speed},${point.power},${point.soc},${point.odometer},${point.batteryTemp},${point.gear},${point.engineSpeedFront},${point.engineSpeedRear}")
+        appendLine(point.exportValues().joinToString(",") { csvEscape(it) })
     }
 }
 
@@ -346,6 +483,24 @@ fun saveTripAsCSV(
 /**
  * Save trip data as JSON directly to the device's Download folder.
  */
+private fun Any?.toJsonLiteral(): String = when (this) {
+    null            -> "null"
+    is Boolean      -> toString()
+    is Number       -> toString()
+    is String       -> {
+        val trimmed = trim()
+        // rawJson is stored as serialized JSON — embed verbatim when it looks valid,
+        // otherwise emit as an escaped JSON string.
+        if ((trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+            (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+            trimmed
+        } else {
+            "\"${jsonEscape(this)}\""
+        }
+    }
+    else            -> "\"${jsonEscape(toString())}\""
+}
+
 fun buildTripJson(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
     dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>
@@ -361,19 +516,20 @@ fun buildTripJson(
     appendLine("  \"maxSpeed\": ${trip.maxSpeed},")
     appendLine("  \"maxPower\": ${trip.maxPower},")
     appendLine("  \"dataPoints\": [")
-    dataPoints.forEachIndexed { index, point ->
+    val exportable = dataPoints.filter { it.latitude != 0.0 || it.longitude != 0.0 }
+    exportable.forEachIndexed { index, point ->
+        val values = point.exportValues()
         appendLine("    {")
-        appendLine("      \"timestamp\": ${point.timestamp},")
-        appendLine("      \"latitude\": ${point.latitude},")
-        appendLine("      \"longitude\": ${point.longitude},")
-        appendLine("      \"altitude\": ${point.altitude},")
-        appendLine("      \"speed\": ${point.speed},")
-        appendLine("      \"power\": ${point.power},")
-        appendLine("      \"soc\": ${point.soc},")
-        appendLine("      \"gear\": \"${point.gear}\",")
-        appendLine("      \"engineSpeedFront\": ${point.engineSpeedFront},")
-        appendLine("      \"engineSpeedRear\": ${point.engineSpeedRear}")
-        appendLine("    }${if (index < dataPoints.size - 1) "," else ""}")
+        tripExportColumns.forEachIndexed { i, col ->
+            val raw = values[i]
+            val literal = when {
+                col == "gear" && raw is String -> "\"${jsonEscape(raw)}\""
+                else -> raw.toJsonLiteral()
+            }
+            val sep = if (i < tripExportColumns.lastIndex) "," else ""
+            appendLine("      \"$col\": $literal$sep")
+        }
+        appendLine("    }${if (index < exportable.size - 1) "," else ""}")
     }
     appendLine("  ]")
     appendLine("}")
@@ -390,6 +546,98 @@ fun saveTripAsJSON(
     } catch (e: Exception) {
         Log.e("TripDetailScreen", "Save JSON failed", e)
         android.widget.Toast.makeText(context, "Save failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
+/**
+ * Builds a single self-contained HTML file that bundles `docs/trip-viewer.html`
+ * (synced into assets at build time — see `syncTripViewer` task) with the trip's
+ * JSON injected as `window.__embeddedTrip`. The viewer's auto-render hook picks
+ * the embedded data up and skips the file picker, so the resulting file is
+ * double-click-ready in any browser with no separate JSON to manage.
+ */
+fun buildTripEmbeddedHtml(
+    context: android.content.Context,
+    trip: com.byd.tripstats.data.local.entity.TripEntity,
+    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>
+): String {
+    val viewerTemplate = context.assets.open("trip-viewer.html")
+        .bufferedReader(Charsets.UTF_8)
+        .use { it.readText() }
+    val tripJson = buildTripJson(trip, dataPoints)
+    // Embed before the closing </head> so window.__embeddedTrip is set before the
+    // viewer's main <script> runs. </script> in JSON strings is escaped per the
+    // HTML5 spec so an embedded "</script>" sequence can't terminate our wrapper.
+    val safeJson = tripJson.replace("</", "<\\/")
+    val embedTag = "<script>window.__embeddedTrip = $safeJson;</script>\n</head>"
+    return viewerTemplate.replaceFirst("</head>", embedTag)
+}
+
+/**
+ * Saves a self-contained HTML viewer + embedded trip data to the Downloads folder.
+ * Double-clicking the resulting file opens the trip in the user's default browser
+ * with all charts pre-rendered.
+ */
+fun saveTripAsHtml(
+    context: android.content.Context,
+    trip: com.byd.tripstats.data.local.entity.TripEntity,
+    dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>
+) {
+    try {
+        val fileName = "trip_${trip.id}_${System.currentTimeMillis()}.html"
+        saveToDownloads(context, fileName, "text/html", buildTripEmbeddedHtml(context, trip, dataPoints))
+    } catch (e: Exception) {
+        Log.e("TripDetailScreen", "Save HTML failed", e)
+        android.widget.Toast.makeText(context, "Save failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
+/**
+ * Writes [content] to a temp file in cacheDir and ships it to the configured
+ * Telegram bot. Progress and result surface through [TelegramManager.state],
+ * which the Settings/Backup screens already render — same UX as backup/probe.
+ */
+fun sendTripExportToTelegram(
+    context: android.content.Context,
+    telegram: TelegramManager,
+    scope: CoroutineScope,
+    trip: com.byd.tripstats.data.local.entity.TripEntity,
+    format: String,
+    content: String,
+) {
+    val fileName = "trip_${trip.id}_${System.currentTimeMillis()}.$format"
+    android.widget.Toast.makeText(
+        context, "Sending ${format.uppercase()} to Telegram…",
+        android.widget.Toast.LENGTH_SHORT
+    ).show()
+    scope.launch(Dispatchers.IO) {
+        val tempFile = java.io.File(context.cacheDir, fileName)
+        try {
+            tempFile.writeText(content, Charsets.UTF_8)
+            telegram.sendFile(
+                tempFile,
+                caption = "BYD Trip Stats — trip #${trip.id} (${format.uppercase()})"
+            )
+            val finalState = telegram.state.value
+            val msg = when (finalState) {
+                is TelegramManager.TelegramState.Success -> "Sent to Telegram ✓"
+                is TelegramManager.TelegramState.Error   -> "Telegram send failed: ${finalState.message}"
+                else                                     -> "Telegram send finished."
+            }
+            launch(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Exception) {
+            Log.e("TripDetailScreen", "Telegram trip send failed", e)
+            launch(Dispatchers.Main) {
+                android.widget.Toast.makeText(
+                    context, "Telegram send failed: ${e.message}",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        } finally {
+            tempFile.delete()
+        }
     }
 }
 

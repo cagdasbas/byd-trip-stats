@@ -126,7 +126,18 @@ tasks.register<Copy>("syncChangelog") {
     into(layout.projectDirectory.dir("src/main/assets"))
     rename { "changelog.md" }
 }
-tasks.named("preBuild") { dependsOn("syncChangelog") }
+// Keep app/src/main/assets/trip-viewer.html in sync with docs/trip-viewer.html so the
+// "Save as HTML" trip export can inject the user's trip JSON into a single self-contained
+// HTML file. Copied at build time so the asset always matches the latest viewer.
+tasks.register<Copy>("syncTripViewer") {
+    from(rootProject.file("docs/trip-viewer.html"))
+    into(layout.projectDirectory.dir("src/main/assets"))
+    rename { "trip-viewer.html" }
+}
+tasks.named("preBuild") {
+    dependsOn("syncChangelog")
+    dependsOn("syncTripViewer")
+}
 
 dependencies {
     // Core Android

@@ -311,34 +311,40 @@ fun CompactBattery(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Canvas(modifier = Modifier.size(width = 40.dp, height = 20.dp)) {
-            val bodyWidth = size.width * 0.85f
-            val bodyHeight = size.height * 0.9f
+            val strokePx = 2f
+            val bodyWidth = size.width * 0.85f - strokePx
+            val bodyHeight = size.height * 0.9f - strokePx
             val nippleWidth = size.width * 0.1f
             val nippleHeight = size.height * 0.5f
-            
-            // Battery body
+            val bodyTop = (size.height - bodyHeight) / 2f
+            val cornerPx = 6f
+
+            // Battery body — inset by half the stroke width so the outline
+            // (including the rounded corners) stays fully inside the canvas
+            // rather than clipping at the left/top edges.
             drawRoundRect(
                 color = Color(0xFF444444),
-                topLeft = Offset(0f, (size.height - bodyHeight) / 2f),
+                topLeft = Offset(strokePx / 2f, bodyTop),
                 size = Size(bodyWidth, bodyHeight),
-                cornerRadius = CornerRadius(4f, 4f),
-                style = Stroke(2f)
+                cornerRadius = CornerRadius(cornerPx, cornerPx),
+                style = Stroke(strokePx)
             )
-            
+
             // Battery nipple
             drawRoundRect(
                 color = Color(0xFF444444),
-                topLeft = Offset(bodyWidth, (size.height - nippleHeight) / 2f),
+                topLeft = Offset(strokePx / 2f + bodyWidth, (size.height - nippleHeight) / 2f),
                 size = Size(nippleWidth, nippleHeight),
                 cornerRadius = CornerRadius(2f, 2f)
             )
-            
+
             // Fill
-            val fillWidth = (bodyWidth - 4f) * (animatedSoc / 100f)
+            val fillPadding = strokePx + 1f
+            val fillWidth = (bodyWidth - 2f * fillPadding).coerceAtLeast(0f) * (animatedSoc / 100f)
             drawRoundRect(
                 color = batteryColor,
-                topLeft = Offset(2f, (size.height - bodyHeight) / 2f + 2f),
-                size = Size(fillWidth, bodyHeight - 4f),
+                topLeft = Offset(strokePx / 2f + fillPadding, bodyTop + fillPadding),
+                size = Size(fillWidth, (bodyHeight - 2f * fillPadding).coerceAtLeast(0f)),
                 cornerRadius = CornerRadius(2f, 2f)
             )
         }

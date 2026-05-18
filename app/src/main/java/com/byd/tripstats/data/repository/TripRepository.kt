@@ -105,6 +105,17 @@ class TripRepository private constructor(context: Context) {
 
     private var tripState             = TripState.IDLE
     private var cachedCurrentTrip: TripEntity? = null
+
+    /**
+     * Returns the active trip's currently-cached `startTotalDischarge` anchor,
+     * or null if no trip is active. DashboardViewModel reads this every tick so
+     * its live "energy consumed" delta stays in sync with the post-tick anchor
+     * correction (see [correctStaleDischargeAnchorIfNeeded]) — without it the
+     * live display would keep using the original stale-zero anchor for the rest
+     * of the trip, defeating the purpose of the correction.
+     */
+    fun currentTripStartTotalDischarge(): Double? = cachedCurrentTrip?.startTotalDischarge
+
     private var lastTelemetry:        VehicleTelemetry? = null
     private var lastRecordedTelemetry: VehicleTelemetry? = null
     private var lastTelemetryTime     = 0L
@@ -126,10 +137,12 @@ class TripRepository private constructor(context: Context) {
     // trip.startTotalDischarge), this gives doEndTrip a non-stale value that was
     // actually observed mid-trip. Absolute kWh value, not a delta.
     private var tripBestTotalDischarge = 0.0
-    // Running sum of max(0, enginePower) × dt over the active trip, in kWh. Serves as
-    // a power-integrated floor for end discharge: when car under-
-    // reports totalDischarge for long stretches, this integral still reflects the
-    // energy the car actually pulled from the pack tick-by-tick.
+    // Running sum of max(0, enginePower) × dt over the active trip, in kWh.
+    // Serves as a power-integrated floor / fallback for end discharge: when
+    // the car under-reports totalDischarge for long stretches, this integral
+    // still reflects the energy the car actually pulled from the pack
+    // tick-by-tick. Also used as the "energy actually consumed so far"
+    // estimate for the per-tick stale-zero anchor correction below.
     private var tripIntegratedDischargeKwh = 0.0
     // Running min of telemetry.soc seen during the active trip. Pairs with the
     // discharge running-max so endSoc can fall back to the lowest mid-trip SoC
@@ -176,6 +189,18 @@ class TripRepository private constructor(context: Context) {
     // Data-point heartbeat raised to 10 s because GPS is owned by segments now.
     private val WRITE_INTERVAL_MS = 10_000L
 
+    // ── Discharge-anchor sanity bounds ────────────────────────────────────────
+    // A single trip cannot consume more than a couple of full battery's worth
+    // of energy (no opportunity to recharge mid-trip), so any observed delta
+    // of (telemetry.totalDischarge − trip.startTotalDischarge) above this
+    // multiple of the pack capacity points at a corrupted anchor — typically
+    // a stale 0 read from the BMS at the moment of trip start, later replaced
+    // by the true lifetime-cumulative value (often in the thousands of kWh).
+    private val MAX_PLAUSIBLE_TRIP_BATTERIES = 2.0
+    // Fallback pack capacity used when no car is selected yet. Generous so
+    // the sanity check is permissive rather than over-eager.
+    private val FALLBACK_BATTERY_KWH = 100.0
+
     private val DRIVE_GEARS = setOf("D", "R")
 
     private fun validBatteryTemp(temp: Double): Double? =
@@ -183,6 +208,69 @@ class TripRepository private constructor(context: Context) {
 
     private fun validCellTemp(temp: Int): Int? =
         temp.takeIf { it > 0 }
+
+    /**
+     * Usable pack capacity in kWh for sanity bounds. For PHEVs the EV-only
+     * portion is preferred since totalDischarge tracks only the HV-pack
+     * traction draw. Returns a generous fallback when no car config is loaded.
+     */
+    private fun resolveBatteryKwh(): Double {
+        val car = prefsManager.getCachedSelectedCarConfig() ?: return FALLBACK_BATTERY_KWH
+        return if (car.isPhev) car.phevUsableBatteryKwh ?: car.batteryKwh else car.batteryKwh
+    }
+
+    /**
+     * Detect and correct a corrupted [TripEntity.startTotalDischarge] anchor
+     * the moment the BMS produces a plausible read.
+     *
+     * The known failure mode: at trip start the BMS may briefly report
+     * `totalDischarge = 0` (stale) — the trip is created with
+     * `startTotalDischarge = 0`, and as soon as the BMS publishes the real
+     * lifetime-cumulative value (often several thousand kWh), every downstream
+     * `end − start` calculation balloons by that amount. The same logic also
+     * covers any other case where the stored anchor turns out to be
+     * implausibly lower than what the BMS is now reporting.
+     *
+     * We re-anchor only when the observed delta exceeds both
+     *   • [MAX_PLAUSIBLE_TRIP_BATTERIES] × pack capacity, and
+     *   • the power-integrated estimate of what we've actually drawn so far
+     *     (with a small absolute-kWh buffer)
+     *
+     * Using `t.totalDischarge − tripIntegratedDischargeKwh` as the corrected
+     * anchor preserves the real trip-energy-so-far that we already integrated
+     * tick-by-tick from enginePower × dt; it doesn't reset progress.
+     */
+    private suspend fun correctStaleDischargeAnchorIfNeeded(t: VehicleTelemetry) {
+        val trip = cachedCurrentTrip ?: return
+        if (!t.totalDischarge.isFinite() || t.totalDischarge <= 0.0) return
+
+        val observedDelta = t.totalDischarge - trip.startTotalDischarge
+        if (!observedDelta.isFinite() || observedDelta <= 0.0) return
+
+        val batteryKwh = resolveBatteryKwh()
+        val implausibleByCapacity = observedDelta > batteryKwh * MAX_PLAUSIBLE_TRIP_BATTERIES
+        val implausibleVsIntegrated = observedDelta > tripIntegratedDischargeKwh + 5.0
+
+        if (implausibleByCapacity && implausibleVsIntegrated) {
+            val correctedAnchor = (t.totalDischarge - tripIntegratedDischargeKwh)
+                .coerceAtLeast(0.0)
+            val updated = trip.copy(startTotalDischarge = correctedAnchor)
+            tripDao.updateTrip(updated)
+            cachedCurrentTrip = updated
+            // Re-seed the running-max so its "advanced past start" check stays
+            // meaningful with the new anchor.
+            if (t.totalDischarge > tripBestTotalDischarge) {
+                tripBestTotalDischarge = t.totalDischarge
+            }
+            Log.w(
+                TAG,
+                "Corrected implausible startTotalDischarge: " +
+                    "${trip.startTotalDischarge} → $correctedAnchor " +
+                    "(observed=${t.totalDischarge}, integratedSoFar=$tripIntegratedDischargeKwh, " +
+                    "batteryKwh=$batteryKwh)"
+            )
+        }
+    }
 
     private fun effectiveSpeedKmh(t: VehicleTelemetry): Double =
         maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
@@ -205,6 +293,12 @@ class TripRepository private constructor(context: Context) {
         val startLon:            Double?,
         val startOdometer:       Double,
         val startTotalDischarge: Double,
+        // Snapshot of the trip-level integrated draw at the moment the segment
+        // opened. Combined with the trip-level integral at flush time, this gives
+        // a per-segment power-integrated kWh estimate that is robust to a stale
+        // totalDischarge anchor on the segment itself (a 30-second window is too
+        // short for the per-tick anchor correction to recover in time).
+        val tripIntegratedKwhAtOpen: Double,
         var endTime:             Long,
         var endLat:              Double?,
         var endLon:              Double?,
@@ -399,6 +493,13 @@ class TripRepository private constructor(context: Context) {
                         tripIntegratedDischargeKwh += t.enginePower * dtH
                     }
                 }
+
+                // After updating the integrated estimate, check whether the BMS now
+                // disagrees with us so strongly that the trip-start anchor must have
+                // been a stale 0. Re-anchor in that case so the eventual
+                // (end − start) delta and every downstream "energy consumed" value
+                // stays bounded by physics.
+                correctStaleDischargeAnchorIfNeeded(t)
 
                 // Gap check: if car is now on but there was a long unexplained
                 // telemetry gap (service crashed while car was driving), end the
@@ -803,10 +904,35 @@ class TripRepository private constructor(context: Context) {
         )
         val powerIntegratedFallback = (trip.startTotalDischarge + tripIntegratedDischargeKwh)
             .takeIf { dischargeCandidates.isEmpty() && tripIntegratedDischargeKwh > 0.0 }
-        val resolvedEndDischarge = overrideTotalDischarge
+        val candidateEndDischarge = overrideTotalDischarge
             ?: dischargeCandidates.maxOrNull()
             ?: powerIntegratedFallback
             ?: trip.startTotalDischarge
+
+        // Sanity-cap the final delta. The per-tick anchor correction above
+        // catches the common stale-zero case, but if a trip is closed before
+        // the BMS ever recovered (or the override path supplied a bad value),
+        // we may still be holding a (end − start) that exceeds the laws of
+        // physics. When that happens, swap the implausible reading for the
+        // power-integrated estimate of energy actually consumed.
+        val batteryKwh = resolveBatteryKwh()
+        val reportedDeltaKwh = candidateEndDischarge - trip.startTotalDischarge
+        val resolvedEndDischarge = if (
+            reportedDeltaKwh > batteryKwh * MAX_PLAUSIBLE_TRIP_BATTERIES &&
+            tripIntegratedDischargeKwh > 0.0
+        ) {
+            Log.w(
+                TAG,
+                "Clamping implausible trip discharge delta: reported=" +
+                    "${"%.2f".format(reportedDeltaKwh)} kWh " +
+                    "(start=${trip.startTotalDischarge}, end=$candidateEndDischarge) " +
+                    "→ power-integrated ${"%.2f".format(tripIntegratedDischargeKwh)} kWh " +
+                    "(batteryKwh=$batteryKwh)"
+            )
+            trip.startTotalDischarge + tripIntegratedDischargeKwh
+        } else {
+            candidateEndDischarge
+        }
 
         // SoC: 0 is possible as a real reading when fully discharged, but in
         // practice a 0 here almost always means stale telemetry. Prefer the
@@ -946,15 +1072,16 @@ class TripRepository private constructor(context: Context) {
         val lat = t.locationLatitude.takeIf  { it != 0.0 }
         val lon = t.locationLongitude.takeIf { it != 0.0 }
         return SegmentBuilder(
-            tripId              = tripId,
-            startTime           = now,
-            startLat            = lat,
-            startLon            = lon,
-            startOdometer       = t.odometer,
-            startTotalDischarge = t.totalDischarge,
-            endTime             = now,
-            endLat              = lat,
-            endLon              = lon
+            tripId                  = tripId,
+            startTime               = now,
+            startLat                = lat,
+            startLon                = lon,
+            startOdometer           = t.odometer,
+            startTotalDischarge     = t.totalDischarge,
+            tripIntegratedKwhAtOpen = tripIntegratedDischargeKwh,
+            endTime                 = now,
+            endLat                  = lat,
+            endLon                  = lon
         )
     }
 
@@ -978,6 +1105,38 @@ class TripRepository private constructor(context: Context) {
             return
         }
 
+        // Per-segment power-integrated kWh = trip integral now − snapshot at open.
+        // This is the ground-truth fallback when the BMS discharge-counter delta
+        // for this segment is physically impossible (typically because the
+        // segment's startTotalDischarge anchor was a stale 0 — the same failure
+        // mode that motivated the trip-level correctStaleDischargeAnchorIfNeeded
+        // path, but inside a 30-second window the per-tick correction usually
+        // doesn't fire in time to save the segment).
+        val segIntegratedKwh = (tripIntegratedDischargeKwh - seg.tripIntegratedKwhAtOpen)
+            .coerceAtLeast(0.0)
+        val batteryKwh = resolveBatteryKwh()
+        // A segment is at most SEGMENT_FLUSH_MS ≈ 30 s of driving. Even at peak
+        // continuous output (~250 kW) that caps real consumption at ~2 kWh per
+        // segment. We use 50% of the pack as the implausibility threshold —
+        // anything above that is unambiguously a corrupt anchor.
+        val segMaxPlausibleKwh = batteryKwh * 0.5
+        val reportedSegEnergy = if (endTelemetry != null)
+                                    maxOf(0.0, endTelemetry.totalDischarge - seg.startTotalDischarge)
+                                else 0.0
+        val resolvedSegEnergy = if (reportedSegEnergy > segMaxPlausibleKwh) {
+            Log.w(
+                TAG,
+                "Clamping implausible segment energyUsed: " +
+                    "${"%.2f".format(reportedSegEnergy)} kWh " +
+                    "(start=${seg.startTotalDischarge}, " +
+                    "end=${endTelemetry?.totalDischarge}) → " +
+                    "power-integrated ${"%.2f".format(segIntegratedKwh)} kWh"
+            )
+            segIntegratedKwh
+        } else {
+            reportedSegEnergy
+        }
+
         segmentDao.insertSegment(
             TripSegmentEntity(
                 tripId     = seg.tripId,
@@ -990,11 +1149,9 @@ class TripRepository private constructor(context: Context) {
                 avgSpeed   = seg.speedSum  / seg.samples,
                 avgPower   = seg.powerSum  / seg.samples,
                 distance   = if (endTelemetry != null)
-                                 maxOf(0.0, endTelemetry.odometer       - seg.startOdometer)
+                                 maxOf(0.0, endTelemetry.odometer - seg.startOdometer)
                              else 0.0,
-                energyUsed = if (endTelemetry != null)
-                                 maxOf(0.0, endTelemetry.totalDischarge - seg.startTotalDischarge)
-                             else 0.0
+                energyUsed = resolvedSegEnergy
             )
         )
 

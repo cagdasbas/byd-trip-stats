@@ -55,6 +55,13 @@ class TelegramManager private constructor(private val context: Context) {
         private const val BASE_URL      = "https://api.telegram.org/bot"
         private const val FILE_BASE_URL = "https://api.telegram.org/file/bot"
 
+        // Telegram Bot API caps `sendDocument` at 50 MB. Larger files are rejected by
+        // the server, but the multipart body has already been transmitted by then —
+        // so an over-cap weekly/daily backup quietly burns the user's data plan
+        // before the rejection arrives. We pre-check against this constant on every
+        // sendFile() path to short-circuit before any bytes go on the wire.
+        const val TELEGRAM_MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024
+
         @Volatile private var INSTANCE: TelegramManager? = null
 
         fun getInstance(context: Context): TelegramManager {
@@ -255,6 +262,16 @@ class TelegramManager private constructor(private val context: Context) {
     suspend fun sendFile(file: File, caption: String = "") = withContext(Dispatchers.IO) {
         try {
             val cfg = _config.value ?: throw Exception("Telegram not configured.")
+            val size = file.length()
+            if (size > TELEGRAM_MAX_FILE_SIZE_BYTES) {
+                val sizeMb = size.toDouble() / (1024.0 * 1024.0)
+                val msg = "Backup file is ${"%.1f".format(sizeMb)} MB — Telegram bots can only " +
+                    "accept files up to 50 MB. Upload skipped to avoid wasting your data plan. " +
+                    "Consider trimming the database (delete old trips) or using local backups instead."
+                Log.w(TAG, msg)
+                _state.value = TelegramState.Error(msg)
+                return@withContext
+            }
             _state.value = TelegramState.InProgress("Sending to Telegram…")
 
             val boundary = "----BydBackup${System.currentTimeMillis()}"

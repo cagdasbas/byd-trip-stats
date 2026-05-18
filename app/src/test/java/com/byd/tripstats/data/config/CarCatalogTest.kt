@@ -14,7 +14,7 @@ class CarCatalogTest {
     @Test fun `fromId returns correct car for known id`() {
         val car = CarCatalog.fromId("BYD_SEAL_EXCELLENCE")
         assertNotNull(car)
-        assertEquals("BYD Seal Excellence", car!!.displayName)
+        assertEquals("Seal Excellence", car!!.displayName)
         assertEquals(Drivetrain.AWD, car.drivetrain)
     }
 
@@ -102,7 +102,7 @@ class CarCatalogTest {
         assertEquals(Drivetrain.FWD, CarCatalog.BYD_SEAL_U_DESIGN.drivetrain)
     }
 
-    @Test fun `catalog contains all 28 expected cars`() {
-        assertEquals(28, CarCatalog.allCars.size)
+    @Test fun `catalog contains all 32 expected cars`() {
+        assertEquals(32, CarCatalog.allCars.size)
     }
 }

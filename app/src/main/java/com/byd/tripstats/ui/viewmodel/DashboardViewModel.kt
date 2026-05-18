@@ -446,13 +446,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     //   produced a valid Wh/km estimate. This is the primary operating mode.
     //   Equivalent to "last 30 km" Trip Range model.
     //
-    // LEVEL 2 — HISTORICAL_BINS (speed-bin model)
+    // LEVEL 2 — HISTORICAL_BINS (cumulative-across-bins model)
     //   Live speed bins are accumulated on every telemetry tick (not just 100 m
-    //   samples) so they build up quickly within the same trip.
-    //   If the current speed bin has ≥ BIN_MIN_DIST_KM of observed distance,
-    //   its Wh/km is used as the projection rate. This captures driving-style
-    //   variation (city vs highway) from actual data without relying on past trips.
-    //   Activated only when Level 1 is not yet available (pre-stabilisation).
+    //   samples) so they build up quickly within the same trip. Wh/km is computed
+    //   as totalBinEnergyWh / totalBinDistanceKm across *all* populated bins,
+    //   gated to a low total-distance threshold (BIN_MIN_DIST_KM ≈ 0.2 km).
+    //   This serves as the pre-stabilisation bridge between BASELINE and LIVE_TRIP:
+    //   it provides a meaningful trip-derived rate within ~15 s of starting to
+    //   drive, and stays valid through speed transitions (which used to drop the
+    //   chart back to BASELINE because only the current bin was consulted).
+    //   Activated only when Level 1 is not yet available.
     //
     // LEVEL 3 — LIFETIME_AVERAGE  ← TODO Phase 2
     //   Aggregate past-trip consumption: sum(energyConsumed) / sum(distance)
@@ -507,7 +510,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // Min consecutive off-time before an engine-on transition resets the segment.
         // Prevents brief stops (red lights, momentary key cycles) from wiping segment km.
         const val SEGMENT_RESET_OFF_THRESHOLD_MS = 90_000L
-        const val BIN_MIN_DIST_KM       = 0.5    // Level 2: min km in a bin before trusting it
+        // Level 2: minimum *total* km accumulated across all populated speed bins
+        // before the historical-bins rate is trusted. Lowered from 0.5 to 0.2 in
+        // the rework that switched HISTORICAL_BINS from "current bin only" to
+        // "cumulative across all bins". With the new aggregation we hit 0.2 km
+        // within ~10–15 s of moving, which makes the tier a useful pre-stabilisation
+        // bridge instead of a path that almost never fires.
+        const val BIN_MIN_DIST_KM       = 0.2
         // TODO Phase 2:
         // const val LIFETIME_MIN_KM    = 50.0   // Level 3: min lifetime km before using average
         private val SOUTHERN_HEMISPHERE_COUNTRY_CODES = setOf(
@@ -608,12 +617,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val liveOdometerDistanceKm: StateFlow<Double> = _liveOdometerDistanceKm.asStateFlow()
 
     private var liveSessionStartOdometer: Double? = null
-    private var liveSessionStartTotalDischarge: Double = 0.0
     private var segmentStartOdometer: Double? = null
     private var lastTelemetryTimeMs: Long?    = null
     private var lastBinOdo:          Double?  = null
+    /** Tracks the previous tick's [VehicleTelemetry.totalDischarge] so we can derive a
+     *  per-tick BMS energy delta — preferred over power-integrated when available because
+     *  on some firmwares (e.g. Seal Excellence) [VehicleTelemetry.enginePower] is reported
+     *  as ~0 for long stretches, starving the rolling-window and bin accumulators and
+     *  pinning the projection in BASELINE forever. */
+    private var lastTotalDischargeKwh: Double? = null
     private var integratedDistanceKm: Double  = 0.0
     private var integratedSegmentDistanceKm: Double = 0.0
+    // Trip-cumulative *net* traction energy (signed): positive power × dt
+    // accumulates, negative power × dt (regen) subtracts. NOT used for the
+    // user-facing "energy consumed" total — that comes from the BMS
+    // totalDischarge counter (see _liveAccumulatedKwh below) so it matches
+    // what the post-trip overview screen stores and what reference apps
+    // like Electro report for the same drive. This accumulator's role is
+    // purely the (distance, energy) sample series feeding the LIVE_TRIP
+    // range projection's rolling-window Wh/km — power-integration keeps
+    // those samples decoupled from BMS lumpiness so the projection tier
+    // engages reliably on cars whose BMS counter is sluggish.
     private var accumulatedEnergyWh: Double   = 0.0
     private var smoothedWhPerKm:     Double?  = null  // Level 1 EMA state
     private val energySamples      = mutableListOf<EnergySample>()
@@ -720,10 +744,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         )
         lastTelemetryTimeMs = telemetryMs
         lastBinOdo = telemetry.odometer
+        lastTotalDischargeKwh = telemetry.totalDischarge.takeIf { it.isFinite() && it > 0.0 }
         if (isFirstTripStart) {
             integratedDistanceKm = 0.0
             accumulatedEnergyWh = 0.0
-            liveSessionStartTotalDischarge = telemetry.totalDischarge
             _liveAccumulatedKwh.value = 0.0
             _liveOdometerDistanceKm.value = 0.0
             smoothedWhPerKm = null
@@ -758,10 +782,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun clearLiveDriveRuntime(keepPoints: Boolean) {
         liveSessionStartOdometer = null
-        liveSessionStartTotalDischarge = 0.0
         segmentStartOdometer = null
         lastTelemetryTimeMs = null
         lastBinOdo = null
+        lastTotalDischargeKwh = null
         integratedDistanceKm = 0.0
         integratedSegmentDistanceKm = 0.0
         accumulatedEnergyWh = 0.0
@@ -773,7 +797,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _liveDistanceKm.value = 0.0
         _liveSegmentDistanceKm.value = 0.0
         _liveSessionStartMs.value = null
-        _activeRangeModel.value = RangeModel.BASELINE
+        // Only reset the active model badge when we're also clearing the chart
+        // (full reset). When keepPoints=true the chart still shows the trip's
+        // LIVE_TRIP-stage projections from earlier in the drive; resetting the
+        // badge to BASELINE in that state lies to the user about what the
+        // displayed line was computed from.
+        if (!keepPoints) {
+            _activeRangeModel.value = RangeModel.BASELINE
+        }
         lastTelemetryWasCarOn = null
         segmentOffSinceMs = null
         suppressJourneyDistance = false
@@ -890,6 +921,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         lastTelemetryWasCarOn = false
                         lastTelemetryTimeMs = telemetryMs
                         lastBinOdo = telemetry.odometer
+                        lastTotalDischargeKwh = telemetry.totalDischarge.takeIf { it.isFinite() && it > 0.0 }
                         wasInTrip = inTrip
                         return@collect
                     }
@@ -919,10 +951,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         if (deltaSeconds in 0.0..MAX_DELTA_SECONDS) {
                             integratedDistanceKm += integrateDistanceKm(effectiveSpeed, deltaSeconds)
                             integratedSegmentDistanceKm += integrateDistanceKm(effectiveSpeed, deltaSeconds)
-                            deltaEnergyWh = telemetry.enginePower * 1000.0 * (deltaSeconds / 3600.0)
-                            if (deltaEnergyWh > 0) {
-                                accumulatedEnergyWh += deltaEnergyWh
-                            }
+                            // Per-tick energy delta. We prefer the BMS totalDischarge delta
+                            // (kWh consumed since the previous packet) because it's measured
+                            // at the battery and matches what the CONS readout already shows
+                            // the user. On firmwares where enginePower is unreliable / often
+                            // reported as ~0 (e.g. Seal Excellence in city driving), the
+                            // power-integrated counter starved both the rolling-window and
+                            // speed-bin accumulators, pinning the projection in BASELINE for
+                            // the whole trip. Falling back to power × dt covers the case where
+                            // totalDischarge is stale or non-monotonic — recently-charged
+                            // packets occasionally report a smaller value than the previous
+                            // tick, and we don't want a negative delta to corrupt the bins.
+                            val powerDeltaWh = telemetry.enginePower * 1000.0 * (deltaSeconds / 3600.0)
+                            val prevTd = lastTotalDischargeKwh
+                            val currentTd = telemetry.totalDischarge.takeIf { it.isFinite() && it > 0.0 }
+                            val bmsDeltaWh = if (prevTd != null && currentTd != null) {
+                                ((currentTd - prevTd) * 1000.0)
+                                    .takeIf { it.isFinite() && it in 0.0..10_000.0 }
+                            } else null
+                            deltaEnergyWh = bmsDeltaWh ?: powerDeltaWh
+                            accumulatedEnergyWh += deltaEnergyWh
+                            if (currentTd != null) lastTotalDischargeKwh = currentTd
                         }
                     }
                     lastTelemetryTimeMs = telemetryMs
@@ -953,11 +1002,31 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val distKm = currentDistanceKm
                     _liveDistanceKm.value = distKm
                     _liveSegmentDistanceKm.value = currentSegmentDistanceKm
-                    // Use discharge counter delta (same source as finalized trip stats) so
-                    // the live consumption display matches what will be stored in the trip.
-                    val dischargeKwh = (telemetry.totalDischarge - liveSessionStartTotalDischarge)
-                        .coerceAtLeast(0.0)
-                    _liveAccumulatedKwh.value = dischargeKwh
+                    // Live "energy consumed" comes from the BMS totalDischarge delta
+                    // (current reading − the trip's start anchor), so it matches what
+                    // the post-trip overview will store and what reference apps like
+                    // Electro report for the same drive. We read the start anchor from
+                    // TripRepository.currentTripStartTotalDischarge() rather than caching
+                    // it locally so that any per-tick stale-zero correction the repo
+                    // applies (see correctStaleDischargeAnchorIfNeeded there) is picked
+                    // up immediately. As a defence in depth against the brief window
+                    // before that correction fires — and against any other case where
+                    // the BMS-derived delta would be physically impossible — we coerce
+                    // the value into [0, 2 × pack capacity]; outside that envelope we
+                    // fall back to the power-integrated gross-traction estimate, which
+                    // is always sane.
+                    val tripStartTd = tripRepository.currentTripStartTotalDischarge()
+                    val bmsDeltaKwh = if (tripStartTd != null)
+                        telemetry.totalDischarge - tripStartTd else 0.0
+                    val sanityBatteryKwh = selectedCarConfig.value?.let {
+                        if (it.isPhev) it.phevUsableBatteryKwh ?: it.batteryKwh else it.batteryKwh
+                    } ?: FALLBACK_BATTERY_KWH
+                    val fallbackKwh = (accumulatedEnergyWh / 1000.0).coerceAtLeast(0.0)
+                    val liveEnergyKwh = if (
+                        bmsDeltaKwh.isFinite() &&
+                        bmsDeltaKwh in 0.0..(sanityBatteryKwh * 2.0)
+                    ) bmsDeltaKwh else fallbackKwh
+                    _liveAccumulatedKwh.value = liveEnergyKwh.coerceAtLeast(0.0)
                     // Pure odometer delta — used for avg speed display to match finalized stats.
                     _liveOdometerDistanceKm.value =
                         (telemetry.odometer - (liveSessionStartOdometer ?: telemetry.odometer))
@@ -970,8 +1039,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         return@collect
                     }
 
-                    // Energy samples use discharge counter so they're consistent with restored trips.
-                    energySamples.add(EnergySample(distKm, dischargeKwh * 1000.0))
+                    // Sample (distance, cumulative net energy) for the LIVE_TRIP rolling
+                    // window. Using the power-integrated counter (rather than the BMS
+                    // discharge delta) is what makes the LIVE_TRIP tier actually engage
+                    // on cars with a lumpy / stale totalDischarge feed.
+                    energySamples.add(EnergySample(distKm, accumulatedEnergyWh))
                     val windowFloor = distKm - ROLLING_WINDOW_KM
                     while (energySamples.size > 1 && energySamples[0].distanceKm < windowFloor) {
                         energySamples.removeAt(0)
@@ -993,10 +1065,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             ?: rawWhPerKm
                     }
 
-                    val currentBinAcc = liveSpeedBins[speedBin(effectiveSpeed)]
-                    val binWhPerKm: Double? = currentBinAcc
-                        ?.takeIf { it.distanceKm >= BIN_MIN_DIST_KM && it.energyWh > 0 }
-                        ?.let { it.energyWh / it.distanceKm }
+                    // Cumulative-across-bins drive Wh/km. Previously this only considered
+                    // the *current* speed bin, so a transition from highway to city (or
+                    // any speed change into a fresh bin) immediately dropped the fallback
+                    // back to BASELINE even though plenty of bin data existed overall.
+                    // Summing all populated bins gives a meaningful pre-stabilisation rate
+                    // from the moment the trip has accumulated BIN_MIN_DIST_KM of drive
+                    // distance, and reflects driving style across all speed regimes.
+                    val totalBinDistanceKm = liveSpeedBins.values.sumOf { it.distanceKm }
+                    val totalBinEnergyWh   = liveSpeedBins.values.sumOf { it.energyWh }
+                    val binWhPerKm: Double? =
+                        if (totalBinDistanceKm >= BIN_MIN_DIST_KM && totalBinEnergyWh > 0.0)
+                            totalBinEnergyWh / totalBinDistanceKm
+                        else null
 
                     val isStabilised = distKm >= STABILISATION_KM
                     val car = selectedCarConfig.value
@@ -1177,25 +1258,35 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 integratedSegmentDistanceKm = _liveSegmentDistanceKm.value
 
                 _liveSessionStartMs.value = trip.startTime
-                liveSessionStartTotalDischarge = trip.startTotalDischarge
                 _liveOdometerDistanceKm.value = odometerCumulative
 
-                // Reconstruct accumulated energy from the last data point if possible
-                val lastPoint = dataPoints.lastOrNull()
-                accumulatedEnergyWh = if (lastPoint != null) {
-                    (lastPoint.totalDischarge - trip.startTotalDischarge).coerceAtLeast(0.0) * 1000.0
-                } else 0.0
-                _liveAccumulatedKwh.value = (lastPoint?.totalDischarge
-                    ?.let { (it - trip.startTotalDischarge).coerceAtLeast(0.0) }
-                    ?: 0.0)
-
-                // Reconstruct energy samples for the rolling window
+                // Reconstruct accumulated energy by replaying power × dt across the
+                // stored data points. This is the same integration TripEnergyBreakdown
+                // uses for its trip totals and matches the live path's accumulator, so
+                // restored state is consistent with live state. We intentionally do NOT
+                // use (lastPoint.totalDischarge − trip.startTotalDischarge): the latter
+                // is the BMS delta, which under-reports during normal driving and can
+                // over-report by thousands of kWh if startTotalDischarge was anchored
+                // to a stale 0 at trip start.
+                // RESTORE_MAX_GAP_SECONDS = 60s tolerates the gaps between 100m-spaced
+                // samples even at low speed; longer gaps (parked stretches) contribute 0.
+                val restoreMaxGapSeconds = 60.0
                 energySamples.clear()
-                dataPoints.forEach { dp ->
+                var cumEnergyWh = 0.0
+                dataPoints.forEachIndexed { i, dp ->
+                    if (i > 0) {
+                        val prev = dataPoints[i - 1]
+                        val dt = (dp.timestamp - prev.timestamp).coerceAtLeast(0L) / 1000.0
+                        if (dt in 0.0..restoreMaxGapSeconds) {
+                            // Net (signed) — mirrors the live path.
+                            cumEnergyWh += prev.power * 1000.0 * (dt / 3600.0)
+                        }
+                    }
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
-                    val eWh = (dp.totalDischarge - trip.startTotalDischarge).coerceAtLeast(0.0) * 1000.0
-                    energySamples.add(EnergySample(dKm, eWh))
+                    energySamples.add(EnergySample(dKm, cumEnergyWh))
                 }
+                accumulatedEnergyWh = cumEnergyWh
+                _liveAccumulatedKwh.value = (cumEnergyWh / 1000.0).coerceAtLeast(0.0)
 
                 // Reconstruct speed bins from all points.
                 // Use midpoint speed (avg of a and b) so the segment is classified by
@@ -1228,6 +1319,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 val baselineWhPerKm = car?.referenceConsumptionKwhPer100km?.times(10.0)
                     ?: FALLBACK_BASELINE_WH_PER_KM
                 val restoredSmoothed = smoothedWhPerKm
+                // Cumulative bin Wh/km — same formula the live path uses (line ~1056).
+                // When this resolves to a non-null value we treat all restored points as
+                // stabilised, so the orange line is drawn from the start of the trip
+                // instead of leaving a 0..STABILISATION_KM visual gap.
+                val restoredBinTotalDist = liveSpeedBins.values.sumOf { it.distanceKm }
+                val restoredBinTotalEnergy = liveSpeedBins.values.sumOf { it.energyWh }
+                val restoredBinWhPerKm: Double? =
+                    if (restoredBinTotalDist >= BIN_MIN_DIST_KM && restoredBinTotalEnergy > 0.0)
+                        restoredBinTotalEnergy / restoredBinTotalDist
+                    else null
                 // For PHEVs: fuel range is not stored per data point, so use the current
                 // telemetry value as a constant offset — fuel level changes slowly relative
                 // to EV drain, so this is a reasonable approximation for the restored series.
@@ -1237,7 +1338,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 _tripDataPoints.value = dataPoints.map { dp ->
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
-                    val stabilised = dKm >= STABILISATION_KM
+                    // A point is stabilised if EITHER the distance threshold has been
+                    // reached OR a non-baseline projection is available — matches the
+                    // live path's `isStabilised || model != BASELINE` shortcut.
+                    val stabilised = dKm >= STABILISATION_KM ||
+                        (restoredSmoothed != null && restoredSmoothed > 0.0) ||
+                        restoredBinWhPerKm != null
                     val remainingWh = batteryKwh * 1000.0 * (dp.soc / 100.0)
                     // Null for non-stabilised points — matches live path behaviour so the
                     // orange projected line doesn't appear after navigation before it would
@@ -1246,6 +1352,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         !stabilised -> null
                         restoredSmoothed != null && restoredSmoothed > 0.0 ->
                             ((remainingWh / restoredSmoothed) + fuelRangeKm).coerceAtLeast(0.0)
+                        restoredBinWhPerKm != null ->
+                            ((remainingWh / restoredBinWhPerKm) + fuelRangeKm).coerceAtLeast(0.0)
                         else ->
                             ((remainingWh / baselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0)
                     }
@@ -1258,8 +1366,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 }
 
-                _activeRangeModel.value = if (smoothedWhPerKm != null) RangeModel.LIVE_TRIP
-                                          else RangeModel.BASELINE
+                // Pick the same tier the live path would (line ~1077). Without checking
+                // bins, a restored trip with valid bin data but no smoothed EMA would
+                // wrongly show BASELINE on the badge even though the line is drawn from
+                // a non-baseline calculation. Reuses [restoredBinWhPerKm] computed above
+                // for the stabilised gating.
+                _activeRangeModel.value = when {
+                    smoothedWhPerKm != null && smoothedWhPerKm!! > 0.0 -> RangeModel.LIVE_TRIP
+                    restoredBinWhPerKm != null                          -> RangeModel.HISTORICAL_BINS
+                    else                                                -> RangeModel.BASELINE
+                }
                 lastTelemetryWasCarOn = telemetry.isCarOn
                 segmentOffSinceMs = null
                 Log.i(TAG, "Restored trip state for id=$tripId with ${dataPoints.size} points")

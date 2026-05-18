@@ -30,6 +30,12 @@ class AbrpConnectionManager(context: Context) {
     ) {
         val config = AbrpConnectionStore.load(appContext)
         if (!config.enabled || config.userToken.isBlank()) return
+        // Skip uploads while the car is parked and not charging — ABRP only cares about
+        // active driving/charging telemetry, and the foreground service stays alive 24/7
+        // (keepServiceAliveWhenOff defaults to true), so without this gate the loop
+        // would burn ~140 MB/day on idle uploads (a fresh TLS handshake per request
+        // dominates the byte count) even when nothing about the car is changing.
+        if (!telemetry.isCarOn && !telemetry.isCharging) return
         val intervalMs = config.uploadIntervalSeconds.coerceIn(5, 120) * 1000L
         val now = System.currentTimeMillis()
         if (lastUploadAtMs > 0L && now - lastUploadAtMs < intervalMs) return
@@ -129,6 +135,12 @@ class AbrpConnectionManager(context: Context) {
             doOutput = true
             setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
         }
+        // Note: we deliberately do NOT call conn.disconnect() on the success path.
+        // HttpURLConnection's connection pool keeps the underlying TCP/TLS socket
+        // alive for reuse once the response stream has been fully drained, which
+        // is what we do below (~5–8 KB TLS handshake saved per request). disconnect()
+        // forces the socket closed and disables that reuse. We only force-close on
+        // exception paths where the connection is in an unknown state.
         return try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val responseCode = conn.responseCode
@@ -139,9 +151,8 @@ class AbrpConnectionManager(context: Context) {
             responseCode in 200..299
         } catch (e: IOException) {
             Log.w("AbrpConnectionManager", "upload failed (network): ${e.message}")
+            runCatching { conn.disconnect() }
             false
-        } finally {
-            conn.disconnect()
         }
     }
 }

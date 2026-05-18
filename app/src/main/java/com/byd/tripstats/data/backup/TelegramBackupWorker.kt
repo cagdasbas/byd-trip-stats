@@ -43,6 +43,22 @@ class TelegramBackupWorker(
                 return Result.retry()
             }
 
+            // Pre-check against Telegram's 50 MB cap. Without this, every periodic run
+            // would copy the DB to cache and stream the whole file to api.telegram.org
+            // before the server replies with "Request Entity Too Large" — silently
+            // burning the user's data plan on a daily/weekly cadence. We mark this as
+            // failure (not retry) so WorkManager doesn't immediately re-try with the
+            // same oversized file; the next periodic tick will check again.
+            val dbSize = dbFile.length()
+            if (dbSize > TelegramManager.TELEGRAM_MAX_FILE_SIZE_BYTES) {
+                Log.w(
+                    TAG,
+                    "Skipping auto-backup: DB is ${dbSize / (1024 * 1024)} MB, " +
+                        "above Telegram's 50 MB limit."
+                )
+                return Result.failure()
+            }
+
             // Flush WAL for a consistent snapshot
             flushWal(dbFile)
 

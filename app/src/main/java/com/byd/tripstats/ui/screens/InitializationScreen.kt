@@ -83,7 +83,7 @@ fun InitializationScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "1) Choose the BYD model you drive",
+                text = "Choose the BYD model you drive",
                 style = MaterialTheme.typography.titleMedium
             )
 

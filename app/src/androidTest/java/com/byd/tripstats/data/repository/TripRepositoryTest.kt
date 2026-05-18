@@ -489,7 +489,13 @@ class TripRepositoryTest {
 
         val trip = repo.getAllTrips().first().single()
         assertFalse("Trip should be completed after manual stop", trip.isActive)
-        assertEquals(28.0, trip.avgBatteryTemp, 0.001)
+        // Expected = (cellMin + cellMax) / 2 = (27 + 31) / 2 = 29.0.
+        // batteryPackTemp is intentionally NOT consulted by VehicleTelemetry.batteryTempAvg
+        // (m51 reads like a coolant probe, m36 sits several °C below cell temps under
+        // active cooling) — see the comment on that getter. The test's role here is to
+        // verify that the invalid zero-temp first packet doesn't drag the avg down, not
+        // to pin the source to packTemp.
+        assertEquals(29.0, trip.avgBatteryTemp, 0.001)
         assertEquals(31, trip.maxBatteryCellTemp)
         assertEquals(27, trip.minBatteryCellTemp)
     }

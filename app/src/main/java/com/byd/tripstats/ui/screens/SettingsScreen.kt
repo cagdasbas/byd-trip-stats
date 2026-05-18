@@ -1140,6 +1140,9 @@ private fun AppPreferencesTab(
 ) {
     val scope = rememberCoroutineScope()
     val keepServiceAliveWhenOff by preferencesManager.keepServiceAliveWhenOff.collectAsState(initial = true)
+    val dashboardIconsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(
+        initial = preferencesManager.getCachedAnimationsEnabled()
+    )
     val carOffTimeoutMinutes by preferencesManager.carOffTimeoutMinutes.collectAsState(
         initial = preferencesManager.getCachedCarOffTimeoutMinutes()
     )
@@ -1178,6 +1181,61 @@ private fun AppPreferencesTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         SectionHeader(icon = Icons.Filled.Tune, title = "Preferences")
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "Dashboard icons & animations",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "When enabled, the range-projection card shows a liquid-fill battery icon, an AWD/axle drawing with tyre pressure/temperature overlays, and an animated consumption thumbnail above the chart. When disabled, those move into the top bar (battery and consumption icons) and a dedicated Tyres stat card on the side panel — freeing vertical space for the range chart and skipping all animations.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = dashboardIconsEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                preferencesManager.saveDashboardAnimationsEnabled(enabled)
+                            }
+                        },
+                        thumbContent = if (!dashboardIconsEnabled) {
+                            {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .background(ToggleUncheckedTrack, CircleShape)
+                                )
+                            }
+                        } else null,
+                        colors = SwitchDefaults.colors(
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = ToggleUncheckedTrack,
+                            uncheckedBorderColor = ToggleUncheckedTrack
+                        )
+                    )
+                }
+            }
+        }
 
         Card(
             modifier = Modifier.fillMaxWidth(),

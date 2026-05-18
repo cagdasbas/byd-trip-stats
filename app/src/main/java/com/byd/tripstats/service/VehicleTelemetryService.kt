@@ -423,20 +423,21 @@ class VehicleTelemetryService : Service() {
                         // enter deeper sleep during normal unconnected overnight parking.
                         //
                         // Throttled to once per 10 min — well within the ~15 min WiFi cut window.
-                        // Gun physically in port (chargingGunState != 0) is the primary keepalive
-                        // signal. It covers pre-charge negotiation, active charging, scheduled-
-                        // charge wait, and post-charge while still plugged in — and returns to
-                        // zero only on physical unplug. chargerWorkState is intentionally excluded:
-                        // its FINISH/TERMINATE values are non-zero but indicate charging has ended,
-                        // which would keep WiFi alive after the session is complete.
-                        val chargingGunPresent = vehicleDataSource.vehicleSnapshot.value.chargingGunState != 0
-                        if (!telemetry.isCarOn && (telemetry.isCharging || chargingGunPresent)) {
+                        // The keepalive uses the *union* of the three charging signals because a
+                        // false positive here (WiFi alive a bit longer than needed) is cheap, while
+                        // a false negative (missing telemetry mid-charge because WiFi got cut) is
+                        // expensive. This is deliberately more inclusive than computeChargingActive,
+                        // which drives UI state and prefers a single authoritative signal.
+                        val snap = vehicleDataSource.vehicleSnapshot.value
+                        val chargingGunPresent = snap.chargingGunState != 0
+                        val chargerWorking = snap.chargerWorkState != 0
+                        if (!telemetry.isCarOn && (telemetry.isCharging || chargingGunPresent || chargerWorking)) {
                             val nowMs = SystemClock.elapsedRealtime()
                             if (nowMs - lastChargingKeepaliveMs >= 10 * 60 * 1000L) {
                                 lastChargingKeepaliveMs = nowMs
                                 try {
                                     McuWakeHelper.keepAlive(applicationContext)
-                                    Log.d(TAG, "MCU keepalive sent (gun=$chargingGunPresent charging=${telemetry.isCharging})")
+                                    Log.d(TAG, "MCU keepalive sent (gun=$chargingGunPresent work=$chargerWorking charging=${telemetry.isCharging})")
                                 } catch (e: Exception) {
                                     Log.w(TAG, "MCU keepalive failed: ${e.message}")
                                 }
