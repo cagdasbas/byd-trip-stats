@@ -34,10 +34,28 @@ data class TripEntity(
     val avgBatteryTemp: Double = 0.0,
     val minSoc: Double = 100.0,
     val maxBatteryCellTemp: Int = Int.MIN_VALUE,   // sentinel: unset until first reading
-    val minBatteryCellTemp: Int = Int.MAX_VALUE    // sentinel: unset until first reading
+    val minBatteryCellTemp: Int = Int.MAX_VALUE,   // sentinel: unset until first reading
+    /**
+     * Wallclock ms during which the trip was open but the car was off — i.e. the
+     * configurable engine-off resume window between trip segments, plus the trailing
+     * window between the last data point and the timeout-triggered trip close.
+     *
+     * Subtracted from [duration] so that displayed trip duration and average speed
+     * reflect actual driving time, not driving + parked-with-the-trip-still-open.
+     * Computed from per-pair gaps in the recorded data points at trip-close time
+     * (see TripRepository.finalizeTripCore / backfillOffStateDuration); defaults to
+     * 0 for trips recorded before the 2.5.0 schema bump so behaviour is unchanged
+     * for legacy rows until the backfill job runs.
+     */
+    val offStateDurationMs: Long = 0
 ) {
+    /** Active driving time only — the wallclock span minus [offStateDurationMs]. */
     val duration: Long?
-        get() = endTime?.let { it - startTime }
+        get() = endTime?.let { (it - startTime - offStateDurationMs).coerceAtLeast(0L) }
+
+    /** Wallclock span from start to end, including any off-state windows. */
+    val wallclockDuration: Long?
+        get() = endTime?.let { (it - startTime).coerceAtLeast(0L) }
 
     val distance: Double?
         get() = endOdometer?.let { it - startOdometer }

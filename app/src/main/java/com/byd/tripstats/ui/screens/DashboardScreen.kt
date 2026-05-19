@@ -106,6 +106,7 @@ fun DashboardScreen(
     val liveOdometerDistanceKm by viewModel.liveOdometerDistanceKm.collectAsState()
     val liveSegmentDistanceKm by viewModel.liveSegmentDistanceKm.collectAsState()
     val liveSessionStartMs by viewModel.liveSessionStartMs.collectAsState()
+    val liveOffStateMs by viewModel.liveOffStateMs.collectAsState()
     val liveAccumulatedKwh by viewModel.liveAccumulatedKwh.collectAsState()
     val weeklyEfficiency by viewModel.weeklyEfficiency.collectAsState()
     val monthlyEfficiency by viewModel.monthlyEfficiency.collectAsState()
@@ -289,6 +290,7 @@ fun DashboardScreen(
                 tripDistanceKm = liveDistanceKm,
                 liveOdometerDistanceKm = liveOdometerDistanceKm,
                 liveSessionStartMs = liveSessionStartMs,
+                liveOffStateMs = liveOffStateMs,
                 liveAccumulatedKwh = liveAccumulatedKwh,
                 modifier = Modifier.padding(paddingValues)
             )
@@ -414,6 +416,7 @@ fun DashboardContent(
     tripDistanceKm: Double = 0.0,
     liveOdometerDistanceKm: Double = 0.0,
     liveSessionStartMs: Long? = null,
+    liveOffStateMs: Long = 0L,
     liveAccumulatedKwh: Double = 0.0,
 ) {
     val context = LocalContext.current
@@ -538,6 +541,7 @@ fun DashboardContent(
                         onEndTrip = onEndTrip,
                         onToggleAutoDetection = onToggleAutoDetection,
                         liveSessionStartMs = liveSessionStartMs,
+                liveOffStateMs = liveOffStateMs,
                         liveDistanceKm = tripDistanceKm,
                         liveOdometerDistanceKm = liveOdometerDistanceKm,
                         liveAccumulatedKwh = liveAccumulatedKwh,
@@ -613,6 +617,7 @@ fun DashboardContent(
                         onEndTrip = onEndTrip,
                         onToggleAutoDetection = onToggleAutoDetection,
                         liveSessionStartMs = liveSessionStartMs,
+                liveOffStateMs = liveOffStateMs,
                         liveDistanceKm = tripDistanceKm,
                         liveOdometerDistanceKm = liveOdometerDistanceKm,
                         liveAccumulatedKwh = liveAccumulatedKwh,
@@ -1227,6 +1232,7 @@ fun TripControls(
     onEndTrip: () -> Unit,
     onToggleAutoDetection: () -> Unit,
     liveSessionStartMs: Long? = null,
+    liveOffStateMs: Long = 0L,
     liveDistanceKm: Double = 0.0,
     liveOdometerDistanceKm: Double = 0.0,
     liveAccumulatedKwh: Double = 0.0,
@@ -1291,15 +1297,23 @@ fun TripControls(
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     ) {
-        // Elapsed time ticker — runs only while recording, survives car-off pauses
-        var elapsedMs by remember(liveSessionStartMs) {
-            mutableStateOf(liveSessionStartMs?.let { System.currentTimeMillis() - it } ?: 0L)
+        // Elapsed time ticker — runs only while recording. Subtracts off-state
+        // ms so the displayed TIME (and the avg-speed calc below) reflect actual
+        // driving time, not driving + engine-off-but-trip-open time. Matches what
+        // the saved trip will store via TripEntity.offStateDurationMs.
+        var elapsedMs by remember(liveSessionStartMs, liveOffStateMs) {
+            mutableStateOf(
+                liveSessionStartMs?.let {
+                    (System.currentTimeMillis() - it - liveOffStateMs).coerceAtLeast(0L)
+                } ?: 0L
+            )
         }
-        LaunchedEffect(liveSessionStartMs) {
+        LaunchedEffect(liveSessionStartMs, liveOffStateMs) {
             if (liveSessionStartMs == null) return@LaunchedEffect
             while (true) {
                 delay(1000L)
-                elapsedMs = System.currentTimeMillis() - liveSessionStartMs
+                elapsedMs = (System.currentTimeMillis() - liveSessionStartMs - liveOffStateMs)
+                    .coerceAtLeast(0L)
             }
         }
 

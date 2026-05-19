@@ -345,6 +345,85 @@ class TripRepository private constructor(context: Context) {
                 Log.w(TAG, "Stats backfill failed: ${e.message}")
             }
         }
+
+        // One-shot backfill of offStateDurationMs for trips created before the
+        // 2.5.0 schema bump. Walks every completed trip with offStateDurationMs=0
+        // (the default after the v3→v4 migration) and recomputes from its data
+        // points. Gated by a SharedPreferences flag so it only runs once.
+        //
+        // Deferred 30 s after start so the critical-path init work (TripEvent.Recover,
+        // first telemetry processing, any auto-start of an in-progress trip) finishes
+        // first. Otherwise, on a DB with many trips, this loop's writes could hold the
+        // SQLite write lock long enough that doStartTrip's insert queued behind it,
+        // delaying the visible "trip started" state by the duration of the backfill.
+        scope.launch(Dispatchers.IO) {
+            try {
+                kotlinx.coroutines.delay(30_000L)
+                if (!prefs.getBoolean(PREF_OFFSTATE_BACKFILL_DONE, false)) {
+                    backfillOffStateDuration()
+                    prefs.edit()
+                        .putBoolean(PREF_OFFSTATE_BACKFILL_DONE, true)
+                        .apply()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "offStateDuration backfill failed: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Walks every completed trip in the DB and back-fills [TripEntity.offStateDurationMs]
+     * from the trip's data points using [computeOffStateDurationMs]. Idempotent: a
+     * second run produces the same values.
+     *
+     * Important: this used to also call [calculateTripStats] on every updated trip so
+     * the persisted avg-speed reflected the corrected duration. That made the backfill
+     * heavy enough to monopolise the SQLite write lock for minutes on a large DB,
+     * which blocked the trip event processor's [doStartTrip] insert and made the
+     * dashboard show "Waiting for Trip..." for ~1.5 km after starting a new drive.
+     *
+     * Now: only update the `offStateDurationMs` column. [TripEntity.duration]'s getter
+     * subtracts it on read, so every UI surface that reads `trip.duration` (Trip Detail,
+     * exports, comparisons, sort) gets the corrected value automatically. The History
+     * list's avg-speed column reads from [TripStatsEntity.avgSpeed] and will continue
+     * to show the legacy wallclock-based value until the trip is opened (or stats are
+     * manually rebuilt) — acceptable trade-off for a non-blocking app start.
+     *
+     * Also yields between iterations so a concurrent trip insert isn't starved if the
+     * DB happens to be busy.
+     */
+    private suspend fun backfillOffStateDuration() {
+        val all = tripDao.getCompletedTripsBefore(Long.MAX_VALUE)
+        if (all.isEmpty()) return
+        var updated = 0
+        for (trip in all) {
+            val points = dataPointDao.getDataPointsForTripSync(trip.id)
+            val off = computeOffStateDurationMs(points, trip.endTime)
+            if (off != trip.offStateDurationMs) {
+                val correctedTrip = trip.copy(offStateDurationMs = off)
+                tripDao.updateTrip(correctedTrip)
+                // Lightweight stats touch: just refresh totalDuration / avgSpeed so the
+                // History list and Trip Detail show the corrected numbers. We do NOT
+                // call calculateTripStats() here — that's what made the previous version
+                // of this backfill monopolise the SQLite write lock and starve the trip
+                // event processor's doStartTrip insert. A column-only update is cheap.
+                val existing = statsDao.getStatsForTrip(trip.id)
+                if (existing != null) {
+                    val durationMs = correctedTrip.duration ?: 0L
+                    val distance = correctedTrip.distance ?: 0.0
+                    val newAvgSpeed = if (durationMs > 0L && distance > 0.0)
+                        distance / (durationMs / 3_600_000.0)
+                    else existing.avgSpeed
+                    statsDao.updateStats(existing.copy(
+                        totalDuration = durationMs,
+                        avgSpeed = newAvgSpeed
+                    ))
+                }
+                updated++
+            }
+            kotlinx.coroutines.yield()
+        }
+        Log.i(TAG, "offStateDuration backfill: updated $updated / ${all.size} trips")
     }
 
     // ── Event dispatcher ──────────────────────────────────────────────────────
@@ -946,14 +1025,23 @@ class TripRepository private constructor(context: Context) {
             ?: socCandidates.minOrNull()
             ?: trip.startSoc
 
+        // Time the car was off but the trip stayed open — subtracted from
+        // trip.duration so avg speed / displayed duration reflect actual driving
+        // time rather than driving + parked-with-trip-still-open.
+        val offStateMs = computeOffStateDurationMs(
+            points = dataPointDao.getDataPointsForTripSync(tripId),
+            tripEndMs = endTime
+        )
+
         tripDao.updateTrip(
             trip.copy(
-                endTime           = endTime,
-                endOdometer       = resolvedEndOdometer,
-                endSoc            = resolvedEndSoc,
-                endTotalDischarge = resolvedEndDischarge,
-                isActive          = false,
-                avgBatteryTemp    = finalAvgTemp
+                endTime             = endTime,
+                endOdometer         = resolvedEndOdometer,
+                endSoc              = resolvedEndSoc,
+                endTotalDischarge   = resolvedEndDischarge,
+                isActive            = false,
+                avgBatteryTemp      = finalAvgTemp,
+                offStateDurationMs  = offStateMs
             )
         )
 
@@ -1640,6 +1728,39 @@ class TripRepository private constructor(context: Context) {
 
     companion object {
         private const val PREF_AUTO_TRIP = "auto_trip_detection"
+        private const val PREF_OFFSTATE_BACKFILL_DONE = "offstate_duration_backfill_v4"
+
+        /**
+         * Gap between consecutive recorded data points (or between the last point
+         * and trip-end) that's considered an off-state window rather than normal
+         * polling variance. Normal in-drive sampling is 1–5 s, so 20 s is well
+         * above the noise floor and below any plausible mid-traffic event.
+         */
+        private const val OFFSTATE_GAP_THRESHOLD_MS = 20_000L
+
+        /**
+         * Sum of gaps in the data-point stream — and the gap between the last
+         * recorded point and [tripEndMs] — that exceed [OFFSTATE_GAP_THRESHOLD_MS].
+         * These represent time when the car was off but the trip stayed open
+         * (the configurable engine-off resume window, plus the trailing window
+         * before the timeout closes the trip).
+         */
+        fun computeOffStateDurationMs(
+            points: List<TripDataPointEntity>,
+            tripEndMs: Long?
+        ): Long {
+            if (points.isEmpty()) return 0L
+            var off = 0L
+            for (i in 1 until points.size) {
+                val gap = points[i].timestamp - points[i - 1].timestamp
+                if (gap > OFFSTATE_GAP_THRESHOLD_MS) off += gap
+            }
+            if (tripEndMs != null) {
+                val tail = tripEndMs - points.last().timestamp
+                if (tail > OFFSTATE_GAP_THRESHOLD_MS) off += tail
+            }
+            return off
+        }
 
         @Volatile private var INSTANCE: TripRepository? = null
 

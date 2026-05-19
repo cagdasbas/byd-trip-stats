@@ -604,6 +604,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _liveSessionStartMs = MutableStateFlow<Long?>(null)
     val liveSessionStartMs: StateFlow<Long?> = _liveSessionStartMs.asStateFlow()
 
+    /**
+     * Accumulated ms during the current trip when the car was off but the trip
+     * stayed open (engine-off resume windows). Mirrors [TripEntity.offStateDurationMs]
+     * for the live drive — subtracted from the displayed TIME and AVG in the Trip
+     * Tracking card so they reflect actual driving rather than driving + parked.
+     * Resets to 0 at every fresh trip start.
+     */
+    private val _liveOffStateMs = MutableStateFlow(0L)
+    val liveOffStateMs: StateFlow<Long> = _liveOffStateMs.asStateFlow()
+
     // Accumulated energy discharge for the current trip in kWh.
     private val _liveAccumulatedKwh = MutableStateFlow(0.0)
     val liveAccumulatedKwh: StateFlow<Double> = _liveAccumulatedKwh.asStateFlow()
@@ -754,6 +764,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             energySamples.clear()
             liveSpeedBins.clear()
             _liveSessionStartMs.value = System.currentTimeMillis()
+            _liveOffStateMs.value = 0L
         }
         integratedSegmentDistanceKm = 0.0
         val initialTripDistanceKm = currentLiveSessionDistanceKm(telemetry)
@@ -797,6 +808,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _liveDistanceKm.value = 0.0
         _liveSegmentDistanceKm.value = 0.0
         _liveSessionStartMs.value = null
+        _liveOffStateMs.value = 0L
         // Only reset the active model badge when we're also clearing the chart
         // (full reset). When keepPoints=true the chart still shows the trip's
         // LIVE_TRIP-stage projections from earlier in the drive; resetting the
@@ -933,12 +945,26 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         val offSince = segmentOffSinceMs
                         val offDurationMs = if (offSince != null) telemetryMs - offSince else 0L
                         if (offDurationMs >= SEGMENT_RESET_OFF_THRESHOLD_MS) {
-                            segmentStartOdometer = deriveLiveSessionAnchorOdometer(
-                                odometerKm = telemetry.odometer,
-                                journeyDistanceKm = journeyDistanceKm(telemetry)
-                            )
+                            // Anchor the new segment at the current odometer reading rather
+                            // than going through deriveLiveSessionAnchorOdometer. That helper
+                            // falls back to the BYD currentJourneyDriveMileage counter, which
+                            // on some firmwares does NOT reset across a brief engine-off cycle
+                            // — when that happens, journey still reads ~4.5 km (the pre-pause
+                            // segment), so the helper returns (currentOdo − 4.5) = the trip's
+                            // start odometer. Segment then equals cumulative for the rest of
+                            // the drive and the Distance metric loses its "13.3 (17.8)" form.
+                            // We're already inside the off→on branch with offDurationMs ≥ 90 s,
+                            // so the resume is unambiguous and anchoring at now is correct.
+                            segmentStartOdometer = telemetry.odometer
                             integratedSegmentDistanceKm = 0.0
                             _liveSegmentDistanceKm.value = 0.0
+                        }
+                        // Accumulate off-state time so the live Trip Tracking
+                        // card's TIME and AVG reflect actual driving rather
+                        // than driving + parked-with-trip-open. Mirrors the
+                        // close-time computation in TripRepository.
+                        if (offDurationMs > 0L) {
+                            _liveOffStateMs.value = _liveOffStateMs.value + offDurationMs
                         }
                         segmentOffSinceMs = null
                     }
@@ -986,7 +1012,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         currentLiveSegmentDistanceKm(telemetry)
                     )
                     val prevOdo = lastBinOdo
-                    if (prevOdo != null && deltaEnergyWh > 0.0) {
+                    if (prevOdo != null) {
+                        // Decouple distance from energy. The earlier
+                        // `deltaEnergyWh > 0.0` gate skipped bin updates entirely on
+                        // every tick where BMS totalDischarge hadn't ticked up yet —
+                        // very common on Seal Excellence where the BMS counter
+                        // updates sparsely (every few seconds) rather than every
+                        // telemetry packet. Result: bin distance lagged real
+                        // distance, often never reaching BIN_MIN_DIST_KM = 0.2 km,
+                        // so binWhPerKm stayed null and the projection was pinned
+                        // in BASELINE for the entire drive.
+                        // Now: bin distance always advances with the odometer
+                        // (matching ground truth); bin energy is added only when
+                        // positive, so a regen tick or a "stale 0" tick doesn't
+                        // poison the bin's energy sum.
                         val odometerDeltaKm = (telemetry.odometer - prevOdo).coerceAtLeast(0.0)
                         val binDistKm = maxOf(
                             odometerDeltaKm,
@@ -994,8 +1033,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         )
                         val bin = speedBin(effectiveSpeed)
                         val acc = liveSpeedBins.getOrPut(bin) { BinAccumulator() }
-                        acc.energyWh += deltaEnergyWh
                         acc.distanceKm += binDistKm
+                        if (deltaEnergyWh > 0.0) {
+                            acc.energyWh += deltaEnergyWh
+                        }
                     }
                     lastBinOdo = telemetry.odometer
 
@@ -1242,7 +1283,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 } else {
                     telemetry.odometer
                 }
-                val segAnchor = journeyAnchor.coerceAtLeast(trip.startOdometer)
+                // If the stored data points contain a gap longer than the
+                // segment-reset threshold (i.e. the trip went through at least one
+                // engine-off → engine-on cycle), anchor segment at the first sample
+                // AFTER the most recent gap so the Distance metric shows the new
+                // segment distinct from cumulative. Same reasoning as the off→on
+                // branch above: BYD's currentJourneyDriveMileage isn't reliable
+                // across brief engine cycles on every firmware. Falling back to
+                // journey-based anchor when no gap exists preserves the original
+                // behaviour for fresh restores of trips that never paused.
+                val postGapAnchor = run {
+                    var anchor: Double? = null
+                    for (i in 1 until dataPoints.size) {
+                        val gap = dataPoints[i].timestamp - dataPoints[i - 1].timestamp
+                        if (gap >= SEGMENT_RESET_OFF_THRESHOLD_MS) {
+                            anchor = dataPoints[i].odometer
+                        }
+                    }
+                    anchor
+                }
+                val segAnchor = postGapAnchor
+                    ?: journeyAnchor.coerceAtLeast(trip.startOdometer)
                 segmentStartOdometer = segAnchor
                 lastTelemetryTimeMs = telemetryMs
                 lastBinOdo          = telemetry.odometer
@@ -1259,15 +1320,35 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 _liveSessionStartMs.value = trip.startTime
                 _liveOdometerDistanceKm.value = odometerCumulative
+                // Reconstruct off-state duration from the stored data-point gaps so
+                // the live TIME/AVG match what the trip will store at close. Mirrors
+                // TripRepository.computeOffStateDurationMs — same 20 s threshold.
+                _liveOffStateMs.value = run {
+                    if (dataPoints.size < 2) return@run 0L
+                    var off = 0L
+                    for (i in 1 until dataPoints.size) {
+                        val gap = dataPoints[i].timestamp - dataPoints[i - 1].timestamp
+                        if (gap > 20_000L) off += gap
+                    }
+                    off
+                }
 
-                // Reconstruct accumulated energy by replaying power × dt across the
-                // stored data points. This is the same integration TripEnergyBreakdown
-                // uses for its trip totals and matches the live path's accumulator, so
-                // restored state is consistent with live state. We intentionally do NOT
-                // use (lastPoint.totalDischarge − trip.startTotalDischarge): the latter
-                // is the BMS delta, which under-reports during normal driving and can
-                // over-report by thousands of kWh if startTotalDischarge was anchored
-                // to a stale 0 at trip start.
+                // Reconstruct accumulated energy by replaying per-pair BMS totalDischarge
+                // deltas across the stored data points — the same source the LIVE path
+                // uses (since the BMS-delta-primary fix) and the same source the CONS
+                // readout uses, so they all agree.
+                //
+                // We previously did this with `prev.power × dt` (pure power integration)
+                // because the BMS counter was unreliable on early firmwares (stale 0 at
+                // trip start could make startTotalDischarge → endTotalDischarge produce
+                // thousand-kWh ghost deltas). That stale-0 problem is now corrected at
+                // anchor time by TripRepository, so per-pair BMS deltas are the better
+                // signal. Pure power integration was over-counting on Seal Excellence
+                // where engine_power spikes during acceleration get amplified over the
+                // sample interval, inflating Wh/km by ~50% and depressing the projected
+                // range by half. Power × dt remains as a per-pair fallback when the
+                // BMS delta for that pair is itself implausible (negative or > 10 kWh).
+                //
                 // RESTORE_MAX_GAP_SECONDS = 60s tolerates the gaps between 100m-spaced
                 // samples even at low speed; longer gaps (parked stretches) contribute 0.
                 val restoreMaxGapSeconds = 60.0
@@ -1278,8 +1359,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         val prev = dataPoints[i - 1]
                         val dt = (dp.timestamp - prev.timestamp).coerceAtLeast(0L) / 1000.0
                         if (dt in 0.0..restoreMaxGapSeconds) {
-                            // Net (signed) — mirrors the live path.
-                            cumEnergyWh += prev.power * 1000.0 * (dt / 3600.0)
+                            val bmsDeltaWh = (dp.totalDischarge - prev.totalDischarge) * 1000.0
+                            val powerDeltaWh = prev.power * 1000.0 * (dt / 3600.0)
+                            cumEnergyWh += if (bmsDeltaWh.isFinite() && bmsDeltaWh in 0.0..10_000.0)
+                                bmsDeltaWh else powerDeltaWh
                         }
                     }
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
@@ -1287,6 +1370,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 accumulatedEnergyWh = cumEnergyWh
                 _liveAccumulatedKwh.value = (cumEnergyWh / 1000.0).coerceAtLeast(0.0)
+                // Seed the per-tick BMS-delta tracker from the last restored data point
+                // so the next live tick computes (currentTd − lastTd) cleanly. Without
+                // this, the first post-resume tick has prevTd=null → falls back to
+                // power × dt for one sample, which on Seal Excellence is ~0 (under-
+                // counts) and very briefly skews the rolling-window Wh/km low.
+                lastTotalDischargeKwh = dataPoints.lastOrNull()?.totalDischarge
+                    ?.takeIf { it.isFinite() && it > 0.0 }
 
                 // Reconstruct speed bins from all points.
                 // Use midpoint speed (avg of a and b) so the segment is classified by

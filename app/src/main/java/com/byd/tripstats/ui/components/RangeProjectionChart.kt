@@ -122,10 +122,19 @@ fun RangeProjectionChart(
             dataPoints.sortedBy { it.distanceKm }
         }
 
-        // BMS range at trip start — used as Y-axis scale anchor
-        val startBmsRange = points.firstOrNull()?.electricDrivingRangeKm?.toDouble()
-            ?: liveElectricRangeKm.toDouble().takeIf { it > 0 }
-            ?: (liveSoc / 100.0 * 400.0)   // last-resort rough fallback
+        // BMS range at trip start — used as Y-axis scale anchor. Each candidate is
+        // guarded against 0 because if the very first stored data point was captured
+        // before the BMS finished its cold-boot wake-up it can carry
+        // electricDrivingRangeKm == 0; without a guard yMax would be 0 too and
+        // yOf would produce a divide-by-zero / NaN, leaving a degenerate chart.
+        // Final fallback uses SoC-scaled WLTP (and a small floor) instead of the
+        // earlier magic 400.0 so it tracks the selected car.
+        val startBmsRange = (
+            points.firstOrNull()?.electricDrivingRangeKm?.toDouble()?.takeIf { it > 0 }
+                ?: liveElectricRangeKm.toDouble().takeIf { it > 0 }
+                ?: (car.wltpKm.toDouble() * (liveSoc / 100.0)).takeIf { it > 0 }
+                ?: 50.0
+            ).coerceAtLeast(50.0)
 
         // For PHEVs the WLTP figure covers EV-only range, but our projection includes
         // fuel range (EV + ICE combined). Use the trip-start BMS combined range as
@@ -138,16 +147,16 @@ fun RangeProjectionChart(
 
         val maxDistanceKm = points.lastOrNull()?.distanceKm?.coerceAtLeast(1.0) ?: 1.0
 
-        // Only include points where isStabilised=true.
-        // projectedRangeKm is technically never null (the ViewModel fallback chain
-        // always produces a BASELINE value), so without this filter the chart would
-        // draw a flat 185 Wh/km extrapolation from point 1, misleading the user
-        // into thinking a real projection is available before calibration is done.
-        // Filtering to isStabilised keeps the canvas empty until the rolling window
-        // has at least STABILISATION_KM of real data behind it.
+        // Include every point that has a non-null projectedRangeKm — both the
+        // stabilised ones (LIVE_TRIP / HISTORICAL_BINS) and the pre-stabilisation
+        // baseline-tier ones at the very start of a drive. The earlier filter
+        // (isStabilised only) was put in place when BASELINE-only could persist
+        // for an entire trip — that risk is gone now that bin distance counts
+        // every tick and HISTORICAL_BINS engages within ~0.2 km — so dropping
+        // the filter is safe and lets the orange line touch the origin instead
+        // of starting at the first stabilised point.
         val projectedPoints: List<Pair<Double, Double>> = remember(points) {
-            points.filter { it.isStabilised }
-                .mapNotNull { p -> p.projectedRangeKm?.let { p.distanceKm to it } }
+            points.mapNotNull { p -> p.projectedRangeKm?.let { p.distanceKm to it } }
         }
 
         // BMS series — secondary reference line
@@ -324,6 +333,30 @@ fun RangeProjectionChart(
                     return (padT + chartH * (1f - fraction)).toFloat()
                 }
 
+                // y-position for a projected value. For unsaturated (≤ WLTP)
+                // values it's the normal yOf mapping. For saturated values
+                // (raw projection > WLTP), the line is rendered at the chart's
+                // visual ceiling with a small asymptotic lift into the top
+                // padding — bounded by padT so it can never escape the panel.
+                //
+                // Why anchor saturated at yMax (chart ceiling) rather than at
+                // the WLTP km mark: when the trip starts with low SoC,
+                // yMax = startBmsRange × 1.15 can be smaller than WLTP, which
+                // put yOf(WLTP) above the canvas's top edge and got eaten by
+                // clipToBounds — saturated segments became invisible. Anchoring
+                // at yMax keeps them on-screen in every case.
+                //
+                // Purely cosmetic: the displayed projected-range text and the
+                // deltaKm math both still cap at WLTP, so semantics elsewhere
+                // are unchanged.
+                fun projectedY(rangeKm: Double): Float {
+                    if (rangeKm <= wltpKm) return yOf(rangeKm)
+                    val ceilingY = yOf(yMax)
+                    val overshootKm = rangeKm - wltpKm
+                    val liftPx = (overshootKm / (overshootKm + 30.0)) * 10f
+                    return ceilingY - liftPx.toFloat()
+                }
+
                 // ── Holographic panel: theme-aware ground + inset hairline ────
                 if (panelBg != Color.Transparent) {
                     drawRoundRect(
@@ -491,9 +524,9 @@ fun RangeProjectionChart(
                             val saturatedA = ra > wltpKm
                             val saturatedB = rb > wltpKm
 
-                            val capRa = ra.coerceAtMost(wltpKm.toDouble())
-                            val capRb = rb.coerceAtMost(wltpKm.toDouble())
-                            val yPa = yOf(capRa); val yPb = yOf(capRb)
+                            // projectedY lifts saturated values asymptotically above the
+                            // WLTP ceiling so the line bulges instead of clipping flat.
+                            val yPa = projectedY(ra); val yPb = projectedY(rb)
                             val bmsA = interpolateBmsAt(da, bmsPoints)
                             val bmsB = interpolateBmsAt(db, bmsPoints)
                             val yBa = yOf(bmsA);  val yBb = yOf(bmsB)
@@ -505,7 +538,10 @@ fun RangeProjectionChart(
                                 return@zipWithNext
                             }
 
-                            val isGreen = capRa >= bmsA
+                            // Segment colour is decided on the raw projected value vs BMS at
+                            // the same x, not the capped one — a 600 km projection that's >
+                            // BMS still counts as "beating" even though we render it capped.
+                            val isGreen = ra >= bmsA
                             val linePath = if (isGreen) greenLine else orangeLine
                             val fillPath = if (isGreen) greenFill else orangeFill
                             linePath.moveTo(xa, yPa)
@@ -574,7 +610,7 @@ fun RangeProjectionChart(
                         // alongside.
                         val last  = projectedPoints.last()
                         val leadX = xOf(last.first)
-                        val leadYa = yOf(last.second.coerceAtMost(wltpKm.toDouble()))
+                        val leadYa = projectedY(last.second)
                         val leadYb = yOf(interpolateBmsAt(last.first, bmsPoints))
 
                         // Tape line + caps

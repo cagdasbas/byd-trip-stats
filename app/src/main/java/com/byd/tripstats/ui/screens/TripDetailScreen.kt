@@ -27,6 +27,7 @@ import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.byd.tripstats.ui.components.AltitudeChart
 import com.byd.tripstats.ui.components.CondensedAltitudeChart
@@ -213,6 +214,39 @@ fun TripDetailScreen(
     }
 }
 
+/**
+ * Tappable section header for the export dialog — caret + label that flips state
+ * on click. Used so the user can see the sections exist without overwhelming the
+ * initial dialog with every save/send button at once.
+ */
+@Composable
+private fun ExpandableSectionHeader(
+    label: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggle() }
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 @Composable
 fun ExportDialog(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
@@ -236,7 +270,14 @@ fun ExportDialog(
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         title = { Text("Export Trip Data", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // verticalScroll so all save/Telegram buttons remain reachable even
+            // on small screens where AlertDialog's height cap clips overflow.
+            // Without this the third Telegram button silently disappears below
+            // the fold on devices where the dialog is taller than the viewport.
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
 
                 // ── Clipboard ─────────────────────────────────────────────────
                 OutlinedButton(
@@ -253,110 +294,121 @@ fun ExportDialog(
 
                 HorizontalDivider()
 
-                // ── Downloads ─────────────────────────────────────────────────
-                Text(
-                    "Save to Download folder:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                // ── Downloads (collapsible) ───────────────────────────────────
+                var downloadsExpanded by remember { mutableStateOf(false) }
+                ExpandableSectionHeader(
+                    label = "Save to Download folder",
+                    expanded = downloadsExpanded,
+                    onToggle = { downloadsExpanded = !downloadsExpanded }
                 )
+                if (downloadsExpanded) {
+                    OutlinedButton(
+                        onClick = {
+                            saveTripAsCSV(context, stableTrip, stableDataPoints)
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.TableChart, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Save as CSV")
+                    }
 
-                OutlinedButton(
-                    onClick = {
-                        saveTripAsCSV(context, stableTrip, stableDataPoints)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.TableChart, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Save as CSV")
-                }
+                    OutlinedButton(
+                        onClick = {
+                            saveTripAsJSON(context, stableTrip, stableDataPoints)
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.DataObject, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Save as JSON")
+                    }
 
-                OutlinedButton(
-                    onClick = {
-                        saveTripAsJSON(context, stableTrip, stableDataPoints)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.DataObject, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Save as JSON")
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        saveTripAsHtml(context, stableTrip, stableDataPoints)
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.Public, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Save as HTML viewer (double-click to open)")
+                    OutlinedButton(
+                        onClick = {
+                            saveTripAsHtml(context, stableTrip, stableDataPoints)
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Public, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Save as HTML viewer (double-click to open)")
+                    }
                 }
 
                 HorizontalDivider()
 
-                // ── Telegram ──────────────────────────────────────────────────
-                Text(
-                    if (telegramConfig != null)
-                        "Send to Telegram bot (@${telegramConfig!!.botName}):"
+                // ── Telegram (collapsible) ────────────────────────────────────
+                var telegramExpanded by remember { mutableStateOf(false) }
+                ExpandableSectionHeader(
+                    label = if (telegramConfig != null)
+                        "Send to Telegram bot (@${telegramConfig!!.botName})"
                     else
-                        "Send to Telegram bot (not configured — set up in Settings → Backup):",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "Send to Telegram bot (not configured)",
+                    expanded = telegramExpanded,
+                    onToggle = { telegramExpanded = !telegramExpanded }
                 )
-
-                OutlinedButton(
-                    onClick = {
-                        sendTripExportToTelegram(
-                            context, telegram, scope, stableTrip,
-                            format = "csv",
-                            content = buildTripCsv(stableDataPoints)
+                if (telegramExpanded) {
+                    if (telegramConfig == null) {
+                        Text(
+                            "Set up the bot in Settings → Backup & Restore.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        onDismiss()
-                    },
-                    enabled = telegramConfig != null && !telegramSending,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Send CSV to Telegram")
-                }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            sendTripExportToTelegram(
+                                context, telegram, scope, stableTrip,
+                                format = "csv",
+                                content = buildTripCsv(stableDataPoints)
+                            )
+                            onDismiss()
+                        },
+                        enabled = telegramConfig != null && !telegramSending,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Send CSV to Telegram")
+                    }
 
-                OutlinedButton(
-                    onClick = {
-                        sendTripExportToTelegram(
-                            context, telegram, scope, stableTrip,
-                            format = "json",
-                            content = buildTripJson(stableTrip, stableDataPoints)
-                        )
-                        onDismiss()
-                    },
-                    enabled = telegramConfig != null && !telegramSending,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Send JSON to Telegram")
-                }
+                    OutlinedButton(
+                        onClick = {
+                            sendTripExportToTelegram(
+                                context, telegram, scope, stableTrip,
+                                format = "json",
+                                content = buildTripJson(stableTrip, stableDataPoints)
+                            )
+                            onDismiss()
+                        },
+                        enabled = telegramConfig != null && !telegramSending,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Send JSON to Telegram")
+                    }
 
-                OutlinedButton(
-                    onClick = {
-                        sendTripExportToTelegram(
-                            context, telegram, scope, stableTrip,
-                            format = "html",
-                            content = buildTripEmbeddedHtml(context, stableTrip, stableDataPoints)
-                        )
-                        onDismiss()
-                    },
-                    enabled = telegramConfig != null && !telegramSending,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Send HTML viewer to Telegram")
+                    OutlinedButton(
+                        onClick = {
+                            sendTripExportToTelegram(
+                                context, telegram, scope, stableTrip,
+                                format = "html",
+                                content = buildTripEmbeddedHtml(context, stableTrip, stableDataPoints)
+                            )
+                            onDismiss()
+                        },
+                        enabled = telegramConfig != null && !telegramSending,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Send HTML viewer to Telegram")
+                    }
                 }
             }
         },
@@ -578,6 +630,15 @@ fun buildTripEmbeddedHtml(
  * Double-clicking the resulting file opens the trip in the user's default browser
  * with all charts pre-rendered.
  */
+/**
+ * Application-wide scope for trip-export Telegram uploads. Independent of any
+ * Composable's lifecycle so dismissing the export dialog doesn't cancel the
+ * upload mid-flight. [SupervisorJob] so one failed upload can't poison the
+ * scope and break later sends.
+ */
+private val TripExportTelegramScope: CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 fun saveTripAsHtml(
     context: android.content.Context,
     trip: com.byd.tripstats.data.local.entity.TripEntity,
@@ -596,7 +657,16 @@ fun saveTripAsHtml(
  * Writes [content] to a temp file in cacheDir and ships it to the configured
  * Telegram bot. Progress and result surface through [TelegramManager.state],
  * which the Settings/Backup screens already render — same UX as backup/probe.
+ *
+ * The [scope] parameter is retained for source-compatibility but deliberately
+ * unused: the export dialog calls `onDismiss()` immediately after this function
+ * returns, which removes the dialog from the composition and cancels any scope
+ * obtained from `rememberCoroutineScope()`. That used to cancel the upload
+ * before it actually ran — toast said "Sending…" but no file ever reached
+ * Telegram. We now launch into an application-wide [TripExportTelegramScope]
+ * so the upload survives the dialog dismissal.
  */
+@Suppress("UNUSED_PARAMETER")
 fun sendTripExportToTelegram(
     context: android.content.Context,
     telegram: TelegramManager,
@@ -610,7 +680,7 @@ fun sendTripExportToTelegram(
         context, "Sending ${format.uppercase()} to Telegram…",
         android.widget.Toast.LENGTH_SHORT
     ).show()
-    scope.launch(Dispatchers.IO) {
+    TripExportTelegramScope.launch(Dispatchers.IO) {
         val tempFile = java.io.File(context.cacheDir, fileName)
         try {
             tempFile.writeText(content, Charsets.UTF_8)
