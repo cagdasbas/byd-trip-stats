@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v2.0.0-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v2.5.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
@@ -22,7 +22,7 @@
 
 ---
 
-> **BYD Trip Stats** is a feature-complete Android analytics dashboard for BYD DiLink vehicles — built by a BYD Seal owner and running on production hardware. It now operates as a standalone in-car analytics app without relying on an external companion bridge.
+> **BYD Trip Stats** is a feature-complete Android analytics dashboard for BYD DiLink vehicles — built by a BYD Seal owner and running on production hardware. It now uses the BYD SDK and operates as a standalone in-car analytics app without relying on an external companion bridge.
 
 ---
 
@@ -44,7 +44,7 @@ No Electro setup, MQTT broker, or topic configuration is required for normal ope
 
 ### Known Limitations
 
-- **Some fields are still inferred or unresolved.** SoH is currently shown as an estimate, cabin temperature is only shown when a trustworthy in-car source is present, and a few battery-temperature sources are still under active investigation.
+- **Some fields are still inferred or unresolved.** SoH is currently shown as an estimate, and cabin temperature is only shown when a trustworthy in-car source is present.
 - **Background persistence depends on DiLink firmware behaviour.** The app uses a foreground service, wake lock, boot receiver, and watchdog, but some BYD firmware builds are still aggressive about killing third-party apps while the car is off.
 
 ---
@@ -66,16 +66,17 @@ No Electro setup, MQTT broker, or topic configuration is required for normal ope
 - Environmentals card with ambient temperature and PM2.5 in/out readings where available
 
 **Range Projection Engine**
-- Power-integrated consumption model (Wh/km) computed over a rolling 10 km window
-- EMA smoothing with stabilisation warmup (first 2 km discarded)
-- Four-tier fallback: live trip → historical speed bins → lifetime average → WLTP baseline
+- Consumption model (Wh/km) fed from the BMS total-discharge counter — the same source as the live consumption readout — computed over a rolling 10 km window, with engine-power integration as a fallback
+- EMA smoothing with a 3 km stabilisation window for the live-trip tier
+- Three-tier model: live trip → historical speed bins → WLTP baseline, with the speed-bin tier engaging within ~0.2 km of starting to drive so the projection leaves the catalog baseline almost immediately
 - WLTP upper bound prevents implausible projections during low-speed urban starts
 - Compared continuously against BMS estimate with signed delta display
 
 **Trip Management**
 - Multi-field filtering: date range, distance, energy, duration, efficiency
 - Six sort criteria with ascending/descending toggle
-- Per-trip CSV and JSON export
+- Configurable engine-off trip timeout and a minimum-trip-distance filter (Settings → Preferences)
+- Per-trip export as CSV, JSON, or a single self-contained HTML viewer — saved locally or sent straight to a Telegram bot
 
 **Analytics & History**
 - Full per-trip storage: route, telemetry timeseries, computed statistics
@@ -137,7 +138,7 @@ Adaptive layouts for both landscape and portrait orientations on the rotating in
 
 ### II. Range Projection & Efficiency
 
-A proprietary power-integration algorithm computes realistic remaining range in real time — based on actual Wh/km consumption, not the BMS's static estimate. The projection self-calibrates across the trip using a rolling 10 km window with EMA smoothing, and is bounded by WLTP to prevent overcorrection during low-speed urban starts.
+A proprietary consumption-modelling algorithm computes realistic remaining range in real time — based on your actual Wh/km from the BMS total-discharge counter, not the BMS's static range estimate. The projection self-calibrates across the trip using a rolling 10 km window with EMA smoothing, and is bounded by WLTP to prevent overcorrection during low-speed urban starts.
 
 <div align="center">
 <table>
@@ -152,7 +153,7 @@ A proprietary power-integration algorithm computes realistic remaining range in 
 
 ### III. Trip Management
 
-Trips are captured automatically via gear-position events — no driver input required. The history view supports multi-field filtering, six sort criteria, and per-trip CSV / JSON export.
+Trips are captured automatically via gear-position events — no driver input required. The history view supports multi-field filtering, six sort criteria, and per-trip export as CSV, JSON, or a self-contained HTML viewer (saved locally or sent to a Telegram bot).
 
 <div align="center">
 <table>
@@ -444,6 +445,8 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Slope in degrees display ✅ *(v2.0.0)*
 - [x] App diagnostics CPU/RAM monitor ✅ *(v2.0.0)*
 - [x] Physics-based per-trip energy breakdown ✅ *(v2.0.0)*
+- [x] Self-contained HTML trip viewer + one-click "Save as HTML viewer" export ✅ *(v2.5.0)*
+- [x] Configurable engine-off trip timeout & minimum-trip-distance filter ✅ *(v2.5.0)*
 
 ### Planned (v2.0.0+)
 

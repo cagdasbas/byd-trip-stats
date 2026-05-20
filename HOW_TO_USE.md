@@ -51,10 +51,14 @@ The dashboard is the live vehicle screen.
 
 ### Energy Flow Area
 
+With **Dashboard icons & animations** enabled (Settings → Preferences — the default):
+
 - **Battery icon** — live SoC, animated while charging
 - **Drivetrain graphic** — tyre pressure overview
 - **Tyre badges** — green = healthy, orange/red = attention needed, grey = no data yet
 - **Consumption chart thumbnail** — tap to expand daily / monthly / yearly consumption
+
+With that preference turned **off**, these elements move into the top app bar (battery + consumption icons) and a dedicated **Tyres** card on the right-side stat panel — freeing the full height for the range projection chart and disabling animations to lower CPU load on older firmware.
 
 ### Range Projection
 
@@ -63,7 +67,7 @@ The main chart compares:
 - **Dashed line** — the car's own BMS estimate
 - **Solid line** — BYD Trip Stats projection from your actual driving
 
-The app needs a short calibration period at the start of each trip. During that time it may show **Calibrating…**
+Before you move off, the chart shows a **SCANNING…** placeholder. Once you start driving, the projection leaves the catalog baseline within the first few hundred metres and keeps refining as the trip continues. A small badge shows which model tier is currently driving the projection — **Live trip**, **Speed bins**, or **Baseline**.
 
 ### Right-side Stat Cards
 
@@ -100,7 +104,7 @@ When **Auto** is enabled:
 - gear changes to **D** or **R** → trip starts
 - gear returns to **P** → trip ends
 
-Short engine-off breaks (under the configured threshold) continue the same trip rather than ending it.
+Short engine-off breaks continue the same trip rather than ending it, as long as you return within the **Engine-off trip timeout** (Settings → Preferences — default 30 minutes). The current engine-on segment distance and the cumulative trip distance are then shown side by side in the dashboard's Distance metric.
 
 ### Manual recording
 
@@ -164,7 +168,13 @@ Notes:
 
 ### Trip Export
 
-From Trip History, tap the export icon on any trip for **CSV** or **JSON** export. Long-press to select multiple trips for bulk export.
+From a trip's detail screen, open **Export** for three formats:
+
+- **CSV** — every recorded telemetry field per data point, for spreadsheets
+- **JSON** — the same data in structured form
+- **HTML viewer** — a single self-contained `.html` file with the trip data embedded inside it. Double-click it on any computer and every chart renders in the browser — no separate JSON to manage, no viewer to host, nothing to install
+
+Each format can be saved to the car's Download folder or sent straight to your configured Telegram bot. The Download and Telegram groups in the Export dialog are collapsible — tap a section header to expand it.
 
 ### Trip Comparison
 
@@ -251,7 +261,9 @@ Open from the gear icon. Three top-level tabs:
 - Electricity tariff (price/kWh + currency symbol)
 - Goals & Personal Bests
 - Units and app behaviour preferences
-- Dashboard animation control (disable for lower CPU usage on older firmware)
+- Engine-off trip timeout — how long a trip stays open across an engine-off break before it closes (default 30 minutes)
+- Minimum trip distance — trips shorter than this are discarded automatically when they end (set to 0 to keep every trip)
+- Dashboard icons & animations — switches between the animated icon layout and the compact top-bar layout; off also lowers CPU usage on older firmware
 
 ### Connections
 
@@ -348,7 +360,6 @@ The app uses a foreground telemetry service, wake lock, Wi-Fi lock, boot receive
 
 - **Estimated SoH** is not yet confirmed as a direct BMS SoH source on all firmware builds
 - **Cabin temperature** may be blank — the app avoids showing HVAC setpoints as if they were real cabin air readings
-- **Battery temperature source** is still under investigation on some firmware versions
 - **HVAC power** is not quantified separately in the energy breakdown — DiLink does not broadcast reliable real-time compressor power
 - **Overnight charging capture** depends on whether DiLink keeps the app alive during sleep
 
@@ -357,7 +368,7 @@ The app uses a foreground telemetry service, wake lock, Wi-Fi lock, boot receive
 ## Tips
 
 - Re-check Autostart after every app update
-- Let the range chart calibrate for the first couple of kilometres before relying on the projection
+- The range projection leaves the catalog baseline within the first few hundred metres — the model-tier badge tells you when it's running on real trip data (Speed bins / Live trip) rather than the WLTP baseline
 - Use the **SoC x-axis** mode in the charging Power + SoC chart for DC taper analysis
 - Use **Heatmaps** to spot correlations — e.g. speed vs consumption to find your car's efficiency sweet spot
 - Use the **Seasonal Analysis** view after your first winter to see the real cold-weather efficiency penalty
