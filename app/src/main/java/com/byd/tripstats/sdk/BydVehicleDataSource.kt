@@ -56,6 +56,13 @@ private const val VEHICLE_STATE_CACHE = "vehicle_state_cache"
 //     0x44700010=low, 0x44700020=high, 0x44700038=avg.
 private const val STAT_CACHE_VERSION = 8
 private const val DIRECT_CHARGING_POWER_TIMEOUT_MS = 4_000L
+// Some firmwares (notably DM-i PHEV) don't return chargerWorkState to 0 after
+// charging completes — the BMS only resets it when the user manually clears
+// charging-data in the car UI. If we've seen capacity activity during this
+// session AND nothing has happened (no power, no capacity increase) for longer
+// than this, treat the work state as stale and force it back to 0. Generous
+// margin so a normal taper / pause / brief BMS silence never trips it.
+private const val STALE_CHARGER_WORK_STATE_TIMEOUT_MS = 10 * 60_000L
 private const val DRIVE_MODE_UNKNOWN = 0
 
 private enum class InstrumentTyrePressureEncoding {
@@ -2940,7 +2947,16 @@ class BydVehicleDataSource(context: Context) {
         try {
 
             val m48 = runtimeGroupMap("m48")
+            // getElecPercentageValue / getSOCBatteryPercentage are stable, non-obfuscated BYD
+            // SDK names. The bridge group can resolve empty (or to a getter that returns 0)
+            // on firmwares it was not mapped for — notably DM-i PHEV variants — which nulls
+            // out SoC entirely. Fall back to the literal getters, treating a non-positive
+            // bridge result as "no reading" so the dashboard SoC stays populated. A genuinely
+            // empty battery still reads 0 from the literal getters, so EVs are unaffected.
             val elecPercentage = invokeDoubleGetter(device, *m48["elecPercentage"].orEmpty().toTypedArray())
+                ?.takeIf { it > 0.0 }
+                ?: invokeDoubleGetter(device, "getElecPercentageValue")?.takeIf { it > 0.0 }
+                ?: invokeIntGetter(device, "getSOCBatteryPercentage")?.toDouble()
             val elecRange = invokeIntGetter(device, *m48["elecRange"].orEmpty().toTypedArray())
 
             // Fuel values: 0xFF (255) = no sensor / EV-only mode; filter it out
@@ -3005,7 +3021,9 @@ class BydVehicleDataSource(context: Context) {
                 ?.takeIf { it in 0..999999 }
             val hevMileage = invokeIntGetter(device, *m48["hevMileage"].orEmpty().toTypedArray())
                 ?.takeIf { it in 0..999999 }
-            val socBatteryPct = invokeDoubleGetter(device, *m48["socBattery"].orEmpty().toTypedArray())
+            val socBatteryPct = (invokeDoubleGetter(device, *m48["socBattery"].orEmpty().toTypedArray())
+                ?.takeIf { it > 0.0 }
+                ?: invokeIntGetter(device, "getSOCBatteryPercentage")?.toDouble())
                 ?.takeIf { it in 0.0..100.0 }
             val remainingBatteryPowerRaw = invokeIntGetter(device, *m48["remainBattery"].orEmpty().toTypedArray())
             // ── Synchronous poll for slow-changing statistic battery fields ───────
@@ -3379,9 +3397,10 @@ class BydVehicleDataSource(context: Context) {
             if (mEn != null && mEn in 1..5) {
                 _energyMode.value = mEn
             }
-            if (mEn != 3) {
-                updateRegenModeCandidate(mEn, strong = false, source = "energy-mode")
-            }
+            // NOTE: mEn (getEnergyMode: EV=1/FORCE_EV=2/HEV=3/FUEL=4/KEEP=5) is the powertrain
+            // source, NOT a regen level. Feeding it to updateRegenModeCandidate made Forced-EV
+            // read as "Higher" regen and EV as "Standard". Regen level comes only from the
+            // instrument/gearbox getters (m03/m14/getEnergyFeedback).
 
             // getEnergyState distinguishes RWD-only (3, 6, 19) from AWD (1, 4) and FWD (2, 5).
             // When confirmed RWD-only, zero out the front motor RPM so it doesn't stick at the
@@ -4331,9 +4350,15 @@ class BydVehicleDataSource(context: Context) {
     private fun handleStatisticEvent(methodName: String, args: Array<out Any?>?) {
         when (methodName) {
             "onElecPercentageChanged" -> {
+                // Only accept a finite, in-range value. Without this guard a single bad
+                // event (null arg, sentinel, or out-of-range) would overwrite the
+                // previously-good polled value, leaving the dashboard SoC at 0.
                 val pct = args?.firstOrNull().asDoubleOrNull()
-                _vehicleSnapshot.value = _vehicleSnapshot.value.copy(statisticElecPercentageValue = pct)
-                publishSnapshot()
+                    ?.takeIf { it.isFinite() && it in 0.0..100.0 }
+                if (pct != null) {
+                    _vehicleSnapshot.value = _vehicleSnapshot.value.copy(statisticElecPercentageValue = pct)
+                    publishSnapshot()
+                }
                 Log.d(TAG, "📈 elecPercentage=$pct")
             }
             "onElecDrivingRangeChanged" -> {
@@ -5324,14 +5349,23 @@ class BydVehicleDataSource(context: Context) {
         // chargerWorkState is set by AbsBYDAutoChargingListener.onChargerWorkStateChanged,
         // which fires from BMS-level middleware independently of ignition state. This catches
         // AC off-state charging where direct power readings are absent but the charger daemon
-        // is still actively reporting its work state.
-        //
-        // chargingGunState (plug-present) was tried instead but had a worse failure mode:
-        // it stays stuck non-zero whenever the app misses the unplug callback (e.g. unplug
-        // while car locked), causing post-charge drives to falsely show "charging in
-        // progress". chargerWorkState's FINISH/TERMINATE states are non-zero too, but only
-        // briefly — the BMS returns it to 0 (idle) once truly idle.
+        // is still actively reporting its work state. This matches the 0efedd1 behaviour the
+        // dev confirmed as reliable for both AC overnight charging and live DC charging.
         val chargerWorking = _chargerWorkState.value > 0
+        // PHEV safety net. On some DM-i firmwares the BMS never returns chargerWorkState
+        // to 0 after charging completes — the session would otherwise stay "in progress"
+        // until the user manually cleared charging-data in the car UI. If we've seen
+        // capacity activity at some point in this session AND nothing fresh has arrived
+        // for STALE_CHARGER_WORK_STATE_TIMEOUT_MS, treat the work state as stale and
+        // force it back to 0. Doesn't affect Seal/EV cars where the BMS resets reliably —
+        // they always have fresh power or capacity activity during real charging.
+        if (chargerWorking && !powerActive && !recentCapacityActivity &&
+            lastChargingActivityElapsedMs != 0L &&
+            nowElapsedMs - lastChargingActivityElapsedMs > STALE_CHARGER_WORK_STATE_TIMEOUT_MS) {
+            Log.i(TAG, "🔋 chargerWorkState stale (${(nowElapsedMs - lastChargingActivityElapsedMs) / 60_000L}m of silence) — forcing 0")
+            _chargerWorkState.value = 0
+            return false
+        }
         return powerActive || recentCapacityActivity || chargerWorking
     }
 

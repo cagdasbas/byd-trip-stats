@@ -938,10 +938,7 @@ fun EnergyFlowDiagram(
                         label = "Range",
                         value = run {
                             val projected = tripDataPoints.lastOrNull()?.projectedRangeKm
-                            val bms = telemetry.electricDrivingRangeKm
-                            if (projected != null && projected.toInt() < bms) formatDistanceValue(projected) else formatDistanceValue(
-                                bms.toDouble() // TODO: Perhaps show always the projected range but be cautious because it might skyrocket
-                            )
+                            formatDistanceValue(projected)
                         },
                         unit = distanceUnit,
                         color = MaterialTheme.extendedColors.range
@@ -1841,12 +1838,19 @@ fun VehicleStats(
 
         StatCard(
             title    = "Driving Dynamics",
-            value    = "${telemetry.regenModeName} / ${telemetry.driveModeName}",
+            value    = run {
+                // Some firmwares (notably DM-i PHEV) never expose a regen level — omit it
+                // rather than showing "UNKNOWN(0)".
+                listOfNotNull(
+                    telemetry.regenModeName.takeIf { telemetry.regenMode != 0 },
+                    telemetry.driveModeName.takeIf { telemetry.driveMode != 0 },
+                ).joinToString(" / ").ifEmpty { "—" }
+            },
             subtitle = run {
                 val slope = vehicleSnapshot?.roadSlopeDeg
-                val needsInit = telemetry.isCarOn && (telemetry.driveMode == 0 || telemetry.regenMode == 0)
+                val needsInit = telemetry.isCarOn && telemetry.driveMode == 0
                 when {
-                    needsInit -> "Change drive/regen modes to initialize display"
+                    needsInit -> "Change drive mode to initialize display"
                     slope != null -> "Slope: ${String.format("%.1f", slope)}°"
                     else -> null
                 }

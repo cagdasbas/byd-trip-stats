@@ -198,8 +198,8 @@ data class VehicleTelemetry(
                     2 -> "Sport"
                     3 -> "Normal"
                     4 -> "Snow"
-                    5 -> "Sand"
-                    6 -> "Mud"
+                    5 -> "Mud"
+                    6 -> "Sand"
                     else -> "Unknown"
                 }
 

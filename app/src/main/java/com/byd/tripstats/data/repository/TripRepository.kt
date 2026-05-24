@@ -116,6 +116,14 @@ class TripRepository private constructor(context: Context) {
      */
     fun currentTripStartTotalDischarge(): Double? = cachedCurrentTrip?.startTotalDischarge
 
+    /**
+     * Sum of positive per-tick totalDischarge deltas accumulated across the active
+     * trip. Robust against counter resets at every car-on cycle. Returns null when
+     * no trip is active. See [tripCumulativeBmsDeltaKwh] for full rationale.
+     */
+    fun currentTripCumulativeBmsDeltaKwh(): Double? =
+        if (cachedCurrentTrip != null) tripCumulativeBmsDeltaKwh else null
+
     private var lastTelemetry:        VehicleTelemetry? = null
     private var lastRecordedTelemetry: VehicleTelemetry? = null
     private var lastTelemetryTime     = 0L
@@ -144,6 +152,17 @@ class TripRepository private constructor(context: Context) {
     // tick-by-tick. Also used as the "energy actually consumed so far"
     // estimate for the per-tick stale-zero anchor correction below.
     private var tripIntegratedDischargeKwh = 0.0
+    // Sum of max(0, currentTotalDischarge − previousTotalDischarge) accumulated
+    // tick-by-tick across the trip. Required because BYD's getTotalElecConValue
+    // resets at every car-on cycle on many firmwares (notably PHEV and the Seal
+    // Excellence) — so a trip that spans an engine-off pause has the counter
+    // running 0→4 in segment 1, 0→2 in segment 2, etc. A naive end−start (or
+    // tripBestTotalDischarge − start) would only capture one segment. Summing
+    // positive per-tick deltas works whether the counter resets or is lifetime-
+    // cumulative: negative deltas (the reset itself) are dropped as 0; within
+    // each segment, positive deltas sum to that segment's real consumption.
+    private var tripCumulativeBmsDeltaKwh = 0.0
+    private var lastTripTotalDischarge: Double? = null
     // Running min of telemetry.soc seen during the active trip. Pairs with the
     // discharge running-max so endSoc can fall back to the lowest mid-trip SoC
     // when the final reads are stale.
@@ -561,6 +580,20 @@ class TripRepository private constructor(context: Context) {
                     t.totalDischarge > tripBestTotalDischarge) {
                     tripBestTotalDischarge = t.totalDischarge
                 }
+                // Cumulative per-segment BMS delta. See field declaration for rationale.
+                // A backwards jump (counter reset between segments) contributes 0.
+                if (t.totalDischarge.isFinite() && t.totalDischarge >= 0.0) {
+                    val prev = lastTripTotalDischarge
+                    if (prev != null) {
+                        val delta = t.totalDischarge - prev
+                        if (delta > 0.0 && delta < 50.0) {
+                            // Cap per-tick delta at 50 kWh — anything larger is a sensor glitch
+                            // (a single tick can't physically pull more than that).
+                            tripCumulativeBmsDeltaKwh += delta
+                        }
+                    }
+                    lastTripTotalDischarge = t.totalDischarge
+                }
                 if (t.soc.isFinite() && t.soc > 0.0 && t.soc < tripMinSoc) {
                     tripMinSoc = t.soc
                 }
@@ -737,6 +770,26 @@ class TripRepository private constructor(context: Context) {
             }
             sum
         }
+        // Re-sum positive per-tick totalDischarge deltas across the stored points so
+        // a recovery resumes the per-segment cumulative draw rather than restarting
+        // at 0 and under-counting after the resume.
+        tripCumulativeBmsDeltaKwh = run {
+            var sum = 0.0
+            var last: Double? = null
+            for (dp in dataPoints) {
+                val td = dp.totalDischarge
+                if (td.isFinite() && td >= 0.0) {
+                    if (last != null) {
+                        val delta = td - last
+                        if (delta > 0.0 && delta < 50.0) sum += delta
+                    }
+                    last = td
+                }
+            }
+            sum
+        }
+        lastTripTotalDischarge = dataPoints.lastOrNull()?.totalDischarge
+            ?.takeIf { it.isFinite() && it >= 0.0 }
 
         if (gap > STALE_THRESHOLD || staleBecauseCarOff) {
             Log.w(TAG, "Stale trip ${activeTrip.id} — closing with last DB values")
@@ -871,6 +924,8 @@ class TripRepository private constructor(context: Context) {
         tripBestDistanceKm         = journeyKm
         tripBestTotalDischarge     = telemetry.totalDischarge
         tripIntegratedDischargeKwh = 0.0
+        tripCumulativeBmsDeltaKwh  = 0.0
+        lastTripTotalDischarge     = telemetry.totalDischarge.takeIf { it.isFinite() && it >= 0.0 }
         tripMinSoc                 = telemetry.soc
 
         currentSegment = openSegment(tripId, telemetry)
@@ -971,20 +1026,32 @@ class TripRepository private constructor(context: Context) {
             ).maxOrNull() ?: trip.startOdometer
         }
 
-        // Guard totalDischarge fallbacks against stale 0 reads (car
-        // offline path). Energy consumed is computed as end - start, so a 0 here
-        // silently zeroes the trip's energy. Prefer the reported counter whenever
-        // we have a plausible value; only fall back to power integration when the
-        // discharge counter never advanced beyond the trip start.
+        // Guard totalDischarge fallbacks against stale 0 reads (car offline path)
+        // AND counter resets across segments. On many BYD firmwares
+        // getTotalElecConValue resets at every car-on cycle, so a trip that
+        // spans an engine-off pause has the counter running 0→4 in segment 1
+        // and 0→2 in segment 2; a naive end−start (or best−start) captures
+        // only one segment's worth, halving (or worse) the recorded consumption.
+        //
+        // tripCumulativeBmsDeltaKwh accumulates max(0, per-tick Δ) across all
+        // segments, so segment resets contribute 0 instead of dragging the total
+        // back down. This is the authoritative value on counter-resetting firmwares
+        // and equals end−start when the counter is lifetime-cumulative.
+        val cumulativeBmsCandidate = (trip.startTotalDischarge + tripCumulativeBmsDeltaKwh)
+            .takeIf { tripCumulativeBmsDeltaKwh > 0.0 }
         val dischargeCandidates = listOfNotNull(
             endTelemetry?.totalDischarge?.takeIf { it > trip.startTotalDischarge },
             endPointFallback?.totalDischarge?.takeIf { it > trip.startTotalDischarge },
             tripBestTotalDischarge.takeIf { it > trip.startTotalDischarge }
         )
         val powerIntegratedFallback = (trip.startTotalDischarge + tripIntegratedDischargeKwh)
-            .takeIf { dischargeCandidates.isEmpty() && tripIntegratedDischargeKwh > 0.0 }
+            .takeIf { cumulativeBmsCandidate == null && dischargeCandidates.isEmpty() && tripIntegratedDischargeKwh > 0.0 }
+        // Prefer the cumulative-BMS value when it exceeds anything else — by
+        // construction it cannot under-report relative to a single end−start
+        // read (it sums everything), but a stale-zero start could let the raw
+        // dischargeCandidates legitimately come out higher.
         val candidateEndDischarge = overrideTotalDischarge
-            ?: dischargeCandidates.maxOrNull()
+            ?: listOfNotNull(cumulativeBmsCandidate, dischargeCandidates.maxOrNull()).maxOrNull()
             ?: powerIntegratedFallback
             ?: trip.startTotalDischarge
 
@@ -1078,6 +1145,8 @@ class TripRepository private constructor(context: Context) {
         tripBestDistanceKm    = 0.0
         tripBestTotalDischarge = 0.0
         tripIntegratedDischargeKwh = 0.0
+        tripCumulativeBmsDeltaKwh  = 0.0
+        lastTripTotalDischarge     = null
         tripMinSoc             = Double.MAX_VALUE
         tripState             = TripState.IDLE
         _currentTripId.value  = null

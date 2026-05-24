@@ -1063,10 +1063,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         if (it.isPhev) it.phevUsableBatteryKwh ?: it.batteryKwh else it.batteryKwh
                     } ?: FALLBACK_BATTERY_KWH
                     val fallbackKwh = (accumulatedEnergyWh / 1000.0).coerceAtLeast(0.0)
-                    val liveEnergyKwh = if (
+                    // Cumulative per-tick positive deltas from the repo. Robust against
+                    // BMS counter resets across engine-off segments — which would
+                    // otherwise make bmsDeltaKwh go negative for the rest of the trip
+                    // and force the fallback (power-integrated) for everything that
+                    // followed. Cumulative equals bmsDeltaKwh when no reset happens
+                    // and only exceeds it after one — so always take the max.
+                    val cumulativeBmsKwh = tripRepository.currentTripCumulativeBmsDeltaKwh() ?: 0.0
+                    val plainBmsKwh = if (
                         bmsDeltaKwh.isFinite() &&
                         bmsDeltaKwh in 0.0..(sanityBatteryKwh * 2.0)
-                    ) bmsDeltaKwh else fallbackKwh
+                    ) bmsDeltaKwh else 0.0
+                    val bestBmsKwh = maxOf(plainBmsKwh, cumulativeBmsKwh)
+                    val liveEnergyKwh = if (bestBmsKwh > 0.0) bestBmsKwh else fallbackKwh
                     _liveAccumulatedKwh.value = liveEnergyKwh.coerceAtLeast(0.0)
                     // Pure odometer delta — used for avg speed display to match finalized stats.
                     _liveOdometerDistanceKm.value =
@@ -1120,6 +1129,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             totalBinEnergyWh / totalBinDistanceKm
                         else null
 
+                    // Trip-cumulative consumption — the robust fallback. liveEnergyKwh is
+                    // the same trip-total energy the CONS readout shows (BMS totalDischarge
+                    // delta against the trip-start anchor, or the power-integrated estimate
+                    // when that delta is implausible). Deriving Wh/km from it always works
+                    // once the trip has moved ≥ BIN_MIN_DIST_KM and consumed anything —
+                    // it does not depend on the BMS incrementing totalDischarge on the
+                    // exact telemetry ticks the rolling-window / speed-bin accumulators
+                    // happen to sample, which is what could still leave those two empty
+                    // and pin the projection in BASELINE on a sparse-update firmware.
+                    val tripWhPerKm: Double? =
+                        if (distKm >= BIN_MIN_DIST_KM && liveEnergyKwh > 0.0)
+                            (liveEnergyKwh * 1000.0) / distKm
+                        else null
+                    // Speed-binned rate preferred (per-regime granularity); trip-cumulative
+                    // rate as the always-available fallback. Either one engages the
+                    // HISTORICAL_BINS tier and gets the chart off the catalog baseline.
+                    val nonBaselineWhPerKm: Double? = binWhPerKm ?: tripWhPerKm
+
                     val isStabilised = distKm >= STABILISATION_KM
                     val car = selectedCarConfig.value
                     // PHEVs: use the usable EV-only battery capacity for the EV range leg;
@@ -1141,8 +1168,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         isStabilised && smoothedWhPerKm != null && smoothedWhPerKm!! > 0.0 ->
                             ((remainingEnergyWh / smoothedWhPerKm!!) + fuelRangeKm).coerceAtLeast(0.0) to
                                 RangeModel.LIVE_TRIP
-                        binWhPerKm != null ->
-                            ((remainingEnergyWh / binWhPerKm) + fuelRangeKm).coerceAtLeast(0.0) to
+                        nonBaselineWhPerKm != null ->
+                            ((remainingEnergyWh / nonBaselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0) to
                                 RangeModel.HISTORICAL_BINS
                         else ->
                             ((remainingEnergyWh / baselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0) to
@@ -1233,6 +1260,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun startManualTrip() {
         _tripDataPoints.value = emptyList()   // reset before repo broadcasts isInTrip = true
         forceFreshAnchorNextSession = true
+        // Pre-anchor the live-session state at the press moment so AVG / TIME / DISTANCE
+        // in the trip-controls card don't briefly show enormous values during the gap
+        // between this call and restoreTripState firing. Without this reset, the live
+        // tick keeps computing distance against the car-on back-anchor (set by
+        // beginLiveDriveSession when the app opened mid-drive) — e.g. journey distance
+        // 2.6 km — while elapsedMs starts climbing from "since press", giving avg
+        // speeds of hundreds of km/h until restoreTripState fires and re-anchors
+        // everything to trip.startOdometer / trip.startTime.
+        liveSessionStartOdometer = null
+        _liveOdometerDistanceKm.value = 0.0
+        _liveDistanceKm.value = 0.0
+        _liveSegmentDistanceKm.value = 0.0
+        _liveSessionStartMs.value = System.currentTimeMillis()
         tripRepository.requestManualStart()
     }
 
@@ -1415,10 +1455,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 // instead of leaving a 0..STABILISATION_KM visual gap.
                 val restoredBinTotalDist = liveSpeedBins.values.sumOf { it.distanceKm }
                 val restoredBinTotalEnergy = liveSpeedBins.values.sumOf { it.energyWh }
-                val restoredBinWhPerKm: Double? =
+                val restoredBinWhPerKm: Double? = (
                     if (restoredBinTotalDist >= BIN_MIN_DIST_KM && restoredBinTotalEnergy > 0.0)
                         restoredBinTotalEnergy / restoredBinTotalDist
                     else null
+                )
+                    // Trip-cumulative fallback — mirrors the live path's tripWhPerKm.
+                    // cumEnergyWh / trip distance always resolves once the restored
+                    // trip has moved ≥ BIN_MIN_DIST_KM and consumed anything, so a
+                    // restored trip whose stored per-pair deltas didn't land in any
+                    // bin still leaves the catalog baseline.
+                    ?: run {
+                        if (liveDistanceKm >= BIN_MIN_DIST_KM && cumEnergyWh > 0.0)
+                            cumEnergyWh / liveDistanceKm
+                        else null
+                    }
                 // For PHEVs: fuel range is not stored per data point, so use the current
                 // telemetry value as a constant offset — fuel level changes slowly relative
                 // to EV drain, so this is a reasonable approximation for the restored series.
