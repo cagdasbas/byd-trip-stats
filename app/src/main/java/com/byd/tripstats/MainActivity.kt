@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +44,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.ThemeMode
 import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.ui.navigation.AppNavigation
 import com.byd.tripstats.ui.screens.InitializationScreen
@@ -101,12 +103,18 @@ class MainActivity : ComponentActivity() {
         checkSetupRequired()
 
         setContent {
-            BydTripStatsTheme {
+            val prefs = remember { PreferencesManager(applicationContext) }
+            val themeMode by prefs.themeMode.collectAsState(initial = prefs.getCachedThemeMode())
+            val darkTheme = when (themeMode) {
+                ThemeMode.LIGHT  -> false
+                ThemeMode.DARK   -> true
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            BydTripStatsTheme(darkTheme = darkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val prefs = remember { PreferencesManager(applicationContext) }
                     val cachedSelectedCarId = remember { prefs.getCachedSelectedCarId() }
                     val selectedCarId by prefs.selectedCarId.collectAsState(
                         initial = cachedSelectedCarId ?: "__loading__"

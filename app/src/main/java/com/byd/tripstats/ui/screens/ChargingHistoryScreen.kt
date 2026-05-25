@@ -322,8 +322,8 @@ private fun ChargingSessionCard(
     val socText =
         when {
             session.socEnd != null ->
-                "%.0f%%  →  %.0f%%".format(session.socStart, session.socEnd)
-            else -> "%.0f%%  →  …".format(session.socStart)
+                "%.1f%%  →  %.1f%%".format(session.socStart, session.socEnd)
+            else -> "%.1f%%  →  …".format(session.socStart)
         }
 
     val kwhText = session.kwhAdded?.let { "%.2f kWh".format(it) } ?: "—"

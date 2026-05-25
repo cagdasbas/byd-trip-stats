@@ -31,6 +31,8 @@ private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_pri
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
 private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms")
 private val UNIT_SYSTEM                  = stringPreferencesKey("unit_system")
+private val THEME_MODE                   = stringPreferencesKey("theme_mode")
+private val SOC_SOURCE                   = stringPreferencesKey("soc_source")
 private val CAR_OFF_TIMEOUT_MINUTES      = intPreferencesKey("car_off_timeout_minutes")
 private val MIN_TRIP_DISTANCE_KM         = doublePreferencesKey("min_trip_distance_km")
 
@@ -184,6 +186,46 @@ class PreferencesManager(private val context: Context) {
     private fun localeDefaultUnitSystem(): UnitSystem =
         if (Locale.getDefault().country.uppercase() == "GB") UnitSystem.IMPERIAL
         else UnitSystem.METRIC
+
+    // ── Theme mode ────────────────────────────────────────────────────────────
+
+    val themeMode: Flow<ThemeMode> = context.dataStore.data
+        .map { prefs ->
+            prefs[THEME_MODE]
+                ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
+                ?: ThemeMode.SYSTEM
+        }
+        .onEach { cache.edit().putString("theme_mode", it.name).apply() }
+
+    fun getCachedThemeMode(): ThemeMode =
+        cache.getString("theme_mode", null)
+            ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
+            ?: ThemeMode.SYSTEM
+
+    suspend fun saveThemeMode(mode: ThemeMode) {
+        context.dataStore.edit { it[THEME_MODE] = mode.name }
+        cache.edit().putString("theme_mode", mode.name).apply()
+    }
+
+    // ── SoC source ────────────────────────────────────────────────────────────
+
+    val socSource: Flow<SocSource> = context.dataStore.data
+        .map { prefs ->
+            prefs[SOC_SOURCE]
+                ?.let { runCatching { SocSource.valueOf(it) }.getOrNull() }
+                ?: SocSource.PANEL
+        }
+        .onEach { cache.edit().putString("soc_source", it.name).apply() }
+
+    fun getCachedSocSource(): SocSource =
+        cache.getString("soc_source", null)
+            ?.let { runCatching { SocSource.valueOf(it) }.getOrNull() }
+            ?: SocSource.PANEL
+
+    suspend fun saveSocSource(source: SocSource) {
+        context.dataStore.edit { it[SOC_SOURCE] = source.name }
+        cache.edit().putString("soc_source", source.name).apply()
+    }
 
     // ── Engine-off timeout (trip auto-end) ────────────────────────────────────
     // Minutes the trip stays open after the engine turns off. If the car comes

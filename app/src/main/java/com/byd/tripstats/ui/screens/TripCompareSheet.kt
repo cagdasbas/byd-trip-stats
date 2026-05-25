@@ -233,7 +233,7 @@ private fun CompareSummaryTab(
         MetricRow("Avg speed",
             trips.map { displayMetrics[it.id]?.avgSpeedKmh?.let { v -> "$v ${unitSystem.speedUnit}" } ?: "—" },
             bestIndices(trips.map { displayMetrics[it.id]?.avgSpeedKmh?.toDouble() }, false)),
-        MetricRow("SoC start→end",
+        MetricRow("SoC start→end (BMS)",
             trips.map { "${it.startSoc.toInt()}% → ${it.endSoc?.toInt() ?: "—"}%" },
             trips.map { false }),
         MetricRow("Regen recovered",

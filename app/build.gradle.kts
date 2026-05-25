@@ -30,12 +30,32 @@ android {
         }
     }
 
+    // ── Version scheme ────────────────────────────────────────────────────────
+    // versionCode = major * 1_000_000 + minor * 10_000 + patch * 100 + preRelease
+    //   preRelease = 99  → stable release  (versionName = "X.Y.Z")
+    //   preRelease = 1–98 → pre-release    (versionName = "X.Y.Z-betaNN")
+    // A stable release always has a higher versionCode than any beta of the same
+    // version, so beta testers automatically receive the stable upgrade via sideload.
+    val versionMajor    = 2
+    val versionMinor    = 5
+    val versionPatch    = 1
+    val versionPre      = 1  // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
+
+    val computedVersionCode = versionMajor * 1_000_000 +
+                              versionMinor *    10_000 +
+                              versionPatch *       100 +
+                              versionPre
+    val computedVersionName = if (versionPre == 99)
+        "$versionMajor.$versionMinor.$versionPatch"
+    else
+        "$versionMajor.$versionMinor.$versionPatch-beta${versionPre.toString().padStart(2, '0')}"
+
     defaultConfig {
         applicationId = "com.byd.tripstats"
         minSdk = 29
         targetSdk = 29
-        versionCode = 16
-        versionName = "2.5.0"
+        versionCode = computedVersionCode
+        versionName = computedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Run instrumented tests as a separate package with its own isolated data
@@ -72,7 +92,7 @@ android {
     applicationVariants.all {
         outputs.all {
             if (this is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
-                outputFileName = "byd-trip-stats-${versionName}-${name}.apk"
+                outputFileName = "byd-trip-stats-${versionName}.apk"
             }
         }
     }

@@ -64,6 +64,8 @@ import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.DEFAULT_CAR_OFF_TIMEOUT_MINUTES
 import com.byd.tripstats.data.preferences.DEFAULT_MIN_TRIP_DISTANCE_KM
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.SocSource
+import com.byd.tripstats.data.preferences.ThemeMode
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
@@ -1149,6 +1151,12 @@ private fun AppPreferencesTab(
     val minTripDistanceKm by preferencesManager.minTripDistanceKm.collectAsState(
         initial = preferencesManager.getCachedMinTripDistanceKm()
     )
+    val themeMode by preferencesManager.themeMode.collectAsState(
+        initial = preferencesManager.getCachedThemeMode()
+    )
+    val socSource by preferencesManager.socSource.collectAsState(
+        initial = preferencesManager.getCachedSocSource()
+    )
     val unitSystem by viewModel.unitSystem.collectAsState()
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol by viewModel.currencySymbol.collectAsState()
@@ -1165,7 +1173,8 @@ private fun AppPreferencesTab(
             "€" to "EUR",
             "£" to "GBP",
             "$" to "USD",
-            "A$" to "AUD"
+            "A$" to "AUD",
+            "฿" to "THB"
         )
     }
     var currencyMenuExpanded by remember { mutableStateOf(false) }
@@ -1232,6 +1241,118 @@ private fun AppPreferencesTab(
                             uncheckedTrackColor = ToggleUncheckedTrack,
                             uncheckedBorderColor = ToggleUncheckedTrack
                         )
+                    )
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Theme",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Choose how the app looks. System default follows your device's dark/light setting.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        ThemeMode.SYSTEM to "System",
+                        ThemeMode.LIGHT  to "Light",
+                        ThemeMode.DARK   to "Dark",
+                    ).forEach { (mode, label) ->
+                        Button(
+                            onClick = { scope.launch { preferencesManager.saveThemeMode(mode) } },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (themeMode == mode)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (themeMode == mode)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Text(label, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "SoC source",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Choose which battery percentage reading to display on the dashboard.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        SocSource.PANEL to "Panel",
+                        SocSource.BMS   to "BMS",
+                    ).forEach { (source, label) ->
+                        Button(
+                            onClick = { scope.launch { preferencesManager.saveSocSource(source) } },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (socSource == source)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (socSource == source)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Text(label, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        "On PHEVs the BMS SoC is usually not reported — use Panel if BMS shows 0.\nBMS is more accurate (float) than Panel (integer). Also, larger divergence from Panel is a great indication that it is time for either 100% charge or charging calibration",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

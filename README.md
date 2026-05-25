@@ -456,7 +456,7 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [ ] Battery cell imbalance alert — threshold-based notification when cell voltage spread exceeds a configurable limit (e.g. 0.05 V), surfacing the diagnostic the Cell Voltage Spread heatmap already visualises
 - [x] 12V DC monitoring when car is off — rolling 48-hour chart overlaying HV bus voltage, cell min/max, and SoC so 12V drain events (and the corresponding HV top-up) are immediately visible ✅ *(v2.1.0)*
 - [ ] DiLink home screen widget — quick-glance tile showing current SoC, last trip distance, and range projection without opening the app
-- [ ] Web dashboard companion — browse trip history and charts on a desktop browser offline-first: upload your backup file, charts render locally, nothing leaves your device
+- [ ] Web dashboard companion — browse trip history and charts on any browser offline-first: upload your backup file, charts render locally, nothing leaves your device; built as a PWA so it can be added to your phone's home screen for a near-native experience
 **Vote on features** by 👍 reacting to issues!
 
 ---

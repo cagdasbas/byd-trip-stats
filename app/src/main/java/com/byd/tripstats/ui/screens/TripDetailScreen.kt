@@ -434,7 +434,7 @@ fun copyTripSummaryToClipboard(
         appendLine("⏱️ Duration: ${formatDuration(trip.duration ?: 0)}")
         appendLine("⚡ Energy: ${String.format("%.2f", trip.energyConsumed ?: 0.0)} kWh")
         appendLine("🌿 Consumption: ${String.format("%.1f", unitSystem.convertEfficiency(trip.efficiency ?: 0.0))} ${unitSystem.consumptionUnit}")
-        appendLine("🔋 SOC: ${String.format("%.1f", trip.startSoc)}% → ${String.format("%.1f", trip.endSoc ?: 0.0)}%")
+        appendLine("🔋 SoC (BMS): ${String.format("%.1f", trip.startSoc)}% → ${String.format("%.1f", trip.endSoc ?: 0.0)}%")
         appendLine("⚡ Max Power: ${trip.maxPower.toInt()} kW")
         appendLine("🔋 Max Regen: ${kotlin.math.abs(trip.maxRegenPower).toInt()} kW")
         appendLine("🏎️ Max Speed: ${unitSystem.convertSpeed(trip.maxSpeed).toInt()} ${unitSystem.speedUnit}")
@@ -907,9 +907,9 @@ fun TripOverviewTab(
                 DetailRow("Trip distance", trip.distance?.let { "${String.format("%.1f", unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Start SOC", "${String.format("%.1f", trip.startSoc)}%")
-                DetailRow("End SOC", trip.endSoc?.let { "${String.format("%.1f", it)}%" } ?: "-")
-                DetailRow("SOC Change", trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                DetailRow("Start SoC (BMS)", "${String.format("%.1f", trip.startSoc)}%")
+                DetailRow("End SoC (BMS)", trip.endSoc?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                DetailRow("SoC Change (BMS)", trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
                 DetailRow("Max Speed", "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}")

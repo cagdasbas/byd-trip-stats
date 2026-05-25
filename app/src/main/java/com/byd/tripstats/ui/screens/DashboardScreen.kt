@@ -41,6 +41,7 @@ import com.byd.tripstats.data.config.Drivetrain
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
@@ -121,6 +122,7 @@ fun DashboardScreen(
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
     val dashboardIconsEnabled by prefs.dashboardAnimationsEnabled
         .collectAsState(initial = prefs.getCachedAnimationsEnabled())
+    val socSource by prefs.socSource.collectAsState(initial = prefs.getCachedSocSource())
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
     var showBattery12vDialog by remember { mutableStateOf(false) }
@@ -193,7 +195,7 @@ fun DashboardScreen(
                     if (!dashboardIconsEnabled) {
                         IconButton(onClick = onNavigateToCharging) {
                             CompactBattery(
-                                soc = telemetry?.soc?.toFloat() ?: 0f,
+                                soc = (if (socSource == SocSource.PANEL) telemetry?.socPanel?.toFloat() else telemetry?.soc?.toFloat()) ?: 0f,
                                 isCharging = telemetry?.isCharging ?: false
                             )
                         }
@@ -284,6 +286,7 @@ fun DashboardScreen(
                 tyreUnit = tyreUnit,
                 onShowTyreDialog = { showTyreUnitDialog = true },
                 dashboardIconsEnabled = dashboardIconsEnabled,
+                socSource = socSource,
                 onNavigateToCharging = onNavigateToCharging,
                 widthSizeClass = widthSizeClass,
                 sessionDistanceKm = liveSegmentDistanceKm,
@@ -410,6 +413,7 @@ fun DashboardContent(
     tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
     onShowTyreDialog: () -> Unit = {},
     dashboardIconsEnabled: Boolean = true,
+    socSource: SocSource = SocSource.PANEL,
     onNavigateToCharging: () -> Unit = {},
     widthSizeClass: WindowWidthSizeClass = WindowWidthSizeClass.Expanded,
     sessionDistanceKm: Double = 0.0,
@@ -466,6 +470,7 @@ fun DashboardContent(
                     onConsumptionExpand = onConsumptionExpand,
                     onConsumptionClose = onConsumptionClose,
                     dashboardIconsEnabled = dashboardIconsEnabled,
+                    socSource = socSource,
                     onNavigateToCharging = onNavigateToCharging,
                     onShowTyreDialog = onShowTyreDialog,
                     tyreUnit = tyreUnit,
@@ -521,6 +526,7 @@ fun DashboardContent(
                         onConsumptionExpand = onConsumptionExpand,
                         onConsumptionClose = onConsumptionClose,
                         dashboardIconsEnabled = dashboardIconsEnabled,
+                        socSource = socSource,
                         onNavigateToCharging = onNavigateToCharging,
                         onShowTyreDialog = onShowTyreDialog,
                         tyreUnit = tyreUnit,
@@ -597,6 +603,7 @@ fun DashboardContent(
                         onConsumptionExpand = onConsumptionExpand,
                         onConsumptionClose = onConsumptionClose,
                         dashboardIconsEnabled = dashboardIconsEnabled,
+                        socSource = socSource,
                         onNavigateToCharging = onNavigateToCharging,
                         onShowTyreDialog = onShowTyreDialog,
                         tyreUnit = tyreUnit,
@@ -703,6 +710,7 @@ fun EnergyFlowDiagram(
     onConsumptionExpand: () -> Unit = {},
     onConsumptionClose: () -> Unit = {},
     dashboardIconsEnabled: Boolean = true,
+    socSource: SocSource = SocSource.PANEL,
     onNavigateToCharging: () -> Unit = {},
     onShowTyreDialog: () -> Unit = {},
     tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
@@ -783,7 +791,7 @@ fun EnergyFlowDiagram(
                         )
 
                         LiquidFillBattery(
-                            soc = telemetry.soc.toFloat(),
+                            soc = if (socSource == SocSource.PANEL) telemetry.socPanel.toFloat() else telemetry.soc.toFloat(),
                             isCharging = isCharging,
                             animationsEnabled = true,
                             width = 60.dp,
@@ -893,7 +901,7 @@ fun EnergyFlowDiagram(
                 ) {
                     RangeProjectionChart(
                         dataPoints = tripDataPoints,
-                        liveSoc = telemetry.soc,
+                        liveSoc = if (socSource == SocSource.PANEL) telemetry.socPanel.toDouble() else telemetry.soc,
                         liveElectricRangeKm = telemetry.electricDrivingRangeKm,
                         useImperial = unitSystem.isImperial,
                         modifier = Modifier.fillMaxSize()
@@ -929,16 +937,17 @@ fun EnergyFlowDiagram(
                         color = BydEcoTealDim
                     )
                     PowerMetric(
-                        label = "SoC (BMS)",
-                        value = "${telemetry.soc.toInt()}",
+                        label = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)",
+                        value = if (socSource == SocSource.PANEL) "${telemetry.socPanel}" else "${"%.1f".format(telemetry.soc)}",
                         unit = "%",
                         color = BatteryBlue
                     )
                     PowerMetric(
                         label = "Range",
                         value = run {
-                            val projected = tripDataPoints.lastOrNull()?.projectedRangeKm
-                            formatDistanceValue(projected)
+                            val km = tripDataPoints.lastOrNull()?.projectedRangeKm
+                                ?: telemetry.electricDrivingRangeKm.toDouble()
+                            formatDistanceValue(unitSystem.convertDistance(km))
                         },
                         unit = distanceUnit,
                         color = MaterialTheme.extendedColors.range

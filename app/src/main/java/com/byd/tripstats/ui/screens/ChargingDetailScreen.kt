@@ -581,7 +581,7 @@ private fun ChargingPowerSocTab(
                                         "+${mins}m"
                                     }
                                 }
-                                ChargingXAxisMode.SOC -> "%.0f%%".format(point.soc)
+                                ChargingXAxisMode.SOC -> "%.1f%%".format(point.soc)
                             }
                             nc.drawText(label, x, h - 8f, xLabelPaint)
                             lastLabelX = x

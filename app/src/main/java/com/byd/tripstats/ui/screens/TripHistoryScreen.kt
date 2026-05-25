@@ -732,7 +732,7 @@ fun TripItem(
                 )
                 TripMetricChip(
                     icon = Icons.Filled.Battery4Bar,
-                    label = "SOC",
+                    label = "SoC (BMS)",
                     value = if (trip.endSoc != null)
                         "${trip.startSoc.toInt()}%-> ${trip.endSoc.toInt()}%"
                     else "—",

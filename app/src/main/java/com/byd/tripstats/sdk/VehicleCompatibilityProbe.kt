@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.util.Log
+import com.byd.tripstats.BuildConfig
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +64,8 @@ object VehicleCompatibilityProbe {
 
     // Static metadata captured once
     private var androidBuild: String = ""
+    private var appVersionName: String = ""
+    private var appVersionCode: Int = 0
     private var captureStartedAt: String = ""
 
     // ── Vehicle identity (set externally) ─────────────────────────────────────
@@ -110,6 +113,8 @@ object VehicleCompatibilityProbe {
         val persisted = prefs.getBoolean(KEY_ENABLED, false)
         _isEnabled.value = persisted
         androidBuild = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) — ${Build.MANUFACTURER} ${Build.MODEL}"
+        appVersionName = BuildConfig.VERSION_NAME
+        appVersionCode = BuildConfig.VERSION_CODE
     }
 
     @Synchronized
@@ -418,6 +423,7 @@ object VehicleCompatibilityProbe {
 
         // ── Vehicle identity ──────────────────────────────────────────────────
         val vehicleInfo = JSONObject()
+        vehicleInfo.put("appVersion",              "$appVersionName ($appVersionCode)")
         vehicleInfo.put("userSelectedModel",       userModelName ?: "not set")
         vehicleInfo.put("userSelectedModelId",     userModelId ?: "not set")
         vehicleInfo.put("isPhev",                  userModelIsPhev ?: false)

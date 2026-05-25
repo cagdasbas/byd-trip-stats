@@ -490,7 +490,7 @@ private fun WaypointsCard(dataPoints: List<TripDataPointEntity>) {
                 icon    = Icons.Filled.FlagCircle,
                 label   = "Start",
                 time    = fmt(startPoint.timestamp),
-                soc     = "${startPoint.soc.toInt()}%",
+                soc     = "${"%.1f".format(startPoint.soc)}%",
                 color   = RegenGreen
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -498,7 +498,7 @@ private fun WaypointsCard(dataPoints: List<TripDataPointEntity>) {
                 icon    = Icons.Filled.LocationOn,
                 label   = "End",
                 time    = fmt(endPoint.timestamp),
-                soc     = "${endPoint.soc.toInt()}%",
+                soc     = "${"%.1f".format(endPoint.soc)}%",
                 color   = BydErrorRed
             )
         }
@@ -611,7 +611,7 @@ private fun SegmentItem(
                 color = if (avgPower < 0) RegenGreen else AccelerationOrange
             )
             Text(
-                text = "${String.format("%.1f", abs(socChange))}% SoC",
+                text = "${String.format("%.1f", abs(socChange))}% SoC (BMS)",
                 style = MaterialTheme.typography.bodySmall
             )
         }

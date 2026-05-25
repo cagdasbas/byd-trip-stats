@@ -741,6 +741,10 @@ class BydVehicleDataSource(context: Context) {
     private var lastChargingCapacityRaw: Double? = null
     private val chargingCapacityHistory = ArrayDeque<Pair<Long, Double>>()
     private var lastChargingActivityElapsedMs: Long = 0L
+    // Tracks when chargerWorkState first went non-zero in this session. Used as the stale
+    // baseline when no capacity activity has been seen yet (e.g. fresh install connecting
+    // to a PHEV whose BMS never cleared chargerWorkState after the last charge).
+    private var chargerWorkStateSetElapsedMs: Long = 0L
     private var lastChargingPowerCandidateElapsedMs: Long = 0L
     private val _speedAccelerateDeepness = MutableStateFlow<Int?>(null)
     private val _speedBrakeDeepness = MutableStateFlow<Int?>(null)
@@ -917,6 +921,8 @@ class BydVehicleDataSource(context: Context) {
             }
         }
         override fun onChargerWorkStateChanged(state: Int) {
+            if (state > 0 && _chargerWorkState.value == 0) chargerWorkStateSetElapsedMs = SystemClock.elapsedRealtime()
+            else if (state == 0) chargerWorkStateSetElapsedMs = 0L
             _chargerWorkState.value = state
             publishSnapshot()
             if (ENABLE_VERBOSE_RAW_EVENT_LOGS) {
@@ -1707,6 +1713,19 @@ class BydVehicleDataSource(context: Context) {
                 tryDevice("Sensor refresh")     { sensorDevice?.let     { logSensorSnapshot(it)     } }
                 tryDevice("Battery refresh")    { batteryDevice?.let    { logBatterySnapshot(it)    } }
                 tryDevice("BMS refresh")        { bmsDevice?.let        { logBatterySnapshot(it)    } }
+                // PM2.5 debounce requires two consecutive identical readings before publishing.
+                // The climate device is only polled once at registration, so a second read never
+                // arrives unless we re-poll here. Cars where the instrument device doesn't expose
+                // PM2.5 getters (e.g. PHEV firmware) rely entirely on this periodic climate poll.
+                tryDevice("PM2.5 refresh") {
+                    climateDevice?.let { dev ->
+                        val pm25In  = invokeIntGetter(dev, *runtimeMethodNames("m15"))?.takeIf { it in 1..999 }
+                        val pm25Out = invokeIntGetter(dev, *runtimeMethodNames("m16"))?.takeIf { it in 1..999 }
+                        if (pm25In != null || pm25Out != null) {
+                            updatePm25Snapshot(inCar = pm25In, outCar = pm25Out, source = "climate-refresh")
+                        }
+                    }
+                }
                 // Statistic refresh — without this, elecDrivingRange (and other statistic
                 // metrics like totalMileage, avgFuelCon, waterTemperature) are only read at
                 // bootstrap. The onElecDrivingRangeChanged callback doesn't fire on every
@@ -1889,7 +1908,11 @@ class BydVehicleDataSource(context: Context) {
             chargingRestTime?.first?.let { _remainHours.value = it }
             chargingRestTime?.second?.let { _remainMinutes.value = it }
             chargerState?.let { _chargerState.value = it }
-            chargerWorkState?.let { _chargerWorkState.value = it }
+            chargerWorkState?.let {
+                if (it > 0 && _chargerWorkState.value == 0) chargerWorkStateSetElapsedMs = SystemClock.elapsedRealtime()
+                else if (it == 0) chargerWorkStateSetElapsedMs = 0L
+                _chargerWorkState.value = it
+            }
             chargingType?.let { _chargingType.value = it }
             chargingGunState?.let { _chargingGunState.value = it }
             chargingMode?.let { _chargingMode.value = it }
@@ -3761,8 +3784,8 @@ class BydVehicleDataSource(context: Context) {
                 }
             }
 
-            val pm25In = invokeIntGetter(device, *runtimeMethodNames("m15"))?.takeIf { it in 0..999 }
-            val pm25Out = invokeIntGetter(device, *runtimeMethodNames("m16"))?.takeIf { it in 0..999 }
+            val pm25In = invokeIntGetter(device, *runtimeMethodNames("m15"))?.takeIf { it in 1..999 }
+            val pm25Out = invokeIntGetter(device, *runtimeMethodNames("m16"))?.takeIf { it in 1..999 }
             if (pm25In != null || pm25Out != null) {
                 updatePm25Snapshot(inCar = pm25In, outCar = pm25Out, source = "climate-device")
             }
@@ -4209,8 +4232,8 @@ class BydVehicleDataSource(context: Context) {
                 updateRegenModeCandidate(energyFeedback, strong = true, source = "energy-feedback")
             }
 
-            val pm25In = invokeIntGetter(device, *runtimeMethodNames("m15"))?.takeIf { it in 0..999 }
-            val pm25Out = invokeIntGetter(device, *runtimeMethodNames("m16"))?.takeIf { it in 0..999 }
+            val pm25In = invokeIntGetter(device, *runtimeMethodNames("m15"))?.takeIf { it in 1..999 }
+            val pm25Out = invokeIntGetter(device, *runtimeMethodNames("m16"))?.takeIf { it in 1..999 }
             if (pm25In != null || pm25Out != null) {
                 updatePm25Snapshot(inCar = pm25In, outCar = pm25Out, source = "instrument-device")
             }
@@ -5338,7 +5361,7 @@ class BydVehicleDataSource(context: Context) {
         val driving = snap.directSpeedKmh > 5.0 && snap.gear in setOf("D", "R")
         if (driving) {
             if (_chargingGunState.value != 0) _chargingGunState.value = 0
-            if (_chargerWorkState.value != 0) _chargerWorkState.value = 0
+            if (_chargerWorkState.value != 0) { _chargerWorkState.value = 0; chargerWorkStateSetElapsedMs = 0L }
             lastChargingActivityElapsedMs = 0L
             updateDirectChargingPower(null)
             return false
@@ -5359,11 +5382,17 @@ class BydVehicleDataSource(context: Context) {
         // for STALE_CHARGER_WORK_STATE_TIMEOUT_MS, treat the work state as stale and
         // force it back to 0. Doesn't affect Seal/EV cars where the BMS resets reliably —
         // they always have fresh power or capacity activity during real charging.
+        // Use capacity activity as the stale baseline when available; fall back to when
+        // chargerWorkState was first set (covers fresh-install / no-prior-charge case where
+        // a PHEV's BMS never cleared chargerWorkState from the previous session).
+        val staleBaseline = if (lastChargingActivityElapsedMs != 0L) lastChargingActivityElapsedMs
+                            else chargerWorkStateSetElapsedMs
         if (chargerWorking && !powerActive && !recentCapacityActivity &&
-            lastChargingActivityElapsedMs != 0L &&
-            nowElapsedMs - lastChargingActivityElapsedMs > STALE_CHARGER_WORK_STATE_TIMEOUT_MS) {
-            Log.i(TAG, "🔋 chargerWorkState stale (${(nowElapsedMs - lastChargingActivityElapsedMs) / 60_000L}m of silence) — forcing 0")
+            staleBaseline != 0L &&
+            nowElapsedMs - staleBaseline > STALE_CHARGER_WORK_STATE_TIMEOUT_MS) {
+            Log.i(TAG, "🔋 chargerWorkState stale (${(nowElapsedMs - staleBaseline) / 60_000L}m of silence) — forcing 0")
             _chargerWorkState.value = 0
+            chargerWorkStateSetElapsedMs = 0L
             return false
         }
         return powerActive || recentCapacityActivity || chargerWorking
