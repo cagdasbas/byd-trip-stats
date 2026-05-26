@@ -1157,7 +1157,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val baselineWhPerKm = car?.referenceConsumptionKwhPer100km
                         ?.times(10.0)
                         ?: FALLBACK_BASELINE_WH_PER_KM
-                    val remainingEnergyWh = batteryKwh * 1000.0 * (telemetry.soc / 100.0)
+                    val effectiveSoc = telemetry.soc.takeIf { it > 0 } ?: telemetry.socPanel.toDouble()
+                    val remainingEnergyWh = batteryKwh * 1000.0 * (effectiveSoc / 100.0)
                     // PHEVs: add the BMS fuel range estimate so the projection covers EV+ICE.
                     // For BEVs fuelDrivingRangeKm is 0, so adding it is a no-op.
                     val fuelRangeKm = if (car?.isPhev == true)
@@ -1485,7 +1486,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val stabilised = dKm >= STABILISATION_KM ||
                         (restoredSmoothed != null && restoredSmoothed > 0.0) ||
                         restoredBinWhPerKm != null
-                    val remainingWh = batteryKwh * 1000.0 * (dp.soc / 100.0)
+                    val remainingWh = batteryKwh * 1000.0 * ((dp.soc.takeIf { it > 0 } ?: dp.socPanel.toDouble()) / 100.0)
                     // Null for non-stabilised points — matches live path behaviour so the
                     // orange projected line doesn't appear after navigation before it would
                     // appear during a fresh live drive session.

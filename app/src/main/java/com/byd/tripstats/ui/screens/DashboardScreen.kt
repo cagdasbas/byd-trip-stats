@@ -945,8 +945,17 @@ fun EnergyFlowDiagram(
                     PowerMetric(
                         label = "Range",
                         value = run {
-                            val km = tripDataPoints.lastOrNull()?.projectedRangeKm
-                                ?: telemetry.electricDrivingRangeKm.toDouble()
+                            val isPhev = telemetry.fuelDrivingRangeKm > 0
+                            val km = if (isPhev) {
+                                // Projection includes fuel offset — use car's EV-only estimate
+                                telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
+                                    ?: tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
+                                    ?: 0.0
+                            } else {
+                                tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
+                                    ?: telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
+                                    ?: 0.0
+                            }
                             formatDistanceValue(unitSystem.convertDistance(km))
                         },
                         unit = distanceUnit,
