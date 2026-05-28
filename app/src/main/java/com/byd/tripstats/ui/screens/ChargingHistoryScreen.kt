@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.ui.theme.*
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -38,6 +39,7 @@ fun ChargingHistoryScreen(
     onNavigateBack: () -> Unit
 ) {
     val sessions by viewModel.allChargingSessions.collectAsState()
+    val socSource by viewModel.socSource.collectAsState()
     val completed = sessions.filter { !it.isActive }.sortedByDescending { it.startTime }
     val active = sessions.filter { it.isActive }.sortedByDescending { it.startTime }
 
@@ -145,6 +147,7 @@ fun ChargingHistoryScreen(
                         isActive = true,
                         isSelected = selectedSessions.contains(session.id),
                         selectionMode = selectionMode,
+                        socSource = socSource,
                         onClick = {
                             if (selectionMode) {
                                 selectedSessions =
@@ -169,7 +172,7 @@ fun ChargingHistoryScreen(
 
                 // Summary header
                 if (completed.isNotEmpty()) {
-                    item { ChargingStatsSummary(completed) }
+                    item { ChargingStatsSummary(completed, socSource) }
                 }
 
                 items(completed, key = { it.id }) { session ->
@@ -178,6 +181,7 @@ fun ChargingHistoryScreen(
                         isActive = false,
                         isSelected = selectedSessions.contains(session.id),
                         selectionMode = selectionMode,
+                        socSource = socSource,
                         onClick = {
                             if (selectionMode) {
                                 selectedSessions =
@@ -239,10 +243,20 @@ fun ChargingHistoryScreen(
 // ── Summary card ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ChargingStatsSummary(sessions: List<ChargingSessionEntity>) {
-    val totalKwh     = sessions.sumOf { it.kwhAdded ?: 0.0 }
+private fun ChargingStatsSummary(
+    sessions : List<ChargingSessionEntity>,
+    socSource: SocSource = SocSource.PANEL,
+) {
+    val totalKwh      = sessions.sumOf { it.kwhAdded ?: 0.0 }
     val totalSessions = sessions.size
-    val avgSocDelta  = sessions.mapNotNull { it.socDelta }.takeIf { it.isNotEmpty() }?.average() ?: 0.0
+    val avgSocDelta = if (socSource == SocSource.PANEL) {
+        sessions.mapNotNull { it.socPanelDelta.takeIf { d -> d != null && it.socStartPanel > 0.0 } }
+            .takeIf { it.isNotEmpty() }?.average()
+            ?: sessions.mapNotNull { it.socDelta }.takeIf { it.isNotEmpty() }?.average()
+            ?: 0.0
+    } else {
+        sessions.mapNotNull { it.socDelta }.takeIf { it.isNotEmpty() }?.average() ?: 0.0
+    }
 
     Card(
         modifier =
@@ -301,13 +315,14 @@ private fun SummaryMetric(label: String, value: String, unit: String) {
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun ChargingSessionCard(
-    session: ChargingSessionEntity,
-    isActive: Boolean,
-    isSelected: Boolean = false,
+    session      : ChargingSessionEntity,
+    isActive     : Boolean,
+    isSelected   : Boolean = false,
     selectionMode: Boolean = false,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit = {},
-    onDelete: () -> Unit = {}
+    socSource    : SocSource = SocSource.PANEL,
+    onClick      : () -> Unit,
+    onLongClick  : () -> Unit = {},
+    onDelete     : () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     val dateFmt = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
@@ -319,11 +334,14 @@ private fun ChargingSessionCard(
             session.durationSeconds?.let { formatDuration(it) } ?: "—"
         }
 
+    val usePanelSoc = socSource == SocSource.PANEL && session.socStartPanel > 0.0
+    val displaySocStart = if (usePanelSoc) session.socStartPanel else session.socStart
+    val displaySocEnd   = if (usePanelSoc) session.socEndPanel else session.socEnd
     val socText =
         when {
-            session.socEnd != null ->
-                "%.1f%%  →  %.1f%%".format(session.socStart, session.socEnd)
-            else -> "%.1f%%  →  …".format(session.socStart)
+            displaySocEnd != null ->
+                "%.1f%%  →  %.1f%%".format(displaySocStart, displaySocEnd)
+            else -> "%.1f%%  →  …".format(displaySocStart)
         }
 
     val kwhText = session.kwhAdded?.let { "%.2f kWh".format(it) } ?: "—"

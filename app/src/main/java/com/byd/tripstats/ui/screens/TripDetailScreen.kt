@@ -52,6 +52,7 @@ import com.byd.tripstats.ui.components.RouteAnalysisTab
 import com.byd.tripstats.ui.components.TripHeatmapsTab
 import com.byd.tripstats.ui.components.SocChart
 import com.byd.tripstats.ui.components.SpeedChart
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
@@ -86,6 +87,7 @@ fun TripDetailScreen(
     val electricityPrice by viewModel.electricityPricePerKwh.collectAsState()
     val currencySymbol   by viewModel.currencySymbol.collectAsState()
     val unitSystem       by viewModel.unitSystem.collectAsState()
+    val socSource        by viewModel.socSource.collectAsState()
     val chargingSessions by viewModel.allChargingSessions.collectAsState()
     val tripAdditionalChargingCosts by viewModel.tripAdditionalChargingCosts.collectAsState()
     val selectedCarConfig by viewModel.selectedCarConfig.collectAsState(initial = null)
@@ -182,6 +184,7 @@ fun TripDetailScreen(
                             electricityPrice = electricityPrice,
                             currencySymbol = currencySymbol,
                             unitSystem = unitSystem,
+                            socSource = socSource,
                             chargingSessions = chargingSessions,
                             additionalChargingCost = tripAdditionalChargingCosts[tripId] ?: 0.0,
                             onSaveAdditionalChargingCost = { amount ->
@@ -192,9 +195,10 @@ fun TripDetailScreen(
                         2 -> TripHeatmapsTab(dataPoints = dataPoints)
                         3 -> TripRouteTab(dataPoints = dataPoints, useImperial = unitSystem.isImperial)
                         4 -> RouteAnalysisTab(
-                            trip = trip,
-                            dataPoints = dataPoints,
-                            useImperial = unitSystem.isImperial
+                            trip        = trip,
+                            dataPoints  = dataPoints,
+                            useImperial = unitSystem.isImperial,
+                            socSource   = socSource
                         )
                     }
                 }
@@ -209,7 +213,8 @@ fun TripDetailScreen(
             trip = capturedTrip,
             dataPoints = capturedPoints,
             onDismiss = { dialogData = null },
-            unitSystem = unitSystem
+            unitSystem = unitSystem,
+            socSource = socSource
         )
     }
 }
@@ -252,7 +257,8 @@ fun ExportDialog(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
     dataPoints: List<com.byd.tripstats.data.local.entity.TripDataPointEntity>,
     onDismiss: () -> Unit,
-    unitSystem: UnitSystem = UnitSystem.METRIC
+    unitSystem: UnitSystem = UnitSystem.METRIC,
+    socSource: SocSource = SocSource.PANEL
 ) {
     // Capture stable references
     val context          = androidx.compose.ui.platform.LocalContext.current
@@ -282,7 +288,7 @@ fun ExportDialog(
                 // ── Clipboard ─────────────────────────────────────────────────
                 OutlinedButton(
                     onClick = {
-                        copyTripSummaryToClipboard(context, stableTrip, unitSystem)
+                        copyTripSummaryToClipboard(context, stableTrip, unitSystem, socSource)
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -424,7 +430,8 @@ fun ExportDialog(
 fun copyTripSummaryToClipboard(
     context: android.content.Context,
     trip: com.byd.tripstats.data.local.entity.TripEntity,
-    unitSystem: UnitSystem = UnitSystem.METRIC
+    unitSystem: UnitSystem = UnitSystem.METRIC,
+    socSource: SocSource = SocSource.PANEL
 ) {
     val summary = buildString {
         appendLine("🚗 BYD Trip Stats")
@@ -434,7 +441,11 @@ fun copyTripSummaryToClipboard(
         appendLine("⏱️ Duration: ${formatDuration(trip.duration ?: 0)}")
         appendLine("⚡ Energy: ${String.format("%.2f", trip.energyConsumed ?: 0.0)} kWh")
         appendLine("🌿 Consumption: ${String.format("%.1f", unitSystem.convertEfficiency(trip.efficiency ?: 0.0))} ${unitSystem.consumptionUnit}")
-        appendLine("🔋 SoC (BMS): ${String.format("%.1f", trip.startSoc)}% → ${String.format("%.1f", trip.endSoc ?: 0.0)}%")
+        if (socSource == SocSource.PANEL) {
+            appendLine("🔋 SoC (Panel): ${trip.startSocPanel.toInt()}% → ${trip.endSocPanel?.toInt() ?: 0}%")
+        } else {
+            appendLine("🔋 SoC (BMS): ${String.format("%.1f", trip.startSoc)}% → ${String.format("%.1f", trip.endSoc ?: 0.0)}%")
+        }
         appendLine("⚡ Max Power: ${trip.maxPower.toInt()} kW")
         appendLine("🔋 Max Regen: ${kotlin.math.abs(trip.maxRegenPower).toInt()} kW")
         appendLine("🏎️ Max Speed: ${unitSystem.convertSpeed(trip.maxSpeed).toInt()} ${unitSystem.speedUnit}")
@@ -759,6 +770,7 @@ fun TripOverviewTab(
     electricityPrice: Double = 0.0,
     currencySymbol: String = "€",
     unitSystem: UnitSystem = UnitSystem.METRIC,
+    socSource: SocSource = SocSource.PANEL,
     chargingSessions: List<com.byd.tripstats.data.local.entity.ChargingSessionEntity> = emptyList(),
     additionalChargingCost: Double = 0.0,
     onSaveAdditionalChargingCost: (Double?) -> Unit = {}
@@ -907,9 +919,15 @@ fun TripOverviewTab(
                 DetailRow("Trip distance", trip.distance?.let { "${String.format("%.1f", unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Start SoC (BMS)", "${String.format("%.1f", trip.startSoc)}%")
-                DetailRow("End SoC (BMS)", trip.endSoc?.let { "${String.format("%.1f", it)}%" } ?: "-")
-                DetailRow("SoC Change (BMS)", trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                if (socSource == SocSource.PANEL) {
+                    DetailRow("Start SoC (Panel)", "${trip.startSocPanel.toInt()}%")
+                    DetailRow("End SoC (Panel)", trip.endSocPanel?.let { "${it.toInt()}%" } ?: "-")
+                    DetailRow("SoC Change (Panel)", trip.socPanelDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                } else {
+                    DetailRow("Start SoC (BMS)", "${String.format("%.1f", trip.startSoc)}%")
+                    DetailRow("End SoC (BMS)", trip.endSoc?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                    DetailRow("SoC Change (BMS)", trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp),color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
                 DetailRow("Max Speed", "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}")

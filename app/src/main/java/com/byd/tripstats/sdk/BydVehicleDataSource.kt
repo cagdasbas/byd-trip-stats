@@ -2231,9 +2231,6 @@ class BydVehicleDataSource(context: Context) {
 
     private fun logMotorSnapshot(device: Any) {
         try {
-            val BYD_RPM_SENTINELS = setOf(8191, 16383, 32767, 65535)
-            val enginePower = _vehicleSnapshot.value.enginePower
-
             // Probe all plausible traction-motor RPM getters — log all raw values so
             // we can identify which ones exist on this firmware.
             val speedFrontSpecific = invokeIntGetter(device, *runtimeMethodNames("m20"))
@@ -2256,18 +2253,16 @@ class BydVehicleDataSource(context: Context) {
             }
 
             // Use MotorDevice as an RPM source if Engine/Speed haven't populated it.
+            // Only write a non-zero value — zero readings from this supplementary path
+            // are spurious SDK poll artefacts and should not overwrite the main path's value.
             val frontRaw = speedFrontSpecific ?: speedGeneric
-            val front = frontRaw
-                ?.takeIf { it !in BYD_RPM_SENTINELS && it > -10000 }
-                ?.let { if (it <= 5 && (enginePower == null || enginePower == 0)) 0 else it }
+            val front = frontRaw?.takeIf { it > 0 }
             if (front != null && (_vehicleSnapshot.value.engineSpeedFront == null || _vehicleSnapshot.value.engineSpeedFront == 0)) {
-                val rear = speedRearSpecific
-                    ?.takeIf { it !in BYD_RPM_SENTINELS && it > -10000 }
-                    ?.let { if (it <= 5 && (enginePower == null || enginePower == 0)) 0 else it }
-                    ?: if (speedRearSpecific == null) _vehicleSnapshot.value.engineSpeedRear else 0
+                val rear = speedRearSpecific?.takeIf { it > 0 }
+                    ?: if (speedRearSpecific == null) _vehicleSnapshot.value.engineSpeedRear else null
                 _vehicleSnapshot.value = _vehicleSnapshot.value.copy(
                     engineSpeedFront = front,
-                    engineSpeedRear  = rear ?: 0
+                    engineSpeedRear  = rear ?: _vehicleSnapshot.value.engineSpeedRear ?: 0
                 )
                 Log.i(TAG, "🔬 RPM (MotorDevice applied): front=$front rear=$rear")
             }
@@ -2916,27 +2911,34 @@ class BydVehicleDataSource(context: Context) {
             val engineSpeedFrontSpecificRaw = invokeIntGetter(device, *runtimeMethodNames("m20"))
             val engineSpeedRearRaw          = invokeIntGetter(device, *runtimeMethodNames("m21"))
             val engineSpeedGenericRaw       = invokeIntGetter(device, *runtimeMethodNames("m22"))
-            val BYD_RPM_SENTINELS = setOf(8191, 16383, 32767, 65535)
             val engineSpeedFrontRaw = engineSpeedFrontSpecificRaw ?: engineSpeedGenericRaw
-            // Keep null when the engine device has no front-RPM getter at all, so other
-            // fallback sources (SpeedDevice, MotorDevice, Instrument) can still populate it.
-            // Only resolve to 0 when the getter exists but returned a sentinel or sub-threshold value.
-            // Keep null (preserve last) when no front getter exists on this device, so the
-            // event-driven path (dispatchDynamicRawFeatureEvent) is not overwritten on every poll.
+            // Rule: if the car is moving and the getter returns 0, that is a spurious SDK
+            // poll result (the getter updates slower than the 50 ms poll interval).
+            // Preserve the last known value in that case. Only write 0 when the car is
+            // genuinely stopped (speed < 1 km/h), which also covers cold-boot / pre-drive.
+            // No sentinel filtering — we do not know which values are firmware sentinels vs
+            // valid readings (e.g. motors can legitimately reach 8 000+ RPM).
+            val directSpeedKmh = _vehicleSnapshot.value.directSpeedKmh
+            val prevFront = _vehicleSnapshot.value.engineSpeedFront ?: 0
             val engineSpeedFront = if (engineSpeedFrontRaw == null) {
-                _vehicleSnapshot.value.engineSpeedFront  // no getter — preserve last event value
-            } else {
+                _vehicleSnapshot.value.engineSpeedFront  // no getter on device — preserve
+            } else if (engineSpeedFrontRaw > 0) {
                 engineSpeedFrontRaw
-                    .takeIf { it !in BYD_RPM_SENTINELS }
-                    ?.let { if (it <= 5 && (enginePower == null || enginePower == 0)) 0 else it }
-                    ?: 0
+            } else if (directSpeedKmh < 1.0) {
+                0  // car is stopped — 0 is the correct reading
+            } else {
+                prevFront  // car is moving, SDK returned 0 spuriously — preserve last known
             }
-            val engineSpeedRear = engineSpeedRearRaw
-                ?.takeIf { it !in BYD_RPM_SENTINELS }
-                ?.let { if (it <= 5 && (enginePower == null || enginePower == 0)) 0 else it }
-                // rear getter is absent on some cars — preserve last value only when the getter
-                // itself doesn't exist (raw is null because no such method), not when it returned a sentinel.
-                ?: if (engineSpeedRearRaw == null) _vehicleSnapshot.value.engineSpeedRear else 0
+            val prevRear = _vehicleSnapshot.value.engineSpeedRear ?: 0
+            val engineSpeedRear = if (engineSpeedRearRaw == null) {
+                _vehicleSnapshot.value.engineSpeedRear  // no getter on device — preserve
+            } else if (engineSpeedRearRaw > 0) {
+                engineSpeedRearRaw
+            } else if (directSpeedKmh < 1.0) {
+                0
+            } else {
+                prevRear
+            }
             val m47 = runtimeGroupMap("m47")
             val engineCoolantTemp = invokeIntGetter(
                 device, *m47["coolant"].orEmpty().toTypedArray()
@@ -4069,10 +4071,16 @@ class BydVehicleDataSource(context: Context) {
                     "healthyIndex" to listOf("getHealthyIndex", "getBatteryHealthyIndex", "getBatteryHealthIndex"),
                 )
             )
+            // Only fall back to externalChargingPower when no primary charging power getter
+            // exists on this device. On DM-i PHEVs, getChargePower returns a sentinel (359.4)
+            // when idle but becomes 0.8 via getExternalChargingPower *after* charging ends,
+            // which would keep powerActive=true indefinitely if used as a fallback.
+            val primaryChargePowerPresent = chargingPowerValues["chargePower"] != null
+                    || chargingPowerValues["chargingPower"] != null
             val instrumentChargingPower = sequenceOf(
                 chargingPowerValues["chargingPower"],
                 chargingPowerValues["chargePower"],
-                externalChargingPower
+                if (!primaryChargePowerPresent) externalChargingPower else null
             ).firstOrNull { it != null && it.isFinite() && it in 0.1..50.0 }
             last50Km?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentLast50KmPowerConsume = it) }
             outCarTemp?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = it) }
@@ -5379,17 +5387,40 @@ class BydVehicleDataSource(context: Context) {
         // to 0 after charging completes — the session would otherwise stay "in progress"
         // until the user manually cleared charging-data in the car UI. If we've seen
         // capacity activity at some point in this session AND nothing fresh has arrived
-        // for STALE_CHARGER_WORK_STATE_TIMEOUT_MS, treat the work state as stale and
-        // force it back to 0. Doesn't affect Seal/EV cars where the BMS resets reliably —
-        // they always have fresh power or capacity activity during real charging.
-        // Use capacity activity as the stale baseline when available; fall back to when
-        // chargerWorkState was first set (covers fresh-install / no-prior-charge case where
-        // a PHEV's BMS never cleared chargerWorkState from the previous session).
-        val staleBaseline = if (lastChargingActivityElapsedMs != 0L) lastChargingActivityElapsedMs
+        // for the relevant timeout, treat the work state as stale and force it back to 0.
+        // Doesn't affect Seal/EV cars where the BMS resets reliably — they always have
+        // fresh power or capacity activity during real charging.
+        // When capacity was actually observed (lastChargingActivityElapsedMs != 0L), 2 min
+        // of silence reliably means charging has finished — use the shorter window so the
+        // icon clears promptly after a PHEV reaches 100%. The conservative 10-min window
+        // is kept for the fresh-install / no-prior-charge path (chargerWorkStateSetElapsedMs
+        // only) where we've never actually seen capacity move.
+        val hasCapacityEvidence = lastChargingActivityElapsedMs != 0L
+        // Root-cause fix for DM-i PHEVs whose BMS firmware never fires
+        // onChargerWorkStateChanged(0) when charging finishes.
+        // chargeState (from getChargeState / onChargingStateChanged) is a separate
+        // BMS signal that represents the state machine rather than the daemon work
+        // state. If it reads 0 ("idle") while chargerWorkState is still non-zero,
+        // the daemon flag is definitively stale — clear it immediately without any
+        // timeout. Guard: only apply once we've seen actual capacity activity so
+        // we don't misfire at session start before chargeState has been reported.
+        if (chargerWorking && !powerActive && !recentCapacityActivity &&
+            hasCapacityEvidence && _chargeState.value == 0) {
+            Log.i(TAG, "🔋 chargerWorkState stuck but chargeState=0 after capacity activity — clearing immediately")
+            _chargerWorkState.value = 0
+            chargerWorkStateSetElapsedMs = 0L
+            return false
+        }
+        // Fallback stale-state safety net for firmwares where chargeState also
+        // doesn't reset reliably. When capacity was observed: 2-min silence;
+        // fresh-install / no-prior-charge path: conservative 10-min.
+        val staleBaseline = if (hasCapacityEvidence) lastChargingActivityElapsedMs
                             else chargerWorkStateSetElapsedMs
+        val staleTimeoutMs = if (hasCapacityEvidence) 2 * 60_000L
+                             else STALE_CHARGER_WORK_STATE_TIMEOUT_MS
         if (chargerWorking && !powerActive && !recentCapacityActivity &&
             staleBaseline != 0L &&
-            nowElapsedMs - staleBaseline > STALE_CHARGER_WORK_STATE_TIMEOUT_MS) {
+            nowElapsedMs - staleBaseline > staleTimeoutMs) {
             Log.i(TAG, "🔋 chargerWorkState stale (${(nowElapsedMs - staleBaseline) / 60_000L}m of silence) — forcing 0")
             _chargerWorkState.value = 0
             chargerWorkStateSetElapsedMs = 0L

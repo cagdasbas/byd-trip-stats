@@ -27,6 +27,9 @@ data class ChargingSessionEntity(
     val socStart: Double,
     val socEnd: Double? = null,
 
+    val socStartPanel: Double = 0.0,
+    val socEndPanel: Double? = null,
+
     /** kWh added — computed on close, null while session is still active */
     val kwhAdded: Double? = null,
 
@@ -52,6 +55,9 @@ data class ChargingSessionEntity(
 
     val socDelta: Double?
         get() = socEnd?.let { it - socStart }
+
+    val socPanelDelta: Double?
+        get() = socEndPanel?.let { it - socStartPanel }
 }
 
 /**

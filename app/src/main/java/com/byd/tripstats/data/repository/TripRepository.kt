@@ -900,6 +900,7 @@ class TripRepository private constructor(context: Context) {
             startTime           = startTime,
             startOdometer       = startOdometer,
             startSoc            = telemetry.soc,
+            startSocPanel       = telemetry.socPanel.toDouble(),
             startTotalDischarge = telemetry.totalDischarge,
             isActive            = true,
             isManual            = isManual,
@@ -1092,6 +1093,13 @@ class TripRepository private constructor(context: Context) {
             ?: socCandidates.minOrNull()
             ?: trip.startSoc
 
+        // Panel SoC: take the last available non-zero reading (no "lowest wins" logic
+        // since panel SoC doesn't monotonically decrease on PHEVs with engine assist).
+        val resolvedEndSocPanel = listOfNotNull(
+            endTelemetry?.socPanel?.toDouble()?.takeIf { it > 0.0 },
+            endPointFallback?.socPanel?.toDouble()?.takeIf { it > 0.0 }
+        ).firstOrNull() ?: trip.startSocPanel
+
         // Time the car was off but the trip stayed open — subtracted from
         // trip.duration so avg speed / displayed duration reflect actual driving
         // time rather than driving + parked-with-trip-still-open.
@@ -1105,6 +1113,7 @@ class TripRepository private constructor(context: Context) {
                 endTime             = endTime,
                 endOdometer         = resolvedEndOdometer,
                 endSoc              = resolvedEndSoc,
+                endSocPanel         = resolvedEndSocPanel,
                 endTotalDischarge   = resolvedEndDischarge,
                 isActive            = false,
                 avgBatteryTemp      = finalAvgTemp,

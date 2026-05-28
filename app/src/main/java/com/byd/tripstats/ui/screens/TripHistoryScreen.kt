@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
@@ -56,6 +57,7 @@ fun TripHistoryScreen(
     val monthlyCosts   by viewModel.monthlyCosts.collectAsState()
     val currencySymbol by viewModel.currencySymbol.collectAsState()
     val unitSystem     by viewModel.unitSystem.collectAsState()
+    val socSource      by viewModel.socSource.collectAsState()
     val sortField     by viewModel.sortField.collectAsState()
     val sortOrder     by viewModel.sortOrder.collectAsState()
     val filterState   by viewModel.filterState.collectAsState()
@@ -238,6 +240,7 @@ fun TripHistoryScreen(
                         tripCost = metrics?.tripCost,
                         currencySymbol = currencySymbol,
                         unitSystem = unitSystem,
+                        socSource = socSource,
                         isSelected = selectedTrips.contains(trip.id),
                         selectionMode = selectionMode,
                         isActive = trip.isActive,
@@ -534,6 +537,7 @@ fun TripItem(
     tripCost: Double? = null,
     currencySymbol: String = "€",
     unitSystem: UnitSystem = UnitSystem.METRIC,
+    socSource: SocSource = SocSource.PANEL,
     isSelected: Boolean = false,
     selectionMode: Boolean = false,
     isActive: Boolean = false,
@@ -732,10 +736,16 @@ fun TripItem(
                 )
                 TripMetricChip(
                     icon = Icons.Filled.Battery4Bar,
-                    label = "SoC (BMS)",
-                    value = if (trip.endSoc != null)
-                        "${trip.startSoc.toInt()}%-> ${trip.endSoc.toInt()}%"
-                    else "—",
+                    label = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)",
+                    value = if (socSource == SocSource.PANEL) {
+                        if (trip.endSocPanel != null)
+                            "${trip.startSocPanel.toInt()}% → ${trip.endSocPanel.toInt()}%"
+                        else "—"
+                    } else {
+                        if (trip.endSoc != null)
+                            "${trip.startSoc.toInt()}% → ${trip.endSoc.toInt()}%"
+                        else "—"
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }

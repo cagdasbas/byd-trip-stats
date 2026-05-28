@@ -73,6 +73,7 @@ class ChargingRepository private constructor(context: Context) {
         val timestamp: Long,
         val tempAvg: Double,
         val voltage: Int,
+        val socPanel: Int = 0,
     )
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -223,6 +224,7 @@ class ChargingRepository private constructor(context: Context) {
         val session = ChargingSessionEntity(
             startTime        = System.currentTimeMillis(),
             socStart         = telemetry.soc,
+            socStartPanel    = telemetry.socPanel.toDouble(),
             batteryTempStart = telemetry.batteryTempAvg,
             voltageStart     = telemetry.batteryTotalVoltage,
             batteryKwh       = carConfig?.batteryKwh ?: FALLBACK_BATTERY_KWH,
@@ -265,8 +267,9 @@ class ChargingRepository private constructor(context: Context) {
         val needsSocUpdate  = telemetry.soc != activeSession?.socEnd
         if (needsPeakUpdate || needsSocUpdate) {
             val updated = activeSession!!.copy(
-                peakKw = if (needsPeakUpdate) telemetry.chargingPower else activeSession!!.peakKw,
-                socEnd = telemetry.soc
+                peakKw      = if (needsPeakUpdate) telemetry.chargingPower else activeSession!!.peakKw,
+                socEnd      = telemetry.soc,
+                socEndPanel = telemetry.socPanel.toDouble()
             )
             activeSession = updated
             sessionDao.updateSession(updated)
@@ -328,14 +331,15 @@ class ChargingRepository private constructor(context: Context) {
         }
 
         val closed = session.copy(
-            endTime = lastPoint.timestamp,
-            socEnd = lastPoint.soc,
-            kwhAdded = kwhAdded,
-            peakKw = peakKw,
-            avgKw = avgKw,
+            endTime      = lastPoint.timestamp,
+            socEnd       = lastPoint.soc,
+            socEndPanel  = lastPoint.socPanel.toDouble(),
+            kwhAdded     = kwhAdded,
+            peakKw       = peakKw,
+            avgKw        = avgKw,
             batteryTempEnd = lastPoint.batteryTempAvg,
-            voltageEnd = lastPoint.batteryTotalVoltage,
-            isActive = false
+            voltageEnd   = lastPoint.batteryTotalVoltage,
+            isActive     = false
         )
         sessionDao.updateSession(closed)
         Log.i(TAG, "Charging session ${session.id} closed — ${session.socStart}% → ${lastPoint.soc}%  ${dataPoints.size} points")
@@ -390,6 +394,8 @@ class ChargingRepository private constructor(context: Context) {
             endTime          = now,
             socStart         = lastSoc,
             socEnd           = telemetry.soc,
+            socStartPanel    = (previousShutdownState?.socPanel ?: 0).toDouble(),
+            socEndPanel      = telemetry.socPanel.toDouble(),
             kwhAdded         = kwhAdded,
             peakKw           = 0.0,   // not available — car was off
             avgKw            = 0.0,   // not available — car was off
@@ -408,10 +414,11 @@ class ChargingRepository private constructor(context: Context) {
 
     private fun persistShutdownState(telemetry: VehicleTelemetry) {
         prefs.edit()
-            .putFloat(KEY_LAST_SOC,      telemetry.soc.toFloat())
-            .putLong(KEY_LAST_TIMESTAMP, System.currentTimeMillis())
-            .putFloat(KEY_LAST_TEMP_AVG, telemetry.batteryTempAvg.toFloat())
-            .putInt(KEY_LAST_VOLTAGE,    telemetry.batteryTotalVoltage)
+            .putFloat(KEY_LAST_SOC,       telemetry.soc.toFloat())
+            .putLong(KEY_LAST_TIMESTAMP,  System.currentTimeMillis())
+            .putFloat(KEY_LAST_TEMP_AVG,  telemetry.batteryTempAvg.toFloat())
+            .putInt(KEY_LAST_VOLTAGE,     telemetry.batteryTotalVoltage)
+            .putInt(KEY_LAST_SOC_PANEL,   telemetry.socPanel)
             .commit()
     }
 
@@ -420,10 +427,11 @@ class ChargingRepository private constructor(context: Context) {
         val lastTimestamp = prefs.getLong(KEY_LAST_TIMESTAMP, -1L)
         if (lastSoc < 0 || lastTimestamp < 0) return null
         return ShutdownState(
-            soc = lastSoc,
+            soc       = lastSoc,
             timestamp = lastTimestamp,
-            tempAvg = prefs.getFloat(KEY_LAST_TEMP_AVG, 0f).toDouble(),
-            voltage = prefs.getInt(KEY_LAST_VOLTAGE, 0)
+            tempAvg   = prefs.getFloat(KEY_LAST_TEMP_AVG, 0f).toDouble(),
+            voltage   = prefs.getInt(KEY_LAST_VOLTAGE, 0),
+            socPanel  = prefs.getInt(KEY_LAST_SOC_PANEL, 0)
         )
     }
 
@@ -466,6 +474,7 @@ class ChargingRepository private constructor(context: Context) {
         private const val KEY_LAST_TIMESTAMP  = "last_timestamp"
         private const val KEY_LAST_TEMP_AVG   = "last_temp_avg"
         private const val KEY_LAST_VOLTAGE    = "last_voltage"
+        private const val KEY_LAST_SOC_PANEL  = "last_soc_panel"
 
         private const val MIN_SOC_DELTA_PCT   = 1.0
         private const val MIN_KWH_ADDED       = 0.3

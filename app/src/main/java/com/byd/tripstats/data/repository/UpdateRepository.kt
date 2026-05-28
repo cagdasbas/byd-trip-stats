@@ -141,13 +141,15 @@ class UpdateRepository private constructor(private val context: Context) {
      * Returns true if [latest] is strictly greater than [current].
      */
     private fun isNewerVersion(latest: String, current: String): Boolean {
-        fun parse(v: String) = v.split(".").map { it.toIntOrNull() ?: 0 }
+        // Strip pre-release suffix (e.g. "2.6.0-beta02" → "2.6.0") before comparing
+        fun parse(v: String) = v.substringBefore("-").split(".").map { it.toIntOrNull() ?: 0 }
         val l = parse(latest); val c = parse(current)
         for (i in 0 until maxOf(l.size, c.size)) {
             val diff = (l.getOrElse(i) { 0 }) - (c.getOrElse(i) { 0 })
             if (diff != 0) return diff > 0
         }
-        return false
+        // Same numeric version — stable (no suffix) is newer than a pre-release
+        return current.contains("-") && !latest.contains("-")
     }
 
     // ── Download ──────────────────────────────────────────────────────────────

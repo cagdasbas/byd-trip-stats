@@ -14,6 +14,7 @@ import com.byd.tripstats.data.local.entity.TripStatsEntity
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
@@ -108,6 +109,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val unitSystem: StateFlow<UnitSystem> = preferencesManager.unitSystem
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000),
             preferencesManager.getCachedUnitSystem())
+
+    val socSource: StateFlow<SocSource> = preferencesManager.socSource
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000),
+            preferencesManager.getCachedSocSource())
 
     fun saveUnitSystem(system: UnitSystem) {
         viewModelScope.launch { preferencesManager.saveUnitSystem(system) }
@@ -763,7 +768,22 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             smoothedWhPerKm = null
             energySamples.clear()
             liveSpeedBins.clear()
-            _liveSessionStartMs.value = System.currentTimeMillis()
+            // Back-date the session start to match the back-anchored odometer so
+            // avgSpeed = journeyKm / journeyTime rather than journeyKm / a-few-seconds
+            // (which produces 400+ km/h for the first minute after the app opens mid-drive).
+            // Use the car's own journey drive-time counter when available; otherwise
+            // estimate elapsed drive time from journey distance and current speed.
+            val journeyKmForBackdate = if (!freshAnchor) journeyDistanceKm(telemetry) else null
+            val backdateMs = if (journeyKmForBackdate != null && journeyKmForBackdate > 0.0) {
+                telemetry.currentJourneyDriveTime
+                    ?.takeIf { it.isFinite() && it > 0.0 }
+                    ?.let { (it * 60_000.0).toLong() }
+                    ?: run {
+                        val speedKmh = effectiveSpeed(telemetry).coerceAtLeast(1.0)
+                        ((journeyKmForBackdate / speedKmh) * 3_600_000.0).toLong()
+                    }
+            } else 0L
+            _liveSessionStartMs.value = System.currentTimeMillis() - backdateMs
             _liveOffStateMs.value = 0L
         }
         integratedSegmentDistanceKm = 0.0
@@ -1261,6 +1281,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun startManualTrip() {
         _tripDataPoints.value = emptyList()   // reset before repo broadcasts isInTrip = true
         forceFreshAnchorNextSession = true
+        // Suppress journey-counter distance immediately so live ticks between this call
+        // and restoreTripState firing don't inflate distKm with the car's journey counter.
+        suppressJourneyDistance = true
         // Pre-anchor the live-session state at the press moment so AVG / TIME / DISTANCE
         // in the trip-controls card don't briefly show enormous values during the gap
         // between this call and restoreTripState firing. Without this reset, the live
@@ -1274,6 +1297,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _liveDistanceKm.value = 0.0
         _liveSegmentDistanceKm.value = 0.0
         _liveSessionStartMs.value = System.currentTimeMillis()
+        // Also reset off-state time so elapsedMs isn't skewed by a previous trip's
+        // off-state window when the user taps Start immediately after Stop.
+        _liveOffStateMs.value = 0L
         tripRepository.requestManualStart()
     }
 

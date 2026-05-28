@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
@@ -74,6 +75,7 @@ fun TripCompareSheet(
     val displayMetrics by viewModel.tripDisplayMetrics.collectAsState()
     val compareStats    = remember(trips) { viewModel.getCompareStats(trips.map { it.id }) }
     val unitSystem     by viewModel.unitSystem.collectAsState()
+    val socSource      by viewModel.socSource.collectAsState()
 
     var selectedTab  by remember { mutableIntStateOf(0) }
     val tabs = listOf("Summary", "Charts", "Routes")
@@ -181,8 +183,8 @@ fun TripCompareSheet(
             //                weight alone is not sufficient during that pass).
             Box(modifier = Modifier.weight(1f).clipToBounds()) {
                 when (selectedTab) {
-                    0 -> CompareSummaryTab(trips, displayMetrics, compareStats, visibleTrips, unitSystem)
-                    1 -> CompareChartsTab(trips, compareData, visibleTrips, unitSystem)
+                    0 -> CompareSummaryTab(trips, displayMetrics, compareStats, visibleTrips, unitSystem, socSource)
+                    1 -> CompareChartsTab(trips, compareData, visibleTrips, unitSystem, socSource)
                     2 -> CompareRoutesTab(trips, compareStats, visibleTrips, unitSystem)
                 }
             }
@@ -198,7 +200,8 @@ private fun CompareSummaryTab(
     displayMetrics: Map<Long, DashboardViewModel.TripDisplayMetrics>,
     compareStats  : List<com.byd.tripstats.data.local.entity.TripStatsEntity>,
     visibleTrips  : Set<Int>,
-    unitSystem    : UnitSystem = UnitSystem.METRIC
+    unitSystem    : UnitSystem = UnitSystem.METRIC,
+    socSource     : SocSource  = SocSource.PANEL
 ) {
     val statsById = compareStats.associateBy { it.tripId }
 
@@ -233,8 +236,12 @@ private fun CompareSummaryTab(
         MetricRow("Avg speed",
             trips.map { displayMetrics[it.id]?.avgSpeedKmh?.let { v -> "$v ${unitSystem.speedUnit}" } ?: "—" },
             bestIndices(trips.map { displayMetrics[it.id]?.avgSpeedKmh?.toDouble() }, false)),
-        MetricRow("SoC start→end (BMS)",
-            trips.map { "${it.startSoc.toInt()}% → ${it.endSoc?.toInt() ?: "—"}%" },
+        MetricRow(
+            if (socSource == SocSource.PANEL) "SoC start→end (Panel)" else "SoC start→end (BMS)",
+            if (socSource == SocSource.PANEL)
+                trips.map { "${it.startSocPanel.toInt()}% → ${it.endSocPanel?.toInt() ?: "—"}%" }
+            else
+                trips.map { "${it.startSoc.toInt()}% → ${it.endSoc?.toInt() ?: "—"}%" },
             trips.map { false }),
         MetricRow("Regen recovered",
             trips.map { statsById[it.id]?.totalRegenEnergy?.let { v -> "%.2f kWh".format(v) } ?: "—" },
@@ -338,7 +345,8 @@ private fun CompareChartsTab(
     trips       : List<TripEntity>,
     compareData : Map<Long, List<TripDataPointEntity>>,
     visibleTrips: Set<Int>,
-    unitSystem  : UnitSystem = UnitSystem.METRIC
+    unitSystem  : UnitSystem = UnitSystem.METRIC,
+    socSource   : SocSource  = SocSource.PANEL,
 ) {
     if (trips.any { it.id !in compareData }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -353,7 +361,7 @@ private fun CompareChartsTab(
     }
 
     val normalised = trips.map { trip ->
-        normaliseTripData(compareData[trip.id] ?: emptyList())
+        normaliseTripData(compareData[trip.id] ?: emptyList(), socSource = socSource)
     }
 
     Column(
@@ -418,8 +426,9 @@ private data class NormalisedPoint(
 )
 
 private fun normaliseTripData(
-    points : List<TripDataPointEntity>,
-    buckets: Int = 100
+    points   : List<TripDataPointEntity>,
+    buckets  : Int = 100,
+    socSource: SocSource = SocSource.PANEL,
 ): List<NormalisedPoint> {
     if (points.size < 2) return emptyList()
     val startOdo  = points.first().odometer
@@ -442,7 +451,10 @@ private fun normaliseTripData(
             avgConsumption = if (consPts.isNotEmpty())
                 consPts.map { it.power / it.speed * 100.0 }.average()
             else 0.0,
-            avgSoc         = pts.map { it.soc }.average(),
+            avgSoc         = pts.map { p ->
+                if (socSource == SocSource.PANEL && p.socPanel > 0) p.socPanel.toDouble()
+                else p.soc
+            }.average(),
             avgElevation   = pts.map { it.altitude }.average()
         )
     }

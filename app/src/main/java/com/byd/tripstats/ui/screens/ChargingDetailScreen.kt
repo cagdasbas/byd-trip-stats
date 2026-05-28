@@ -30,6 +30,7 @@ import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.theme.*
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,6 +52,7 @@ private val chargingDetailJson = Json { ignoreUnknownKeys = true }
 private data class ChargingChartPoint(
     val timestamp: Long,
     val soc: Double,
+    val socPanel: Double = 0.0,
     val chargingPowerKw: Double,
     val batteryTotalVoltageV: Double,
     val batteryTempAvgC: Double,
@@ -81,6 +83,7 @@ fun ChargingDetailScreen(
     val session    by viewModel.selectedSession.collectAsState()
     val dataPoints by viewModel.selectedSessionDataPoints.collectAsState()
     val liveTelemetry by viewModel.displayTelemetry.collectAsState()
+    val socSource by viewModel.socSource.collectAsState()
     // JSON parsing per data point is expensive — do it off the main thread.
     // For a 5→100% AC session this can be 3000–6000 points; running it
     // synchronously inside remember() blocks composition and makes the
@@ -155,7 +158,7 @@ fun ChargingDetailScreen(
             val isSynthetic = session!!.peakKw == 0.0 && session!!.avgKw == 0.0
 
             when (selectedTab) {
-                0 -> ChargingOverviewTab(session!!, chartPoints, powerSummary)
+                0 -> ChargingOverviewTab(session!!, chartPoints, powerSummary, socSource)
                 1 -> if (session!!.isActive && chartPoints.size < 2) {
                     ActiveChargingPowerTab(
                         latestKw = liveTelemetry?.chargingPower?.takeIf { it > 0.1 }
@@ -163,8 +166,9 @@ fun ChargingDetailScreen(
                     )
                 } else {
                     ChargingPowerSocTab(
-                        dataPoints = chartPoints,
-                        isSynthetic = isSynthetic
+                        dataPoints  = chartPoints,
+                        isSynthetic = isSynthetic,
+                        socSource   = socSource
                     )
                 }
                 2 -> ChargingChartTab(
@@ -228,9 +232,10 @@ private fun ActiveChargingPowerTab(latestKw: Double?) {
 
 @Composable
 private fun ChargingOverviewTab(
-    session   : ChargingSessionEntity,
-    dataPoints: List<ChargingChartPoint>,
-    powerSummary: ChargingPowerSummary?
+    session     : ChargingSessionEntity,
+    dataPoints  : List<ChargingChartPoint>,
+    powerSummary: ChargingPowerSummary?,
+    socSource   : SocSource = SocSource.PANEL,
 ) {
     val dateFmt = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
     val displayPeakKw = powerSummary?.peakKw?.takeIf { it > 0.0 } ?: session.peakKw
@@ -270,10 +275,14 @@ private fun ChargingOverviewTab(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Energy", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                OverviewRow("SoC start",    "%.1f%%".format(session.socStart))
-                session.socEnd?.let {
+                val usePanelSoc = socSource == SocSource.PANEL
+                    && session.socStartPanel > 0.0
+                val displaySocStart = if (usePanelSoc) session.socStartPanel else session.socStart
+                val displaySocEnd   = if (usePanelSoc) session.socEndPanel else session.socEnd
+                OverviewRow("SoC start", "%.1f%%".format(displaySocStart))
+                displaySocEnd?.let {
                     OverviewRow("SoC end",  "%.1f%%".format(it))
-                    OverviewRow("SoC added","%.1f%%".format(it - session.socStart))
+                    OverviewRow("SoC added","%.1f%%".format(it - displaySocStart))
                 }
                 session.kwhAdded?.let {
                     OverviewRow("kWh added", "%.2f kWh".format(it), valueColor = RegenGreen)
@@ -358,8 +367,9 @@ private fun OverviewRow(
 
 @Composable
 private fun ChargingPowerSocTab(
-    dataPoints: List<ChargingChartPoint>,
-    isSynthetic: Boolean = false
+    dataPoints : List<ChargingChartPoint>,
+    isSynthetic: Boolean = false,
+    socSource  : SocSource = SocSource.PANEL,
 ) {
     if (dataPoints.size < 2) {
         ChartEmptyState(isSynthetic)
@@ -373,6 +383,9 @@ private fun ChargingPowerSocTab(
     val socColor = BatteryBlue
     var touchPos by remember { mutableStateOf<Offset?>(null) }
     var xAxisMode by remember { mutableStateOf(ChargingXAxisMode.TIME) }
+    // Use panel SoC when selected and at least one data point has a non-zero panel reading.
+    val hasPanelSoc = socSource == SocSource.PANEL && dataPoints.any { it.socPanel > 0.0 }
+    val socOf: (ChargingChartPoint) -> Double = { p -> if (hasPanelSoc) p.socPanel else p.soc }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Card(
@@ -465,7 +478,7 @@ private fun ChargingPowerSocTab(
                     val chartH = h - padT - padB
 
                     val powerValues = dataPoints.map { it.chargingPowerKw }
-                    val socValues = dataPoints.map { it.soc }
+                    val socValues = dataPoints.map { socOf(it) }
 
                     val powerMinRaw = powerValues.minOrNull() ?: 0.0
                     val powerMaxRaw = powerValues.maxOrNull()?.coerceAtLeast(powerMinRaw + 1.0) ?: 1.0
@@ -490,7 +503,7 @@ private fun ChargingPowerSocTab(
                                 if (totalMs <= 0L) padL + chartW / 2f
                                 else padL + ((point.timestamp - startMs).toDouble() / totalMs.toDouble() * chartW).toFloat()
                             ChargingXAxisMode.SOC -> {
-                                val frac = (point.soc - socXMin) / (socXMax - socXMin)
+                                val frac = (socOf(point) - socXMin) / (socXMax - socXMin)
                                 (padL + frac * chartW).toFloat()
                             }
                         }
@@ -581,7 +594,7 @@ private fun ChargingPowerSocTab(
                                         "+${mins}m"
                                     }
                                 }
-                                ChargingXAxisMode.SOC -> "%.1f%%".format(point.soc)
+                                ChargingXAxisMode.SOC -> "%.1f%%".format(socOf(point))
                             }
                             nc.drawText(label, x, h - 8f, xLabelPaint)
                             lastLabelX = x
@@ -602,9 +615,9 @@ private fun ChargingPowerSocTab(
 
                     if (xAxisMode == ChargingXAxisMode.TIME) {
                         val socPath = Path().apply {
-                            moveTo(xOf(dataPoints.first()), yOfSoc(dataPoints.first().soc))
+                            moveTo(xOf(dataPoints.first()), yOfSoc(socOf(dataPoints.first())))
                             dataPoints.drop(1).forEach { point ->
-                                lineTo(xOf(point), yOfSoc(point.soc))
+                                lineTo(xOf(point), yOfSoc(socOf(point)))
                             }
                         }
                         drawPath(
@@ -624,7 +637,7 @@ private fun ChargingPowerSocTab(
                                 }
                                 ChargingXAxisMode.SOC -> {
                                     val targetSoc = socXMin + (fraction * (socXMax - socXMin))
-                                    dataPoints.minByOrNull { kotlin.math.abs(it.soc - targetSoc) }
+                                    dataPoints.minByOrNull { kotlin.math.abs(socOf(it) - targetSoc) }
                                 }
                             }
                             if (p != null) {
@@ -642,7 +655,7 @@ private fun ChargingPowerSocTab(
                                     padT = padT,
                                     chartH = chartH,
                                     line1 = "Power: %.1f kW".format(p.chargingPowerKw),
-                                    line2 = "SoC: %.1f%%".format(p.soc),
+                                    line2 = "SoC: %.1f%%".format(socOf(p)),
                                     line3 = if (xAxisMode == ChargingXAxisMode.TIME) {
                                         "+%d:%02d  %s".format(secs / 60, secs % 60, realTime)
                                     } else {
@@ -1189,13 +1202,14 @@ private fun ChargingDataPointEntity.toBaseChartPoint(): ChargingChartPoint {
     }
 
     return ChargingChartPoint(
-        timestamp = timestamp,
-        soc = soc,
-        chargingPowerKw = effectiveChargingPower,
+        timestamp            = timestamp,
+        soc                  = soc,
+        socPanel             = socPanel.toDouble(),
+        chargingPowerKw      = effectiveChargingPower,
         batteryTotalVoltageV = effectiveVoltage,
-        batteryTempAvgC = effectiveTempAvg,
-        batteryCellTempMinC = effectiveCellTempMin,
-        batteryCellTempMaxC = effectiveCellTempMax
+        batteryTempAvgC      = effectiveTempAvg,
+        batteryCellTempMinC  = effectiveCellTempMin,
+        batteryCellTempMaxC  = effectiveCellTempMax
     )
 }
 

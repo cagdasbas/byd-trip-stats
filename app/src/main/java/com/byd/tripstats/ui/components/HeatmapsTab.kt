@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.config.Drivetrain
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.isImperial
 import com.byd.tripstats.ui.components.drawCrosshair
 import kotlin.math.abs
@@ -65,6 +66,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
     val car = selectedCar ?: return
     val unitSystem by prefs.unitSystem.collectAsState(initial = prefs.getCachedUnitSystem())
     val useImperial = unitSystem.isImperial
+    val socSource by prefs.socSource.collectAsState(initial = prefs.getCachedSocSource())
     var selectedDriveMode by remember { mutableStateOf(DriveModeFilter.ALL) }
     var selectedRegenMode by remember { mutableStateOf(RegenModeFilter.ALL) }
     val filteredDataPoints = remember(dataPoints, selectedDriveMode, selectedRegenMode) {
@@ -167,7 +169,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "SOC vs Consumption",
             subtitle = "Whether efficiency changes at low or high charge states"
         ) {
-            SocVsConsumptionHeatmap(filteredDataPoints, useImperial, Modifier.fillMaxSize())
+            SocVsConsumptionHeatmap(filteredDataPoints, useImperial, socSource, Modifier.fillMaxSize())
         }
 
         // 8. Time of Day vs Speed — traffic pattern map
@@ -209,7 +211,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "SOC vs Regen Efficiency",
             subtitle = "Where BMS throttles regenerative braking — expected near 100% SoC"
         ) {
-            SocVsRegenHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            SocVsRegenHeatmap(filteredDataPoints, socSource, Modifier.fillMaxSize())
         }
 
         // 13. Speed vs Battery Temperature
@@ -225,7 +227,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
             title    = "Cell Voltage Spread vs SOC",
             subtitle = "Flat = healthy pack · Divergence spike at low SoC = weak cell"
         ) {
-            CellVoltageSpreadVsSocHeatmap(filteredDataPoints, Modifier.fillMaxSize())
+            CellVoltageSpreadVsSocHeatmap(filteredDataPoints, socSource, Modifier.fillMaxSize())
         }
     }
 }
@@ -698,9 +700,10 @@ private fun AccelerationVsSpeedHeatmap(
 
 @Composable
 private fun SocVsConsumptionHeatmap(
-    dataPoints: List<TripDataPointEntity>,
+    dataPoints : List<TripDataPointEntity>,
     useImperial: Boolean = false,
-    modifier: Modifier = Modifier
+    socSource  : SocSource = SocSource.PANEL,
+    modifier   : Modifier = Modifier
 ) {
     val cf    = if (useImperial) 1f / KM_TO_MI else 1f
     val xBins = 20; val yBins = 16
@@ -709,13 +712,14 @@ private fun SocVsConsumptionHeatmap(
 
     // Only count forward-drive samples (speed > 10, positive power) to avoid
     // regen and idle noise skewing the distribution
-    val consPoints = remember(dataPoints, useImperial) {
+    val consPoints = remember(dataPoints, useImperial, socSource) {
         dataPoints.mapNotNull { p ->
             val spd = p.speed.toFloat().takeIf { it > 10f } ?: return@mapNotNull null
             val pwr = p.power.toFloat().takeIf { it > 0f } ?: return@mapNotNull null
             val cons = (pwr / spd * 100f) * cf
             if (cons > yMax) return@mapNotNull null
-            p.soc.toFloat() to cons
+            val soc = if (socSource == SocSource.PANEL && p.socPanel > 0) p.socPanel.toFloat() else p.soc.toFloat()
+            soc to cons
         }
     }
 
@@ -958,17 +962,19 @@ private fun TyrePressureVsConsumptionHeatmap(
 @Composable
 private fun SocVsRegenHeatmap(
     dataPoints: List<TripDataPointEntity>,
-    modifier: Modifier = Modifier
+    socSource : SocSource = SocSource.PANEL,
+    modifier  : Modifier = Modifier
 ) {
     val xBins = 20; val yBins = 14
     val xMin  =  0f; val xMax = 100f  // SoC %
     val yMin  =  0f; val yMax = 100f  // kW regen magnitude
 
     // Only regen samples (negative enginePower below -1 kW threshold)
-    val points = remember(dataPoints) {
+    val points = remember(dataPoints, socSource) {
         dataPoints.mapNotNull { p ->
             val pwr = p.power.toFloat().takeIf { it < -1f } ?: return@mapNotNull null
-            p.soc.toFloat() to kotlin.math.abs(pwr)
+            val soc = if (socSource == SocSource.PANEL && p.socPanel > 0) p.socPanel.toFloat() else p.soc.toFloat()
+            soc to kotlin.math.abs(pwr)
         }
     }
 
@@ -1045,19 +1051,21 @@ private fun SpeedVsBatteryTempHeatmap(
 @Composable
 private fun CellVoltageSpreadVsSocHeatmap(
     dataPoints: List<TripDataPointEntity>,
-    modifier: Modifier = Modifier
+    socSource : SocSource = SocSource.PANEL,
+    modifier  : Modifier = Modifier
 ) {
     val xBins = 20; val yBins = 16
     val xMin  =  0f;    val xMax = 100f   // SoC %
     val yMin  =  0f;    val yMax =   0.1f // V spread — healthy pack < 20 mV, weak cell up to ~100 mV
 
-    val points = remember(dataPoints) {
+    val points = remember(dataPoints, socSource) {
         dataPoints.mapNotNull { p ->
             val vMax = p.batteryCellVoltageMax.toFloat()
             val vMin = p.batteryCellVoltageMin.toFloat()
             if (vMax == 0f && vMin == 0f) return@mapNotNull null
             val spread = (vMax - vMin).coerceAtLeast(0f)
-            p.soc.toFloat() to spread
+            val soc = if (socSource == SocSource.PANEL && p.socPanel > 0) p.socPanel.toFloat() else p.soc.toFloat()
+            soc to spread
         }
     }
 

@@ -24,6 +24,8 @@ data class TripEntity(
     val endOdometer: Double? = null,
     val startSoc: Double,
     val endSoc: Double? = null,
+    val startSocPanel: Double = 0.0,
+    val endSocPanel: Double? = null,
     val startTotalDischarge: Double,
     val endTotalDischarge: Double? = null,
     val isActive: Boolean = true,
@@ -65,6 +67,9 @@ data class TripEntity(
 
     val socDelta: Double?
         get() = endSoc?.let { it - startSoc }
+
+    val socPanelDelta: Double?
+        get() = endSocPanel?.let { it - startSocPanel }
 
     val efficiency: Double?
         get() {

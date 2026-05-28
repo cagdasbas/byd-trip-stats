@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
+import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
@@ -38,10 +39,11 @@ import kotlin.math.abs
  */
 @Composable
 fun RouteAnalysisTab(
-    trip: TripEntity? = null,
-    dataPoints: List<TripDataPointEntity>,
+    trip       : TripEntity? = null,
+    dataPoints : List<TripDataPointEntity>,
     useImperial: Boolean = false,
-    modifier: Modifier = Modifier
+    socSource  : SocSource = SocSource.PANEL,
+    modifier   : Modifier = Modifier
 ) {
     if (dataPoints.isEmpty()) {
         Box(
@@ -68,8 +70,8 @@ fun RouteAnalysisTab(
             trip = trip,
             useImperial = useImperial
         )
-        WaypointsCard(dataPoints)
-        RouteSegmentsCard(dataPoints, useImperial)
+        WaypointsCard(dataPoints, socSource)
+        RouteSegmentsCard(dataPoints, useImperial, socSource)
         EnergyHeatmapCard(dataPoints)
         TripTimelineCard(dataPoints)
     }
@@ -471,7 +473,7 @@ private fun compareRegenModes(summaries: List<ModeSummary>): String? {
 // ── Waypoints ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun WaypointsCard(dataPoints: List<TripDataPointEntity>) {
+private fun WaypointsCard(dataPoints: List<TripDataPointEntity>, socSource: SocSource = SocSource.PANEL) {
     val startPoint = dataPoints.first()
     val endPoint   = dataPoints.last()
 
@@ -490,7 +492,10 @@ private fun WaypointsCard(dataPoints: List<TripDataPointEntity>) {
                 icon    = Icons.Filled.FlagCircle,
                 label   = "Start",
                 time    = fmt(startPoint.timestamp),
-                soc     = "${"%.1f".format(startPoint.soc)}%",
+                soc     = "${"%.1f".format(
+                    if (socSource == SocSource.PANEL && startPoint.socPanel > 0) startPoint.socPanel.toDouble()
+                    else startPoint.soc
+                )}%",
                 color   = RegenGreen
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -498,7 +503,10 @@ private fun WaypointsCard(dataPoints: List<TripDataPointEntity>) {
                 icon    = Icons.Filled.LocationOn,
                 label   = "End",
                 time    = fmt(endPoint.timestamp),
-                soc     = "${"%.1f".format(endPoint.soc)}%",
+                soc     = "${"%.1f".format(
+                    if (socSource == SocSource.PANEL && endPoint.socPanel > 0) endPoint.socPanel.toDouble()
+                    else endPoint.soc
+                )}%",
                 color   = BydErrorRed
             )
         }
@@ -529,7 +537,7 @@ private fun WaypointItem(
 // ── Route Segments ────────────────────────────────────────────────────────────
 
 @Composable
-private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>, useImperial: Boolean = false) {
+private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>, useImperial: Boolean = false, socSource: SocSource = SocSource.PANEL) {
     val segmentSize = (dataPoints.size / 5).coerceAtLeast(1)
     val segments    = dataPoints.chunked(segmentSize).take(5)
     val speedFactor = if (useImperial) 0.621371 else 1.0
@@ -550,7 +558,10 @@ private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>, useImperial
             segments.forEachIndexed { index, segment ->
                 val avgSpeed  = segment.map { it.speed }.average()
                 val avgPower  = segment.map { it.power }.average()
-                val socChange = segment.first().soc - segment.last().soc
+                val socOf: (TripDataPointEntity) -> Double = { p ->
+                    if (socSource == SocSource.PANEL && p.socPanel > 0) p.socPanel.toDouble() else p.soc
+                }
+                val socChange = socOf(segment.first()) - socOf(segment.last())
                 val startTime = fmt(segment.first().timestamp)
                 val endTime   = fmt(segment.last().timestamp)
 
