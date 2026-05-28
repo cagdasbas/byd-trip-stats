@@ -8,6 +8,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PowerManager
 import android.util.Log
+import com.byd.tripstats.data.preferences.OffStateMode
+import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.util.DiagLog
 import com.byd.tripstats.util.McuWakeHelper
@@ -45,6 +47,14 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
         val iteration = intent.getIntExtra(EXTRA_ITERATION, 0)
         val appContext = context.applicationContext
         DiagLog.event(appContext, TAG, "fired iteration=$iteration data=${intent.data}")
+
+        // Safety net: if the user switched to deep sleep mode after this alarm was
+        // already scheduled, cancel the chain and exit without doing any work.
+        if (PreferencesManager(appContext).getCachedOffStateMode() == OffStateMode.DEEP_SLEEP) {
+            DiagLog.event(appContext, TAG, "deep sleep mode — cancelling chain and returning")
+            cancel(appContext)
+            return
+        }
 
         // Acquire a partial wake lock for the duration of the async work.
         // AlarmManager.RTC_WAKEUP holds a wake lock only until onReceive()

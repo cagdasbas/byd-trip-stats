@@ -109,6 +109,7 @@ fun DashboardScreen(
     val liveSessionStartMs by viewModel.liveSessionStartMs.collectAsState()
     val liveOffStateMs by viewModel.liveOffStateMs.collectAsState()
     val liveAccumulatedKwh by viewModel.liveAccumulatedKwh.collectAsState()
+    val activeRangeModel by viewModel.activeRangeModel.collectAsState()
     val weeklyEfficiency by viewModel.weeklyEfficiency.collectAsState()
     val monthlyEfficiency by viewModel.monthlyEfficiency.collectAsState()
     val yearlyEfficiency by viewModel.yearlyEfficiency.collectAsState()
@@ -295,6 +296,7 @@ fun DashboardScreen(
                 liveSessionStartMs = liveSessionStartMs,
                 liveOffStateMs = liveOffStateMs,
                 liveAccumulatedKwh = liveAccumulatedKwh,
+                activeRangeModel = activeRangeModel,
                 modifier = Modifier.padding(paddingValues)
             )
         }
@@ -422,6 +424,7 @@ fun DashboardContent(
     liveSessionStartMs: Long? = null,
     liveOffStateMs: Long = 0L,
     liveAccumulatedKwh: Double = 0.0,
+    activeRangeModel: DashboardViewModel.RangeModel = DashboardViewModel.RangeModel.BASELINE,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context.applicationContext) }
@@ -471,6 +474,7 @@ fun DashboardContent(
                     onConsumptionClose = onConsumptionClose,
                     dashboardIconsEnabled = dashboardIconsEnabled,
                     socSource = socSource,
+                    activeRangeModel = activeRangeModel,
                     onNavigateToCharging = onNavigateToCharging,
                     onShowTyreDialog = onShowTyreDialog,
                     tyreUnit = tyreUnit,
@@ -527,6 +531,7 @@ fun DashboardContent(
                         onConsumptionClose = onConsumptionClose,
                         dashboardIconsEnabled = dashboardIconsEnabled,
                         socSource = socSource,
+                        activeRangeModel = activeRangeModel,
                         onNavigateToCharging = onNavigateToCharging,
                         onShowTyreDialog = onShowTyreDialog,
                         tyreUnit = tyreUnit,
@@ -604,6 +609,7 @@ fun DashboardContent(
                         onConsumptionClose = onConsumptionClose,
                         dashboardIconsEnabled = dashboardIconsEnabled,
                         socSource = socSource,
+                        activeRangeModel = activeRangeModel,
                         onNavigateToCharging = onNavigateToCharging,
                         onShowTyreDialog = onShowTyreDialog,
                         tyreUnit = tyreUnit,
@@ -711,6 +717,7 @@ fun EnergyFlowDiagram(
     onConsumptionClose: () -> Unit = {},
     dashboardIconsEnabled: Boolean = true,
     socSource: SocSource = SocSource.PANEL,
+    activeRangeModel: DashboardViewModel.RangeModel = DashboardViewModel.RangeModel.BASELINE,
     onNavigateToCharging: () -> Unit = {},
     onShowTyreDialog: () -> Unit = {},
     tyreUnit: TyrePressureUnit = TyrePressureUnit.BAR,
@@ -901,6 +908,7 @@ fun EnergyFlowDiagram(
                 ) {
                     RangeProjectionChart(
                         dataPoints = tripDataPoints,
+                        activeRangeModel = activeRangeModel,
                         liveSoc = if (socSource == SocSource.PANEL) telemetry.socPanel.toDouble() else telemetry.soc,
                         liveElectricRangeKm = telemetry.electricDrivingRangeKm,
                         useImperial = unitSystem.isImperial,

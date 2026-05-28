@@ -64,6 +64,7 @@ import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.preferences.DEFAULT_CAR_OFF_TIMEOUT_MINUTES
 import com.byd.tripstats.data.preferences.DEFAULT_MIN_TRIP_DISTANCE_KM
 import com.byd.tripstats.data.preferences.PreferencesManager
+import com.byd.tripstats.data.preferences.OffStateMode
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.ThemeMode
 import com.byd.tripstats.data.preferences.UnitSystem
@@ -1141,7 +1142,9 @@ private fun AppPreferencesTab(
     onNavigateToTripGoals: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val keepServiceAliveWhenOff by preferencesManager.keepServiceAliveWhenOff.collectAsState(initial = true)
+    val offStateMode by preferencesManager.offStateMode.collectAsState(
+        initial = preferencesManager.getCachedOffStateMode()
+    )
     val dashboardIconsEnabled by preferencesManager.dashboardAnimationsEnabled.collectAsState(
         initial = preferencesManager.getCachedAnimationsEnabled()
     )
@@ -1366,61 +1369,58 @@ private fun AppPreferencesTab(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            "Keep service alive when car is off",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "When enabled, the telemetry service keeps running after the car is parked instead of self-stopping. " +
-                                "Gives you continuous 12V/SoC samples in the battery history chart and keeps ADB-over-WiFi reachable without remote-waking the car.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = keepServiceAliveWhenOff,
-                        onCheckedChange = { enabled ->
-                            scope.launch {
-                                preferencesManager.saveKeepServiceAliveWhenOff(enabled)
-                            }
-                        },
-                        thumbContent = if (!keepServiceAliveWhenOff) {
-                            {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .background(ToggleUncheckedTrack, CircleShape)
-                                )
-                            }
-                        } else null,
-                        colors = SwitchDefaults.colors(
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = ToggleUncheckedTrack,
-                            uncheckedBorderColor = ToggleUncheckedTrack
-                        )
-                    )
-                }
-
                 Text(
-                    if (keepServiceAliveWhenOff) {
-                        "Enabled: service runs 24/7. Small additional load on top of the BYD stock background drain, which is the dominant factor anyway."
-                    } else {
-                        "Disabled: service self-stops after 5 min of car-off, then a 90 min keepalive briefly wakes it for a snapshot. Lower drain at the cost of sparse off-state samples and no always-on ADB."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
+                    "Background activity when car is off",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Controls whether the telemetry service keeps running after the car is parked.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        OffStateMode.ENABLED    to "Always On",
+                        OffStateMode.DISABLED   to "Minimal",
+                        OffStateMode.DEEP_SLEEP to "Deep Sleep",
+                    ).forEach { (mode, label) ->
+                        Button(
+                            onClick = { scope.launch { preferencesManager.saveOffStateMode(mode) } },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (offStateMode == mode)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (offStateMode == mode)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            Text(label, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                listOf(
+                    OffStateMode.ENABLED    to "Always On: service runs 24/7. Continuous 12V/SoC samples in battery history and ADB-over-WiFi stays reachable. Small additional load on top of BYD's own stock background drain.",
+                    OffStateMode.DISABLED   to "Minimal: service self-stops 5 min after the car turns off, then a 90-min alarm briefly wakes it for a charging snapshot. Lower drain at the cost of sparse off-state samples and no always-on ADB.",
+                    OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep. Trips resume automatically when you start the engine.",
+                ).forEach { (mode, description) ->
+                    Text(
+                        description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (offStateMode == mode)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (offStateMode == mode) FontWeight.Medium else FontWeight.Normal,
+                    )
+                }
             }
         }
 

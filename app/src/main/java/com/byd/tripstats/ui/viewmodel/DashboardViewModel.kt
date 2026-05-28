@@ -774,10 +774,28 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             // Use the car's own journey drive-time counter when available; otherwise
             // estimate elapsed drive time from journey distance and current speed.
             val journeyKmForBackdate = if (!freshAnchor) journeyDistanceKm(telemetry) else null
-            val backdateMs = if (journeyKmForBackdate != null && journeyKmForBackdate > 0.0) {
-                telemetry.currentJourneyDriveTime
-                    ?.takeIf { it.isFinite() && it > 0.0 }
-                    ?.let { (it * 60_000.0).toLong() }
+            val rawJourneyTimeMs = journeyKmForBackdate
+                ?.takeIf { it > 0.0 }
+                ?.let {
+                    telemetry.currentJourneyDriveTime
+                        ?.takeIf { t -> t.isFinite() && t > 0.0 }
+                        ?.let { t -> (t * 60_000.0).toLong() }
+                }
+            // Guard: on some firmwares the journey mileage counter resets slower than the
+            // journey time counter. At the start of a new trip the mileage still shows the
+            // previous journey's total while the time has just reset to near-zero, producing
+            // an implied average speed that is physically impossible (> 200 km/h). When this
+            // happens, treat both counters as stale: reset the odometer anchor to the current
+            // position so distance starts at 0, and start the clock from now.
+            val journeyCountersStale = journeyKmForBackdate != null
+                && rawJourneyTimeMs != null && rawJourneyTimeMs > 0L
+                && journeyKmForBackdate / (rawJourneyTimeMs / 3_600_000.0) > 200.0
+            if (journeyCountersStale) {
+                liveSessionStartOdometer = telemetry.odometer
+                segmentStartOdometer = telemetry.odometer
+            }
+            val backdateMs = if (!journeyCountersStale && journeyKmForBackdate != null && journeyKmForBackdate > 0.0) {
+                rawJourneyTimeMs
                     ?: run {
                         val speedKmh = effectiveSpeed(telemetry).coerceAtLeast(1.0)
                         ((journeyKmForBackdate / speedKmh) * 3_600_000.0).toLong()

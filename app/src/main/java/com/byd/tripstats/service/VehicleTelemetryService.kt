@@ -35,6 +35,7 @@ import com.byd.tripstats.MainActivity
 import com.byd.tripstats.R
 import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.model.VehicleTelemetry
+import com.byd.tripstats.data.preferences.OffStateMode
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
@@ -479,50 +480,53 @@ class VehicleTelemetryService : Service() {
                                             "chargingPower=${telemetry.chargingPower}) — treating as off")
                                 }
                             } else if (SystemClock.elapsedRealtime() - carOffSinceMs >= 5 * 60 * 1000L) {
-                                val keepAlive = PreferencesManager(applicationContext)
-                                    .getCachedKeepServiceAliveWhenOff()
-                                if (keepAlive) {
-                                    if (!loggedKeepAliveSkip) {
+                                val offStateMode = PreferencesManager(applicationContext)
+                                    .getCachedOffStateMode()
+                                when (offStateMode) {
+                                    OffStateMode.ENABLED -> {
+                                        if (!loggedKeepAliveSkip) {
+                                            DiagLog.event(
+                                                applicationContext, TAG,
+                                                "self-stop skipped — offStateMode=ENABLED (continuous-sampling mode)",
+                                            )
+                                            loggedKeepAliveSkip = true
+                                        }
+                                        // Fall through to next loop iteration without stopping.
+                                    }
+                                    OffStateMode.DISABLED -> {
                                         DiagLog.event(
                                             applicationContext, TAG,
-                                            "self-stop skipped — keepServiceAliveWhenOff=true (continuous-sampling mode)",
+                                            "self-stop: car off + not charging for 5 min — arming 90-min keepalive and stopping",
                                         )
-                                        loggedKeepAliveSkip = true
+                                        ServiceIdleState.setStayingIdle(applicationContext, true)
+                                        ServiceWatchdogWorker.cancel(applicationContext)
+                                        ServiceRestarterJobService.cancelPeriodic(applicationContext)
+                                        // Defensive arm — BootReceiver on ACC_OFF may not fire reliably
+                                        // (remote-off, sleep timeout). Upsert-safe.
+                                        OffStateKeepaliveReceiver.schedule(
+                                            applicationContext,
+                                            iteration = 0,
+                                            source = "service-self-stop",
+                                        )
+                                        intentionalStop = true
+                                        stopSelf()
+                                        return@launch
                                     }
-                                    // Fall through to next loop iteration without stopping.
-                                    // The 5-min timer stays armed; an off→on transition resets it.
-                                } else {
-                                DiagLog.event(
-                                    applicationContext, TAG,
-                                    "self-stop: car off + not charging for 5 min — arming keepalive and stopping",
-                                )
-                                // Set the off-state idle flag and tear down all
-                                // periodic restart sources before stopping.
-                                // Without this, ServiceWatchdogWorker (15-min)
-                                // and ServiceRestarterJobService periodic
-                                // (15-min) re-start the service on their next
-                                // tick — burning the 12V battery overnight.
-                                ServiceIdleState.setStayingIdle(applicationContext, true)
-                                ServiceWatchdogWorker.cancel(applicationContext)
-                                ServiceRestarterJobService.cancelPeriodic(applicationContext)
-                                // Defensive: arm the off-state keepalive chain HERE,
-                                // not just from BootReceiver on ACC_OFF. The DiLink
-                                // firmware does not reliably broadcast ACC_OFF on
-                                // every car-off transition (e.g. remote-off, sleep
-                                // timeout). Scheduling at the moment we observe
-                                // carOff+notCharging from telemetry guarantees the
-                                // chain is armed regardless of which broadcast did
-                                // or didn't fire. setExactAndAllowWhileIdle is
-                                // upsert-safe, so this is a no-op if BootReceiver
-                                // already scheduled it.
-                                OffStateKeepaliveReceiver.schedule(
-                                    applicationContext,
-                                    iteration = 0,
-                                    source = "service-self-stop",
-                                )
-                                intentionalStop = true
-                                stopSelf()
-                                return@launch
+                                    OffStateMode.DEEP_SLEEP -> {
+                                        DiagLog.event(
+                                            applicationContext, TAG,
+                                            "self-stop: car off + not charging for 5 min — deep sleep mode, no keepalive scheduled",
+                                        )
+                                        ServiceIdleState.setStayingIdle(applicationContext, true)
+                                        ServiceWatchdogWorker.cancel(applicationContext)
+                                        ServiceRestarterJobService.cancelPeriodic(applicationContext)
+                                        // Explicitly cancel any previously scheduled keepalive chain
+                                        // (e.g. from a prior mode switch or BootReceiver).
+                                        OffStateKeepaliveReceiver.cancel(applicationContext)
+                                        intentionalStop = true
+                                        stopSelf()
+                                        return@launch
+                                    }
                                 }
                             }
                         } else {

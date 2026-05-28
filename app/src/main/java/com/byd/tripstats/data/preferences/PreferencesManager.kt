@@ -27,6 +27,7 @@ private val SELECTED_CAR_ID             = stringPreferencesKey("selected_car_id"
 private val LAST_SEEN_VERSION_CODE       = intPreferencesKey("last_seen_version_code")
 private val DASHBOARD_ANIMATIONS_ENABLED = booleanPreferencesKey("dashboard_animations_enabled")
 private val KEEP_SERVICE_ALIVE_WHEN_OFF  = booleanPreferencesKey("keep_service_alive_when_off")
+private val OFF_STATE_MODE               = stringPreferencesKey("off_state_mode")
 private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_price_per_kwh")
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
 private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms")
@@ -108,6 +109,33 @@ class PreferencesManager(private val context: Context) {
     suspend fun saveKeepServiceAliveWhenOff(enabled: Boolean) {
         context.dataStore.edit { it[KEEP_SERVICE_ALIVE_WHEN_OFF] = enabled }
         cache.edit().putBoolean("keep_service_alive_when_off", enabled).apply()
+    }
+
+    // ── Off-state mode ────────────────────────────────────────────────────────
+    // Three-way enum replacing the old boolean keepServiceAliveWhenOff:
+    //   ENABLED    — service runs 24/7 (old true)
+    //   DISABLED   — service stops after 5 min, 90-min wakeup for snapshots (old false)
+    //   DEEP_SLEEP — service stops after 5 min, no wakeups, car can fully deep sleep
+    // Backward compat: if OFF_STATE_MODE is unset, falls back to old boolean key.
+
+    val offStateMode: Flow<OffStateMode> = context.dataStore.data
+        .map { prefs ->
+            prefs[OFF_STATE_MODE]
+                ?.let { runCatching { OffStateMode.valueOf(it) }.getOrNull() }
+                ?: if (prefs[KEEP_SERVICE_ALIVE_WHEN_OFF] == false) OffStateMode.DISABLED
+                   else OffStateMode.ENABLED
+        }
+        .onEach { cache.edit().putString("off_state_mode", it.name).apply() }
+
+    fun getCachedOffStateMode(): OffStateMode =
+        cache.getString("off_state_mode", null)
+            ?.let { runCatching { OffStateMode.valueOf(it) }.getOrNull() }
+            ?: if (!getCachedKeepServiceAliveWhenOff()) OffStateMode.DISABLED
+               else OffStateMode.ENABLED
+
+    suspend fun saveOffStateMode(mode: OffStateMode) {
+        context.dataStore.edit { it[OFF_STATE_MODE] = mode.name }
+        cache.edit().putString("off_state_mode", mode.name).apply()
     }
 
     // ── Electricity cost ──────────────────────────────────────────────────────

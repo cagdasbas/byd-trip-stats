@@ -13,6 +13,8 @@ import com.byd.tripstats.util.RtInProcessPatches
 import com.byd.tripstats.util.RtShellPatches
 import com.byd.tripstats.util.ServiceIdleState
 import com.byd.tripstats.worker.ServiceWatchdogWorker
+import com.byd.tripstats.data.preferences.OffStateMode
+import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.receiver.OffStateKeepaliveReceiver
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CoroutineScope
@@ -101,6 +103,7 @@ class BootReceiver : BroadcastReceiver() {
                 action == Intent.ACTION_POWER_DISCONNECTED
             if (isOffEvent) {
                 if (action == "com.byd.action.ACC_OFF" || action == "com.byd.accmode.ACC_MODE_CHANGED") {
+                    val offStateMode = PreferencesManager(appContext).getCachedOffStateMode()
                     val pending = goAsync()
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
@@ -114,8 +117,12 @@ class BootReceiver : BroadcastReceiver() {
                             pending.finish()
                         }
                     }
-                    // Off-state keepalive chain — survives process death
-                    OffStateKeepaliveReceiver.schedule(appContext, iteration = 0, source = "boot:$action")
+                    // Off-state keepalive chain — only arm when not in deep sleep mode
+                    if (offStateMode != OffStateMode.DEEP_SLEEP) {
+                        OffStateKeepaliveReceiver.schedule(appContext, iteration = 0, source = "boot:$action")
+                    } else {
+                        DiagLog.event(appContext, TAG, "deep sleep mode — skipping keepalive schedule on $action")
+                    }
                 }
                 DiagLog.event(appContext, TAG, "off-event $action — skipping service start and restart re-arm")
                 return
