@@ -79,6 +79,9 @@ private const val SPEED_EVENT_FRESHNESS_MS = 3_000L
 // can't drive the speedometer or poison the learned event→km/h scale. In-range spikes that
 // slip under this ceiling are caught per-sample by the Max-Speed guard in TripRepository.
 private const val MAX_PLAUSIBLE_SPEED_KMH = 250.0
+// Minimum GPS speed (km/h) treated as clear motion when bridging a wedged/zero speed getter.
+// Above typical standstill GPS jitter so a parked car still reads 0.
+private const val GPS_BRIDGE_MIN_KMH = 2.0
 private const val DRIVE_MODE_UNKNOWN = 0
 
 private enum class InstrumentTyrePressureEncoding {
@@ -758,6 +761,11 @@ class BydVehicleDataSource(context: Context) {
     // committed once independent motion signals (power / GPS) also agree the car is
     // stopped, or after a short grace window with no such signal.
     private var lastPositiveSpeedElapsedMs = 0L
+    // Last time the POLLED getter (getCurrentSpeed) returned a fresh, plausible
+    // non-zero reading. Distinct from lastPositiveSpeedElapsedMs (which the event
+    // stream also bumps). The event stream is only allowed to drive speed once the
+    // getter goes stale by this clock, so a healthy getter is always authoritative.
+    @Volatile private var lastGetterPositiveElapsedMs = 0L
     // Throttle for persisting the speed-stall diagnostic to DiagLog.
     private var lastSpeedStallDiagMs = 0L
     // Live speed from the Speed device's EVENT stream. The polled getCurrentSpeed getter
@@ -767,6 +775,10 @@ class BydVehicleDataSource(context: Context) {
     @Volatile private var lastSpeedEventRaw: Double? = null
     @Volatile private var lastSpeedEventElapsedMs: Long = 0L
     @Volatile private var speedEventScale: Double? = null
+    // Last time the Speed device's TYPED speed push (onCurrentSpeedChanged) delivered a
+    // value. This push survives getCurrentSpeed() wedging at 0 after a mid-session process
+    // restart, so when it is fresh it is authoritative over both the poll and the GPS bridge.
+    @Volatile private var lastSpeedPushElapsedMs: Long = 0L
     private var lastSpeedEventDiagMs = 0L
     // Name of the device-refresh stage currently running. If a getter hangs, this is
     // left pointing at it so the wedge guard can name the culprit. Read from the service.
@@ -1706,6 +1718,7 @@ class BydVehicleDataSource(context: Context) {
         statisticDevice = null
         speedDevice = null
         lastPositiveSpeedElapsedMs = 0L
+        lastGetterPositiveElapsedMs = 0L
         lightDevice = null
         powerDevice = null
         sensorDevice = null
@@ -1826,6 +1839,35 @@ class BydVehicleDataSource(context: Context) {
         }
     }
 
+    /**
+     * Force the BYD device's internal `mContext` to our live, permission-bypassing context.
+     *
+     * `getInstance(ctx)` returns a process/system SINGLETON. If that singleton was first
+     * created elsewhere (the system, another BYD app, or a prior process of ours) its
+     * `mContext` is stale/null — and the value getters (getCurrentSpeed, getEnginePower, the
+     * RPM getters, …) then return a frozen 0 over IPC while the event stream still flows. This
+     * is the "speed/motor stuck at 0 after a mid-session (re)start, only fixed by an ECU
+     * power-cycle" wedge. Overwriting `mContext` with a fresh context fixes it without a
+     * power-cycle — this is exactly what the Overdrive reference app does (ensureDeviceContext).
+     */
+    private fun ensureDeviceContext(device: Any?) {
+        if (device == null) return
+        try {
+            var cls: Class<*>? = device.javaClass
+            while (cls != null && cls != Any::class.java) {
+                val field = try { cls.getDeclaredField("mContext") } catch (_: NoSuchFieldException) { null }
+                if (field != null) {
+                    field.isAccessible = true
+                    if (runCatching { field.get(device) }.getOrNull() !== ctx) {
+                        runCatching { field.set(device, ctx) }
+                    }
+                    return
+                }
+                cls = cls.superclass
+            }
+        } catch (_: Throwable) { }
+    }
+
     private fun tryDynamicDevice(
         label: String,
         className: String,
@@ -1837,6 +1879,9 @@ class BydVehicleDataSource(context: Context) {
             val deviceClass = Class.forName(className)
             val getInstance = deviceClass.getMethod("getInstance", Context::class.java)
             val device = getInstance.invoke(null, ctx) ?: return
+            // getInstance may hand back a singleton with a stale/null mContext — repair it so
+            // the value getters return live data (not a frozen 0) after a mid-session restart.
+            ensureDeviceContext(device)
 
             if (listenerInterfaceName != null && onEvent != null) {
                 val listenerInterface = Class.forName(listenerInterfaceName)
@@ -1879,6 +1924,7 @@ class BydVehicleDataSource(context: Context) {
                 val deviceClass = Class.forName(className)
                 val getInstance = deviceClass.getMethod("getInstance", Context::class.java)
                 val device = getInstance.invoke(null, ctx) ?: return@forEach
+                ensureDeviceContext(device)
 
                 if (listenerInterfaceName != null && onEvent != null) {
                     val listenerInterface = Class.forName(listenerInterfaceName)
@@ -3296,6 +3342,10 @@ class BydVehicleDataSource(context: Context) {
             val brake = m25.getOrNull(2)?.let { invokeIntGetter(device, it) }
             speed?.let { newSpeed ->
                 val snap = _vehicleSnapshot.value
+                // A fresh typed speed push (onCurrentSpeedChanged) is authoritative — it keeps
+                // delivering real speed even when getCurrentSpeed() is wedged at 0 after a
+                // mid-session restart. Don't let the poll (or its GPS bridge) override it.
+                if (android.os.SystemClock.elapsedRealtime() - lastSpeedPushElapsedMs < SPEED_EVENT_FRESHNESS_MS) return@let
                 // Ignore implausible getter spikes outright: don't drive the speedometer or
                 // learn a scale from them — just preserve the last known speed by not touching
                 // the snapshot for this sample.
@@ -3308,36 +3358,34 @@ class BydVehicleDataSource(context: Context) {
                     val s = newSpeed / evRaw
                     if (s.isFinite() && s in 0.001..10.0) speedEventScale = s
                 }
-                // If the live event stream is actively driving speed, let it own the value —
-                // don't overwrite with this getter, which may be returning a frozen 0.
-                val eventFresh = android.os.SystemClock.elapsedRealtime() - lastSpeedEventElapsedMs < SPEED_EVENT_FRESHNESS_MS
-                if (eventFresh && speedEventScale != null) return@let
 
                 val prevSpeed = snap.directSpeedKmh
                 if (newSpeed > 0.1) {
-                    // Valid positive reading — commit and remember when.
-                    lastPositiveSpeedElapsedMs = android.os.SystemClock.elapsedRealtime()
+                    // Valid positive getter reading — the getter is authoritative. Commit it
+                    // unconditionally (even if the event stream is fresh), and mark the getter
+                    // healthy so the event stream stays subordinate. On firmwares where the
+                    // event raw isn't proportional to speed, this keeps the reliable getter in
+                    // charge instead of being overridden by a noisy event-derived value.
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    lastPositiveSpeedElapsedMs = now
+                    lastGetterPositiveElapsedMs = now
                     _vehicleSnapshot.value = snap.copy(directSpeedKmh = newSpeed)
                 } else if (prevSpeed < 0.1) {
-                    // Already showing ~0 — nothing to preserve, keep it 0.
+                    // Already showing ~0 — keep it 0.
                     _vehicleSnapshot.value = snap.copy(directSpeedKmh = 0.0)
                 } else {
-                    // Getter returned 0 but we were showing a positive speed. The BYD
-                    // speed getter updates slower than the 1 s poll and intermittently
-                    // returns a stale 0 mid-drive. Only commit 0 when independent signals
-                    // agree the car is actually stopped:
-                    //   • engine power below a small traction threshold (|kW| < 2), AND
-                    //   • GPS speed absent or ~0, AND
-                    //   • we're past a short grace window since the last positive reading.
-                    // Otherwise preserve the last known speed. Motor RPM is deliberately
-                    // NOT used here — the RPM path gates on directSpeedKmh, so coupling the
-                    // two would deadlock both at a stop (each preserving the other's stale value).
+                    // Getter returned a 0 but we were showing a positive speed. getCurrentSpeed
+                    // updates slightly slower than the 1 s poll and can return a transient stale
+                    // 0 mid-drive. Only commit 0 when independent signals agree we've actually
+                    // stopped (traction power < 2 kW AND GPS ~0 AND past a short grace window);
+                    // otherwise preserve the last known speed. GPS is used only as a "still
+                    // moving" hint here, never as the displayed value. Motor RPM is deliberately
+                    // NOT used — the RPM path gates on directSpeedKmh, so coupling them would
+                    // deadlock both at a stop.
                     val powerMoving = snap.enginePower?.let { kotlin.math.abs(it) >= 2 } == true
                     val gpsMoving   = snap.locationGpsSpeed?.let { it > 0.1 } == true
                     val withinGrace = android.os.SystemClock.elapsedRealtime() - lastPositiveSpeedElapsedMs < SPEED_STALE_GRACE_MS
-                    if (powerMoving || gpsMoving || withinGrace) {
-                        // Preserve last known speed — do not overwrite with the stale 0.
-                    } else {
+                    if (!(powerMoving || gpsMoving || withinGrace)) {
                         _vehicleSnapshot.value = snap.copy(directSpeedKmh = 0.0)
                     }
                 }
@@ -3357,6 +3405,7 @@ class BydVehicleDataSource(context: Context) {
                     val msg = "🐌 speed=0 while moving: rawGetter=${speed ?: "null"} " +
                         "gear=${s.gear} rpmF=${s.engineSpeedFront} rpmR=${s.engineSpeedRear} " +
                         "power=${s.enginePower} gps=${s.locationGpsSpeed ?: "n/a"} " +
+                        "chargeKw=${_chargingPowerKw.value} gun=${_chargingGunState.value} work=${_chargerWorkState.value} " +
                         "m25=${runtimeMethodNames("m25").getOrNull(0) ?: "none"} " +
                         "spEventAgoMs=$evAgoMs spEventRaw=${lastSpeedEventRaw ?: "none"} scale=${speedEventScale ?: "none"}"
                     logInfoIfChanged("speedStall", msg)
@@ -4630,18 +4679,28 @@ class BydVehicleDataSource(context: Context) {
             chargingEventCapacityRaw = _chargingEventCapacityRaw.value,
             chargingEventUnknownInt27Raw = _chargingEventUnknownInt27Raw.value,
             chargingEventUnknownCounterRaw = _chargingEventUnknownCounterRaw.value,
-            gear = when {
-                gearboxDevice != null -> _gear.value
-                // InstrumentDevice successfully read a gear value — use it directly.
-                // This correctly handles R, N, P as well as D and avoids the speed
-                // ambiguity (reverse speed is also positive).
-                instrumentGearKnown -> _gear.value
-                // Last resort: no gear device and instrument gave nothing.
-                // Speed > 1 km/h means the car is moving; the only reasonable guess is D.
-                // R is indistinguishable from D here, but this is better than showing P
-                // while clearly driving forward in HEV/EV mode.
-                _vehicleSnapshot.value.directSpeedKmh > 1.0 -> "D"
-                else -> _gear.value
+            gear = run {
+                val resolved = when {
+                    gearboxDevice != null -> _gear.value
+                    // InstrumentDevice successfully read a gear value — use it directly.
+                    // This correctly handles R, N, P as well as D and avoids the speed
+                    // ambiguity (reverse speed is also positive).
+                    instrumentGearKnown -> _gear.value
+                    // Last resort: no gear device and instrument gave nothing.
+                    // Speed > 1 km/h means the car is moving; the only reasonable guess is D.
+                    // R is indistinguishable from D here, but this is better than showing P
+                    // while clearly driving forward in HEV/EV mode.
+                    _vehicleSnapshot.value.directSpeedKmh > 1.0 -> "D"
+                    else -> _gear.value
+                }
+                // Physical-impossibility guard: you cannot be in Park at speed — the
+                // parking pawl would lock the driveline. Some firmwares leave the gearbox
+                // gear stuck at its default "P" when the gear getter/event never reports,
+                // and the gearboxDevice!=null branch above trusts that stale "P" forever
+                // (which also makes the gear=D/R car-on proxy read false while driving).
+                // Override to "D" only when clearly moving forward; leave R alone (low-speed
+                // reverse is legitimate) and stay above creep speed to avoid false flips.
+                if (resolved == "P" && _vehicleSnapshot.value.directSpeedKmh > 5.0) "D" else resolved
             },
             chargeState = _chargeState.value,
             remainMinutes = _remainMinutes.value,
@@ -6083,22 +6142,37 @@ class BydVehicleDataSource(context: Context) {
                     val raw = rawNumber.toDouble().takeIf { it in 0.0..5000.0 } ?: return
                     lastSpeedEventRaw = raw
                     lastSpeedEventElapsedMs = SystemClock.elapsedRealtime()
-                    // Drive speed from this live event once the raw→km/h scale is known.
-                    // This is what keeps the speedometer alive when getCurrentSpeed freezes.
+                    // Drive speed from this live event ONLY as a fallback for a frozen getter.
+                    // The polled getCurrentSpeed getter is authoritative whenever it's healthy;
+                    // on firmwares where the event raw isn't proportional to speed, letting
+                    // events override a working getter produced wildly wrong / zero speeds.
+                    // So commit an event-derived value only when BOTH:
+                    //   • the getter has gone stale (no fresh positive reading), AND
+                    //   • independent signals (GPS or traction power) confirm we're moving —
+                    //     this prevents the noisy event raw from inventing speed at a standstill.
                     val scale = speedEventScale
-                    if (scale != null) {
+                    val now = SystemClock.elapsedRealtime()
+                    val getterHealthy = now - lastGetterPositiveElapsedMs < SPEED_EVENT_FRESHNESS_MS
+                    val snap = _vehicleSnapshot.value
+                    // GPS is the preferred bridge for a dead getter (handled in the poll path);
+                    // only let the event stream drive speed when GPS is NOT giving a clear
+                    // reading (e.g. tunnel / no fix) but traction power still says we're moving.
+                    // This keeps the noisy event raw from overriding good GPS on firmwares where
+                    // the event value isn't proportional to km/h.
+                    val gpsClear = snap.locationGpsSpeed?.let { it > GPS_BRIDGE_MIN_KMH } == true
+                    val powerMoving = snap.enginePower?.let { kotlin.math.abs(it) >= 2 } == true
+                    if (scale != null && !getterHealthy && powerMoving && !gpsClear) {
                         val kmh = (raw * scale).takeIf { it.isFinite() && it in 0.0..MAX_PLAUSIBLE_SPEED_KMH }
                         if (kmh != null) {
-                            if (kmh > 0.1) lastPositiveSpeedElapsedMs = SystemClock.elapsedRealtime()
-                            _vehicleSnapshot.value = _vehicleSnapshot.value.copy(directSpeedKmh = kmh)
+                            if (kmh > 0.1) lastPositiveSpeedElapsedMs = now
+                            _vehicleSnapshot.value = snap.copy(directSpeedKmh = kmh)
                             publishSnapshot()
-                            // Confirm in the in-app log that events are driving speed while the
-                            // getter is stale, so the fix can be verified after parking.
-                            val nowMs = SystemClock.elapsedRealtime()
-                            if (kmh > 0.1 && nowMs - lastSpeedEventDiagMs > 30_000L) {
-                                lastSpeedEventDiagMs = nowMs
+                            // Confirm in the in-app log that events are bridging a stale getter,
+                            // so the fix can be verified after parking.
+                            if (kmh > 0.1 && now - lastSpeedEventDiagMs > 30_000L) {
+                                lastSpeedEventDiagMs = now
                                 DiagLog.event(appContext, TAG,
-                                    "✅ speed from event stream: ${String.format("%.0f", kmh)} km/h " +
+                                    "✅ speed from event stream (getter stale): ${String.format("%.0f", kmh)} km/h " +
                                         "(raw=${String.format("%.0f", raw)} scale=${String.format("%.4f", scale)})")
                             }
                         }

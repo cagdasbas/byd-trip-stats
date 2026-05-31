@@ -56,6 +56,12 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
             return
         }
 
+        // Record that the keepalive actually fired. Surfaced in Settings so a user can
+        // tell whether Minimal works on their vehicle: on head units that fully power
+        // off at park (no drain in Deep Sleep), this alarm can't fire and this timestamp
+        // never advances while parked — the signal to use Always On for parked data.
+        recordFired(appContext)
+
         // Acquire a partial wake lock for the duration of the async work.
         // AlarmManager.RTC_WAKEUP holds a wake lock only until onReceive()
         // returns — the goAsync() coroutine runs unprotected after that.
@@ -98,9 +104,14 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
         private const val WAKE_LOCK_TIMEOUT_MS = 15_000L
 
         // 90 minutes — lets the MCU sleep between pokes (WiFi cuts after ~15 min,
-        // system genuinely idles for ~75 min per cycle). POWER_CONNECTED is the
-        // primary wake-up for charging; this alarm is just a fallback so a missed
-        // charge session is at most 90 min late rather than never detected.
+        // system genuinely idles for ~75 min per cycle). NOTE: this alarm is the
+        // ONLY reliable trigger for off-state EV charging. android.intent.action
+        // .POWER_CONNECTED only reflects the head unit's own 12V/USB power, not the
+        // traction battery being plugged in, so it does not fire when the EV starts
+        // charging while parked. A charge session that begins off-state is therefore
+        // detected at most ~90 min late here (Minimal mode); in Deep Sleep mode this
+        // chain isn't scheduled at all, so off-state charging is only reconstructed
+        // from the SoC delta on the next ACC_ON.
         private const val INTERVAL_MS = 90 * 60 * 1000L
 
         // Backup fires 5 min after the primary. At 90 min cadence, if the primary
@@ -109,6 +120,34 @@ class OffStateKeepaliveReceiver : BroadcastReceiver() {
 
         private val REQUEST_CODE = ACTION.hashCode()
         private val BACKUP_REQUEST_CODE = (ACTION + "_backup").hashCode()
+
+        // ── Health stats (surfaced in Settings) ──────────────────────────────
+        private const val STATS_PREFS = "offstate_keepalive_stats"
+        private const val KEY_LAST_FIRED = "last_fired_ms"
+        private const val KEY_FIRE_COUNT = "fire_count"
+
+        private fun statsPrefs(context: Context) =
+            context.getSharedPreferences(STATS_PREFS, Context.MODE_PRIVATE)
+
+        /** Record a real keepalive fire (wall-clock + running count). */
+        fun recordFired(context: Context) {
+            val p = statsPrefs(context)
+            p.edit()
+                .putLong(KEY_LAST_FIRED, System.currentTimeMillis())
+                .putInt(KEY_FIRE_COUNT, p.getInt(KEY_FIRE_COUNT, 0) + 1)
+                .apply()
+        }
+
+        /** Wall-clock ms of the last keepalive fire, or 0 if it has never fired. */
+        fun lastFiredMs(context: Context): Long = statsPrefs(context).getLong(KEY_LAST_FIRED, 0L)
+
+        /** Total number of keepalive fires recorded since install. */
+        fun fireCount(context: Context): Int = statsPrefs(context).getInt(KEY_FIRE_COUNT, 0)
+
+        /** Whether a keepalive alarm is currently armed. */
+        fun isScheduled(context: Context): Boolean = pendingIntent(
+            context, 0, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+        ) != null
 
         private fun pendingIntent(context: Context, iteration: Int, flags: Int): PendingIntent? {
             val intent = Intent(context, OffStateKeepaliveReceiver::class.java).apply {

@@ -62,6 +62,12 @@ class ChargingRepository private constructor(context: Context) {
 
     private var activeSession: ChargingSessionEntity? = null
     private var lastChargingSeenAtMs: Long = 0L
+    // Post-charge settle top-up: after a near-full off-state session closes, the BMS keeps
+    // recomputing SoC upward for a few minutes (e.g. 98.5% → 100%). While settleUntilMs is
+    // in the future, applyPostChargeSettle() revises the already-closed session's end SoC.
+    private var settleSessionId: Long? = null
+    private var settleBaselineSoc: Double = 0.0
+    private var settleUntilMs: Long = 0L
 
     /** Prevents reconstruction from running more than once per car wake-up cycle. */
     private var reconstructionAttempted = false
@@ -150,8 +156,10 @@ class ChargingRepository private constructor(context: Context) {
                 // Do NOT close the session — it will be closed when charging stops.
                 handleRealTimeCharging(telemetry, carConfig)
             } else {
-                // Car is off and not charging — close any open session.
+                // Car is off and not charging — close any open session, then keep revising
+                // a just-closed near-full session's end SoC while the BMS settles to 100%.
                 closeActiveSessionIfAny(carConfig, telemetry)
+                applyPostChargeSettle(telemetry)
             }
         }
     }
@@ -206,6 +214,7 @@ class ChargingRepository private constructor(context: Context) {
     ) {
         if (telemetry.isCharging) {
             lastChargingSeenAtMs = System.currentTimeMillis()
+            settleSessionId = null; settleUntilMs = 0L   // active charging — cancel any pending settle top-up
             if (activeSession == null) {
                 startSession(telemetry, carConfig)
             } else {
@@ -278,7 +287,7 @@ class ChargingRepository private constructor(context: Context) {
 
     private suspend fun closeActiveSessionIfAny(
         carConfig : CarConfig?,
-        @Suppress("UNUSED_PARAMETER") telemetry : VehicleTelemetry,
+        telemetry : VehicleTelemetry,
         force: Boolean = true
     ) {
         val session = activeSession ?: return
@@ -290,10 +299,57 @@ class ChargingRepository private constructor(context: Context) {
         val dataPoints = sessionDao.getDataPointsForSessionSync(session.id)
         closePersistedActiveSession(session, dataPoints, carConfig)
 
+        // Arm post-charge settle top-up for a near-full off-state charge: the session is
+        // already closed (activeSessionId clears immediately, as callers expect), but the
+        // BMS keeps recomputing SoC upward for a few minutes after current stops
+        // (e.g. 98.5% → 100%). applyPostChargeSettle() revises the closed row's end SoC
+        // during this window. Bounded + capped so it can never absorb a drive or a
+        // separate charge. Car-off only (off-state charging completion).
+        val closedEndSoc = maxOf(dataPoints.lastOrNull()?.soc ?: 0.0, session.socEnd ?: 0.0)
+        if (!telemetry.isCarOn && dataPoints.isNotEmpty() && closedEndSoc >= SETTLE_NEAR_FULL_PCT) {
+            settleSessionId   = session.id
+            settleBaselineSoc = closedEndSoc
+            settleUntilMs     = now + SETTLE_GRACE_MS
+        } else {
+            settleSessionId = null
+            settleUntilMs   = 0L
+        }
+
         activeSession = null
         lastChargingSeenAtMs = 0L
         _activeSessionId.value = null
         _isCharging.value = false
+    }
+
+    /**
+     * After a near-full off-state session closes, the BMS keeps recomputing SoC upward for
+     * a few minutes (the CV/settle phase, e.g. 98.5% → 100%). While within the settle
+     * window and the car stays parked, revise the closed session's end SoC (and energy)
+     * to the higher value. Capped at [SETTLE_MAX_RISE_PCT] and gated so it can never absorb
+     * a drive or a separate charge.
+     */
+    private suspend fun applyPostChargeSettle(telemetry: VehicleTelemetry) {
+        val sid = settleSessionId ?: return
+        val now = System.currentTimeMillis()
+        val carMoving = telemetry.speed > 1.0 || telemetry.gear in setOf("D", "R")
+        if (now >= settleUntilMs || telemetry.isCharging || telemetry.isCarOn || carMoving) {
+            settleSessionId = null
+            settleUntilMs   = 0L
+            return
+        }
+        val cur = telemetry.soc
+        if (cur <= settleBaselineSoc || cur - settleBaselineSoc > SETTLE_MAX_RISE_PCT || cur > 100.5) return
+
+        val session = sessionDao.getSessionById(sid) ?: run { settleSessionId = null; return }
+        val newDelta = (cur - session.socStart).coerceAtLeast(0.0)
+        val updated = session.copy(
+            socEnd      = cur,
+            socEndPanel = maxOf(session.socEndPanel ?: 0.0, telemetry.socPanel.toDouble()),
+            kwhAdded    = (newDelta / 100.0) * session.batteryKwh,
+        )
+        sessionDao.updateSession(updated)
+        settleBaselineSoc = cur
+        Log.i(TAG, "Post-charge settle: session $sid end SoC revised to ${"%.1f".format(cur)}%")
     }
 
     private suspend fun closePersistedActiveSession(
@@ -308,8 +364,12 @@ class ChargingRepository private constructor(context: Context) {
         }
 
         val lastPoint = dataPoints.last()
+        // End SoC includes any post-charge settle captured on the session row (socEnd may
+        // exceed the last recorded data point's SoC by the CV-phase top-off, e.g. 100% vs 98.5%).
+        val endSoc      = maxOf(lastPoint.soc, session.socEnd ?: lastPoint.soc)
+        val endSocPanel = maxOf(lastPoint.socPanel.toDouble(), session.socEndPanel ?: 0.0)
         val batteryKwh = carConfig?.batteryKwh ?: session.batteryKwh
-        val socDelta = (lastPoint.soc - session.socStart).coerceAtLeast(0.0)
+        val socDelta = (endSoc - session.socStart).coerceAtLeast(0.0)
         val kwhAdded = (socDelta / 100.0) * batteryKwh
         val durationMs = lastPoint.timestamp - session.startTime
         val positivePowers = dataPoints.map { it.chargingPower }.filter { it > 0.1 }
@@ -332,8 +392,8 @@ class ChargingRepository private constructor(context: Context) {
 
         val closed = session.copy(
             endTime      = lastPoint.timestamp,
-            socEnd       = lastPoint.soc,
-            socEndPanel  = lastPoint.socPanel.toDouble(),
+            socEnd       = endSoc,
+            socEndPanel  = endSocPanel,
             kwhAdded     = kwhAdded,
             peakKw       = peakKw,
             avgKw        = avgKw,
@@ -342,7 +402,7 @@ class ChargingRepository private constructor(context: Context) {
             isActive     = false
         )
         sessionDao.updateSession(closed)
-        Log.i(TAG, "Charging session ${session.id} closed — ${session.socStart}% → ${lastPoint.soc}%  ${dataPoints.size} points")
+        Log.i(TAG, "Charging session ${session.id} closed — ${session.socStart}% → $endSoc%  ${dataPoints.size} points")
     }
 
     // ── SoC-delta reconstruction (car-off charging) ───────────────────────────
@@ -487,6 +547,12 @@ class ChargingRepository private constructor(context: Context) {
         private const val OVERLAP_GUARD_MS    = 5 * 60 * 1000L
         private const val FALLBACK_BATTERY_KWH = 82.5
         private const val ACTIVE_SESSION_CLOSE_GRACE_MS = 20_000L
+        // Post-charge settle: hold a near-full off-state session open this long after charge
+        // current stops so the BMS's SoC recalibration to 100% is captured. Comfortably
+        // within the service's 5-min car-off self-stop window.
+        private const val SETTLE_GRACE_MS = 4 * 60_000L
+        private const val SETTLE_NEAR_FULL_PCT = 90.0
+        private const val SETTLE_MAX_RISE_PCT = 4.0
         private const val MIN_COMPLETED_SESSION_DURATION_MS = 90_000L
         private const val MIN_COMPLETED_SESSION_SOC_DELTA_PCT = 0.05
         private const val MIN_COMPLETED_SESSION_KWH = 0.05

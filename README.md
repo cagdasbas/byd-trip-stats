@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v2.5.0-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v2.7.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
@@ -30,7 +30,7 @@
 
 ### Requirements
 
-- A BYD vehicle with **DiLink 3.0** (tested on BYD Seal; should be compatible with Atto 3, Dolphin, and other DiLink-equipped models)
+- A BYD vehicle with **DiLink 3.0** (BEV as well as PHEV are supported)
 - Android **10 or higher** on the DiLink head unit
 
 ### Installation
@@ -44,7 +44,7 @@ No Electro setup, MQTT broker, or topic configuration is required for normal ope
 
 ### Known Limitations
 
-- **Some fields are still inferred or unresolved.** SoH is currently shown as an estimate, and cabin temperature is only shown when a trustworthy in-car source is present.
+- **Some fields are still inferred or unresolved.** SoH is currently shown as an estimate, there is no cabin temperature present in the SDK.
 - **Background persistence depends on DiLink firmware behaviour.** The app uses a foreground service, wake lock, boot receiver, and watchdog, but some BYD firmware builds are still aggressive about killing third-party apps while the car is off.
 
 ---
@@ -445,8 +445,10 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Slope in degrees display ✅ *(v2.0.0)*
 - [x] App diagnostics CPU/RAM monitor ✅ *(v2.0.0)*
 - [x] Physics-based per-trip energy breakdown ✅ *(v2.0.0)*
+- [x] 12V DC monitoring when car is off — rolling 48-hour chart overlaying HV bus voltage, cell min/max, and SoC so 12V drain events (and the corresponding HV top-up) are immediately visible ✅ *(v2.1.0)*
 - [x] Self-contained HTML trip viewer + one-click "Save as HTML viewer" export ✅ *(v2.5.0)*
 - [x] Configurable engine-off trip timeout & minimum-trip-distance filter ✅ *(v2.5.0)*
+- [x] Web dashboard companion — browse trip history and charts on any browser offline-first: upload your backup file, charts render locally, nothing leaves your device; built as a PWA so it can be added to your phone's home screen for a near-native experience ✅ *(v2.7.0)*
 
 ### Planned (v2.0.0+)
 
@@ -454,9 +456,7 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [ ] Trip merging — combine two auto-split trips that were the same journey, separated by a brief stop (e.g. petrol station, red light timeout)
 - [ ] Trip tagging — label trips with a custom tag (e.g. "commute", "motorway", "errand") and filter history and analytics by tag
 - [ ] Battery cell imbalance alert — threshold-based notification when cell voltage spread exceeds a configurable limit (e.g. 0.05 V), surfacing the diagnostic the Cell Voltage Spread heatmap already visualises
-- [x] 12V DC monitoring when car is off — rolling 48-hour chart overlaying HV bus voltage, cell min/max, and SoC so 12V drain events (and the corresponding HV top-up) are immediately visible ✅ *(v2.1.0)*
 - [ ] DiLink home screen widget — quick-glance tile showing current SoC, last trip distance, and range projection without opening the app
-- [ ] Web dashboard companion — browse trip history and charts on any browser offline-first: upload your backup file, charts render locally, nothing leaves your device; built as a PWA so it can be added to your phone's home screen for a near-native experience
 **Vote on features** by 👍 reacting to issues!
 
 ---

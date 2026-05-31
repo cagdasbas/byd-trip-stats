@@ -81,6 +81,8 @@ import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.R
 import com.byd.tripstats.sdk.VehicleCompatibilityProbe
+import com.byd.tripstats.receiver.OffStateKeepaliveReceiver
+import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
@@ -642,6 +644,17 @@ private fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                         uncheckedTrackColor  = ToggleUncheckedTrack,
                         uncheckedBorderColor = ToggleUncheckedTrack
                     )
+                )
+            }
+
+            if (enabled) {
+                Text(
+                    "Reachable only while the telemetry service is alive: continuously with " +
+                        "\"Always On\", only during the brief ~90-min wake blips with \"Minimal\", " +
+                        "and never while parked with \"Deep Sleep\" (set under Background activity " +
+                        "when car is off).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -1271,8 +1284,15 @@ private fun ConnectionsTab() {
                                 label = { Text("Publish interval (seconds)") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("Driving: every ${mqttIntervalInput.ifBlank { "1" }} s  ·  Charging: every 30 s  ·  Idle: snapshot every ~90 min", style = MaterialTheme.typography.bodySmall) },
+                                supportingText = { Text("Driving: every ${mqttIntervalInput.ifBlank { "1" }} s  ·  Charging / idle while running: every 30 s", style = MaterialTheme.typography.bodySmall) },
                                 modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                "While parked, publishing depends on the Background activity mode: " +
+                                    "Always On keeps publishing (including off-state charging), " +
+                                    "Minimal only during the ~90-min wake blips, and Deep Sleep not at all.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Button(
@@ -1444,6 +1464,7 @@ private fun AppPreferencesTab(
     onNavigateToTripGoals: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val offStateMode by preferencesManager.offStateMode.collectAsState(
         initial = preferencesManager.getCachedOffStateMode()
     )
@@ -1691,7 +1712,31 @@ private fun AppPreferencesTab(
                         OffStateMode.DEEP_SLEEP to "Deep Sleep",
                     ).forEach { (mode, label) ->
                         Button(
-                            onClick = { scope.launch { preferencesManager.saveOffStateMode(mode) } },
+                            onClick = {
+                                scope.launch { preferencesManager.saveOffStateMode(mode) }
+                                // Reconcile background scheduling to the new mode immediately.
+                                // saveOffStateMode only persists the pref; without this, the
+                                // keepalive chain is (re)armed only on the next ACC_OFF, so
+                                // switching e.g. Deep Sleep → Minimal while the car is already
+                                // parked would leave NO keepalive armed (Deep Sleep cancels it),
+                                // and off-state charging would never be sampled until the next
+                                // drive. Apply the change now instead of waiting for a car cycle.
+                                when (mode) {
+                                    OffStateMode.DEEP_SLEEP ->
+                                        OffStateKeepaliveReceiver.cancel(context)
+                                    OffStateMode.DISABLED ->
+                                        // Arm only if absent — if the service is still running it
+                                        // will schedule the chain itself on self-stop.
+                                        OffStateKeepaliveReceiver.ensureScheduled(context, "settings:minimal")
+                                    OffStateMode.ENABLED -> {
+                                        // Always On: keepalive is redundant (watchdog/restarter
+                                        // keep the service alive); start the service now so it
+                                        // goes resident even if the car is currently parked.
+                                        OffStateKeepaliveReceiver.cancel(context)
+                                        VehicleTelemetryService.start(context)
+                                    }
+                                }
+                            },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (offStateMode == mode)
@@ -1709,9 +1754,9 @@ private fun AppPreferencesTab(
                     }
                 }
                 listOf(
-                    OffStateMode.ENABLED    to "Always On: service runs 24/7. Continuous 12V/SoC samples in battery history and ADB-over-WiFi stays reachable. Small additional load on top of BYD's own stock background drain.",
-                    OffStateMode.DISABLED   to "Minimal: service self-stops 5 min after the car turns off, then a 90-min alarm briefly wakes it for a charging snapshot. Lower drain at the cost of sparse off-state samples and no always-on ADB.",
-                    OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep.",
+                    OffStateMode.ENABLED    to "Always On: service runs 24/7. Continuous 12V/SoC samples in battery history, ADB-over-WiFi stays reachable, and the Web Companion (PWA) + MQTT keep publishing while parked — including off-state (e.g. overnight) charging. Small additional load on top of BYD's own stock background drain.",
+                    OffStateMode.DISABLED   to "Minimal: service self-stops 5 min after the car turns off, then a 90-min alarm briefly wakes it for a charging snapshot. Lower drain, but off-state samples are sparse, ADB is not always on, the Web Companion (PWA) is only reachable during the brief wake blip, and MQTT is idle between blips. Off-state charging is caught within ~90 min, after which it publishes for the rest of the charge.",
+                    OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep. The Web Companion (PWA) is unreachable and MQTT is silent the whole time the car is parked; off-state charging is not captured live — only reconstructed from the SoC delta when the car next turns on.",
                 ).forEach { (mode, description) ->
                     Text(
                         description,
@@ -1723,6 +1768,28 @@ private fun AppPreferencesTab(
                         fontWeight = if (offStateMode == mode) FontWeight.Medium else FontWeight.Normal,
                     )
                 }
+                // Keepalive health — lets the user tell whether Minimal actually works on
+                // their vehicle. The 90-min keepalive can't fire on head units that fully
+                // power off at park, so a "never fired" here (after a real park) is the
+                // signal that Minimal behaves like Deep Sleep and Always On is needed.
+                val kaLastFired = OffStateKeepaliveReceiver.lastFiredMs(context)
+                val kaCount     = OffStateKeepaliveReceiver.fireCount(context)
+                val kaArmed     = OffStateKeepaliveReceiver.isScheduled(context)
+                val kaStatus = if (kaLastFired <= 0L) {
+                    "Keepalive: never fired yet${if (kaArmed) " (armed)" else ""}. If this stays " +
+                        "\"never\" after the car has been parked a while, your head unit powers off " +
+                        "fully at park — Minimal then behaves like Deep Sleep, so use Always On for parked data."
+                } else {
+                    val agoMin = ((System.currentTimeMillis() - kaLastFired) / 60_000L).coerceAtLeast(0)
+                    val ago = if (agoMin < 60) "$agoMin min ago" else "${agoMin / 60}h ${agoMin % 60}m ago"
+                    "Keepalive: last fired $ago • $kaCount total${if (kaArmed) " • armed" else " • not armed"}"
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+                Text(
+                    kaStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 

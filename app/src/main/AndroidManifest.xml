@@ -133,10 +133,15 @@
             </intent-filter>
         </receiver>
 
-        <!-- Off-state keepalive: 90-minute fallback alarm chain after ACC_OFF.
-             POWER_CONNECTED is the primary wake-up for charging detection;
-             this alarm is a backstop so a missed charge session is at most
-             90 min late. Survives process death via AlarmManager RTC_WAKEUP. -->
+        <!-- Off-state keepalive: 90-minute alarm chain after ACC_OFF. This is the
+             ONLY reliable wake-up for off-state EV charging: android.intent.action
+             .POWER_CONNECTED tracks the head unit's own 12V/USB power, not the
+             traction battery being plugged into an AC/DC charger, so it does not
+             fire when an EV starts charging while parked. The alarm therefore
+             bounds a missed off-state charge session to at most ~90 min late (in
+             Minimal mode). Not scheduled in Deep Sleep mode — off-state charging is
+             then only reconstructed from the SoC delta on the next ACC_ON. Survives
+             process death via AlarmManager RTC_WAKEUP. -->
         <receiver
             android:name=".receiver.OffStateKeepaliveReceiver"
             android:exported="false">

@@ -42,6 +42,7 @@ class BydStatsApplication : Application(), Configuration.Provider {
         super.onCreate()
         Log.d(TAG, "=== BYD Trip Stats starting (pid=${android.os.Process.myPid()}) ===")
         installCrashRestartHandler()
+        // applyStartupSafeguards() must run before any vehicle-device access below.
         applyStartupSafeguards()
         applyRuntimePatches()
         DatabaseMaintenanceWorker.schedule(this)
