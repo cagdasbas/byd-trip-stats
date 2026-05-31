@@ -32,7 +32,7 @@ import java.io.IOException
         ChargingSessionEntity::class,
         ChargingDataPointEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -70,7 +70,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
                 )
                     // .fallbackToDestructiveMigration()
                     // .fallbackToDestructiveMigrationOnDowngrade()
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance
@@ -199,6 +199,17 @@ abstract class BydStatsDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE charging_sessions ADD COLUMN socStartPanel REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE charging_sessions ADD COLUMN socEndPanel REAL")
+            }
+        }
+
+        // ── Migration 6 → 7 ──────────────────────────────────────────────────
+        // Adds isFavourite to trips and charging_sessions. Favourited rows are
+        // exempt from automatic point-thinning and the manual DatabaseTrimmer,
+        // preserving their full data-point density and rawJson diagnostics.
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trips ADD COLUMN isFavourite INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE charging_sessions ADD COLUMN isFavourite INTEGER NOT NULL DEFAULT 0")
             }
         }
 

@@ -1021,14 +1021,25 @@ private fun DatabaseTrimSection(
             Text(
                 "Removes diagnostic data and downsamples old recordings to free up space:\n" +
                 "  • Strips redundant fields from every data point.\n" +
-                "  • Clears full-detail diagnostic payloads for trips and charging older than 45 days.\n" +
-                "  • Downsamples trip points older than 60 days to one sample per minute.\n" +
+                "  • Clears full-detail diagnostic payloads for non-favourite trips and charging sessions older than 45 days.\n" +
+                "  • Downsamples trip points older than 1) 45-90 days to 30 samples per minute, b) 90-180 days to 15 samples per minute and c) 180 days to six samples per minute.\n" +
                 "  • Deletes second-by-second AC charging history older than 45 days (DC fast-charging history is preserved).\n" +
                 "  • Reclaims freed space (VACUUM).\n\n" +
                 "Trip summaries, statistics, charging session totals, and all DC charging detail are not affected.\n" +
                 "It should be run when no trip/charging recording session in order not to disrupt that session",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                "WARNING: Downsampling means that charts/heatmaps from trimmed sessions will have very scarce points thus not be in detail.\n" +
+                "If you just want to reduce storage usage, you might want to delete older trips instead of trimming.\n" +
+                "THIS ACTION IS IRREVERSIBLE! ",
+                style      = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color      = BydErrorRed
             )
 
             Spacer(Modifier.height(8.dp))

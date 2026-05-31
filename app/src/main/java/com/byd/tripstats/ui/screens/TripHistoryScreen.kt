@@ -139,6 +139,18 @@ fun TripHistoryScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                     } else if (!selectionMode) {
+                        // Favourites-only quick filter — star toggle
+                        IconButton(onClick = { viewModel.toggleFavouritesOnly() }) {
+                            Icon(
+                                imageVector = if (filterState.favouritesOnly)
+                                    Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (filterState.favouritesOnly)
+                                    "Show all trips" else "Show favourites only",
+                                tint = if (filterState.favouritesOnly)
+                                    ChargingYellow else LocalContentColor.current,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                         // Sort button — icon reflects current direction
                         IconButton(onClick = { showSortSheet = true }) {
                             Icon(
@@ -197,14 +209,22 @@ fun TripHistoryScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
+                    val filtersOrFav = activeFilters > 0 || filterState.favouritesOnly
                     Text(
-                        text = if (activeFilters > 0) "No trips match your filters" else "No trips yet",
+                        text = when {
+                            filterState.favouritesOnly && activeFilters == 0 -> "No favourite trips yet"
+                            filtersOrFav -> "No trips match your filters"
+                            else -> "No trips yet"
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = if (activeFilters > 0) "Try adjusting or clearing the filters"
-                               else "Start driving to record your first trip!",
+                        text = when {
+                            filterState.favouritesOnly && activeFilters == 0 -> "Tap the ☆ on a trip to mark it a favourite"
+                            filtersOrFav -> "Try adjusting or clearing the filters"
+                            else -> "Start driving to record your first trip!"
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -263,6 +283,7 @@ fun TripHistoryScreen(
                                 selectedTrips = setOf(trip.id)
                             }
                         },
+                        onToggleFavourite = { viewModel.setTripFavourite(trip.id, !trip.isFavourite) },
                         onDelete = { viewModel.deleteTrip(trip.id) }
                     )
                 }
@@ -543,6 +564,7 @@ fun TripItem(
     isActive: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
+    onToggleFavourite: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -622,6 +644,27 @@ fun TripItem(
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+                // Favourite star — reserve space; only actionable for completed trips
+                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    if (!selectionMode && trip.endTime != null) {
+                        IconButton(
+                            onClick = onToggleFavourite,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (trip.isFavourite)
+                                    Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (trip.isFavourite)
+                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (trip.isFavourite)
+                                    ChargingYellow
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 // Delete icon - always reserve space so date doesn't shift

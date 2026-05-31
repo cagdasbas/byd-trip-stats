@@ -108,8 +108,14 @@ object DatabaseTrimmer {
             Log.i(TAG, "Phase A — rewritten trip=$tripRewritten chg=$chgRewritten")
 
             _state.value = State.InProgress("Clearing old diagnostic data…")
-            val tripCleared = clearOldRawJson(sqLiteDb, "trip_data_points", cutoffRawJson)
-            val chgCleared  = clearOldRawJson(sqLiteDb, "charging_data_points", cutoffRawJson)
+            val tripCleared = clearOldRawJson(
+                sqLiteDb, "trip_data_points", cutoffRawJson,
+                "AND tripId NOT IN (SELECT id FROM trips WHERE isFavourite = 1)"
+            )
+            val chgCleared  = clearOldRawJson(
+                sqLiteDb, "charging_data_points", cutoffRawJson,
+                "AND sessionId NOT IN (SELECT id FROM charging_sessions WHERE isFavourite = 1)"
+            )
             Log.i(TAG, "Phase B — rawJson cleared trip=$tripCleared chg=$chgCleared")
 
             _state.value = State.InProgress("Downsampling old trips…")
@@ -156,12 +162,18 @@ object DatabaseTrimmer {
                 Log.w(TAG, "VACUUM failed: ${ve.message}", ve)
             }
 
+            val favTrips    = countFavourites(sqLiteDb, "trips")
+            val favSessions = countFavourites(sqLiteDb, "charging_sessions")
+
             val ts = System.currentTimeMillis()
             val summary = buildString {
                 append("Stripped redundant fields from ${tripRewritten + chgRewritten} rows. ")
                 append("Cleared diagnostic data for ${tripCleared + chgCleared} rows older than $RAWJSON_DROP_AFTER_DAYS days. ")
                 append("Downsampled $tripDownsampled trip points older than $DOWNSAMPLE_AFTER_DAYS days. ")
                 append("Deleted $chgAcDeleted AC charging points older than $RAWJSON_DROP_AFTER_DAYS days (DC sessions kept). ")
+                if (favTrips > 0 || favSessions > 0) {
+                    append("Skipped $favTrips favourited trip(s) and $favSessions favourited charging session(s) — kept at full detail. ")
+                }
                 append(if (vacuumOk) "Database vacuumed." else "VACUUM failed (${vacuumError ?: "unknown"}).")
             }
 
@@ -220,26 +232,37 @@ object DatabaseTrimmer {
     }
 
     // ── Phase B ──────────────────────────────────────────────────────────────
-    private fun clearOldRawJson(db: SupportSQLiteDatabase, table: String, cutoff: Long): Int {
+    // [favouriteExclusion] is an extra AND-clause excluding rows whose parent
+    // trip / charging session is favourited, so their diagnostic rawJson is kept.
+    private fun clearOldRawJson(
+        db: SupportSQLiteDatabase,
+        table: String,
+        cutoff: Long,
+        favouriteExclusion: String,
+    ): Int {
         val countCursor = db.query(
-            "SELECT COUNT(*) FROM $table WHERE timestamp < ? AND LENGTH(rawJson) > 2",
+            "SELECT COUNT(*) FROM $table WHERE timestamp < ? AND LENGTH(rawJson) > 2 $favouriteExclusion",
             arrayOf(cutoff.toString()),
         )
         val count = countCursor.use { if (it.moveToFirst()) it.getInt(0) else 0 }
         if (count == 0) return 0
         db.execSQL(
-            "UPDATE $table SET rawJson = '{}' WHERE timestamp < ? AND LENGTH(rawJson) > 2",
+            "UPDATE $table SET rawJson = '{}' WHERE timestamp < ? AND LENGTH(rawJson) > 2 $favouriteExclusion",
             arrayOf<Any>(cutoff),
         )
         return count
     }
 
     // ── Phase C ──────────────────────────────────────────────────────────────
+    // Favourited trips are excluded from the outer DELETE so their full point
+    // density is preserved regardless of age.
     private fun downsampleTripPoints(db: SupportSQLiteDatabase, cutoff: Long): Int {
+        val favClause = "AND tripId NOT IN (SELECT id FROM trips WHERE isFavourite = 1)"
         val countCursor = db.query(
             """
             SELECT COUNT(*) FROM trip_data_points
             WHERE timestamp < ?
+              $favClause
               AND id NOT IN (
                 SELECT MIN(id) FROM trip_data_points
                 WHERE timestamp < ?
@@ -254,6 +277,7 @@ object DatabaseTrimmer {
             """
             DELETE FROM trip_data_points
             WHERE timestamp < ?
+              $favClause
               AND id NOT IN (
                 SELECT MIN(id) FROM trip_data_points
                 WHERE timestamp < ?
@@ -265,6 +289,13 @@ object DatabaseTrimmer {
         return count
     }
 
+    // Counts favourited rows in a parent table ("trips" / "charging_sessions"),
+    // used purely for the user-facing summary note.
+    private fun countFavourites(db: SupportSQLiteDatabase, table: String): Int {
+        val cursor = db.query("SELECT COUNT(*) FROM $table WHERE isFavourite = 1")
+        return cursor.use { if (it.moveToFirst()) it.getInt(0) else 0 }
+    }
+
     // ── Phase D ──────────────────────────────────────────────────────────────
     private fun deleteOldAcChargingPoints(db: SupportSQLiteDatabase, cutoff: Long): Int {
         val countCursor = db.query(
@@ -273,6 +304,7 @@ object DatabaseTrimmer {
             WHERE sessionId IN (
                 SELECT id FROM charging_sessions
                 WHERE isActive = 0
+                  AND isFavourite = 0
                   AND endTime IS NOT NULL
                   AND endTime < ?
                   AND peakKw > 0
@@ -289,6 +321,7 @@ object DatabaseTrimmer {
             WHERE sessionId IN (
                 SELECT id FROM charging_sessions
                 WHERE isActive = 0
+                  AND isFavourite = 0
                   AND endTime IS NOT NULL
                   AND endTime < ?
                   AND peakKw > 0

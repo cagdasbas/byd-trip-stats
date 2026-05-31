@@ -33,6 +33,9 @@ interface TripDao {
     @Query("DELETE FROM trips WHERE id = :tripId")
     suspend fun deleteTripById(tripId: Long)
 
+    @Query("UPDATE trips SET isFavourite = :favourite WHERE id = :tripId")
+    suspend fun setFavourite(tripId: Long, favourite: Boolean)
+
     @Query("SELECT * FROM trips WHERE startTime >= :startDate AND startTime <= :endDate ORDER BY startTime DESC")
     fun getTripsByDateRange(startDate: Long, endDate: Long): Flow<List<TripEntity>>
 

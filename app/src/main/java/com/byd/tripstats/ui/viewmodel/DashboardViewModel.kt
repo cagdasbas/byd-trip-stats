@@ -187,6 +187,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         chargingRepository.getAllSessions()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val _chargingFavouritesOnly = MutableStateFlow(
+        getApplication<Application>()
+            .getSharedPreferences("trip_history_prefs", 0)
+            .getBoolean("charging_favourites_only", false)
+    )
+    val chargingFavouritesOnly: StateFlow<Boolean> = _chargingFavouritesOnly.asStateFlow()
+
+    fun toggleChargingFavouritesOnly() {
+        val next = !_chargingFavouritesOnly.value
+        _chargingFavouritesOnly.value = next
+        getApplication<Application>()
+            .getSharedPreferences("trip_history_prefs", 0)
+            .edit().putBoolean("charging_favourites_only", next).apply()
+    }
+
+    /** Charging sessions after applying the favourites-only quick toggle. */
+    val displayedChargingSessions: StateFlow<List<ChargingSessionEntity>> =
+        combine(allChargingSessions, _chargingFavouritesOnly) { sessions, favOnly ->
+            if (favOnly) sessions.filter { it.isFavourite } else sessions
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _selectedSessionId = MutableStateFlow<Long?>(null)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -686,6 +707,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // liveSessionStartOdometer. Keep these in sync with the local mirrors inside
     // the combine block — they move together.
     private var liveDriveSessionActive: Boolean = false
+    // True once restoreTripState has completed for the current trip, so we don't
+    // re-restore on every inTrip && !wasInTrip edge during the same engine-on cycle.
+    private var sessionRestoredFromDb: Boolean = false
 
     /** Mirror of TripRepository.speedBin — kept in sync manually. */
     private fun speedBin(speed: Double) = when {
@@ -830,6 +854,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun clearLiveDriveRuntime(keepPoints: Boolean) {
+        sessionRestoredFromDb = false
         liveSessionStartOdometer = null
         segmentStartOdometer = null
         lastTelemetryTimeMs = null
@@ -932,8 +957,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 if (inTrip && !wasInTrip) {
                     val existingTripId = currentTripId.value
-                    if (existingTripId != null && !liveDriveSessionActive) {
+                    // Restore whenever we transition into in-trip and haven't yet synced
+                    // from the DB for this engine-on cycle. This covers:
+                    //  (a) fresh ViewModel start (service restart in Minimal/Deep Sleep)
+                    //  (b) the case where beginLiveDriveSession fired before inTrip=true
+                    //      propagated — the session was initialised incorrectly (energy=0,
+                    //      wrong anchor) and must be overwritten with DB truth.
+                    if (existingTripId != null && !sessionRestoredFromDb) {
                         liveDriveSessionActive = true
+                        sessionRestoredFromDb = true   // guard against re-entry this cycle
                         restoreTripState(existingTripId, telemetry, telemetryMs)
                         wasInTrip = inTrip
                         return@collect
@@ -1040,14 +1072,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     lastTelemetryTimeMs = telemetryMs
 
+                    // Distance is primarily odometer-based (ground truth), but the BYD
+                    // odometer / statistic ECU lags after an engine restart — it can keep
+                    // reporting a stale value for several seconds while the car is already
+                    // moving again. During that window the odometer delta is 0, which used
+                    // to freeze the live Distance / segment at 0 (the classic "0.0 (2.5)"
+                    // after a brief stop). The speed-integrated counters (advanced every
+                    // tick from effectiveSpeed, which already folds in GPS speed) bridge
+                    // that gap so distance keeps growing; the odometer reclaims the value
+                    // via max() the moment it advances, keeping the figure odometer-accurate.
                     val previousDistanceKm = _liveDistanceKm.value
                     val currentDistanceKm = maxOf(
                         previousDistanceKm,
-                        currentLiveSessionDistanceKm(telemetry)
+                        currentLiveSessionDistanceKm(telemetry),
+                        integratedDistanceKm
                     )
                     val currentSegmentDistanceKm = maxOf(
                         _liveSegmentDistanceKm.value,
-                        currentLiveSegmentDistanceKm(telemetry)
+                        currentLiveSegmentDistanceKm(telemetry),
+                        integratedSegmentDistanceKm
                     )
                     val prevOdo = lastBinOdo
                     if (prevOdo != null) {
@@ -1081,6 +1124,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val distKm = currentDistanceKm
                     _liveDistanceKm.value = distKm
                     _liveSegmentDistanceKm.value = currentSegmentDistanceKm
+                    // Re-sync the speed-integrated bridge to the odometer whenever the
+                    // odometer advances, so the integration can't drift above ground truth
+                    // over a long trip (the BYD speedometer reads a few % high). The
+                    // integration therefore only ever *leads* during the brief windows
+                    // where the odometer is stale, and snaps back to the odometer the
+                    // moment it ticks.
+                    if (prevOdo != null && telemetry.odometer > prevOdo) {
+                        integratedDistanceKm = currentLiveSessionDistanceKm(telemetry)
+                        integratedSegmentDistanceKm = currentLiveSegmentDistanceKm(telemetry)
+                    }
                     // Live "energy consumed" comes from the BMS totalDischarge delta
                     // (current reading − the trip's start anchor), so it matches what
                     // the post-trip overview will store and what reference apps like
@@ -1408,7 +1461,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 // Reconstruct off-state duration from the stored data-point gaps so
                 // the live TIME/AVG match what the trip will store at close. Mirrors
                 // TripRepository.computeOffStateDurationMs — same 20 s threshold.
-                _liveOffStateMs.value = run {
+                val dbOffStateMs = run {
                     if (dataPoints.size < 2) return@run 0L
                     var off = 0L
                     for (i in 1 until dataPoints.size) {
@@ -1417,6 +1470,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     off
                 }
+                // Add the current pending off-state that isn't stored in DB yet — the
+                // car just came back on. segmentOffSinceMs is set when the car turned off
+                // (same ViewModel session); on a fresh ViewModel start (Minimal/Deep Sleep
+                // service restart) it is null, so we fall back to the gap from the last
+                // stored data point, which approximates the parked window.
+                val currentOffMs = segmentOffSinceMs
+                    ?.let { (telemetryMs - it).coerceAtLeast(0L) }
+                    ?: dataPoints.lastOrNull()?.let { lastPt ->
+                        val gap = telemetryMs - lastPt.timestamp
+                        if (gap > 20_000L) gap else 0L
+                    } ?: 0L
+                _liveOffStateMs.value = dbOffStateMs + currentOffMs
 
                 // Reconstruct accumulated energy by replaying per-pair BMS totalDischarge
                 // deltas across the stored data points — the same source the LIVE path
@@ -1723,7 +1788,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val regenEffMin:    Float? = null,   // %
         val regenEffMax:    Float? = null,
         val maxSpeedMin:    Float? = null,   // km/h
-        val maxSpeedMax:    Float? = null
+        val maxSpeedMax:    Float? = null,
+        // Quick toggle (separate star chip in the UI) — not part of the numeric
+        // range-filter sheet, so deliberately excluded from activeFilterCount.
+        val favouritesOnly: Boolean = false
     ) {
         val activeFilterCount: Int get() = listOf(
             distanceMin, distanceMax, durationMin, durationMax,
@@ -1768,7 +1836,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             regenEffMin    = getFloatOrNull("f_regen_min"),
             regenEffMax    = getFloatOrNull("f_regen_max"),
             maxSpeedMin    = getFloatOrNull("f_speed_min"),
-            maxSpeedMax    = getFloatOrNull("f_speed_max")
+            maxSpeedMax    = getFloatOrNull("f_speed_max"),
+            favouritesOnly = getBoolean("f_favourites_only", false)
         )
     }
 
@@ -1824,11 +1893,25 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             putFloatOrRemove("f_cons_min",  f.consumptionMin); putFloatOrRemove("f_cons_max",  f.consumptionMax)
             putFloatOrRemove("f_regen_min", f.regenEffMin);    putFloatOrRemove("f_regen_max", f.regenEffMax)
             putFloatOrRemove("f_speed_min", f.maxSpeedMin);    putFloatOrRemove("f_speed_max", f.maxSpeedMax)
+            putBoolean("f_favourites_only", f.favouritesOnly)
             apply()
         }
     }
 
-    fun clearFilters() = setFilter(TripFilterState())
+    /** Clears only the numeric range filters; preserves the favourites-only toggle. */
+    fun clearFilters() = setFilter(TripFilterState(favouritesOnly = _filterState.value.favouritesOnly))
+
+    fun toggleFavouritesOnly() {
+        setFilter(_filterState.value.copy(favouritesOnly = !_filterState.value.favouritesOnly))
+    }
+
+    fun setTripFavourite(tripId: Long, favourite: Boolean) {
+        viewModelScope.launch { tripRepository.setTripFavourite(tripId, favourite) }
+    }
+
+    fun setChargingFavourite(sessionId: Long, favourite: Boolean) {
+        viewModelScope.launch { chargingRepository.setFavourite(sessionId, favourite) }
+    }
 
     val sortedFilteredTrips: StateFlow<List<TripEntity>> =
         combine(allTrips, tripDisplayMetrics, _sortField, _sortOrder, _filterState) {
@@ -1854,7 +1937,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 (filter.regenEffMin    == null || regen  >= filter.regenEffMin)    &&
                 (filter.regenEffMax    == null || regen  <= filter.regenEffMax)    &&
                 (filter.maxSpeedMin    == null || spd    >= filter.maxSpeedMin)    &&
-                (filter.maxSpeedMax    == null || spd    <= filter.maxSpeedMax)
+                (filter.maxSpeedMax    == null || spd    <= filter.maxSpeedMax)    &&
+                (!filter.favouritesOnly || trip.isFavourite)
             }
 
             val sorted = when (field) {

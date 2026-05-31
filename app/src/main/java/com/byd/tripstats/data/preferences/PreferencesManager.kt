@@ -36,8 +36,11 @@ private val THEME_MODE                   = stringPreferencesKey("theme_mode")
 private val SOC_SOURCE                   = stringPreferencesKey("soc_source")
 private val CAR_OFF_TIMEOUT_MINUTES      = intPreferencesKey("car_off_timeout_minutes")
 private val MIN_TRIP_DISTANCE_KM         = doublePreferencesKey("min_trip_distance_km")
+private val WEB_SERVER_ENABLED           = booleanPreferencesKey("web_server_enabled")
+private val WEB_SERVER_PORT              = intPreferencesKey("web_server_port")
+private val WEB_SERVER_PIN               = stringPreferencesKey("web_server_pin")
 
-const val DEFAULT_CAR_OFF_TIMEOUT_MINUTES = 30
+const val DEFAULT_CAR_OFF_TIMEOUT_MINUTES = 3
 const val DEFAULT_MIN_TRIP_DISTANCE_KM    = 0.0
 
 class PreferencesManager(private val context: Context) {
@@ -116,22 +119,25 @@ class PreferencesManager(private val context: Context) {
     //   ENABLED    — service runs 24/7 (old true)
     //   DISABLED   — service stops after 5 min, 90-min wakeup for snapshots (old false)
     //   DEEP_SLEEP — service stops after 5 min, no wakeups, car can fully deep sleep
-    // Backward compat: if OFF_STATE_MODE is unset, falls back to old boolean key.
+    // Default is DISABLED (Minimal). Backward compat: only an EXPLICIT legacy
+    // keepServiceAliveWhenOff=true is honoured as ENABLED (Always On); anyone who
+    // never explicitly chose Always On — including new installs — defaults to Minimal.
 
     val offStateMode: Flow<OffStateMode> = context.dataStore.data
         .map { prefs ->
             prefs[OFF_STATE_MODE]
                 ?.let { runCatching { OffStateMode.valueOf(it) }.getOrNull() }
-                ?: if (prefs[KEEP_SERVICE_ALIVE_WHEN_OFF] == false) OffStateMode.DISABLED
-                   else OffStateMode.ENABLED
+                ?: if (prefs[KEEP_SERVICE_ALIVE_WHEN_OFF] == true) OffStateMode.ENABLED
+                   else OffStateMode.DISABLED
         }
         .onEach { cache.edit().putString("off_state_mode", it.name).apply() }
 
     fun getCachedOffStateMode(): OffStateMode =
         cache.getString("off_state_mode", null)
             ?.let { runCatching { OffStateMode.valueOf(it) }.getOrNull() }
-            ?: if (!getCachedKeepServiceAliveWhenOff()) OffStateMode.DISABLED
-               else OffStateMode.ENABLED
+            ?: if (cache.contains("keep_service_alive_when_off") && getCachedKeepServiceAliveWhenOff())
+                   OffStateMode.ENABLED
+               else OffStateMode.DISABLED
 
     suspend fun saveOffStateMode(mode: OffStateMode) {
         context.dataStore.edit { it[OFF_STATE_MODE] = mode.name }
@@ -292,5 +298,44 @@ class PreferencesManager(private val context: Context) {
         val clamped = km.coerceAtLeast(0.0)
         context.dataStore.edit { it[MIN_TRIP_DISTANCE_KM] = clamped }
         cache.edit().putFloat("min_trip_distance_km", clamped.toFloat()).apply()
+    }
+
+    // ── Web companion server ──────────────────────────────────────────────────
+
+    val webServerEnabled: Flow<Boolean> = context.dataStore.data
+        .map { it[WEB_SERVER_ENABLED] ?: true }
+
+    fun getCachedWebServerEnabled(): Boolean =
+        context.dataStore.data.let { false }  // non-critical; always read from Flow
+
+    suspend fun saveWebServerEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[WEB_SERVER_ENABLED] = enabled }
+    }
+
+    val webServerPort: Flow<Int> = context.dataStore.data
+        .map { it[WEB_SERVER_PORT] ?: DEFAULT_WEB_SERVER_PORT }
+
+    suspend fun saveWebServerPort(port: Int) {
+        context.dataStore.edit { it[WEB_SERVER_PORT] = port }
+    }
+
+    val webServerPin: Flow<String> = context.dataStore.data
+        .map { it[WEB_SERVER_PIN] ?: "" }
+
+    /** Returns the stored PIN, auto-generating and persisting one if none exists yet. */
+    suspend fun getOrCreateWebServerPin(): String {
+        val existing = webServerPin.first()
+        if (existing.isNotEmpty()) return existing
+        val generated = (100_000..999_999).random().toString()
+        saveWebServerPin(generated)
+        return generated
+    }
+
+    suspend fun saveWebServerPin(pin: String) {
+        context.dataStore.edit { it[WEB_SERVER_PIN] = pin }
+    }
+
+    companion object {
+        const val DEFAULT_WEB_SERVER_PORT = 8888
     }
 }

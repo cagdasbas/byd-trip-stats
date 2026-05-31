@@ -14,6 +14,8 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ElectricalServices
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -38,7 +40,8 @@ fun ChargingHistoryScreen(
     onSessionClick: (Long) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    val sessions by viewModel.allChargingSessions.collectAsState()
+    val sessions by viewModel.displayedChargingSessions.collectAsState()
+    val favouritesOnly by viewModel.chargingFavouritesOnly.collectAsState()
     val socSource by viewModel.socSource.collectAsState()
     val completed = sessions.filter { !it.isActive }.sortedByDescending { it.startTime }
     val active = sessions.filter { it.isActive }.sortedByDescending { it.startTime }
@@ -96,6 +99,18 @@ fun ChargingHistoryScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
+                    } else if (!selectionMode) {
+                        IconButton(onClick = { viewModel.toggleChargingFavouritesOnly() }) {
+                            Icon(
+                                imageVector = if (favouritesOnly)
+                                    Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (favouritesOnly)
+                                    "Show all sessions" else "Show favourites only",
+                                tint = if (favouritesOnly)
+                                    ChargingYellow else LocalContentColor.current,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
                 },
                 colors =
@@ -119,13 +134,16 @@ fun ChargingHistoryScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "No charging sessions yet",
+                        if (favouritesOnly) "No favourite sessions yet" else "No charging sessions yet",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Sessions are reconstructed automatically\nfrom SoC changes on each car wake-up",
+                        if (favouritesOnly)
+                            "Tap the ☆ on a session to mark it a favourite"
+                        else
+                            "Sessions are reconstructed automatically\nfrom SoC changes on each car wake-up",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -166,6 +184,7 @@ fun ChargingHistoryScreen(
                                 selectedSessions = setOf(session.id)
                             }
                         },
+                        onToggleFavourite = { viewModel.setChargingFavourite(session.id, !session.isFavourite) },
                         onDelete = { viewModel.deleteChargingSession(session.id) }
                     )
                 }
@@ -200,6 +219,7 @@ fun ChargingHistoryScreen(
                                 selectedSessions = setOf(session.id)
                             }
                         },
+                        onToggleFavourite = { viewModel.setChargingFavourite(session.id, !session.isFavourite) },
                         onDelete = { viewModel.deleteChargingSession(session.id) }
                     )
                 }
@@ -322,6 +342,7 @@ private fun ChargingSessionCard(
     socSource    : SocSource = SocSource.PANEL,
     onClick      : () -> Unit,
     onLongClick  : () -> Unit = {},
+    onToggleFavourite: () -> Unit = {},
     onDelete     : () -> Unit = {}
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -414,6 +435,27 @@ private fun ChargingSessionCard(
                     }
                 }
 
+                // Favourite star — reserve space; only actionable for completed sessions
+                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    if (!selectionMode && !isActive) {
+                        IconButton(
+                            onClick = onToggleFavourite,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (session.isFavourite)
+                                    Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (session.isFavourite)
+                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (session.isFavourite)
+                                    ChargingYellow
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
                 // Delete icon
                 Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
                     if (!selectionMode) {

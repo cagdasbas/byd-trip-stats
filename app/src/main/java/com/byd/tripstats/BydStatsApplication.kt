@@ -3,8 +3,10 @@ package com.byd.tripstats
 import android.app.Application
 import android.util.Log
 import androidx.work.Configuration
+import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.runtimebridge.RuntimeExtensionBridge
 import com.byd.tripstats.sdk.VehicleCompatibilityProbe
+import com.byd.tripstats.server.WebServerManager
 import com.byd.tripstats.service.ServiceRestarterJobService
 import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.util.RtDispatch
@@ -17,6 +19,7 @@ import com.byd.tripstats.worker.ServiceWatchdogWorker
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -43,6 +46,18 @@ class BydStatsApplication : Application(), Configuration.Provider {
         applyRuntimePatches()
         DatabaseMaintenanceWorker.schedule(this)
         VehicleCompatibilityProbe.initialize(this)
+        // Restore the web companion server if the user had it enabled.
+        // Runs unconditionally — the server only needs the DB, not the telemetry service.
+        // It doesn't run in deep sleep mode.
+        CoroutineScope(Dispatchers.IO).launch {
+            val prefs = PreferencesManager(applicationContext)
+            if (prefs.webServerEnabled.first()) {
+                val port = prefs.webServerPort.first()
+                val pin  = prefs.getOrCreateWebServerPin()
+                val err  = WebServerManager.start(applicationContext, port, pin)
+                if (err != null) Log.w(TAG, "Web companion failed to start at boot on port $port: $err")
+            }
+        }
         // If the service self-stopped due to off-state idle, skip re-arming the
         // periodic restart sources and skip auto-starting the service. The
         // process may have been recreated by an alarm/job firing — letting

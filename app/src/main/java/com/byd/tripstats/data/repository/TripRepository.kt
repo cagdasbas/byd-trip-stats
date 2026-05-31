@@ -152,15 +152,20 @@ class TripRepository private constructor(context: Context) {
     // tick-by-tick. Also used as the "energy actually consumed so far"
     // estimate for the per-tick stale-zero anchor correction below.
     private var tripIntegratedDischargeKwh = 0.0
-    // Sum of max(0, currentTotalDischarge − previousTotalDischarge) accumulated
-    // tick-by-tick across the trip. Required because BYD's getTotalElecConValue
-    // resets at every car-on cycle on many firmwares (notably PHEV and the Seal
-    // Excellence) — so a trip that spans an engine-off pause has the counter
-    // running 0→4 in segment 1, 0→2 in segment 2, etc. A naive end−start (or
-    // tripBestTotalDischarge − start) would only capture one segment. Summing
-    // positive per-tick deltas works whether the counter resets or is lifetime-
-    // cumulative: negative deltas (the reset itself) are dropped as 0; within
-    // each segment, positive deltas sum to that segment's real consumption.
+    // Net energy consumed, accumulated tick-by-tick across the trip from BYD's
+    // getTotalElecConValue. Required because that counter resets at every car-on
+    // cycle on many firmwares (notably PHEV and the Seal Excellence) — so a trip
+    // spanning an engine-off pause runs 0→4 in segment 1, 0→2 in segment 2, etc.,
+    // and a naive end−start would only capture one segment.
+    //
+    // Within a segment the counter moves UP on discharge and DOWN on regen, so we
+    // sum BOTH signs to get NET consumption (matching the car's own kWh/100km and
+    // reference apps). We previously summed only positive deltas, which silently
+    // discarded all regen and over-reported energy by the regen amount (large on
+    // hilly trips). The car-on counter reset is handled separately by dropping the
+    // anchor at the off→on transition (live path) / across segment-gap boundaries
+    // (recovery path), so the only large negative deltas left are sensor glitches,
+    // rejected by the ±50 kWh/tick cap.
     private var tripCumulativeBmsDeltaKwh = 0.0
     private var lastTripTotalDischarge: Double? = null
     // Running min of telemetry.soc seen during the active trip. Pairs with the
@@ -295,7 +300,12 @@ class TripRepository private constructor(context: Context) {
         maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
 
     private fun shouldBackAnchorTripStart(previousTelemetry: VehicleTelemetry?): Boolean {
-        if (previousTelemetry == null) return true
+        // On a fresh service start previousTelemetry is null — we have no reliable
+        // evidence that the car was already in motion before we connected. The
+        // stale-counter guard in doStartTrip is the real safety net; returning false
+        // here is an additional layer so a stale null-previous can't force
+        // backAnchorToJourney=true and produce an enormous startOdometer.
+        if (previousTelemetry == null) return false
         return previousTelemetry.gear in DRIVE_GEARS ||
             effectiveSpeedKmh(previousTelemetry) > 2.0 ||
             kotlin.math.abs(previousTelemetry.enginePower) > 5 ||
@@ -384,8 +394,17 @@ class TripRepository private constructor(context: Context) {
                         .putBoolean(PREF_OFFSTATE_BACKFILL_DONE, true)
                         .apply()
                 }
+                // One-shot repair of trips corrupted by an earlier thinning +
+                // off-state-recompute interaction (impossible avg speeds). Runs once,
+                // after the backfill, so any backfill output is included.
+                if (!prefs.getBoolean(PREF_DURATION_REPAIR_DONE, false)) {
+                    repairImplausibleDurations()
+                    prefs.edit()
+                        .putBoolean(PREF_DURATION_REPAIR_DONE, true)
+                        .apply()
+                }
             } catch (e: Exception) {
-                Log.w(TAG, "offStateDuration backfill failed: ${e.message}")
+                Log.w(TAG, "offStateDuration backfill / repair failed: ${e.message}")
             }
         }
     }
@@ -418,7 +437,22 @@ class TripRepository private constructor(context: Context) {
         for (trip in all) {
             val points = dataPointDao.getDataPointsForTripSync(trip.id)
             val off = computeOffStateDurationMs(points, trip.endTime)
-            if (off != trip.offStateDurationMs) {
+            // Guard against thinned trips: once a trip's data points have been
+            // down-sampled (manual trimmer → 1 point/min), the gaps between
+            // retained points exceed OFFSTATE_GAP_THRESHOLD_MS purely because of
+            // reduced density, and computeOffStateDurationMs mistakes that thinned
+            // driving for engine-off time. The result is an off-state spanning
+            // almost the whole trip → duration collapses → avg speed explodes.
+            // Reject any recompute that would imply a physically impossible average
+            // speed (> 200 km/h); keep the trip's existing (close-time) value.
+            val implausible = run {
+                val end  = trip.endTime ?: return@run false
+                val dist = trip.distance ?: return@run false
+                if (dist <= 0.0) return@run false
+                val durMs = (end - trip.startTime - off).coerceAtLeast(0L)
+                durMs <= 0L || dist / (durMs / 3_600_000.0) > 200.0
+            }
+            if (off != trip.offStateDurationMs && !implausible) {
                 val correctedTrip = trip.copy(offStateDurationMs = off)
                 tripDao.updateTrip(correctedTrip)
                 // Lightweight stats touch: just refresh totalDuration / avgSpeed so the
@@ -443,6 +477,60 @@ class TripRepository private constructor(context: Context) {
             kotlinx.coroutines.yield()
         }
         Log.i(TAG, "offStateDuration backfill: updated $updated / ${all.size} trips")
+    }
+
+    /**
+     * One-shot repair for trips whose stored duration was corrupted by the
+     * thinning + off-state-recompute interaction (see [backfillOffStateDuration]'s
+     * guard): an inflated offStateDurationMs collapsed the trip's duration toward
+     * zero, producing an impossible average speed (e.g. 11 000 km/h).
+     *
+     * For each completed trip whose *stored* duration implies > 200 km/h, we
+     * re-estimate the real driving time from the span of the retained data points
+     * (first-to-last timestamp — this survives thinning and reflects actual elapsed
+     * time), fall back to the wallclock span if needed, then rewrite
+     * offStateDurationMs (so [TripEntity.duration] is correct) and the stored
+     * avgSpeed. Trips that are already plausible are left untouched.
+     */
+    private suspend fun repairImplausibleDurations() {
+        val all = tripDao.getCompletedTripsBefore(Long.MAX_VALUE)
+        if (all.isEmpty()) return
+        var fixed = 0
+        for (trip in all) {
+            val end  = trip.endTime ?: continue
+            val dist = trip.distance ?: continue
+            if (dist <= 0.0) continue
+
+            val storedDurMs = (end - trip.startTime - trip.offStateDurationMs).coerceAtLeast(0L)
+            val storedImplausible =
+                storedDurMs <= 0L || dist / (storedDurMs / 3_600_000.0) > 200.0
+            if (!storedImplausible) continue
+
+            val points     = dataPointDao.getDataPointsForTripSync(trip.id)
+            val wallclock  = (end - trip.startTime).coerceAtLeast(0L)
+            val pointsSpan = if (points.size >= 2)
+                (points.last().timestamp - points.first().timestamp).coerceAtLeast(0L) else 0L
+
+            fun plausible(durMs: Long) = durMs > 0L && dist / (durMs / 3_600_000.0) <= 200.0
+            val candidate = when {
+                plausible(pointsSpan) -> pointsSpan      // best: real recorded span
+                plausible(wallclock)  -> wallclock       // fallback: full wallclock
+                else                  -> 0L              // unrecoverable — leave as-is
+            }
+            if (candidate <= 0L) continue
+
+            val newOff = (wallclock - candidate).coerceAtLeast(0L)
+            tripDao.updateTrip(trip.copy(offStateDurationMs = newOff))
+            statsDao.getStatsForTrip(trip.id)?.let { stats ->
+                statsDao.updateStats(stats.copy(
+                    totalDuration = candidate,
+                    avgSpeed      = dist / (candidate / 3_600_000.0)
+                ))
+            }
+            fixed++
+            kotlinx.coroutines.yield()
+        }
+        Log.i(TAG, "duration repair: fixed $fixed / ${all.size} trips")
     }
 
     // ── Event dispatcher ──────────────────────────────────────────────────────
@@ -550,6 +638,11 @@ class TripRepository private constructor(context: Context) {
                 if (carOffSinceMs > 0L) {
                     Log.i(TAG, "Engine back ON after ${(now - carOffSinceMs) / 1000}s — continuing trip")
                     carOffSinceMs = 0L
+                    // getTotalElecConValue resets to ~0 at car-on on resetting firmwares,
+                    // so the first post-resume delta would be a large negative jump. Drop
+                    // the energy anchor so that one delta is skipped (the next tick re-anchors);
+                    // in-segment regen is still credited by the net accumulator below.
+                    lastTripTotalDischarge = null
                 }
 
                 // Extend the best-known distance. Odometer delta is ground truth
@@ -580,15 +673,16 @@ class TripRepository private constructor(context: Context) {
                     t.totalDischarge > tripBestTotalDischarge) {
                     tripBestTotalDischarge = t.totalDischarge
                 }
-                // Cumulative per-segment BMS delta. See field declaration for rationale.
-                // A backwards jump (counter reset between segments) contributes 0.
+                // Net per-segment BMS delta — see field declaration. Both signs are
+                // summed: positive = discharge, negative = regen. The car-on counter
+                // reset is handled by dropping the anchor in the off→on branch above,
+                // so the only deltas reaching here are within-segment. The ±50 kWh/tick
+                // cap rejects sensor glitches (a single tick can't physically move that).
                 if (t.totalDischarge.isFinite() && t.totalDischarge >= 0.0) {
                     val prev = lastTripTotalDischarge
                     if (prev != null) {
                         val delta = t.totalDischarge - prev
-                        if (delta > 0.0 && delta < 50.0) {
-                            // Cap per-tick delta at 50 kWh — anything larger is a sensor glitch
-                            // (a single tick can't physically pull more than that).
+                        if (delta > -50.0 && delta < 50.0) {
                             tripCumulativeBmsDeltaKwh += delta
                         }
                     }
@@ -770,23 +864,28 @@ class TripRepository private constructor(context: Context) {
             }
             sum
         }
-        // Re-sum positive per-tick totalDischarge deltas across the stored points so
-        // a recovery resumes the per-segment cumulative draw rather than restarting
-        // at 0 and under-counting after the resume.
+        // Re-sum per-tick totalDischarge deltas across the stored points (NET of regen)
+        // so a recovery resumes the per-segment draw rather than restarting at 0. A large
+        // time gap marks a segment boundary where the car-on counter reset, so the delta
+        // across it is dropped; within a segment both signs are summed (discharge + regen).
         tripCumulativeBmsDeltaKwh = run {
             var sum = 0.0
             var last: Double? = null
+            var lastTs: Long? = null
             for (dp in dataPoints) {
                 val td = dp.totalDischarge
                 if (td.isFinite() && td >= 0.0) {
-                    if (last != null) {
+                    val withinSegment = lastTs != null &&
+                        (dp.timestamp - lastTs) < OFFSTATE_GAP_THRESHOLD_MS
+                    if (last != null && withinSegment) {
                         val delta = td - last
-                        if (delta > 0.0 && delta < 50.0) sum += delta
+                        if (delta > -50.0 && delta < 50.0) sum += delta
                     }
                     last = td
+                    lastTs = dp.timestamp
                 }
             }
-            sum
+            sum.coerceAtLeast(0.0)
         }
         lastTripTotalDischarge = dataPoints.lastOrNull()?.totalDischarge
             ?.takeIf { it.isFinite() && it >= 0.0 }
@@ -878,11 +977,26 @@ class TripRepository private constructor(context: Context) {
         // Do not use it for manual starts or for the first moving packet seen
         // after a parked/off packet, otherwise the trip grows beyond the exact
         // timestamps the user expects.
-        val journeyKm = telemetry.currentJourneyDriveMileage
+        val journeyKmRaw = telemetry.currentJourneyDriveMileage
             ?.takeIf { backAnchorToJourney && it.isFinite() && it > 0.01 } ?: 0.0
+        // Guard: same stale-counter check the ViewModel applies to its back-date logic.
+        // If journeyDistance ÷ journeyTime > 200 km/h the mileage counter has not reset
+        // across the engine cycle (e.g. fresh start with the previous run's counter still
+        // showing 60 km). Using it would anchor startOdometer far in the past, inflating
+        // the stored trip distance by the entire day's driving.
+        val journeyTimeMin = telemetry.currentJourneyDriveTime
+        val journeyCountersStale = journeyKmRaw > 0.0 && run {
+            val timeMs = journeyTimeMin?.takeIf { it.isFinite() && it > 0.0 }
+                ?.let { (it * 60_000.0).toLong() }
+            timeMs != null && journeyKmRaw / (timeMs / 3_600_000.0) > 200.0
+        }
+        if (journeyCountersStale) {
+            Log.w(TAG, "Trip start: journey counters stale (${journeyKmRaw}km implied >200km/h) — anchoring at current odometer")
+        }
+        val journeyKm = if (journeyCountersStale) 0.0 else journeyKmRaw
         val startOdometer = (telemetry.odometer - journeyKm).coerceAtLeast(0.0)
         val backdateMs = if (journeyKm > 0.0) {
-            telemetry.currentJourneyDriveTime
+            journeyTimeMin
                 ?.takeIf { it.isFinite() && it > 0.0 }
                 ?.let { (it * 60_000.0).toLong() }
                 ?: run {
@@ -1034,12 +1148,17 @@ class TripRepository private constructor(context: Context) {
         // and 0→2 in segment 2; a naive end−start (or best−start) captures
         // only one segment's worth, halving (or worse) the recorded consumption.
         //
-        // tripCumulativeBmsDeltaKwh accumulates max(0, per-tick Δ) across all
-        // segments, so segment resets contribute 0 instead of dragging the total
-        // back down. This is the authoritative value on counter-resetting firmwares
-        // and equals end−start when the counter is lifetime-cumulative.
+        // tripCumulativeBmsDeltaKwh sums NET per-tick deltas (discharge minus regen)
+        // across all segments, dropping the counter reset at each car-on boundary. It
+        // is the authoritative consumption: for a single segment it telescopes exactly
+        // to end−start, and across resets it sums each segment correctly.
         val cumulativeBmsCandidate = (trip.startTotalDischarge + tripCumulativeBmsDeltaKwh)
             .takeIf { tripCumulativeBmsDeltaKwh > 0.0 }
+        // Fallbacks only — used when the cumulative value is unavailable. NOTE:
+        // tripBestTotalDischarge is the running PEAK; on a counter that nets out regen
+        // it sits above the end value (regen after the peak), so it must never be
+        // preferred over the cumulative net figure or it would re-introduce the
+        // gross/over-count. It's kept here purely as a last-resort stale-end guard.
         val dischargeCandidates = listOfNotNull(
             endTelemetry?.totalDischarge?.takeIf { it > trip.startTotalDischarge },
             endPointFallback?.totalDischarge?.takeIf { it > trip.startTotalDischarge },
@@ -1047,12 +1166,12 @@ class TripRepository private constructor(context: Context) {
         )
         val powerIntegratedFallback = (trip.startTotalDischarge + tripIntegratedDischargeKwh)
             .takeIf { cumulativeBmsCandidate == null && dischargeCandidates.isEmpty() && tripIntegratedDischargeKwh > 0.0 }
-        // Prefer the cumulative-BMS value when it exceeds anything else — by
-        // construction it cannot under-report relative to a single end−start
-        // read (it sums everything), but a stale-zero start could let the raw
-        // dischargeCandidates legitimately come out higher.
+        // Prefer the cumulative NET value whenever it's available; only fall back to
+        // the raw end/peak reads when no net total was accumulated (e.g. a trip that
+        // never produced a usable per-tick delta).
         val candidateEndDischarge = overrideTotalDischarge
-            ?: listOfNotNull(cumulativeBmsCandidate, dischargeCandidates.maxOrNull()).maxOrNull()
+            ?: cumulativeBmsCandidate
+            ?: dischargeCandidates.maxOrNull()
             ?: powerIntegratedFallback
             ?: trip.startTotalDischarge
 
@@ -1395,6 +1514,13 @@ class TripRepository private constructor(context: Context) {
 
     // ── Trip metrics ──────────────────────────────────────────────────────────
 
+    // Max-Speed spike rejection state (see usage below). The BYD SpeedDevice can emit a lone
+    // garbage reading; without this, one bad sample would pin the trip's Max Speed for the
+    // whole trip (maxSpeed is a running max). Averages are distance/time based and unaffected.
+    private val maxPlausibleSpeedKmh = 250.0   // absolute ceiling — above any production BYD top speed
+    private val maxSpeedStepKmh = 80.0         // max believable change between consecutive samples
+    private var lastAcceptedSpeedKmh: Double? = null
+
     private suspend fun updateTripMetrics(t: VehicleTelemetry) {
         val trip = cachedCurrentTrip ?: return
 
@@ -1411,8 +1537,16 @@ class TripRepository private constructor(context: Context) {
             if (trip.minBatteryCellTemp == Int.MAX_VALUE) it else minOf(trip.minBatteryCellTemp, it)
         } ?: trip.minBatteryCellTemp
 
+        // Spike rejection: only fold this sample into maxSpeed if it's under the absolute
+        // ceiling AND not an impossible jump from the last accepted sample (see fields above).
+        val prevSpeed = lastAcceptedSpeedKmh
+        val speedIsPlausible = t.speed in 0.0..maxPlausibleSpeedKmh &&
+            (prevSpeed == null || t.speed <= prevSpeed + maxSpeedStepKmh)
+        if (speedIsPlausible) lastAcceptedSpeedKmh = t.speed
+        val nextMaxSpeed = if (speedIsPlausible && t.speed > trip.maxSpeed) t.speed else trip.maxSpeed
+
         val updated = trip.copy(
-            maxSpeed           = maxOf(trip.maxSpeed, t.speed),
+            maxSpeed           = nextMaxSpeed,
             maxPower           = maxOf(trip.maxPower, t.enginePower.toDouble()),
             maxRegenPower      = if (t.isRegenerating)
                                      minOf(trip.maxRegenPower, t.enginePower.toDouble())
@@ -1714,6 +1848,11 @@ class TripRepository private constructor(context: Context) {
         }
     }
 
+    /** Flags/unflags a trip as favourite — favourites are exempt from all trimming. */
+    suspend fun setTripFavourite(tripId: Long, favourite: Boolean) {
+        tripDao.setFavourite(tripId, favourite)
+    }
+
     fun setAutoTripDetection(enabled: Boolean) {
         autoTripDetection = enabled
         prefs.edit().putBoolean(PREF_AUTO_TRIP, enabled).apply()
@@ -1724,35 +1863,40 @@ class TripRepository private constructor(context: Context) {
     /**
      * Reduces storage for old trips by removing redundant data points.
      *
+     * NOT auto-invoked. As of the favourites release, automatic thinning was
+     * removed — point-thinning is now exclusively user-initiated via the manual
+     * "Trim database" action (DatabaseTrimmer). This tiered thinner is retained
+     * only for potential future use behind an explicit user action; nothing calls
+     * it automatically.
+     *
      * Tiered thinning — keeps recent trips at full resolution, progressively
-     * decimates older trips to reduce storage. First and last points of each
-     * trip are always preserved so route endpoints and stats are unaffected.
+     * decimates older trips. First and last points of each trip are always
+     * preserved, favourited trips are skipped, and trip-level stats (distance,
+     * energy, efficiency) live in TripEntity / TripStatsEntity and are unaffected.
      *
      * Tier policy (trip age → keep one point per N seconds):
-     *   < 7 days   →  kept at full 1 s resolution (untouched)
-     *   7–30 days  →  1 point / 2 s  (~50% reduction)
-     *   30–90 days →  1 point / 10 s (~80% reduction)
-     *   > 90 days  →  1 point / 15 s (~90% reduction)
-     *
-     * Trip-level stats (distance, energy, efficiency) live in TripEntity /
-     * TripStatsEntity and are completely unaffected by thinning.
-     *
-     * Called by DatabaseMaintenanceWorker on a monthly schedule.
+     *   < 45 days   →  untouched (full resolution)
+     *   45–90 days  →  1 point / 2 s
+     *   90–180 days →  1 point / 4 s
+     *   > 180 days  →  1 point / 10 s
      */
     suspend fun thinOldDataPoints() {
         val nowMs = System.currentTimeMillis()
 
-        // Tier boundaries in milliseconds
-        val day7Ms  =  7L * 24L * 3_600_000L
-        val day30Ms = 30L * 24L * 3_600_000L
-        val day90Ms = 90L * 24L * 3_600_000L
+        // Tier boundaries in milliseconds. Recent trips keep full fidelity — nothing
+        // is thinned until a trip is older than 45 days. Favourited trips are never
+        // thinned regardless of age.
+        val day45Ms  =  45L * 24L * 3_600_000L
+        val day90Ms  =  90L * 24L * 3_600_000L
+        val day180Ms = 180L * 24L * 3_600_000L
 
-        // Trips older than 7 days are candidates — anything newer is untouched
-        val cutoffMs = nowMs - day7Ms
+        // Trips older than 45 days are candidates — anything newer is untouched
+        val cutoffMs = nowMs - day45Ms
         val oldTrips = tripDao.getCompletedTripsBefore(cutoffMs)
+            .filterNot { it.isFavourite }   // favourites keep full data-point density
 
         if (oldTrips.isEmpty()) {
-            Log.i(TAG, "thinOldDataPoints: no trips older than 7 days")
+            Log.i(TAG, "thinOldDataPoints: no non-favourite trips older than 45 days")
             return
         }
 
@@ -1763,9 +1907,9 @@ class TripRepository private constructor(context: Context) {
 
             // Determine keep interval for this trip's age tier
             val keepIntervalMs = when {
-                ageMs < day30Ms -> 2_000L    //  7–30 days:  1 point/2 s
-                ageMs < day90Ms -> 10_000L   // 30–90 days:  1 point/10 s
-                else            -> 15_000L   //   > 90 days: 1 point/15 s
+                ageMs < day90Ms  -> 2_000L   //  45–90 days:  1 point/2 s
+                ageMs < day180Ms -> 4_000L   //  90–180 days: 1 point/4 s
+                else             -> 10_000L  //    > 180 days: 1 point/10 s
             }
 
             val points = dataPointDao.getDataPointsForTripSync(trip.id)
@@ -1807,6 +1951,7 @@ class TripRepository private constructor(context: Context) {
     companion object {
         private const val PREF_AUTO_TRIP = "auto_trip_detection"
         private const val PREF_OFFSTATE_BACKFILL_DONE = "offstate_duration_backfill_v4"
+        private const val PREF_DURATION_REPAIR_DONE = "duration_repair_v1"
 
         /**
          * Gap between consecutive recorded data points (or between the last point

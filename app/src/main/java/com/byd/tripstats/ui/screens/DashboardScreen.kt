@@ -308,6 +308,7 @@ fun DashboardScreen(
                 historyPoints = batteryVoltageHistory24h,
                 telemetry = currentTelemetry,
                 vehicleSnapshot = vehicleSnapshot,
+                socSource = socSource,
                 onDismiss = { showBattery12vDialog = false }
             )
         }
@@ -1815,7 +1816,6 @@ fun VehicleStats(
         val isStopped = telemetry.speed < 0.5
         val frontMotorRpm = if (isStopped) null else telemetry.engineSpeedFront.takeIf { it >= 10 }
         val rearMotorRpm  = if (isStopped) null else telemetry.engineSpeedRear.takeIf  { it >= 10 }
-        val motorsAreSpinning = (frontMotorRpm != null || rearMotorRpm != null)
 
         // ── Motor card
         when (selectedCar?.drivetrain) {
@@ -1931,6 +1931,7 @@ private fun Battery12vHistoryDialog(
     historyPoints: List<BatteryVoltageHistoryPoint>,
     telemetry: VehicleTelemetry,
     vehicleSnapshot: VehicleTelemetrySnapshot?,
+    socSource: SocSource,
     onDismiss: () -> Unit
 ) {
     val liveTimestamp = remember(
@@ -1950,7 +1951,8 @@ private fun Battery12vHistoryDialog(
                 battery12vVoltage = it,
                 batteryTotalVoltage = liveHvVoltage,
                 isChargingSample = telemetry.isCharging,
-                soc = telemetry.soc
+                soc = telemetry.soc,
+                socPanel = telemetry.socPanel
             )
         }
         val base = historyPoints.toMutableList()
@@ -2014,6 +2016,7 @@ private fun Battery12vHistoryDialog(
                     }
                     Battery12vHistoryChart(
                         points = mergedPoints,
+                        socSource = socSource,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -2053,6 +2056,7 @@ private fun Battery12vSummaryChip(
 @Composable
 private fun Battery12vHistoryChart(
     points: List<BatteryVoltageHistoryPoint>,
+    socSource: SocSource,
     modifier: Modifier = Modifier
 ) {
     if (points.isEmpty()) {
@@ -2193,6 +2197,10 @@ private fun Battery12vHistoryChart(
                     )
                 }
 
+                fun pointSoc(pt: BatteryVoltageHistoryPoint): Double =
+                    if (socSource == SocSource.PANEL && pt.socPanel > 0) pt.socPanel.toDouble()
+                    else pt.soc
+
                 if (points.size == 1) {
                     val x = xOf(points.first().timestamp)
                     val y = yOf(points.first().battery12vVoltage)
@@ -2210,12 +2218,12 @@ private fun Battery12vHistoryChart(
                         style = Stroke(width = 4f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
                     // SoC line (dashed, only for points that have SoC recorded)
-                    val socPoints = points.filter { it.soc > 0.0 }
+                    val socPoints = points.filter { pointSoc(it) > 0.0 }
                     if (socPoints.size >= 2) {
                         val socPath = Path().apply {
-                            moveTo(xOf(socPoints.first().timestamp), yOfSoc(socPoints.first().soc))
+                            moveTo(xOf(socPoints.first().timestamp), yOfSoc(pointSoc(socPoints.first())))
                             socPoints.drop(1).forEach { pt ->
-                                lineTo(xOf(pt.timestamp), yOfSoc(pt.soc))
+                                lineTo(xOf(pt.timestamp), yOfSoc(pointSoc(pt)))
                             }
                         }
                         drawPath(
@@ -2247,7 +2255,7 @@ private fun Battery12vHistoryChart(
                             padR = padR,
                             padT = padT,
                             chartH = chartH,
-                            line1 = "12V: ${"%.2f".format(closest.battery12vVoltage)} V${if (closest.soc > 0.0) "  |  SoC: ${"%.1f".format(closest.soc)}%" else ""}",
+                            line1 = "12V: ${"%.2f".format(closest.battery12vVoltage)} V${pointSoc(closest).takeIf { it > 0.0 }?.let { "  |  SoC: ${"%.1f".format(it)}%" } ?: ""}",
                             line2 = if (closest.isChargingSample) "charging sample" else "drive/live sample",
                             line3 = timeFormatter.format(Date(closest.timestamp)),
                             accentColor = chartColor

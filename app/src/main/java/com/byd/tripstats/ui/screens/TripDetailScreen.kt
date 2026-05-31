@@ -111,9 +111,25 @@ fun TripDetailScreen(
                     }
                 },
                 actions = {
+                    // Favourite star — protects this trip from automatic & manual trimming
+                    trip?.let { currentTrip ->
+                        IconButton(
+                            onClick = { viewModel.setTripFavourite(currentTrip.id, !currentTrip.isFavourite) }
+                        ) {
+                            Icon(
+                                imageVector = if (currentTrip.isFavourite)
+                                    Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (currentTrip.isFavourite)
+                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                tint = if (currentTrip.isFavourite)
+                                    ChargingYellow else LocalContentColor.current,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
                     // Export/Share button
                     IconButton(
-                        onClick = { 
+                        onClick = {
                             // Capture immutable snapshot when button clicked
                             trip?.let { currentTrip ->
                                 dialogData = currentTrip to dataPoints.toList()

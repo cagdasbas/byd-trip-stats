@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
@@ -117,6 +119,22 @@ fun ChargingDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(28.dp))
+                    }
+                },
+                actions = {
+                    // Favourite star — completed sessions only; protects from trimming
+                    session?.takeIf { !it.isActive }?.let { s ->
+                        IconButton(onClick = { viewModel.setChargingFavourite(s.id, !s.isFavourite) }) {
+                            Icon(
+                                imageVector = if (s.isFavourite)
+                                    Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = if (s.isFavourite)
+                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                tint = if (s.isFavourite)
+                                    ChargingYellow else LocalContentColor.current,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

@@ -48,7 +48,14 @@ data class ChargingSessionEntity(
     /** CarConfig.id snapshotted at session start — for display / reference */
     val carConfigId: String = "",
 
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+
+    /**
+     * User-flagged favourite. Favourited sessions are exempt from the manual
+     * DatabaseTrimmer (their charging data points and rawJson are preserved).
+     * Defaults to false.
+     */
+    val isFavourite: Boolean = false
 ) {
     val durationSeconds: Long?
         get() = endTime?.let { (it - startTime) / 1000L }

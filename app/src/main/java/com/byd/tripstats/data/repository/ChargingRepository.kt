@@ -453,6 +453,11 @@ class ChargingRepository private constructor(context: Context) {
         }
     }
 
+    /** Flags/unflags a charging session as favourite — favourites are exempt from trimming. */
+    suspend fun setFavourite(sessionId: Long, favourite: Boolean) {
+        sessionDao.setFavourite(sessionId, favourite)
+    }
+
     // ── Singleton ─────────────────────────────────────────────────────────────
 
     /** Cancels the coroutine scope. Must be called in tests to prevent

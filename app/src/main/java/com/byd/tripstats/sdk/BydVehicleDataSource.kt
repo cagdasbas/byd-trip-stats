@@ -23,6 +23,7 @@ import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.runtimebridge.RuntimeExtensionBridge
+import com.byd.tripstats.util.DiagLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,6 +64,21 @@ private const val DIRECT_CHARGING_POWER_TIMEOUT_MS = 4_000L
 // than this, treat the work state as stale and force it back to 0. Generous
 // margin so a normal taper / pause / brief BMS silence never trips it.
 private const val STALE_CHARGER_WORK_STATE_TIMEOUT_MS = 10 * 60_000L
+// Grace window for bridging a stale 0 from the speed getter when no independent
+// motion signal (power / GPS) is available. The getter updates slower than the
+// 1 s poll, so a 0 lasting under this window during a drive is treated as a glitch
+// and the last known speed is preserved. ~3.5 s covers several missed poll cycles
+// while a genuine stop (sustained 0 with no power/GPS) commits shortly after.
+private const val SPEED_STALE_GRACE_MS = 3_500L
+// How recently the Speed device's event stream must have fired for it to "own" the
+// displayed speed (so the poll getter, which can freeze at a stale 0, doesn't clobber it).
+private const val SPEED_EVENT_FRESHNESS_MS = 3_000L
+// Absolute ceiling for a single speed reading. The BYD SpeedDevice (poll getter and event
+// stream) occasionally emits a one-off garbage value; anything above any production BYD's
+// electronically-limited top speed is treated as a glitch and dropped at the source, so it
+// can't drive the speedometer or poison the learned event→km/h scale. In-range spikes that
+// slip under this ceiling are caught per-sample by the Max-Speed guard in TripRepository.
+private const val MAX_PLAUSIBLE_SPEED_KMH = 250.0
 private const val DRIVE_MODE_UNKNOWN = 0
 
 private enum class InstrumentTyrePressureEncoding {
@@ -737,6 +753,25 @@ class BydVehicleDataSource(context: Context) {
     // genuine sustained changes within one extra poll cycle (~3 s).
     private var pendingPm25In:  Int? = null
     private var pendingPm25Out: Int? = null
+    // elapsedRealtime of the last poll where the speed getter committed a positive
+    // speed. Used to bridge brief getter glitches: a 0 from the getter is only
+    // committed once independent motion signals (power / GPS) also agree the car is
+    // stopped, or after a short grace window with no such signal.
+    private var lastPositiveSpeedElapsedMs = 0L
+    // Throttle for persisting the speed-stall diagnostic to DiagLog.
+    private var lastSpeedStallDiagMs = 0L
+    // Live speed from the Speed device's EVENT stream. The polled getCurrentSpeed getter
+    // can freeze at a stale 0 (until an engine cycle), but these events keep flowing — so
+    // once we learn the raw→km/h scale (from the getter while it still works) we drive
+    // speed from events instead. See the "Speed" branch of dispatchDynamicRawFeatureEvent.
+    @Volatile private var lastSpeedEventRaw: Double? = null
+    @Volatile private var lastSpeedEventElapsedMs: Long = 0L
+    @Volatile private var speedEventScale: Double? = null
+    private var lastSpeedEventDiagMs = 0L
+    // Name of the device-refresh stage currently running. If a getter hangs, this is
+    // left pointing at it so the wedge guard can name the culprit. Read from the service.
+    @Volatile private var currentRefreshStage: String = "idle"
+    val refreshStage: String get() = currentRefreshStage
 
     private var lastChargingCapacityRaw: Double? = null
     private val chargingCapacityHistory = ArrayDeque<Pair<Long, Double>>()
@@ -1670,6 +1705,7 @@ class BydVehicleDataSource(context: Context) {
         engineDevice = null
         statisticDevice = null
         speedDevice = null
+        lastPositiveSpeedElapsedMs = 0L
         lightDevice = null
         powerDevice = null
         sensorDevice = null
@@ -1770,9 +1806,17 @@ class BydVehicleDataSource(context: Context) {
                 }
             }
         }
+        // Batch finished cleanly — mark idle so a later wedge is attributed to the
+        // actual stage that hangs, not a leftover from this completed pass.
+        currentRefreshStage = "idle"
     }
 
     private fun tryDevice(name: String, block: () -> Unit) {
+        // Record the stage we're entering. If a BYD getter inside [block] hangs, this
+        // value is left pointing at the culprit (the next tryDevice never runs to
+        // overwrite it), so the service's wedge guard can report exactly which device's
+        // getter is blocking — turning a frozen-speed reproduction into a precise fix.
+        currentRefreshStage = name
         try {
             block()
         } catch (e: SecurityException) {
@@ -2916,28 +2960,26 @@ class BydVehicleDataSource(context: Context) {
             // poll result (the getter updates slower than the 50 ms poll interval).
             // Preserve the last known value in that case. Only write 0 when the car is
             // genuinely stopped (speed < 1 km/h), which also covers cold-boot / pre-drive.
-            // No sentinel filtering — we do not know which values are firmware sentinels vs
-            // valid readings (e.g. motors can legitimately reach 8 000+ RPM).
+            // 8191/16383/32767/65535 are CAN "signal unavailable" sentinel values (all-ones
+            // patterns at various bit widths); treat them the same as 0 — write 0 when
+            // stopped, preserve last known when moving.
+            val BYD_RPM_SENTINELS = setOf(8191, 16383, 32767, 65535)
             val directSpeedKmh = _vehicleSnapshot.value.directSpeedKmh
             val prevFront = _vehicleSnapshot.value.engineSpeedFront ?: 0
-            val engineSpeedFront = if (engineSpeedFrontRaw == null) {
-                _vehicleSnapshot.value.engineSpeedFront  // no getter on device — preserve
-            } else if (engineSpeedFrontRaw > 0) {
-                engineSpeedFrontRaw
-            } else if (directSpeedKmh < 1.0) {
-                0  // car is stopped — 0 is the correct reading
-            } else {
-                prevFront  // car is moving, SDK returned 0 spuriously — preserve last known
+            val engineSpeedFront = when {
+                engineSpeedFrontRaw == null                        -> _vehicleSnapshot.value.engineSpeedFront
+                engineSpeedFrontRaw in BYD_RPM_SENTINELS          -> if (directSpeedKmh < 1.0) 0 else prevFront
+                engineSpeedFrontRaw > 0                           -> engineSpeedFrontRaw
+                directSpeedKmh < 1.0                              -> 0
+                else                                              -> prevFront
             }
             val prevRear = _vehicleSnapshot.value.engineSpeedRear ?: 0
-            val engineSpeedRear = if (engineSpeedRearRaw == null) {
-                _vehicleSnapshot.value.engineSpeedRear  // no getter on device — preserve
-            } else if (engineSpeedRearRaw > 0) {
-                engineSpeedRearRaw
-            } else if (directSpeedKmh < 1.0) {
-                0
-            } else {
-                prevRear
+            val engineSpeedRear = when {
+                engineSpeedRearRaw == null                        -> _vehicleSnapshot.value.engineSpeedRear
+                engineSpeedRearRaw in BYD_RPM_SENTINELS           -> if (directSpeedKmh < 1.0) 0 else prevRear
+                engineSpeedRearRaw > 0                            -> engineSpeedRearRaw
+                directSpeedKmh < 1.0                              -> 0
+                else                                              -> prevRear
             }
             val m47 = runtimeGroupMap("m47")
             val engineCoolantTemp = invokeIntGetter(
@@ -3252,9 +3294,82 @@ class BydVehicleDataSource(context: Context) {
             val speed = m25.getOrNull(0)?.let { invokeDoubleGetter(device, it) }
             val accel = m25.getOrNull(1)?.let { invokeIntGetter(device, it) }
             val brake = m25.getOrNull(2)?.let { invokeIntGetter(device, it) }
-            speed?.let {
-                _vehicleSnapshot.value = _vehicleSnapshot.value.copy(directSpeedKmh = it)
+            speed?.let { newSpeed ->
+                val snap = _vehicleSnapshot.value
+                // Ignore implausible getter spikes outright: don't drive the speedometer or
+                // learn a scale from them — just preserve the last known speed by not touching
+                // the snapshot for this sample.
+                if (newSpeed > MAX_PLAUSIBLE_SPEED_KMH) return@let
+                // Learn the event-raw → km/h scale while the getter still gives a trustworthy
+                // non-zero reading, so we can drive speed from the live event stream once the
+                // getter freezes (see the "Speed" branch of dispatchDynamicRawFeatureEvent).
+                val evRaw = lastSpeedEventRaw
+                if (newSpeed > 1.0 && evRaw != null && evRaw > 1.0) {
+                    val s = newSpeed / evRaw
+                    if (s.isFinite() && s in 0.001..10.0) speedEventScale = s
+                }
+                // If the live event stream is actively driving speed, let it own the value —
+                // don't overwrite with this getter, which may be returning a frozen 0.
+                val eventFresh = android.os.SystemClock.elapsedRealtime() - lastSpeedEventElapsedMs < SPEED_EVENT_FRESHNESS_MS
+                if (eventFresh && speedEventScale != null) return@let
+
+                val prevSpeed = snap.directSpeedKmh
+                if (newSpeed > 0.1) {
+                    // Valid positive reading — commit and remember when.
+                    lastPositiveSpeedElapsedMs = android.os.SystemClock.elapsedRealtime()
+                    _vehicleSnapshot.value = snap.copy(directSpeedKmh = newSpeed)
+                } else if (prevSpeed < 0.1) {
+                    // Already showing ~0 — nothing to preserve, keep it 0.
+                    _vehicleSnapshot.value = snap.copy(directSpeedKmh = 0.0)
+                } else {
+                    // Getter returned 0 but we were showing a positive speed. The BYD
+                    // speed getter updates slower than the 1 s poll and intermittently
+                    // returns a stale 0 mid-drive. Only commit 0 when independent signals
+                    // agree the car is actually stopped:
+                    //   • engine power below a small traction threshold (|kW| < 2), AND
+                    //   • GPS speed absent or ~0, AND
+                    //   • we're past a short grace window since the last positive reading.
+                    // Otherwise preserve the last known speed. Motor RPM is deliberately
+                    // NOT used here — the RPM path gates on directSpeedKmh, so coupling the
+                    // two would deadlock both at a stop (each preserving the other's stale value).
+                    val powerMoving = snap.enginePower?.let { kotlin.math.abs(it) >= 2 } == true
+                    val gpsMoving   = snap.locationGpsSpeed?.let { it > 0.1 } == true
+                    val withinGrace = android.os.SystemClock.elapsedRealtime() - lastPositiveSpeedElapsedMs < SPEED_STALE_GRACE_MS
+                    if (powerMoving || gpsMoving || withinGrace) {
+                        // Preserve last known speed — do not overwrite with the stale 0.
+                    } else {
+                        _vehicleSnapshot.value = snap.copy(directSpeedKmh = 0.0)
+                    }
+                }
             }
+            // ── Speed-stall diagnostics ──────────────────────────────────────────
+            // Fires when the committed speed is ~0 but other (listener-backed) signals
+            // say the car is moving — i.e. the "speed stuck at 0 after resume" bug.
+            // Captures the RAW getter result so we can distinguish a stale-0 getter from
+            // a null/failed getter, and whether GPS could have bridged it.
+            run {
+                val s = _vehicleSnapshot.value
+                val looksMoving = s.gear in setOf("D", "R") ||
+                    (s.engineSpeedFront ?: 0) > 0 || (s.engineSpeedRear ?: 0) > 0 ||
+                    (s.enginePower?.let { kotlin.math.abs(it) >= 2 } == true)
+                if (s.directSpeedKmh < 0.1 && looksMoving) {
+                    val evAgoMs = android.os.SystemClock.elapsedRealtime() - lastSpeedEventElapsedMs
+                    val msg = "🐌 speed=0 while moving: rawGetter=${speed ?: "null"} " +
+                        "gear=${s.gear} rpmF=${s.engineSpeedFront} rpmR=${s.engineSpeedRear} " +
+                        "power=${s.enginePower} gps=${s.locationGpsSpeed ?: "n/a"} " +
+                        "m25=${runtimeMethodNames("m25").getOrNull(0) ?: "none"} " +
+                        "spEventAgoMs=$evAgoMs spEventRaw=${lastSpeedEventRaw ?: "none"} scale=${speedEventScale ?: "none"}"
+                    logInfoIfChanged("speedStall", msg)
+                    // Persist to the in-app diagnostic log (viewable / shareable after
+                    // parking — no logcat needed). Throttled so it can't flood the file.
+                    val nowMs = android.os.SystemClock.elapsedRealtime()
+                    if (nowMs - lastSpeedStallDiagMs > 30_000L) {
+                        lastSpeedStallDiagMs = nowMs
+                        DiagLog.event(appContext, TAG, msg)
+                    }
+                }
+            }
+
             accel?.let { _speedAccelerateDeepness.value = it }
             brake?.let { _speedBrakeDeepness.value = it }
 
@@ -5003,10 +5118,23 @@ class BydVehicleDataSource(context: Context) {
         val candidateIn  = inCar  ?: snap.pm25InCar
         val candidateOut = outCar ?: snap.pm25OutCar
 
-        // Debounce: require the same value on two consecutive polls before
-        // publishing to the snapshot. This suppresses 1-cycle sensor oscillation.
-        val stableIn  = if (candidateIn  == pendingPm25In)  candidateIn  else { pendingPm25In  = candidateIn;  null }
-        val stableOut = if (candidateOut == pendingPm25Out) candidateOut else { pendingPm25Out = candidateOut; null }
+        // Debounce: require the same value on two consecutive polls to suppress
+        // 1-cycle sensor oscillation (e.g. alternating 18/22 every second).
+        // Exception: skip debounce on the very first reading (snap values are both
+        // null) — there is nothing to debounce against and the extra poll cycle
+        // delay is user-visible as "PM2.5 not showing until I reopen the app".
+        val firstReading = snap.pm25InCar == null && snap.pm25OutCar == null
+        val stableIn: Int?
+        val stableOut: Int?
+        if (firstReading) {
+            stableIn       = candidateIn
+            stableOut      = candidateOut
+            pendingPm25In  = candidateIn
+            pendingPm25Out = candidateOut
+        } else {
+            stableIn  = if (candidateIn  == pendingPm25In)  candidateIn  else { pendingPm25In  = candidateIn;  null }
+            stableOut = if (candidateOut == pendingPm25Out) candidateOut else { pendingPm25Out = candidateOut; null }
+        }
 
         val nextIn  = stableIn  ?: snap.pm25InCar
         val nextOut = stableOut ?: snap.pm25OutCar
@@ -5952,10 +6080,32 @@ class BydVehicleDataSource(context: Context) {
             "Speed" -> {
                 val spIds = speedAuxFeatureIds
                 if (spIds.isNotEmpty() && (featureId == spIds[0] || (spIds.size > 1 && featureId == spIds[1]))) {
-                    val raw = rawNumber.toDouble().takeIf { it in 0.0..3000.0 } ?: return
+                    val raw = rawNumber.toDouble().takeIf { it in 0.0..5000.0 } ?: return
+                    lastSpeedEventRaw = raw
+                    lastSpeedEventElapsedMs = SystemClock.elapsedRealtime()
+                    // Drive speed from this live event once the raw→km/h scale is known.
+                    // This is what keeps the speedometer alive when getCurrentSpeed freezes.
+                    val scale = speedEventScale
+                    if (scale != null) {
+                        val kmh = (raw * scale).takeIf { it.isFinite() && it in 0.0..MAX_PLAUSIBLE_SPEED_KMH }
+                        if (kmh != null) {
+                            if (kmh > 0.1) lastPositiveSpeedElapsedMs = SystemClock.elapsedRealtime()
+                            _vehicleSnapshot.value = _vehicleSnapshot.value.copy(directSpeedKmh = kmh)
+                            publishSnapshot()
+                            // Confirm in the in-app log that events are driving speed while the
+                            // getter is stale, so the fix can be verified after parking.
+                            val nowMs = SystemClock.elapsedRealtime()
+                            if (kmh > 0.1 && nowMs - lastSpeedEventDiagMs > 30_000L) {
+                                lastSpeedEventDiagMs = nowMs
+                                DiagLog.event(appContext, TAG,
+                                    "✅ speed from event stream: ${String.format("%.0f", kmh)} km/h " +
+                                        "(raw=${String.format("%.0f", raw)} scale=${String.format("%.4f", scale)})")
+                            }
+                        }
+                    }
                     logInfoIfChanged(
                         "speed-value-$featureId",
-                        "🔬 speed value raw=${String.format("%.0f", raw)}"
+                        "🔬 speed event raw=${String.format("%.0f", raw)} scale=${speedEventScale ?: "learning"}"
                     )
                 }
             }

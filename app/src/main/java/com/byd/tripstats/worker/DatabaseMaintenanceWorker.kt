@@ -4,27 +4,27 @@ import android.content.Context
 import android.util.Log
 import androidx.work.*
 import com.byd.tripstats.data.local.BydStatsDatabase
-import com.byd.tripstats.data.repository.TripRepository
 import java.util.concurrent.TimeUnit
 
 /**
- * Runs once per week in the background to:
+ * Runs once per week in the background to perform **lossless** database
+ * compaction only:
  *
  *  1. Checkpoint the WAL file so the main .db is fully self-consistent
- *  2. VACUUM the database to reclaim space freed by deleted trips/points
- *  3. Thin raw data points for trips older than 3 months — keeps one point
- *     every 30 seconds instead of the full 1-10 second resolution
+ *  2. VACUUM the database to reclaim space freed by deleted trips / manual trims
+ *
+ * Data-point thinning is deliberately NOT done here. Thinning permanently deletes
+ * telemetry samples, so it is left entirely to the user via the manual "Trim
+ * database" action (DatabaseTrimmer). This job never destroys data — it only
+ * compacts what is already there.
  *
  * The worker is registered as a unique periodic job ("db_maintenance") by
  * BydStatsApplication on first launch. Using KEEP policy means a second
  * registration (e.g. after an app update) leaves the existing schedule intact.
  *
  * Why silent / no user interaction:
- *   VACUUM is a purely mechanical compaction step — the user has no meaningful
- *   choice to make. Surfacing it as a UI option adds complexity for zero benefit.
- *   The thinning only removes raw point density on old trips; trip-level stats
- *   (distance, energy, efficiency) live in TripEntity/TripStatsEntity and are
- *   completely unaffected.
+ *   Checkpoint + VACUUM are purely mechanical compaction steps — the user has no
+ *   meaningful choice to make, and they never alter trip data.
  */
 class DatabaseMaintenanceWorker(
     context: Context,
@@ -47,17 +47,15 @@ class DatabaseMaintenanceWorker(
 
             // ── Step 2: VACUUM ────────────────────────────────────────────────
             // SQLite does not reclaim freed pages automatically. After users delete
-            // trips, the file stays the same size until VACUUM compacts it.
-            // On a 1-year database this can recover 20-40 MB.
+            // trips (or run a manual Trim), the file stays the same size until VACUUM
+            // compacts it. On a 1-year database this can recover 20-40 MB.
             db.openHelper.writableDatabase.execSQL("VACUUM")
             Log.i(TAG, "VACUUM complete")
 
-            // ── Step 3: Thin old data points ──────────────────────────────────
-            // For trips older than 3 months, keep 1 point per 30 s instead of
-            // the recorded 1-10 s density. Trip stats are unaffected.
-            val repo = TripRepository.getInstance(applicationContext)
-            // Tiered thinning: 7-30d → 2s, 30-90d → 10s, >90d → 15s
-            repo.thinOldDataPoints()
+            // NOTE: automatic data-point thinning was intentionally removed. Thinning
+            // is irreversible and is now exclusively user-initiated via the manual
+            // "Trim database" action (DatabaseTrimmer). This weekly job only performs
+            // lossless compaction (checkpoint + VACUUM).
 
             Log.i(TAG, "Weekly maintenance finished successfully")
             Result.success()

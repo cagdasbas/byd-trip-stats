@@ -28,7 +28,8 @@ class BatteryVoltageHistoryRepository private constructor(context: Context) {
             battery12vVoltage = voltage12v,
             batteryTotalVoltage = telemetry.batteryTotalVoltage.coerceAtLeast(0),
             isChargingSample = telemetry.isCharging,
-            soc = telemetry.soc
+            soc = telemetry.soc,
+            socPanel = telemetry.socPanel
         )
         val current = _history.value
         val last = current.lastOrNull()

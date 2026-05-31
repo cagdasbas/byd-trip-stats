@@ -101,7 +101,6 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
         }
 
         val consUnit  = if (useImperial) "kWh/100mi" else "kWh/100km"
-        val speedUnit = if (useImperial) "mph" else "km/h"
 
         // 1. Power vs Speed — the classic EV motor operating map
         HeatmapCard(

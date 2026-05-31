@@ -571,7 +571,8 @@ private fun RouteSegmentsCard(dataPoints: List<TripDataPointEntity>, useImperial
                     avgSpeed      = (avgSpeed * speedFactor).toInt(),
                     speedUnit     = speedUnit,
                     avgPower      = avgPower.toInt(),
-                    socChange     = socChange
+                    socChange     = socChange,
+                    socLabel      = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)"
                 )
 
                 if (index < segments.size - 1) {
@@ -589,7 +590,8 @@ private fun SegmentItem(
     avgSpeed: Int,
     speedUnit: String = "km/h",
     avgPower: Int,
-    socChange: Double
+    socChange: Double,
+    socLabel: String = "SoC (BMS)"
 ) {
     Row(
         modifier = Modifier
@@ -622,7 +624,7 @@ private fun SegmentItem(
                 color = if (avgPower < 0) RegenGreen else AccelerationOrange
             )
             Text(
-                text = "${String.format("%.1f", abs(socChange))}% SoC (BMS)",
+                text = "${String.format("%.1f", abs(socChange))}% $socLabel",
                 style = MaterialTheme.typography.bodySmall
             )
         }

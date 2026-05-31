@@ -49,7 +49,14 @@ data class TripEntity(
      * 0 for trips recorded before the 2.5.0 schema bump so behaviour is unchanged
      * for legacy rows until the backfill job runs.
      */
-    val offStateDurationMs: Long = 0
+    val offStateDurationMs: Long = 0,
+    /**
+     * User-flagged favourite. Favourited trips are exempt from both automatic
+     * point-thinning (DatabaseMaintenanceWorker) and the manual DatabaseTrimmer,
+     * so their full data-point density and rawJson diagnostics are preserved
+     * indefinitely. Defaults to false.
+     */
+    val isFavourite: Boolean = false
 ) {
     /** Active driving time only — the wallclock span minus [offStateDurationMs]. */
     val duration: Long?

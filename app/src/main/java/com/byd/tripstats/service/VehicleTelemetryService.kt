@@ -85,6 +85,45 @@ class VehicleTelemetryService : Service() {
         vehicleDataSource.refreshSnapshots()
     }
 
+    /**
+     * Runs [BydVehicleDataSource.refreshSnapshots] on an isolated worker with a
+     * timeout. If a BYD getter is blocking (HAL/binder hang after an engine
+     * off→on cycle), the call won't wedge the telemetry loop — we abandon the
+     * wait, keep looping on the last snapshot, and record the wedge to DiagLog so
+     * it can be reviewed in-app after parking (no logcat needed). A previously
+     * submitted refresh that is still stuck is NOT resubmitted, so hung work can't
+     * pile up; the moment the getter returns, normal refreshes resume.
+     */
+    private fun refreshSnapshotsGuarded() {
+        val pending = pendingRefresh
+        if (pending == null || pending.isDone) {
+            pendingRefresh = refreshExecutor.submit {
+                runCatching { vehicleDataSource.refreshSnapshots() }
+                    .onFailure { Log.w(TAG, "refreshSnapshots threw: ${it.message}") }
+            }
+        }
+        try {
+            pendingRefresh?.get(REFRESH_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            if (refreshWedgeStrikes > 0) {
+                DiagLog.event(this, TAG,
+                    "✅ telemetry refresh recovered after $refreshWedgeStrikes wedged cycle(s) — a blocked BYD getter has returned")
+                refreshWedgeStrikes = 0
+            }
+        } catch (te: java.util.concurrent.TimeoutException) {
+            refreshWedgeStrikes++
+            // Log the first wedge and then sparsely, so a long hang doesn't spam the file.
+            if (refreshWedgeStrikes == 1 || refreshWedgeStrikes % 15 == 0) {
+                DiagLog.event(this, TAG,
+                    "⚠️ telemetry refresh WEDGED at stage '${vehicleDataSource.refreshStage}' " +
+                        "(cycle $refreshWedgeStrikes, >${REFRESH_TIMEOUT_MS}ms): that BYD device getter is blocking. " +
+                        "Speed/telemetry are frozen and the compatibility probe will hang until it returns " +
+                        "(an engine off/on clears it). The loop itself is kept alive.")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "guarded refresh failed: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
     companion object {
         @Volatile
         private var stopRequested = false
@@ -102,6 +141,21 @@ class VehicleTelemetryService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var telemetryLoopJob: Job? = null
+
+    // ── Snapshot-refresh wedge guard ───────────────────────────────────────────
+    // refreshSnapshots() invokes BYD device getters via synchronous reflection /
+    // binder calls that have no timeout of their own. On some firmwares a getter
+    // can block indefinitely after an engine off→on cycle, which — if run directly
+    // on the telemetry loop — would freeze speed/telemetry (and hang the compat
+    // probe) until the HAL recovers. We run it on a dedicated single worker thread
+    // and wait with a timeout, so one hung getter can never wedge the loop; the
+    // loop keeps running on the last snapshot and the wedge is recorded to DiagLog.
+    private val refreshExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "telemetry-refresh").apply { isDaemon = true }
+    }
+    private var pendingRefresh: java.util.concurrent.Future<*>? = null
+    private var refreshWedgeStrikes = 0
+    private val REFRESH_TIMEOUT_MS = 4_000L
 
     private var tripRepository: TripRepository? = null
     private var chargingRepository: ChargingRepository? = null
@@ -268,6 +322,7 @@ class VehicleTelemetryService : Service() {
         wakeLock?.release()
         wifiLock?.release()
         serviceScope.cancel()
+        refreshExecutor.shutdownNow()
         _connectionState.value = ConnectionState.Disconnected
         vehicleDataSource.stop()
         mqttConnectionManager?.shutdown()
@@ -401,7 +456,7 @@ class VehicleTelemetryService : Service() {
                     }
 
                     try {
-                        vehicleDataSource.refreshSnapshots()
+                        refreshSnapshotsGuarded()
                         val snapshot = vehicleDataSource.vehicleSnapshot.value
                         val telemetry = snapshot.toTelemetry(carConfig)
                         lastTelemetry = telemetry

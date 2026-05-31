@@ -503,6 +503,10 @@ private fun AppManagementTab(
         HorizontalDivider()
 
         AppDiagnosticsCard()
+
+        HorizontalDivider()
+
+        WebCompanionSection(context = context, scope = scope)
     }
 
     if (showResetConfirm) {
@@ -547,6 +551,304 @@ private fun AppManagementTab(
                 TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+// ── Web Companion ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun WebCompanionSection(context: Context, scope: CoroutineScope) {
+    val preferencesManager = remember { PreferencesManager(context) }
+    // DataStore is the authoritative state — the switch just writes here and
+    // the LaunchedEffect reacts, so the toggle is always responsive.
+    val enabled by preferencesManager.webServerEnabled.collectAsState(initial = true)
+    val port    by preferencesManager.webServerPort.collectAsState(
+        initial = com.byd.tripstats.data.preferences.PreferencesManager.DEFAULT_WEB_SERVER_PORT
+    )
+    val pin     by preferencesManager.webServerPin.collectAsState(initial = "")
+    var portInput   by remember(port) { mutableStateOf(port.toString()) }
+    var pinInput    by remember(pin)  { mutableStateOf(pin) }
+    var pinVisible   by remember { mutableStateOf(false) }
+    var serverUrl    by remember { mutableStateOf<String?>(null) }
+    var serverError  by remember { mutableStateOf<String?>(null) }
+    val lockedCount  by com.byd.tripstats.server.WebServerManager.lockedOutCount.collectAsState()
+    val clipManager = androidx.compose.ui.platform.LocalClipboardManager.current
+
+    // Ensure a PIN exists as soon as the section is first composed
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { preferencesManager.getOrCreateWebServerPin() }
+    }
+
+    // Start/stop the server whenever enabled, port, or PIN changes.
+    // Runs on IO so ServerSocket binding never touches the main thread.
+    LaunchedEffect(enabled, port, pin) {
+        com.byd.tripstats.server.WebServerManager.stop()
+        serverUrl   = null
+        serverError = null
+        if (enabled && pin.isNotEmpty()) {
+            val error = withContext(Dispatchers.IO) {
+                com.byd.tripstats.server.WebServerManager.start(context, port, pin)
+            }
+            if (error == null) {
+                serverUrl   = com.byd.tripstats.server.WebServerManager.getUrl(context)
+                serverError = null
+            } else {
+                serverUrl   = null
+                serverError = error
+            }
+        }
+    }
+
+    SectionHeader(icon = Icons.Filled.Language, title = "Web Companion")
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Web companion",
+                        style      = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        if (enabled)
+                            "Browse trips & charging from any device on the same WiFi."
+                        else
+                            "Start a local server so you can open trip history in a browser.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked         = enabled,
+                    onCheckedChange = { next ->
+                        scope.launch { preferencesManager.saveWebServerEnabled(next) }
+                    },
+                    thumbContent = if (!enabled) {
+                        { Box(Modifier.size(12.dp).background(ToggleUncheckedTrack, CircleShape)) }
+                    } else null,
+                    colors = SwitchDefaults.colors(
+                        uncheckedThumbColor  = Color.White,
+                        uncheckedTrackColor  = ToggleUncheckedTrack,
+                        uncheckedBorderColor = ToggleUncheckedTrack
+                    )
+                )
+            }
+
+            // Port row — always visible so users can change it even while disabled
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = portInput,
+                    onValueChange = { portInput = it.filter(Char::isDigit).take(5) },
+                    label = { Text("Port") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f)
+                )
+                Button(
+                    onClick = {
+                        val p = portInput.toIntOrNull()?.coerceIn(1024, 65535) ?: return@Button
+                        scope.launch { preferencesManager.saveWebServerPort(p) }
+                    },
+                    enabled = portInput.toIntOrNull()?.let { it in 1024..65535 } == true &&
+                              portInput.toIntOrNull() != port
+                ) { Text("Apply") }
+            }
+            Text(
+                "Try 8081, 8888, 9090 if a port is blocked. Changes restart the server.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+
+            // ── PIN ──────────────────────────────────────────────────────────
+            Text(
+                "Access PIN",
+                style      = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                "Shown on the browser login page when someone opens the server URL.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = pinInput,
+                    onValueChange = { pinInput = it.filter(Char::isDigit).take(10) },
+                    label = { Text("PIN") },
+                    singleLine = true,
+                    visualTransformation = if (pinVisible)
+                        androidx.compose.ui.text.input.VisualTransformation.None
+                    else
+                        PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    trailingIcon = {
+                        IconButton(onClick = { pinVisible = !pinVisible }) {
+                            Icon(
+                                if (pinVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (pinVisible) "Hide PIN" else "Show PIN"
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                // Apply custom PIN
+                Button(
+                    onClick = {
+                        if (pinInput.length >= 4) scope.launch {
+                            preferencesManager.saveWebServerPin(pinInput)
+                        }
+                    },
+                    enabled = pinInput.length >= 4 && pinInput != pin
+                ) { Text("Set") }
+                // Generate a new random PIN
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            val newPin = (100_000..999_999).random().toString()
+                            pinInput = newPin
+                            preferencesManager.saveWebServerPin(newPin)
+                        }
+                    }
+                ) { Text("Regen") }
+            }
+            Text(
+                "Min 4 digits. Changing the PIN invalidates all active browser sessions.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+
+            // ── Lockout banner ───────────────────────────────────────────────
+            if (lockedCount > 0) {
+                val plural = if (lockedCount > 1) "addresses" else "address"
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                            androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint     = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "$lockedCount IP $plural locked out",
+                            style      = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            "Too many incorrect PIN attempts detected.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { com.byd.tripstats.server.WebServerManager.clearLockouts() },
+                        colors  = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) { Text("Clear") }
+                }
+            }
+
+            if (enabled) {
+                if (serverError != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+                                androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint     = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            "Failed to start: $serverError",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else {
+                    val url = serverUrl ?: "Waiting for IP…"
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            url,
+                            style      = MaterialTheme.typography.bodyMedium,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            modifier   = Modifier.weight(1f)
+                        )
+                        if (serverUrl != null) {
+                            IconButton(
+                                onClick  = { clipManager.setText(androidx.compose.ui.text.AnnotatedString(url)) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.ContentCopy,
+                                    contentDescription = "Copy URL",
+                                    modifier = Modifier.size(18.dp),
+                                    tint     = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "Open this address on any device connected to the same WiFi.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1409,7 +1711,7 @@ private fun AppPreferencesTab(
                 listOf(
                     OffStateMode.ENABLED    to "Always On: service runs 24/7. Continuous 12V/SoC samples in battery history and ADB-over-WiFi stays reachable. Small additional load on top of BYD's own stock background drain.",
                     OffStateMode.DISABLED   to "Minimal: service self-stops 5 min after the car turns off, then a 90-min alarm briefly wakes it for a charging snapshot. Lower drain at the cost of sparse off-state samples and no always-on ADB.",
-                    OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep. Trips resume automatically when you start the engine.",
+                    OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep.",
                 ).forEach { (mode, description) ->
                     Text(
                         description,
@@ -1438,7 +1740,7 @@ private fun AppPreferencesTab(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "How long the trip stays open after the car turns off. If the car comes back on within this window the recording resumes seamlessly (same trip, a new segment appears along with the cumulative distance in parenthesis). Past the window the trip ends and the next drive starts a new one. Default is 30 minutes.",
+                    "How long the trip stays open after the car turns off. If the car comes back on within this window the recording resumes seamlessly (same trip, a new segment appears along with the cumulative distance in parenthesis). Past the window the trip ends and the next drive starts a new one. Default is 3 minutes.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1872,6 +2174,51 @@ private fun AppDiagnosticsCard() {
                     )
                 )
             }
+
+            // ── Share diagnostics log ──────────────────────────────────────────
+            // Always available (even with live diagnostics off) so the persistent
+            // diag.log — which records speed-stall and "telemetry refresh wedged"
+            // events — can be sent from the head unit after parking, no PC needed.
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        val text = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val f = java.io.File(context.getExternalFilesDir(null), "diag.log")
+                                if (!f.exists()) "diag.log is empty (no diagnostic events recorded yet)."
+                                else {
+                                    val bytes = f.readBytes()
+                                    // Last ~96 KB is plenty and keeps the share payload small.
+                                    val tail = if (bytes.size > 96_000)
+                                        bytes.copyOfRange(bytes.size - 96_000, bytes.size) else bytes
+                                    String(tail)
+                                }
+                            }.getOrElse { "Failed to read diag.log: ${it.message}" }
+                        }
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "BYD Trip Stats — diagnostics log")
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        runCatching {
+                            context.startActivity(
+                                Intent.createChooser(send, "Share diagnostics log")
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    }
+                }
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Share diagnostics log")
+            }
+            Text(
+                "Sends recent telemetry diagnostics (speed-stall and 'telemetry refresh wedged' events). Share it after parking to diagnose the speed-freeze without a computer.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             if (!diagnosticsEnabled) {
                 Text(

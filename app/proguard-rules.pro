@@ -155,6 +155,10 @@
     public static *;
 }
 
+# NanoHTTPD — embedded web server for the PWA companion
+-keep class fi.iki.elonen.** { *; }
+-keepclassmembers class fi.iki.elonen.** { *; }
+
 # 5. HiveMQ/Netty optional desktop/server transports not packaged on Android
 -dontwarn io.netty.channel.epoll.Epoll
 -dontwarn io.netty.channel.epoll.EpollEventLoopGroup

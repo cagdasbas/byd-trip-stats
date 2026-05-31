@@ -38,6 +38,9 @@ interface ChargingSessionDao {
     @Query("SELECT * FROM charging_sessions ORDER BY startTime DESC LIMIT 1")
     suspend fun getMostRecentSession(): ChargingSessionEntity?
 
+    @Query("SELECT * FROM charging_sessions WHERE isActive = 0 AND endTime IS NOT NULL ORDER BY startTime DESC")
+    suspend fun getAllCompletedSessions(): List<ChargingSessionEntity>
+
     @Query("SELECT * FROM charging_sessions WHERE startTime >= :startDate AND startTime <= :endDate ORDER BY startTime DESC")
     fun getSessionsByDateRange(startDate: Long, endDate: Long): Flow<List<ChargingSessionEntity>>
 
@@ -46,6 +49,9 @@ interface ChargingSessionDao {
 
     @Query("SELECT SUM(kwhAdded) FROM charging_sessions WHERE kwhAdded IS NOT NULL")
     suspend fun getTotalKwhAdded(): Double?
+
+    @Query("UPDATE charging_sessions SET isFavourite = :favourite WHERE id = :sessionId")
+    suspend fun setFavourite(sessionId: Long, favourite: Boolean)
 
     // ── Data points ───────────────────────────────────────────────────────────
 

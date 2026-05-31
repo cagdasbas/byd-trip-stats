@@ -254,8 +254,14 @@ fun RangeProjectionChart(
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = textColor.copy(alpha = 0.7f)
                         )
+                        val satSubtitle = when (activeRangeModel) {
+                            DashboardViewModel.RangeModel.BASELINE ->
+                                "Low-speed calibration — capped at WLTP"
+                            else ->
+                                "Value above WLTP average — capped at rated range"
+                        }
                         Text(
-                            text  = "Low-speed calibration — capped at WLTP",
+                            text  = satSubtitle,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
