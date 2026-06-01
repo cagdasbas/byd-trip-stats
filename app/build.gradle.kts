@@ -37,7 +37,7 @@ android {
     // A stable release always has a higher versionCode than any beta of the same
     // version, so beta testers automatically receive the stable upgrade via sideload.
     val versionMajor    = 2
-    val versionMinor    = 6
+    val versionMinor    = 7
     val versionPatch    = 0
     val versionPre      = 99  // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
 
@@ -140,6 +140,12 @@ android {
     }
 }
 
+// Keep app/src/main/assets/pwa/ in sync with docs/pwa/ so the embedded web server
+// serves the same PWA as GitHub Pages.
+tasks.register<Copy>("syncPwa") {
+    from(rootProject.file("docs/pwa"))
+    into(layout.projectDirectory.dir("src/main/assets/pwa"))
+}
 // Keep app/src/main/assets/changelog.md in sync with the root CHANGELOG.md at every build
 tasks.register<Copy>("syncChangelog") {
     from(rootProject.file("CHANGELOG.md"))
@@ -155,6 +161,7 @@ tasks.register<Copy>("syncTripViewer") {
     rename { "trip-viewer.html" }
 }
 tasks.named("preBuild") {
+    dependsOn("syncPwa")
     dependsOn("syncChangelog")
     dependsOn("syncTripViewer")
 }
@@ -207,6 +214,9 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Embedded HTTP server for the web companion PWA
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
 
     // osmdroid for offline maps
     implementation("org.osmdroid:osmdroid-android:6.1.18")
