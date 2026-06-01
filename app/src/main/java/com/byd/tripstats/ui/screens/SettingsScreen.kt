@@ -2249,40 +2249,44 @@ private fun AppDiagnosticsCard() {
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
             OutlinedButton(
                 onClick = {
-                    scope.launch {
-                        val text = withContext(Dispatchers.IO) {
-                            runCatching {
-                                val f = java.io.File(context.getExternalFilesDir(null), "diag.log")
-                                if (!f.exists()) "diag.log is empty (no diagnostic events recorded yet)."
-                                else {
-                                    val bytes = f.readBytes()
-                                    // Last ~96 KB is plenty and keeps the share payload small.
-                                    val tail = if (bytes.size > 96_000)
-                                        bytes.copyOfRange(bytes.size - 96_000, bytes.size) else bytes
-                                    String(tail)
-                                }
-                            }.getOrElse { "Failed to read diag.log: ${it.message}" }
-                        }
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, "BYD Trip Stats — diagnostics log")
-                            putExtra(Intent.EXTRA_TEXT, text)
-                        }
-                        runCatching {
-                            context.startActivity(
-                                Intent.createChooser(send, "Share diagnostics log")
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
+                    val telegram = TelegramManager.getInstance(context)
+                    val f = java.io.File(context.getExternalFilesDir(null), "diag.log")
+                    when {
+                        telegram.config.value == null ->
+                            android.widget.Toast.makeText(
+                                context,
+                                "Telegram not configured — set it up under Backup & Restore first.",
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        !f.exists() || f.length() == 0L ->
+                            android.widget.Toast.makeText(
+                                context,
+                                "diag.log is empty (no diagnostic events recorded yet).",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        else -> scope.launch {
+                            try {
+                                telegram.sendFile(f, caption = "BYD Trip Stats — diagnostics log")
+                                android.widget.Toast.makeText(
+                                    context, "Diagnostics log sent via Telegram ✓",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(
+                                    context, "Telegram send failed: ${e.message}",
+                                    android.widget.Toast.LENGTH_LONG,
+                                ).show()
+                            }
                         }
                     }
                 }
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Share diagnostics log")
+                Text("Send diagnostics log to Telegram")
             }
             Text(
-                "Sends recent telemetry diagnostics (speed-stall and 'telemetry refresh wedged' events). Share it after parking to diagnose the speed-freeze without a computer.",
+                "Sends the full diagnostics log (speed-stall and 'telemetry refresh wedged' events) straight to your connected Telegram bot — nothing is saved or shared locally. Connect a bot under Backup & Restore → Telegram Backup first.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

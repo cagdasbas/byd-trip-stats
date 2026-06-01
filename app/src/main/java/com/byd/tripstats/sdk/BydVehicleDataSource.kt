@@ -82,6 +82,10 @@ private const val MAX_PLAUSIBLE_SPEED_KMH = 250.0
 // Minimum GPS speed (km/h) treated as clear motion when bridging a wedged/zero speed getter.
 // Above typical standstill GPS jitter so a parked car still reads 0.
 private const val GPS_BRIDGE_MIN_KMH = 2.0
+// Wedge detection: getCurrentSpeed stuck at 0 while GPS shows clear motion for this long ⇒ the
+// getter is wedged (the post-mid-session-install state that only a car off/on clears).
+private const val WEDGE_GPS_THRESHOLD_KMH = 8.0
+private const val WEDGE_CONFIRM_MS = 10_000L
 private const val DRIVE_MODE_UNKNOWN = 0
 
 private enum class InstrumentTyrePressureEncoding {
@@ -130,6 +134,9 @@ data class VehicleTelemetrySnapshot(
     val tyreTempLR: Int? = null,
     val tyreTempRR: Int? = null,
     val directSpeedKmh: Double = 0.0,
+    // True when getCurrentSpeed() is wedged at 0 while GPS shows the car is clearly moving —
+    // the "needs a head-unit (car off/on) cycle after a mid-session install" state.
+    val speedGetterWedged: Boolean = false,
     val speedAccelerateDeepness: Int? = null,
     val speedBrakeDeepness: Int? = null,
     val gearboxBrakePedalState: Int? = null,
@@ -352,6 +359,7 @@ data class VehicleTelemetrySnapshot(
             gear = gear,
             odometer = odometerValue,
             enginePower = enginePower ?: 0,
+            speedGetterWedged = speedGetterWedged,
             totalDischarge = statisticTotalElecConValue ?: 0.0,
             totalElecConPHM = statisticTotalElecConPHMValue,
             battery12vVoltage = battery12vVoltage ?: 0.0,
@@ -780,6 +788,10 @@ class BydVehicleDataSource(context: Context) {
     // restart, so when it is fresh it is authoritative over both the poll and the GPS bridge.
     @Volatile private var lastSpeedPushElapsedMs: Long = 0L
     private var lastSpeedEventDiagMs = 0L
+    // Throttle for the gear-source diagnostic (what the gearbox getter returns vs committed gear).
+    private var lastGearDiagMs = 0L
+    // When the getCurrentSpeed-stuck-while-GPS-moving condition first started (wedge timer).
+    @Volatile private var speedWedgeSinceMs = 0L
     // Name of the device-refresh stage currently running. If a getter hangs, this is
     // left pointing at it so the wedge guard can name the culprit. Read from the service.
     @Volatile private var currentRefreshStage: String = "idle"
@@ -1028,7 +1040,9 @@ class BydVehicleDataSource(context: Context) {
             _currentGearRaw.value = gear
             _gear.value = label
             publishSnapshot()
-            Log.d(TAG, "⚙️ gear=$label (raw=$gear)")
+            // Release-safe: confirms the gear EVENT fires on a physical shift (independent of
+            // speed). If this never appears, gear is poll-only on this firmware.
+            DiagLog.event(appContext, TAG, "⚙️ gear EVENT: $label (raw=$gear)")
         }
         override fun onGearboxAutoModeTypeChanged(type: Int) {
             if (!ENABLE_MODE_STATE_LOGS) return
@@ -1839,34 +1853,17 @@ class BydVehicleDataSource(context: Context) {
         }
     }
 
-    /**
-     * Force the BYD device's internal `mContext` to our live, permission-bypassing context.
-     *
-     * `getInstance(ctx)` returns a process/system SINGLETON. If that singleton was first
-     * created elsewhere (the system, another BYD app, or a prior process of ours) its
-     * `mContext` is stale/null — and the value getters (getCurrentSpeed, getEnginePower, the
-     * RPM getters, …) then return a frozen 0 over IPC while the event stream still flows. This
-     * is the "speed/motor stuck at 0 after a mid-session (re)start, only fixed by an ECU
-     * power-cycle" wedge. Overwriting `mContext` with a fresh context fixes it without a
-     * power-cycle — this is exactly what the Overdrive reference app does (ensureDeviceContext).
-     */
-    private fun ensureDeviceContext(device: Any?) {
-        if (device == null) return
-        try {
-            var cls: Class<*>? = device.javaClass
-            while (cls != null && cls != Any::class.java) {
-                val field = try { cls.getDeclaredField("mContext") } catch (_: NoSuchFieldException) { null }
-                if (field != null) {
-                    field.isAccessible = true
-                    if (runCatching { field.get(device) }.getOrNull() !== ctx) {
-                        runCatching { field.set(device, ctx) }
-                    }
-                    return
-                }
-                cls = cls.superclass
-            }
-        } catch (_: Throwable) { }
-    }
+    // NOTE — do NOT reintroduce an "ensureDeviceContext"/mContext-overwrite helper here.
+    //
+    // A previous beta (commit 1e983fe) added one to "repair" the BYD device singleton's
+    // internal `mContext` after getInstance, on the theory that a stale mContext caused the
+    // "speed/motor stuck at 0 after a mid-session restart" wedge. It did the OPPOSITE:
+    // clobbering the freshly-established singleton's mContext corrupts the bind and freezes
+    // the value getters (getCurrentSpeed/getEnginePower/RPM) at 0 over IPC while the event
+    // stream keeps flowing. Proven by comparison — 2.3.0/2.6.0 never touch mContext and bind
+    // cleanly on a cold install; the beta with the overwrite wedged on every clean install and
+    // only "recovered" via a head-unit power-cycle (a fresh process re-establishing the bind).
+    // Leave the device exactly as getInstance(ctx) returns it.
 
     private fun tryDynamicDevice(
         label: String,
@@ -1879,9 +1876,9 @@ class BydVehicleDataSource(context: Context) {
             val deviceClass = Class.forName(className)
             val getInstance = deviceClass.getMethod("getInstance", Context::class.java)
             val device = getInstance.invoke(null, ctx) ?: return
-            // getInstance may hand back a singleton with a stale/null mContext — repair it so
-            // the value getters return live data (not a frozen 0) after a mid-session restart.
-            ensureDeviceContext(device)
+            // Use the singleton exactly as returned — do NOT overwrite its mContext (see the
+            // note by the former ensureDeviceContext: it corrupts a fresh bind and wedges the
+            // value getters at 0).
 
             if (listenerInterfaceName != null && onEvent != null) {
                 val listenerInterface = Class.forName(listenerInterfaceName)
@@ -1924,7 +1921,8 @@ class BydVehicleDataSource(context: Context) {
                 val deviceClass = Class.forName(className)
                 val getInstance = deviceClass.getMethod("getInstance", Context::class.java)
                 val device = getInstance.invoke(null, ctx) ?: return@forEach
-                ensureDeviceContext(device)
+                // Do NOT overwrite the singleton's mContext (see note by former
+                // ensureDeviceContext) — it corrupts a fresh bind and wedges the getters.
 
                 if (listenerInterfaceName != null && onEvent != null) {
                     val listenerInterface = Class.forName(listenerInterfaceName)
@@ -2099,6 +2097,17 @@ class BydVehicleDataSource(context: Context) {
                 _gearboxBrakePedalState.value = it
             }
             normalizedGear?.let { _gear.value = it }
+            // gear-source diagnostic (release-safe): what the gearbox getter actually returns
+            // vs the committed gear, at standstill too — confirms whether the firmware reports
+            // gear only while moving. Throttled.
+            val nowG = SystemClock.elapsedRealtime()
+            if (nowG - lastGearDiagMs > 5_000L) {
+                lastGearDiagMs = nowG
+                DiagLog.event(appContext, TAG,
+                    "⚙️ gear poll: gearCode=${rawGear ?: "null"} currentGear=${currentGear ?: "null"} " +
+                        "→ ${normalizedGear ?: "(no update)"} committed=${_gear.value} " +
+                        "spd=${String.format("%.0f", _vehicleSnapshot.value.directSpeedKmh)}")
+            }
             publishSnapshot()
 
         } catch (t: Throwable) {
@@ -3416,6 +3425,32 @@ class BydVehicleDataSource(context: Context) {
                         lastSpeedStallDiagMs = nowMs
                         DiagLog.event(appContext, TAG, msg)
                     }
+                }
+            }
+
+            // ── Wedge detection (drives the dashboard "restart the car" hint) ─────
+            // getCurrentSpeed stuck at 0 while GPS shows clear, sustained motion ⇒ the getter
+            // is wedged (post-mid-session-install state that only a car off/on clears). GPS is
+            // the independent ground truth, so this never false-fires at a genuine stop.
+            run {
+                val nowW = android.os.SystemClock.elapsedRealtime()
+                val getterDead = (speed ?: 0.0) < 0.1
+                val gpsClearMotion = (_vehicleSnapshot.value.locationGpsSpeed ?: 0.0) > WEDGE_GPS_THRESHOLD_KMH
+                when {
+                    getterDead && gpsClearMotion -> {
+                        if (speedWedgeSinceMs == 0L) speedWedgeSinceMs = nowW
+                        else if (nowW - speedWedgeSinceMs > WEDGE_CONFIRM_MS && !_vehicleSnapshot.value.speedGetterWedged) {
+                            _vehicleSnapshot.value = _vehicleSnapshot.value.copy(speedGetterWedged = true)
+                        }
+                    }
+                    (speed ?: 0.0) > 0.1 -> {
+                        // Getter is alive again (only happens after a car off/on) — clear the flag.
+                        speedWedgeSinceMs = 0L
+                        if (_vehicleSnapshot.value.speedGetterWedged) {
+                            _vehicleSnapshot.value = _vehicleSnapshot.value.copy(speedGetterWedged = false)
+                        }
+                    }
+                    else -> speedWedgeSinceMs = 0L  // stopped / no GPS — not enough to judge; keep prior flag
                 }
             }
 

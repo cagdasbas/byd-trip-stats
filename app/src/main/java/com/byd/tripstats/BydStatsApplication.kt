@@ -40,9 +40,13 @@ class BydStatsApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        // MUST be the first thing — runs before anything else can touch a vehicle device.
+        val primed = RuntimeExtensionBridge.prime()
+        val dc = RuntimeExtensionBridge.registerDataCache(this)
+        val acc = RuntimeExtensionBridge.whitelistAcc(this)
+        DiagLog.event(this, TAG, "runtime prime=$primed dc=$dc acc=$acc")
         Log.d(TAG, "=== BYD Trip Stats starting (pid=${android.os.Process.myPid()}) ===")
         installCrashRestartHandler()
-        // applyStartupSafeguards() must run before any vehicle-device access below.
         applyStartupSafeguards()
         applyRuntimePatches()
         DatabaseMaintenanceWorker.schedule(this)

@@ -267,6 +267,7 @@ fun DashboardScreen(
                 CircularProgressIndicator()
             }
         } else {
+          Box(modifier = Modifier.fillMaxSize()) {
             DashboardContent(
                 telemetry = currentTelemetry,
                 vehicleSnapshot = vehicleSnapshot,
@@ -299,6 +300,15 @@ fun DashboardScreen(
                 activeRangeModel = activeRangeModel,
                 modifier = Modifier.padding(paddingValues)
             )
+            if (currentTelemetry.speedGetterWedged) {
+                SpeedWedgeBanner(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(paddingValues)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+          }
         }
     }
 
@@ -390,6 +400,43 @@ fun DashboardScreen(
                 TextButton(onClick = { showTyreUnitDialog = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+/**
+ * Shown only while the BYD speed getter is wedged at 0 despite the car clearly moving (GPS) —
+ * the state that occurs after the app is updated/restarted mid-drive on firmwares that only
+ * bind the vehicle getters at a fresh head-unit boot. Auto-clears the moment the getter recovers.
+ */
+@Composable
+private fun SpeedWedgeBanner(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(Icons.Filled.WarningAmber, contentDescription = null)
+            Column {
+                Text(
+                    "Live telemetry paused",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Speed, power and gear can't update after an app update mid-drive. " +
+                        "Turn the car off and on once to restore them.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
     }
 }
 

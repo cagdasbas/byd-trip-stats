@@ -131,7 +131,8 @@ class MainActivity : ComponentActivity() {
                                     "autostart for this app, which enables background data collection " +
                                     "when the car is off (e.g. charging overnight).\n\n" +
                                     "For best reliability, reboot the car once after changing this " +
-                                    "setting, then open BYD Trip Stats again."
+                                    "setting, then open BYD Trip Stats again.\n" +
+                                    "WARNING: In case you don't see speed and other values updating while driving, you need to reboot the car!"
                                 )
                             },
                             confirmButton = {

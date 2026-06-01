@@ -33,6 +33,31 @@ object RuntimeExtensionBridge {
         return invokeString("describe") ?: "optional module unavailable"
     }
 
+    /** Earliest process-start hook. Must be the first thing called in Application.onCreate. */
+    fun prime(): Boolean {
+        return runCatching { hookClass?.getMethod("prime")?.invoke(null) as? Boolean }
+            .onFailure { Log.w(TAG, "prime failed: ${it.message}") }
+            .getOrNull() ?: false
+    }
+
+    /** Register this client with the vehicle data-cache service. Re-run on each process start. */
+    fun registerDataCache(context: Context): Boolean {
+        return runCatching {
+            hookClass?.getMethod("registerDataCache", Any::class.java)
+                ?.invoke(null, context.applicationContext) as? Boolean
+        }.onFailure { Log.w(TAG, "registerDataCache failed: ${it.message}") }
+            .getOrNull() ?: false
+    }
+
+    /** Add the package to the persistent ACC-mode whitelist. Re-run on each process start. */
+    fun whitelistAcc(context: Context): Boolean {
+        return runCatching {
+            hookClass?.getMethod("whitelistAcc", Any::class.java)
+                ?.invoke(null, context.applicationContext) as? Boolean
+        }.onFailure { Log.w(TAG, "whitelistAcc failed: ${it.message}") }
+            .getOrNull() ?: false
+    }
+
     fun doubleValue(key: String, fallback: Double): Double {
         return runCatching {
             hookClass
