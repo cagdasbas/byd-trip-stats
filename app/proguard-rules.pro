@@ -104,6 +104,25 @@
 -keep class com.byd.tripstats.data.** { *; }
 -keep class com.byd.tripstats.ui.viewmodel.** { *; }
 
+# Detached process-start entrypoint. The BYD native launcher (app_process /
+# rtlauncher) loads this class by its exact fully-qualified name and invokes
+# its static main(). Nothing in our own code references it, so without this
+# rule R8 strips/renames it and the launcher SIGABRTs with
+# ClassNotFoundException, crash-looping the process before the service starts.
+-keep class com.byd.tripstats.util.RuntimeLauncher { *; }
+
+# Privileged telemetry daemon — launched by exact class name via app_process. See
+# private-telemetry/INSTANT_TELEMETRY_PLAN.md.
+-keep class com.byd.tripstats.util.TelemetryDaemonMain { *; }
+
+# bydauto stubs must keep their exact names so anonymous typed-listener subclasses
+# (object : AbsBYDAutoSpeedListener() / AbsBYDAutoGearboxListener()) extend the REAL
+# framework classes (shadowed by name) rather than an R8-renamed app stub — otherwise
+# registerListener(typedListener) gets a type mismatch. See TelemetryDaemonMain / INSTANT_TELEMETRY_PLAN.md.
+-keep class android.hardware.bydauto.** { *; }
+-keep class android.hardware.IBYDAutoListener { *; }
+-keep class android.hardware.IBYDAutoEvent { *; }
+
 # Keep all classes Android instantiates by name
 -keep public class * extends android.app.Service
 -keep public class * extends android.app.Application

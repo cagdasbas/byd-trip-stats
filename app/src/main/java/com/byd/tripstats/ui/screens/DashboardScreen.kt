@@ -511,6 +511,8 @@ fun DashboardContent(
                 // Energy flow / range card
                 EnergyFlowDiagram(
                     telemetry = telemetry,
+                    liveSpeedKmh = vehicleSnapshot?.directSpeedKmh,
+                    livePowerKw = vehicleSnapshot?.enginePower,
                     tripDataPoints = tripDataPoints,
                     weeklyEfficiency = weeklyEfficiency,
                     monthlyEfficiency = monthlyEfficiency,
@@ -568,6 +570,8 @@ fun DashboardContent(
                 ) {
                     EnergyFlowDiagram(
                         telemetry = telemetry,
+                        liveSpeedKmh = vehicleSnapshot?.directSpeedKmh,
+                        livePowerKw = vehicleSnapshot?.enginePower,
                         tripDataPoints = tripDataPoints,
                         weeklyEfficiency = weeklyEfficiency,
                         monthlyEfficiency = monthlyEfficiency,
@@ -646,6 +650,8 @@ fun DashboardContent(
                 ) {
                     EnergyFlowDiagram(
                         telemetry = telemetry,
+                        liveSpeedKmh = vehicleSnapshot?.directSpeedKmh,
+                        livePowerKw = vehicleSnapshot?.enginePower,
                         tripDataPoints = tripDataPoints,
                         weeklyEfficiency = weeklyEfficiency,
                         monthlyEfficiency = monthlyEfficiency,
@@ -754,6 +760,11 @@ private fun formatDistanceValue(km: Double): String {
 @Composable
 fun EnergyFlowDiagram(
     telemetry: VehicleTelemetry,
+    // Live (~10 Hz) speed & power straight from the snapshot, so these readouts refresh
+    // as fast as the daemon delivers rather than the 1 s telemetry/DB loop. Null ⇒ fall
+    // back to telemetry (mock mode, or firmwares with no live snapshot source).
+    liveSpeedKmh: Double? = null,
+    livePowerKw: Int? = null,
     tripDataPoints: List<RangeDataPoint>,
     weeklyEfficiency: List<DashboardViewModel.DailyEfficiency>,
     monthlyEfficiency: List<DashboardViewModel.DailyEfficiency>,
@@ -774,8 +785,11 @@ fun EnergyFlowDiagram(
     val power = if (telemetry.isCharging && telemetry.chargingPower > 0.1) {
         -telemetry.chargingPower
     } else {
-        telemetry.enginePower.toDouble()
+        (livePowerKw ?: telemetry.enginePower).toDouble()
     }
+    // Prefer the live direct speed; fall back to telemetry.speed (which carries the GPS
+    // fallback) when the live source reads ~0.
+    val displaySpeedKmh = liveSpeedKmh?.takeIf { it > 0.1 } ?: telemetry.speed
     val isRegenerating = telemetry.isRegenerating
     val isCharging = telemetry.isCharging
     val hasActiveEnergyFlow = abs(power) > 1.0 || isCharging
@@ -988,7 +1002,7 @@ fun EnergyFlowDiagram(
                     )
                     PowerMetric(
                         label = "Speed",
-                        value = "${unitSystem.convertSpeed(telemetry.speed.toDouble()).toInt()}",
+                        value = "${unitSystem.convertSpeed(displaySpeedKmh.toDouble()).toInt()}",
                         unit = speedUnit,
                         color = BydEcoTealDim
                     )

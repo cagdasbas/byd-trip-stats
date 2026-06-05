@@ -299,13 +299,23 @@ class TripRepository private constructor(context: Context) {
     private fun effectiveSpeedKmh(t: VehicleTelemetry): Double =
         maxOf(t.speed, t.locationGpsSpeed ?: 0.0)
 
-    private fun shouldBackAnchorTripStart(previousTelemetry: VehicleTelemetry?): Boolean {
-        // On a fresh service start previousTelemetry is null — we have no reliable
-        // evidence that the car was already in motion before we connected. The
-        // stale-counter guard in doStartTrip is the real safety net; returning false
-        // here is an additional layer so a stale null-previous can't force
-        // backAnchorToJourney=true and produce an enormous startOdometer.
-        if (previousTelemetry == null) return false
+    private fun shouldBackAnchorTripStart(
+        previousTelemetry: VehicleTelemetry?,
+        currentTelemetry: VehicleTelemetry? = null
+    ): Boolean {
+        if (previousTelemetry == null) {
+            // Fresh service start after idle: back-anchor if the first packet itself
+            // shows active driving AND a non-trivial journey counter. This covers the
+            // case where the service was idle while the user was already driving and
+            // opens the app mid-trip. The staleness guard in doStartTrip is still the
+            // safety net for wild counter values.
+            val cur = currentTelemetry ?: return false
+            val journeyKm = cur.currentJourneyDriveMileage ?: return false
+            return journeyKm > 0.5 &&
+                (cur.gear in DRIVE_GEARS ||
+                    effectiveSpeedKmh(cur) > 2.0 ||
+                    kotlin.math.abs(cur.enginePower) > 5)
+        }
         return previousTelemetry.gear in DRIVE_GEARS ||
             effectiveSpeedKmh(previousTelemetry) > 2.0 ||
             kotlin.math.abs(previousTelemetry.enginePower) > 5 ||
@@ -559,7 +569,7 @@ class TripRepository private constructor(context: Context) {
                 val inCooldown = now < manualStopCooldownUntilMs
                 val previousTelemetry = lastTelemetry
                 if (!inCooldown && autoTripDetection && shouldAutoStart(t, previousTelemetry)) {
-                    val backAnchorToJourney = shouldBackAnchorTripStart(previousTelemetry)
+                    val backAnchorToJourney = shouldBackAnchorTripStart(previousTelemetry, t)
                     // Assign lastTelemetry AFTER the check so odometer
                     // comparison uses the actual previous packet.
                     Log.i(TAG, "Auto-detect: movement → starting trip")
@@ -725,7 +735,8 @@ class TripRepository private constructor(context: Context) {
                         doStartTrip(
                             telemetry = t,
                             isManual = false,
-                            backAnchorToJourney = true
+                            backAnchorToJourney = true,
+                            maxBackdateMs = carOffTimeoutMs()
                         )
                         return
                     }
@@ -968,7 +979,8 @@ class TripRepository private constructor(context: Context) {
     private suspend fun doStartTrip(
         telemetry: VehicleTelemetry,
         isManual: Boolean,
-        backAnchorToJourney: Boolean
+        backAnchorToJourney: Boolean,
+        maxBackdateMs: Long = 8 * 60 * 60 * 1000L
     ) {
         val now = System.currentTimeMillis()
         // Back-anchor using the car's journey counter so a trip opened mid-drive
@@ -1004,7 +1016,7 @@ class TripRepository private constructor(context: Context) {
                     ((journeyKm / effectiveSpeedKmh) * 3_600_000.0).toLong()
                 }
         } else 0L
-        val clampedBackdateMs = backdateMs.coerceAtMost(carOffTimeoutMs())
+        val clampedBackdateMs = backdateMs.coerceAtMost(maxBackdateMs)
         val startTime = now - clampedBackdateMs
 
         val startBatteryTemp = validBatteryTemp(telemetry.batteryTempAvg)

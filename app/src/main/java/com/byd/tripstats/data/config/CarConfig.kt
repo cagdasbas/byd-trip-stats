@@ -397,6 +397,37 @@ object CarCatalog {
         phevUsableBatteryKwh = 15.2
     )
 
+    val BYD_HAN_EV = CarConfig(
+        id = "BYD_HAN_EV",
+        displayName = "Han EV",
+        drivetrain = Drivetrain.RWD,
+        batteryKwh = 85.44,
+        estimatedKerbMassKg = 2165.0,
+        wltpKm = 521,
+        referenceConsumptionKwhPer100km = 16.8,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        rearMotorRatedKw = 200,
+        cellCount = 176,  // 85.44 kWh @ ~563V → 176S Blade LFP (176 × 3.2V × 152Ah ≈ 85.4 kWh)
+        cdA = 0.601       // Cd 0.233 × A 2.58 m²
+    )
+
+    val BYD_HAN_EV_AWD = CarConfig(
+        id = "BYD_HAN_EV_AWD",
+        displayName = "Han EV AWD",
+        drivetrain = Drivetrain.AWD,
+        batteryKwh = 85.44,
+        estimatedKerbMassKg = 2335.0,
+        wltpKm = 466,
+        referenceConsumptionKwhPer100km = 18.4,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 163,
+        rearMotorRatedKw = 200,
+        cellCount = 176,  // same 85.44 kWh pack as RWD: 176S Blade LFP
+        cdA = 0.601       // Cd 0.233 × A 2.58 m² (same body)
+    )
+
     val BYD_HAN_DM_I = CarConfig(
         id = "BYD_HAN_DM_I",
         displayName = "Han DM-i",
@@ -552,6 +583,8 @@ object CarCatalog {
         BYD_M6_SUPERIOR_150KW,
         BYD_SEAL_6_PREMIUM_95KW,
         BYD_SEAL_6_PREMIUM_160KW,
+        BYD_HAN_EV,
+        BYD_HAN_EV_AWD,
         BYD_TANG_EV,
         BYD_SEAL_U_DM_I,
         BYD_SEAL_U_DM_I_COMFORT,
@@ -586,6 +619,7 @@ object CarCatalog {
         "BYD M6" to listOf(BYD_M6_STANDARD_120KW, BYD_M6_SUPERIOR_100KW, BYD_M6_SUPERIOR_150KW),
         "BYD Seal 6" to listOf(BYD_SEAL_6_PREMIUM_95KW, BYD_SEAL_6_PREMIUM_160KW),
         "BYD Sealion 6" to listOf(BYD_SEALION_6_EV_STANDARD, BYD_SEALION_6_EV_EXTENDED),
+        "BYD Han" to listOf(BYD_HAN_EV, BYD_HAN_EV_AWD),
         "BYD Tang" to listOf(BYD_TANG_EV),
     )
 

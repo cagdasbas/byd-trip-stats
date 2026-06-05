@@ -102,7 +102,7 @@ class CarCatalogTest {
         assertEquals(Drivetrain.FWD, CarCatalog.BYD_SEAL_U_DESIGN.drivetrain)
     }
 
-    @Test fun `catalog contains all 32 expected cars`() {
-        assertEquals(32, CarCatalog.allCars.size)
+    @Test fun `catalog contains all 34 expected cars`() {
+        assertEquals(34, CarCatalog.allCars.size)
     }
 }

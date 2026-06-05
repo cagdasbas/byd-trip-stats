@@ -128,6 +128,11 @@ class VehicleTelemetryService : Service() {
         @Volatile
         private var stopRequested = false
 
+        // Live reference to the running data source, so an in-app update can gracefully release the
+        // BYD SDK listeners before the install force-kills this process (prevents the post-update wedge).
+        @Volatile
+        private var activeDataSource: com.byd.tripstats.sdk.BydVehicleDataSource? = null
+
         fun start(context: Context) {
             stopRequested = false
             context.startForegroundService(Intent(context, VehicleTelemetryService::class.java))
@@ -136,6 +141,11 @@ class VehicleTelemetryService : Service() {
         fun stop(context: Context) {
             stopRequested = true
             context.stopService(Intent(context, VehicleTelemetryService::class.java))
+        }
+
+        /** Call right before committing an in-app update — unregisters all SDK listeners while alive. */
+        fun prepareForUpdate() {
+            runCatching { activeDataSource?.prepareForUpdate() }
         }
     }
 
@@ -220,6 +230,7 @@ class VehicleTelemetryService : Service() {
         acquireWakeLock()
         acquireLocationSubscription()
         vehicleDataSource = BydVehicleDataSource(this)
+        activeDataSource = vehicleDataSource
         vehicleDataSource.start()
     }
 
@@ -325,6 +336,7 @@ class VehicleTelemetryService : Service() {
         refreshExecutor.shutdownNow()
         _connectionState.value = ConnectionState.Disconnected
         vehicleDataSource.stop()
+        activeDataSource = null
         mqttConnectionManager?.shutdown()
         if (!stopRequested && !intentionalStop) {
             scheduleSelfRestart("onDestroy")
@@ -433,12 +445,24 @@ class VehicleTelemetryService : Service() {
                 var loggedKeepAliveSkip = false
                 while (true) {
                     val msSinceLastEvent = SystemClock.elapsedRealtime() - vehicleDataSource.lastFeatureEventElapsedMs
+                    // SDK event-delivery wedge recovery: GPS (independent of the BYD SDK) shows the car
+                    // moving, yet no SDK callback has arrived for a while ⇒ the SDK push channel has
+                    // stalled (getters still work). Re-register listeners in-process to recover rather
+                    // than waiting for a full service restart. Throttled inside recoverEventDelivery().
+                    if (vehicleDataSource.lastFeatureEventElapsedMs > 0L && msSinceLastEvent > 8_000L) {
+                        val gpsKmh = vehicleDataSource.vehicleSnapshot.value.locationGpsSpeed ?: 0.0
+                        if (gpsKmh > 2.0) vehicleDataSource.recoverEventDelivery()
+                    }
                     val pollIntervalMs = when {
                         lastTelemetry == null -> 0L
                         lastTelemetry.isCarOn -> 1_000L
                         lastTelemetry.isCharging && lastTelemetry.chargingPower > 23.0 -> 1_000L
                         lastTelemetry.isCharging -> 30_000L      // AC/slow charging: 30s for SoC granularity
                         msSinceLastEvent < 60_000L -> 5_000L     // car awake (recent SDK event) but not driving
+                        // Always-On mode: keep polling at 30 s so MQTT publishes on its
+                        // configured cadence rather than only once every 5 min.
+                        PreferencesManager(applicationContext).getCachedOffStateMode() ==
+                            OffStateMode.ENABLED -> 30_000L
                         else -> 5 * 60 * 1000L                   // car off, not charging: 5 min
                     }
                     delay(pollIntervalMs)

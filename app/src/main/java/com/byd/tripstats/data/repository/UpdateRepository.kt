@@ -319,6 +319,11 @@ class UpdateRepository private constructor(private val context: Context) {
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or
                     android.app.PendingIntent.FLAG_IMMUTABLE
             )
+            // The install force-kills this process (no onDestroy/stop), which would leave stale BYD
+            // SDK listener registrations that wedge the SDK for the freshly-installed app. Release them
+            // gracefully here, while still alive, before committing.
+            runCatching { com.byd.tripstats.service.VehicleTelemetryService.prepareForUpdate() }
+            try { Thread.sleep(600) } catch (_: InterruptedException) {}
             session.commit(pi.intentSender)
             Log.i(TAG, "PackageInstaller session committed — install in progress")
         }

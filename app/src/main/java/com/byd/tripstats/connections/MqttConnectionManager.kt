@@ -117,15 +117,16 @@ class MqttConnectionManager(context: Context) {
             val avTopic = "byd-trip-stats/$resolvedId/availability"
             val stTopic = "byd-trip-stats/$resolvedId/state"
 
+            // Do NOT use automaticReconnect — it reconnects internally and bypasses
+            // ensureConnected(), so the availability "online" publish never fires
+            // after a WiFi drop/LWT. We rely on ensureConnected() on every tick:
+            // a failed publish resets connected=false and the next tick does a full
+            // reconnect that re-publishes "online".
             val builder = MqttClient.builder()
                 .useMqttVersion3()
                 .identifier("BydTripStats")
                 .serverHost(config.brokerUrl.trim())
                 .serverPort(config.brokerPort.coerceIn(1, 65535))
-                .automaticReconnect()
-                .initialDelay(1, TimeUnit.SECONDS)
-                .maxDelay(30, TimeUnit.SECONDS)
-                .applyAutomaticReconnect()
 
             if (config.brokerPort == 8883) {
                 builder.sslWithDefaultConfig()
@@ -213,9 +214,11 @@ class MqttConnectionManager(context: Context) {
                     latch.countDown()
                 }
             latch.await(10, TimeUnit.SECONDS)
+            if (!ok) synchronized(lock) { connected = false }
             return ok
         } catch (t: Throwable) {
             Log.e(TAG, "MQTT publish error", t)
+            synchronized(lock) { connected = false }
             return false
         }
     }

@@ -947,10 +947,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 if (curTripId != null) lastSeenTripId = curTripId
 
-                // Parse telemetry timestamp — more accurate than system clock
+                // Parse telemetry timestamp — more accurate than system clock.
+                // Bound-check against system time: if the ECU sends local time with a
+                // 'Z' suffix (treating local as UTC), the parsed epoch is off by the
+                // timezone offset (e.g. +2h). A timestamp that far from reality would
+                // make offDurationMs huge on the first car-on tick, falsely resetting
+                // the segment. Reject anything > 6 hours from system time and fall back.
+                val sysNow = System.currentTimeMillis()
                 val telemetryMs = runCatching {
                     java.time.Instant.parse(telemetry.currentDatetime).toEpochMilli()
-                }.getOrNull() ?: System.currentTimeMillis()
+                }.getOrNull()?.takeIf { kotlin.math.abs(it - sysNow) <= 6 * 60 * 60 * 1000L }
+                    ?: sysNow
 
                 // Charging telemetry is handled by the vehicle service (service-level),
                 // so it survives Activity death and car-off scenarios.
@@ -1433,10 +1440,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 val postGapAnchor = run {
                     var anchor: Double? = null
                     for (i in 1 until dataPoints.size) {
-                        val gap = dataPoints[i].timestamp - dataPoints[i - 1].timestamp
-                        if (gap >= SEGMENT_RESET_OFF_THRESHOLD_MS) {
-                            anchor = dataPoints[i].odometer
-                        }
+                        val prev = dataPoints[i - 1]
+                        val curr = dataPoints[i]
+                        val gap = curr.timestamp - prev.timestamp
+                        if (gap < SEGMENT_RESET_OFF_THRESHOLD_MS) continue
+                        val odometerDelta = curr.odometer - prev.odometer
+                        // Only treat as a genuine car-off boundary if the odometer didn't
+                        // advance. If the car was moving during the gap (service hiccup while
+                        // driving), the ECU odometer still counts up.
+                        // Note: carOn is NOT used here — on some BYD firmwares powerStateRaw
+                        // reports 0 even while driving at speed (gear=D, speed>0), making
+                        // carOn==0 an unreliable car-off signal.
+                        if (odometerDelta < 0.05) anchor = curr.odometer
                     }
                     anchor
                 }

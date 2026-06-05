@@ -31,6 +31,16 @@ class BootReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "BootReceiver"
 
+        /**
+         * Maintenance hook: gracefully release all BYD SDK listeners *before* an external
+         * force-kill that skips onDestroy (e.g. `adb install -r`). Without this, the SDK keeps
+         * the dead process's stale registrations and wedges event delivery for the next process.
+         * Not advertised in the manifest (delivered only via explicit-component broadcast):
+         *   adb shell am broadcast -a com.byd.tripstats.action.PREPARE_UPDATE \
+         *       -n com.byd.tripstats/.receiver.BootReceiver
+         */
+        const val ACTION_PREPARE_UPDATE = "com.byd.tripstats.action.PREPARE_UPDATE"
+
         private val START_ACTIONS = setOf(
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_LOCKED_BOOT_COMPLETED,
@@ -63,6 +73,15 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
+
+        // Graceful pre-kill unregister (see ACTION_PREPARE_UPDATE). Runs synchronously so the
+        // unregister completes before the caller's `adb install -r` force-kills the process.
+        if (action == ACTION_PREPARE_UPDATE) {
+            DiagLog.event(context.applicationContext, TAG, "PREPARE_UPDATE — releasing SDK listeners before kill")
+            runCatching { VehicleTelemetryService.prepareForUpdate() }
+            return
+        }
+
         if (action !in START_ACTIONS) {
             Log.d(TAG, "Ignoring action=$action")
             return

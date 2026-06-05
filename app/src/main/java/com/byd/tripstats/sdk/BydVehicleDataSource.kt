@@ -73,6 +73,10 @@ private const val SPEED_STALE_GRACE_MS = 3_500L
 // How recently the Speed device's event stream must have fired for it to "own" the
 // displayed speed (so the poll getter, which can freeze at a stale 0, doesn't clobber it).
 private const val SPEED_EVENT_FRESHNESS_MS = 3_000L
+// Min spacing between committed typed-speed pushes (onSpeedChanged). The cluster can fire
+// these faster than the UI needs; ~100 ms (10 Hz) keeps the speedometer visually instant
+// without recomposing on every sub-frame event. Matches Kinex's onSpeedChanged throttle.
+private const val SPEED_PUSH_MIN_INTERVAL_MS = 100L
 // Absolute ceiling for a single speed reading. The BYD SpeedDevice (poll getter and event
 // stream) occasionally emits a one-off garbage value; anything above any production BYD's
 // electronically-limited top speed is treated as a glitch and dropped at the source, so it
@@ -787,7 +791,11 @@ class BydVehicleDataSource(context: Context) {
     // value. This push survives getCurrentSpeed() wedging at 0 after a mid-session process
     // restart, so when it is fresh it is authoritative over both the poll and the GPS bridge.
     @Volatile private var lastSpeedPushElapsedMs: Long = 0L
+    // Last time the daemon pushed an engine-power value — makes the 1 s poll yield to it.
+    @Volatile private var lastPowerPushElapsedMs: Long = 0L
     private var lastSpeedEventDiagMs = 0L
+    // Throttle for the typed-speed-push (onSpeedChanged) confirmation diagnostic.
+    private var lastSpeedPushDiagMs = 0L
     // Throttle for the gear-source diagnostic (what the gearbox getter returns vs committed gear).
     private var lastGearDiagMs = 0L
     // When the getCurrentSpeed-stuck-while-GPS-moving condition first started (wedge timer).
@@ -845,6 +853,11 @@ class BydVehicleDataSource(context: Context) {
     private val lastDiagnosticLogs = mutableMapOf<String, String>()
     private val lastRegenDiagMessages = mutableMapOf<String, String>()
     private val listenerReferences = mutableListOf<Any>()
+    // Tracks the generic mirror listeners (device + proxy + interface) so they can be unregistered
+    // and re-registered when the SDK's event-callback channel wedges (see recoverEventDelivery).
+    private class MirrorReg(val device: Any, val proxy: Any, val label: String, val iface: Class<*>)
+    private val mirrorRegs = java.util.concurrent.CopyOnWriteArrayList<MirrorReg>()
+    @Volatile private var lastWedgeRecoveryMs = 0L
     // Method cache: eliminates repeated Class.getMethod() lookups (~12,000/min without this).
     private val methodCache = java.util.concurrent.ConcurrentHashMap<Pair<Class<*>, String>, java.lang.reflect.Method?>()
     // Tick counter for tiered polling
@@ -919,6 +932,13 @@ class BydVehicleDataSource(context: Context) {
     // True once InstrumentDevice has successfully returned a gear value while gearboxDevice
     // is absent. Used to gate the speed-based D/P fallback so we don't override a real R.
     @Volatile private var instrumentGearKnown: Boolean = false
+    // True once the privileged telemetry daemon has supplied a real gear — makes the daemon gear
+    // authoritative over the in-process speed-inference fallback (see toTelemetry gear resolution).
+    @Volatile private var daemonGearKnown: Boolean = false
+    // Client for the privileged telemetry daemon (instant speed/gear the app process can't get itself).
+    private val daemonClient = com.byd.tripstats.util.TelemetryDaemonClient { speedKmh, gear, powerKw ->
+        applyDaemonTelemetry(speedKmh, gear, powerKw)
+    }
     private var tyreDevice:     BYDAutoTyreDevice?     = null
     private var bodyworkDevice: Any? = null
     private var batteryDevice: Any? = null
@@ -1045,6 +1065,23 @@ class BydVehicleDataSource(context: Context) {
             DiagLog.event(appContext, TAG, "⚙️ gear EVENT: $label (raw=$gear)")
         }
         override fun onGearboxAutoModeTypeChanged(type: Int) {
+            // DORMANT (see CLAUDE.md): the GearboxDevice does NOT register on this firmware
+            // (gearboxDeviceRegistered=false), so this never fires here and gear stays
+            // speed-inference only. Kinex reads gear via com.ts.lib.caradapter, not bydauto.
+            // Correct/harmless; would work on firmwares where the gearbox device registers — keep it.
+            //
+            // The gear SELECTOR position is reported here as the "auto mode type"
+            // (1=P 2=R 3=N 4=D 5=M 6=S). On firmwares where onCurrentGearChanged
+            // never fires and the gear getters return NULL, this is the only event
+            // that reflects a physical P→D shift — and it fires instantly, even while
+            // stationary. Drive gear from it so the dashboard updates the moment you shift.
+            mapGearboxAutoModeToGear(type)?.let { label ->
+                if (_gear.value != label) {
+                    _gear.value = label
+                    publishSnapshot()
+                    DiagLog.event(appContext, TAG, "⚙️ gear EVENT (autoModeType): $label (type=$type)")
+                }
+            }
             if (!ENABLE_MODE_STATE_LOGS) return
             logInfoIfChanged(
                 "modeState-gearboxAutoModeType",
@@ -1181,6 +1218,7 @@ class BydVehicleDataSource(context: Context) {
             RuntimeExtensionBridge.onDataSourceStarted(ctx)
         }
         restorePersistedStatisticState()
+        daemonClient.start()
         publishSnapshot()
         if (RuntimeExtensionBridge.isAvailable) {
             startReadLogsMonitor()
@@ -1662,6 +1700,18 @@ class BydVehicleDataSource(context: Context) {
         // Start 1-second polling loop for values the car only pushes when they change.
         val scope = CoroutineScope(Dispatchers.IO)
         pollingScope = scope
+
+        // Proactive wedge clear after a fresh start. Installing a new build over the old app
+        // (adb install -r) kills the previous process, leaving stale SDK listener registrations that
+        // block the new process's callbacks — the "always wedged right after install" symptom. GPS-
+        // based detection can't catch this (often no GPS fix in a garage), so re-register a couple of
+        // times early to kick the SDK's listener state. Harmless if the car is off (no events to lose).
+        scope.launch {
+            listOf(12_000L, 35_000L).forEach { waitMs ->
+                delay(waitMs)
+                runCatching { recoverEventDelivery(force = true) }
+            }
+        }
         pollingJob = scope.launch {
             Log.i(TAG, "⏱️ Cell voltage polling loop started (2s interval)")
             statisticDevice?.let { dev ->
@@ -1708,8 +1758,31 @@ class BydVehicleDataSource(context: Context) {
         }
     }
 
+    /**
+     * Called right before an in-app update commits the install. An update force-kills this process
+     * (skipping onDestroy/stop), so we proactively unregister all SDK listeners here while still
+     * alive — leaving none stale to wedge the SDK service-wide for the freshly-installed process.
+     * Does NOT tear down devices/polling, so a failed install self-heals via the re-register recovery.
+     */
+    fun prepareForUpdate() {
+        runCatching { chargingDevice?.unregisterListener(chargingListener) }
+        runCatching { gearboxDevice?.unregisterListener(gearboxListener) }
+        runCatching { tyreDevice?.unregisterListener(tyreListener) }
+        for (reg in mirrorRegs.toList()) {
+            runCatching {
+                reg.device.javaClass.methods.firstOrNull {
+                    it.name == "unregisterListener" && it.parameterTypes.size == 1 &&
+                        it.parameterTypes[0].isAssignableFrom(reg.proxy.javaClass)
+                }?.invoke(reg.device, reg.proxy)
+            }
+        }
+        mirrorRegs.clear()
+        runCatching { DiagLog.event(appContext, TAG, "🔄 update prep — unregistered all SDK listeners") }
+    }
+
     fun stop() {
         RuntimeExtensionBridge.onDataSourceStopped()
+        daemonClient.stop()
         pollingJob?.cancel()
         pollingJob = null
         readLogsMonitorJob?.cancel()
@@ -1719,6 +1792,20 @@ class BydVehicleDataSource(context: Context) {
         try { chargingDevice?.unregisterListener(chargingListener) } catch (_: Exception) {}
         try { gearboxDevice?.unregisterListener(gearboxListener)   } catch (_: Exception) {}
         try { tyreDevice?.unregisterListener(tyreListener)         } catch (_: Exception) {}
+        // Unregister the generic mirror listeners too. Leaving them registered means that on the next
+        // (re)start the BYD SDK still holds this now-dead process's Binder proxies — stale registrations
+        // that stall the SDK's event-callback delivery service-wide (the "wedge"). Clean shutdown here
+        // avoids leaking them; force-kills (adb install / OOM) that skip stop() are handled by the
+        // re-register recovery + proactive re-register on start.
+        for (reg in mirrorRegs.toList()) {
+            runCatching {
+                reg.device.javaClass.methods.firstOrNull {
+                    it.name == "unregisterListener" && it.parameterTypes.size == 1 &&
+                        it.parameterTypes[0].isAssignableFrom(reg.proxy.javaClass)
+                }?.invoke(reg.device, reg.proxy)
+            }
+        }
+        mirrorRegs.clear()
         bodyworkDevice = null
         locationDevice = null
         energyDevice = null
@@ -2087,9 +2174,16 @@ class BydVehicleDataSource(context: Context) {
             val currentGear = m26["currentGear"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
             val brakePedalState = m26["brakeState"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
             val rawGear = m26["gearCode"]?.takeIf { it.isNotEmpty() }?.let { invokeStringGetter(device, it) }
+            // Gear-selector position via the auto-mode-type getter (1=P 2=R 3=N 4=D 5=M 6=S).
+            // On firmwares where gearCode/currentGear return NULL this is the only working
+            // gear source; used as a fallback so gear is correct on app start / after a
+            // missed event (the onGearboxAutoModeTypeChanged event handles live shifts).
+            val autoModeType = invokeIntGetter(device, "getGearboxAutoModeType")
+            val autoModeGear = autoModeType?.let(::mapGearboxAutoModeToGear)
             val normalizedGear = rawGear
                 ?.takeUnless { it.equals("NULL", ignoreCase = true) }
                 ?: currentGear?.let(::mapGearValue)
+                ?: autoModeGear
 
             state?.let { _gearboxState.value = it }
             _currentGearRaw.value = currentGear
@@ -2105,6 +2199,7 @@ class BydVehicleDataSource(context: Context) {
                 lastGearDiagMs = nowG
                 DiagLog.event(appContext, TAG,
                     "⚙️ gear poll: gearCode=${rawGear ?: "null"} currentGear=${currentGear ?: "null"} " +
+                        "autoModeType=${autoModeType ?: "null"} " +
                         "→ ${normalizedGear ?: "(no update)"} committed=${_gear.value} " +
                         "spd=${String.format("%.0f", _vehicleSnapshot.value.directSpeedKmh)}")
             }
@@ -3045,7 +3140,10 @@ class BydVehicleDataSource(context: Context) {
             val oilLevel = oilLevelRaw?.takeIf { it != 255 }
 
             _vehicleSnapshot.value = _vehicleSnapshot.value.copy(
-                enginePower = enginePower,
+                // Yield to a fresh daemon power push (instant ENGINE_POWER event) — keep its value
+                // instead of overwriting with this slower poll getter.
+                enginePower = if (SystemClock.elapsedRealtime() - lastPowerPushElapsedMs < SPEED_EVENT_FRESHNESS_MS)
+                    _vehicleSnapshot.value.enginePower else enginePower,
                 engineSpeedFront = engineSpeedFront,
                 engineSpeedRear = engineSpeedRear,
             )
@@ -4555,9 +4653,20 @@ class BydVehicleDataSource(context: Context) {
             }
             "onPowerLevelChanged" -> {
                 val level = args?.firstOrNull().asIntOrNull()
+                val prevLevel = _vehicleSnapshot.value.bodyworkPowerLevel
                 _vehicleSnapshot.value = _vehicleSnapshot.value.copy(bodyworkPowerLevel = level)
                 publishSnapshot()
                 Log.d(TAG, "🚗 bodyworkPowerLevel=$level")
+                // Capture the off→on power-level transitions to diag.log so the
+                // value→state mapping can be learned (this bodywork power level is the
+                // car-on signal Electro uses; the power-device MCU status is silent on
+                // these firmwares). Once mapped, derive carOn from it for instant on/off.
+                // DORMANT (see CLAUDE.md): BodyworkDevice doesn't register in-process on this
+                // firmware, so onPowerLevelChanged never fires here (car-on via power level was
+                // Electro's/Kinex's approach via a different API). Harmless capture; keep it.
+                if (level != prevLevel) {
+                    DiagLog.event(appContext, TAG, "🚗 bodyworkPowerLevel: $prevLevel → $level")
+                }
             }
         }
     }
@@ -4679,6 +4788,76 @@ class BydVehicleDataSource(context: Context) {
         }
     }
 
+    /**
+     * Apply instant speed/gear pushed by the privileged telemetry daemon (TelemetryDaemonClient).
+     * Drives the live UI snapshot immediately; the 1 s poll yields to it via lastSpeedPushElapsedMs
+     * (see logSpeedSnapshot) and daemonGearKnown (see toTelemetry). DB recording stays on the poll.
+     */
+    fun applyDaemonTelemetry(speedKmh: Double?, gear: String?, powerKw: Double?) {
+        val now = SystemClock.elapsedRealtime()
+        var changed = false
+        if (speedKmh != null && speedKmh in 0.0..MAX_PLAUSIBLE_SPEED_KMH) {
+            lastSpeedPushElapsedMs = now
+            if (speedKmh > 0.1) lastPositiveSpeedElapsedMs = now
+            _vehicleSnapshot.value = _vehicleSnapshot.value.copy(directSpeedKmh = speedKmh)
+            changed = true
+        }
+        if (gear != null && gear.isNotEmpty()) {
+            daemonGearKnown = true
+            if (_gear.value != gear) { _gear.value = gear; changed = true }
+        }
+        if (powerKw != null && kotlin.math.abs(powerKw) <= 500.0) {
+            lastPowerPushElapsedMs = now
+            val kwInt = Math.round(powerKw).toInt()
+            if (_vehicleSnapshot.value.enginePower != kwInt) {
+                _vehicleSnapshot.value = _vehicleSnapshot.value.copy(enginePower = kwInt)
+                changed = true
+            }
+        }
+        if (changed) {
+            publishSnapshot()
+            if (now - lastDaemonDiagMs > 5_000L) {
+                lastDaemonDiagMs = now
+                DiagLog.event(appContext, TAG, "📡 daemon telemetry: speed=${speedKmh ?: "-"} gear=${gear ?: "-"} power=${powerKw ?: "-"}")
+            }
+        }
+    }
+    private var lastDaemonDiagMs = 0L
+
+    /**
+     * Recover a wedged SDK event-callback channel. On this firmware the BYD SDK occasionally stops
+     * delivering pushed callbacks (speed/gear/etc.) while synchronous getters keep working — events
+     * silently stall and only resume after the listeners are re-registered (empirically, a full
+     * service restart fixed it). This does the lightweight in-process equivalent: unregister the
+     * current listeners and register fresh ones, so we don't have to bounce the whole service.
+     * Throttled so a persistent stall can't spin. Returns true if a recovery pass ran.
+     */
+    fun recoverEventDelivery(force: Boolean = false): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        if (!force && now - lastWedgeRecoveryMs < 30_000L) return false
+        lastWedgeRecoveryMs = now
+        DiagLog.event(appContext, TAG, "♻️ SDK event-delivery wedge — re-registering listeners (force=$force)")
+        // Separate runCatching per step so a failed unregister never leaves us without the listener.
+        runCatching { gearboxDevice?.unregisterListener(gearboxListener) }
+        runCatching { gearboxDevice?.registerListener(gearboxListener) }
+        runCatching { chargingDevice?.unregisterListener(chargingListener) }
+        runCatching { chargingDevice?.registerListener(chargingListener) }
+        runCatching { tyreDevice?.unregisterListener(tyreListener) }
+        runCatching { tyreDevice?.registerListener(tyreListener) }
+        // Generic mirror listeners: drop the stale proxy, register a fresh one (registerEventMirrorListener
+        // de-dupes its own tracking by device).
+        for (reg in mirrorRegs.toList()) {
+            runCatching {
+                reg.device.javaClass.methods.firstOrNull {
+                    it.name == "unregisterListener" && it.parameterTypes.size == 1 &&
+                        it.parameterTypes[0].isAssignableFrom(reg.proxy.javaClass)
+                }?.invoke(reg.device, reg.proxy)
+            }
+            runCatching { registerEventMirrorListener(reg.device, reg.label) }
+        }
+        return true
+    }
+
     private fun publishSnapshot() {
         val publishImmediately = synchronized(snapshotPublishLock) {
             if (snapshotBatchDepth > 0) {
@@ -4716,6 +4895,10 @@ class BydVehicleDataSource(context: Context) {
             chargingEventUnknownCounterRaw = _chargingEventUnknownCounterRaw.value,
             gear = run {
                 val resolved = when {
+                    // Privileged telemetry daemon supplied a real gear (P/R/N/D) — authoritative.
+                    // Correctly handles R while reversing, where the speed-inference fallback below
+                    // would otherwise show "D".
+                    daemonGearKnown -> _gear.value
                     gearboxDevice != null -> _gear.value
                     // InstrumentDevice successfully read a gear value — use it directly.
                     // This correctly handles R, N, P as well as D and avoids the speed
@@ -6196,7 +6379,10 @@ class BydVehicleDataSource(context: Context) {
                     // the event value isn't proportional to km/h.
                     val gpsClear = snap.locationGpsSpeed?.let { it > GPS_BRIDGE_MIN_KMH } == true
                     val powerMoving = snap.enginePower?.let { kotlin.math.abs(it) >= 2 } == true
-                    if (scale != null && !getterHealthy && powerMoving && !gpsClear) {
+                    // Defer to a fresh typed onSpeedChanged push — it's the clean km/h source
+                    // and must not be overridden by this noisy raw-event fallback.
+                    val pushFresh = now - lastSpeedPushElapsedMs < SPEED_EVENT_FRESHNESS_MS
+                    if (scale != null && !getterHealthy && powerMoving && !gpsClear && !pushFresh) {
                         val kmh = (raw * scale).takeIf { it.isFinite() && it in 0.0..MAX_PLAUSIBLE_SPEED_KMH }
                         if (kmh != null) {
                             if (kmh > 0.1) lastPositiveSpeedElapsedMs = now
@@ -6426,6 +6612,25 @@ class BydVehicleDataSource(context: Context) {
         else -> gear.toString()
     }
 
+    /**
+     * Maps the gearbox "auto mode type" (the gear-selector position) to a gear label.
+     * Values are the platform BYDAutoGearboxDevice constants:
+     *   1=P  2=R  3=N  4=D  5=M(manual)  6=S(sport).
+     * On firmwares where onCurrentGearChanged never fires and the gearCode/currentGear
+     * getters return NULL, this is the channel that actually reports the selector — it
+     * fires instantly on a physical shift, even while stationary (this is what the stock
+     * cluster and third-party apps read). M and S are forward-driving selector-gate
+     * positions, so they map to D for gear/trip purposes (DRIVE_GEARS = {D, R}).
+     */
+    private fun mapGearboxAutoModeToGear(type: Int): String? = when (type) {
+        1 -> "P"
+        2 -> "R"
+        3 -> "N"
+        4 -> "D"
+        5, 6 -> "D"
+        else -> null
+    }
+
     private fun normalizeTyrePressureBar(raw: Double?, @Suppress("UNUSED_PARAMETER") state: Int? = 0): Double {
         // Do NOT gate on state here — non-zero states (low battery, sensor warning) are
         // informational and should not suppress a valid pressure reading. The raw value range
@@ -6616,6 +6821,41 @@ class BydVehicleDataSource(context: Context) {
                     arrayOf(listenerType),
                 ) { _, proxyMethod, args ->
                     when (proxyMethod.name) {
+                        "onSpeedChanged", "onCurrentSpeedChanged" -> {
+                            // DORMANT (see CLAUDE.md): the bydauto SpeedDevice does NOT deliver this
+                            // typed callback to a normal in-process app on this firmware (only the
+                            // noisy raw onDataEventChanged). Kinex gets instant speed from a different
+                            // API (com.ts.lib.caradapter / CarSensorAdapterManager), not bydauto. This
+                            // handler is correct and harmless and would activate if the callback is ever
+                            // delivered (privileged daemon like Overdrive, or other firmware) — keep it.
+                            //
+                            // Typed speed push from the SpeedDevice — the cluster's actual
+                            // km/h, delivered the instant it changes. It is clean and already in km/h,
+                            // unlike the raw feature event (noisy, non-proportional). Apply it
+                            // straight to the snapshot for an instant UI update; setting
+                            // lastSpeedPushElapsedMs makes the 1 s poll getter yield to it
+                            // (see logSpeedSnapshot). DB recording stays on the poll cadence.
+                            if (label == "Speed") {
+                                val kmh = (args?.getOrNull(0) as? Number)?.toDouble()
+                                if (kmh != null && kmh in 0.0..MAX_PLAUSIBLE_SPEED_KMH) {
+                                    val now = SystemClock.elapsedRealtime()
+                                    if (now - lastSpeedPushElapsedMs >= SPEED_PUSH_MIN_INTERVAL_MS) {
+                                        val firstPush = lastSpeedPushElapsedMs == 0L
+                                        lastSpeedPushElapsedMs = now
+                                        if (kmh > 0.1) lastPositiveSpeedElapsedMs = now
+                                        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(directSpeedKmh = kmh)
+                                        publishSnapshot()
+                                        // Confirm the typed push is live (throttled ~5 s). If these
+                                        // appear, speed is now event-driven/instant on this firmware.
+                                        if (firstPush || now - lastSpeedPushDiagMs > 5_000L) {
+                                            lastSpeedPushDiagMs = now
+                                            DiagLog.event(appContext, TAG,
+                                                "✅ speed PUSH (onSpeedChanged): ${String.format("%.0f", kmh)} km/h")
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         "onDataEventChanged", "onEventChanged", "onFeatureChanged", "onDataChanged" -> {
                             val arg0 = args?.getOrNull(0)
                             val arg1 = args?.getOrNull(1)
@@ -6774,6 +7014,9 @@ class BydVehicleDataSource(context: Context) {
                 try {
                     method.invoke(device, proxy)
                     listenerReferences += proxy
+                    // Track for wedge recovery (re-register on a stalled SDK callback channel).
+                    mirrorRegs.removeAll { it.device === device }
+                    mirrorRegs += MirrorReg(device, proxy, label, listenerType)
                     if (ENABLE_LAB_DIAGNOSTICS) {
                         Log.i(TAG, "\u2705 $label raw listener registered via ${listenerType.simpleName}")
                     }
