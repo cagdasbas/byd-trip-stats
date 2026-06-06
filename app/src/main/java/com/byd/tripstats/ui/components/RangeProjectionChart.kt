@@ -136,10 +136,9 @@ fun RangeProjectionChart(
                 ?: 50.0
             ).coerceAtLeast(50.0)
 
-        // For PHEVs the WLTP figure covers EV-only range, but our projection includes
-        // fuel range (EV + ICE combined). Use the trip-start BMS combined range as
-        // the effective ceiling, which already accounts for both energy sources.
-        // For BEVs this is always the catalog wltpKm.
+        // The projection is EV-only (electric range from your actual EV consumption), so the ceiling
+        // is the EV WLTP. For PHEVs allow the trip-start BMS EV range to raise it if that already
+        // reads above WLTP (a fresh/efficient pack can). BEVs use the catalog wltpKm.
         val wltpKm = if (car.isPhev)
             startBmsRange.coerceAtLeast(car.wltpKm.toDouble()).toInt()
         else

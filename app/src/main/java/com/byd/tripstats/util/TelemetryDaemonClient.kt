@@ -15,7 +15,7 @@ import java.net.Socket
  * silent — if the daemon isn't running the app simply falls back to its in-process poll/inference.
  */
 class TelemetryDaemonClient(
-    private val onTelemetry: (speedKmh: Double?, gear: String?, powerKw: Double?) -> Unit
+    private val onTelemetry: (speedKmh: Double?, gear: String?, powerKw: Double?, frontRpm: Int?, rearRpm: Int?) -> Unit
 ) {
     @Volatile private var running = false
     private var thread: Thread? = null
@@ -62,7 +62,10 @@ class TelemetryDaemonClient(
             val speed = if (o.has("speedKmh")) o.getDouble("speedKmh") else null
             val gear = if (o.has("gear")) o.getString("gear") else null
             val power = if (o.has("powerKw")) o.getDouble("powerKw") else null
-            if (speed != null || gear != null || power != null) onTelemetry(speed, gear, power)
+            val frontRpm = if (o.has("frontRpm")) o.getInt("frontRpm") else null
+            val rearRpm = if (o.has("rearRpm")) o.getInt("rearRpm") else null
+            if (speed != null || gear != null || power != null || frontRpm != null || rearRpm != null)
+                onTelemetry(speed, gear, power, frontRpm, rearRpm)
         } catch (_: Exception) { /* ignore malformed line */ }
     }
 

@@ -1257,21 +1257,20 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         ?: FALLBACK_BASELINE_WH_PER_KM
                     val effectiveSoc = telemetry.soc.takeIf { it > 0 } ?: telemetry.socPanel.toDouble()
                     val remainingEnergyWh = batteryKwh * 1000.0 * (effectiveSoc / 100.0)
-                    // PHEVs: add the BMS fuel range estimate so the projection covers EV+ICE.
-                    // For BEVs fuelDrivingRangeKm is 0, so adding it is a no-op.
-                    val fuelRangeKm = if (car?.isPhev == true)
-                        telemetry.fuelDrivingRangeKm.toDouble().coerceAtLeast(0.0)
-                    else 0.0
-
+                    // EV-only projection: models how your actual EV consumption affects electric range
+                    // vs the BMS/WLTP EV estimate. We used to add the BMS fuel range for PHEVs, but the
+                    // chart caps at the EV-only WLTP — so any PHEV with fuel in the tank projected
+                    // EV+ICE combined (hundreds of km) and pinned permanently at "≥ WLTP, capped".
+                    // Fuel range isn't driven by EV consumption, so it doesn't belong on this curve.
                     val (projectedRange, model) = when {
                         isStabilised && smoothedWhPerKm != null && smoothedWhPerKm!! > 0.0 ->
-                            ((remainingEnergyWh / smoothedWhPerKm!!) + fuelRangeKm).coerceAtLeast(0.0) to
+                            (remainingEnergyWh / smoothedWhPerKm!!).coerceAtLeast(0.0) to
                                 RangeModel.LIVE_TRIP
                         nonBaselineWhPerKm != null ->
-                            ((remainingEnergyWh / nonBaselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0) to
+                            (remainingEnergyWh / nonBaselineWhPerKm).coerceAtLeast(0.0) to
                                 RangeModel.HISTORICAL_BINS
                         else ->
-                            ((remainingEnergyWh / baselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0) to
+                            (remainingEnergyWh / baselineWhPerKm).coerceAtLeast(0.0) to
                                 RangeModel.BASELINE
                     }
 
@@ -1595,13 +1594,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                             cumEnergyWh / liveDistanceKm
                         else null
                     }
-                // For PHEVs: fuel range is not stored per data point, so use the current
-                // telemetry value as a constant offset — fuel level changes slowly relative
-                // to EV drain, so this is a reasonable approximation for the restored series.
-                val fuelRangeKm = if (car?.isPhev == true)
-                    telemetry.fuelDrivingRangeKm.toDouble().coerceAtLeast(0.0)
-                else 0.0
-
+                // EV-only projection (matches the live path) — fuel range is excluded because it
+                // isn't driven by EV consumption and would pin PHEVs at the EV-WLTP cap.
                 _tripDataPoints.value = dataPoints.map { dp ->
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
                     // A point is stabilised if EITHER the distance threshold has been
@@ -1617,11 +1611,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val projected: Double? = when {
                         !stabilised -> null
                         restoredSmoothed != null && restoredSmoothed > 0.0 ->
-                            ((remainingWh / restoredSmoothed) + fuelRangeKm).coerceAtLeast(0.0)
+                            (remainingWh / restoredSmoothed).coerceAtLeast(0.0)
                         restoredBinWhPerKm != null ->
-                            ((remainingWh / restoredBinWhPerKm) + fuelRangeKm).coerceAtLeast(0.0)
+                            (remainingWh / restoredBinWhPerKm).coerceAtLeast(0.0)
                         else ->
-                            ((remainingWh / baselineWhPerKm) + fuelRangeKm).coerceAtLeast(0.0)
+                            (remainingWh / baselineWhPerKm).coerceAtLeast(0.0)
                     }
                     RangeDataPoint(
                         distanceKm             = dKm,

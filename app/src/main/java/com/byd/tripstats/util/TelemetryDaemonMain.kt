@@ -32,17 +32,35 @@ import java.util.concurrent.atomic.AtomicReference
 object TelemetryDaemonMain {
 
     const val DAEMON_PORT = 28200
-    private const val F_POWER = 339738656   // ENGINE_POWER feature id (value via doubleValue field)
+    // Fallback feature ids. The REAL ids vary by firmware, so we also resolve them
+    // from the device's android.hardware.bydauto.BYDAutoFeatureIds at runtime (resolveFeatureId).
+    // The front fallback happens to match this head unit; the rear does NOT — hence the resolve.
+    private const val F_POWER = 339738656       // ENGINE_POWER
+    private const val F_RPM_FRONT = 1141899272  // ENGINE_FRONT_MOTOR_SPEED
+    private const val F_RPM_REAR = 621805576    // ENGINE_REAR_MOTOR_SPEED
+    // BYD "signal unavailable" sentinels that slip through as motor-speed values.
+    private val RPM_SENTINELS = setOf(8191, 16383, 32767, 65535)
+
+    /** Resolve a BYDAutoFeatureIds constant from the device by name; fall back to a known id. */
+    private fun resolveFeatureId(field: String, fallback: Int): Int = runCatching {
+        Class.forName(s(97,110,100,114,111,105,100,46,104,97,114,100,119,97,114,101,46,98,121,100,97,117,116,111,46,66,89,68,65,117,116,111,70,101,97,116,117,114,101,73,100,115))
+            .getField(field).getInt(null)
+    }.getOrDefault(fallback)
 
     private val snapshot = AtomicReference(Snap())
     private val clients = CopyOnWriteArrayList<PrintWriter>()
     @Volatile private var dirty = false
+    // NOTE: rear motor RPM is event-only on this firmware (no rear getter on Engine or Motor device,
+    // verified 2026-06-05) and the HAL throttles the rear event to ~1/s — so rear updates ~1/s while
+    // speed/gear/power/front stream fast. Not fixable here; left as-is.
 
     data class Snap(
         val speedKmh: Double? = null,
         val gear: String? = null,
         val gearRaw: Int? = null,
         val powerKw: Double? = null,
+        val frontRpm: Int? = null,
+        val rearRpm: Int? = null,
         val ts: Long = 0L,
     )
 
@@ -115,26 +133,47 @@ object TelemetryDaemonMain {
         log("gear listener: ${regTyped(dev, AbsBYDAutoGearboxListener::class.java, l)}")
     }
 
-    // ---- engine power (raw feature event; value in BYDAutoEventValue.doubleValue) ----
+    // ---- engine feature events: power + front/rear motor RPM (value in intValue) ----
 
     private fun registerPower(ctx: Context) {
         val dev = device(ctx, s(97,110,100,114,111,105,100,46,104,97,114,100,119,97,114,101,46,98,121,100,97,117,116,111,46,101,110,103,105,110,101,46,66,89,68,65,117,116,111,69,110,103,105,110,101,68,101,118,105,99,101)) ?: return
         val iface = runCatching { Class.forName(s(97,110,100,114,111,105,100,46,104,97,114,100,119,97,114,101,46,73,66,89,68,65,117,116,111,76,105,115,116,101,110,101,114)) }.getOrNull() ?: return
         val dbl = s(100,111,117,98,108,101,86,97,108,117,101)   // "doubleValue"
         val iv  = s(105,110,116,86,97,108,117,101)              // "intValue"
+        // Resolve the real ids for this firmware; subscribe to BOTH the resolved and fallback ids
+        // so a working id is never missed (front already works on the fallback; rear needs resolve).
+        val powerIds = setOf(F_POWER, resolveFeatureId("ENGINE_POWER", F_POWER))
+        val frontIds = setOf(F_RPM_FRONT, resolveFeatureId("ENGINE_FRONT_MOTOR_SPEED", F_RPM_FRONT))
+        val rearIds  = setOf(F_RPM_REAR, resolveFeatureId("ENGINE_REAR_MOTOR_SPEED", F_RPM_REAR))
+        log("engine ids: power=$powerIds front=$frontIds rear=$rearIds")
         val proxy = Proxy.newProxyInstance(iface.classLoader, arrayOf(iface)) { _, m, a ->
-            if (m.name == "onDataEventChanged" && (a?.getOrNull(0) as? Int) == F_POWER) {
-                val ev = a.getOrNull(1)
-                // BYD reports power as an int (kW) — value is in intValue; doubleValue stays 0.
-                // Prefer a non-zero int, then a non-zero double, else treat as 0.
+            val fid = if (m.name == "onDataEventChanged") a?.getOrNull(0) as? Int else null
+            if (fid != null) {
+                val ev = a?.getOrNull(1)
+                // BYD reports these as ints — value is in intValue; doubleValue usually stays 0.
                 val i = runCatching { ev?.javaClass?.getField(iv)?.getInt(ev) }.getOrNull()
                 val d = runCatching { ev?.javaClass?.getField(dbl)?.getDouble(ev) }.getOrNull()
-                val kw = when {
-                    i != null && i != 0 -> i.toDouble()
-                    d != null && d != 0.0 -> d
-                    else -> 0.0
+                when (fid) {
+                    in powerIds -> {
+                        val kw = when {
+                            i != null && i != 0 -> i.toDouble()
+                            d != null && d != 0.0 -> d
+                            else -> 0.0
+                        }
+                        if (kw in -300.0..600.0) update { it.copy(powerKw = kw) }
+                    }
+                    in frontIds -> {
+                        val rpm = i ?: d?.toInt()
+                        // Front motor speed is reported negated on some firmwares — use magnitude.
+                        if (rpm != null && kotlin.math.abs(rpm) in 0..30000 && kotlin.math.abs(rpm) !in RPM_SENTINELS)
+                            update { it.copy(frontRpm = kotlin.math.abs(rpm)) }
+                    }
+                    in rearIds -> {
+                        val rpm = i ?: d?.toInt()
+                        if (rpm != null && kotlin.math.abs(rpm) in 0..30000 && kotlin.math.abs(rpm) !in RPM_SENTINELS)
+                            update { it.copy(rearRpm = kotlin.math.abs(rpm)) }
+                    }
                 }
-                if (kw in -300.0..600.0) update { it.copy(powerKw = kw) }
             }
             when (m.name) { "hashCode" -> 1; "equals" -> false; "toString" -> "d"; else -> null }
         }
@@ -143,8 +182,17 @@ object TelemetryDaemonMain {
             it.name == reg && it.parameterTypes.size == 2 &&
                 it.parameterTypes[0].isAssignableFrom(proxy.javaClass) && it.parameterTypes[1] == IntArray::class.java
         }
-        val ok = runCatching { m2?.invoke(dev, proxy, intArrayOf(F_POWER)); m2 != null }.getOrDefault(false)
-        log("power listener: $ok")
+        val subIds = (powerIds + frontIds + rearIds).toIntArray()
+        var ok = false
+        if (m2 != null) {
+            // Best-effort subscribe-all FIRST (Overdrive's engine strategy: empty int[]). On HALs that
+            // honour it, every engine feature arrives — so rear is delivered (and discoverable) even if
+            // its id is unknown. Register the explicit ids LAST so that whatever the HAL's add/replace
+            // semantics, power/front and the resolved rear stay subscribed — the working front can't regress.
+            val subscribeAll = runCatching { m2.invoke(dev, proxy, IntArray(0)); true }.getOrDefault(false)
+            ok = runCatching { m2.invoke(dev, proxy, subIds); true }.getOrDefault(false)
+            log("engine listener: explicit=$ok subscribeAll=$subscribeAll ids=${subIds.toList()}")
+        }
     }
 
     private fun gearLabel(type: Int): String? = when (type) {
@@ -155,6 +203,7 @@ object TelemetryDaemonMain {
         snapshot.updateAndGet { f(it).copy(ts = System.currentTimeMillis()) }
         dirty = true
     }
+
 
     // ---- socket server ----
 
@@ -201,6 +250,8 @@ object TelemetryDaemonMain {
         s.gear?.let { put("gear", it) }
         s.gearRaw?.let { put("gearRaw", it) }
         s.powerKw?.let { put("powerKw", it) }
+        s.frontRpm?.let { put("frontRpm", it) }
+        s.rearRpm?.let { put("rearRpm", it) }
         put("ts", s.ts)
     }.toString()
 

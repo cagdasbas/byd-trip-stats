@@ -541,6 +541,7 @@ fun DashboardContent(
                 // Trip controls
                 TripControls(
                     telemetry = telemetry,
+                    liveGear = vehicleSnapshot?.gear,
                     isInTrip = isInTrip,
                     autoTripDetection = autoTripDetection,
                     onStartTrip = onStartTrip,
@@ -598,6 +599,7 @@ fun DashboardContent(
                     )
                     TripControls(
                         telemetry = telemetry,
+                        liveGear = vehicleSnapshot?.gear,
                         isInTrip = isInTrip,
                         autoTripDetection = autoTripDetection,
                         onStartTrip = onStartTrip,
@@ -678,6 +680,7 @@ fun DashboardContent(
                     )
                     TripControls(
                         telemetry = telemetry,
+                        liveGear = vehicleSnapshot?.gear,
                         isInTrip = isInTrip,
                         autoTripDetection = autoTripDetection,
                         onStartTrip = onStartTrip,
@@ -1311,6 +1314,10 @@ private fun LiveTripStat(label: String, value: String, unit: String, isFullScree
 @Composable
 fun TripControls(
     telemetry: VehicleTelemetry,
+    // Instant (~10 Hz) gear from the snapshot, so the trip card's gear letter and status text
+    // track the live gear indicator instead of lagging on the 1 s telemetry/DB loop. Null ⇒
+    // fall back to telemetry (mock mode / no live source).
+    liveGear: String? = null,
     isInTrip: Boolean,
     autoTripDetection: Boolean,
     onStartTrip: () -> Unit,
@@ -1444,27 +1451,31 @@ fun TripControls(
             )
         }
 
+        // Use the instant snapshot gear when available so the trip card matches the live
+        // gear indicator (P→D shows "Ready to Drive" immediately, not on the next 1 s tick).
+        val gear = liveGear ?: telemetry.gear
+
         // BYD auto-shifts to P whenever the car stops (e.g. at a traffic light).
         // During an active trip that auto-P is not a deliberate park, so the
         // statusText below maps it to "Stopped" rather than "Trip in Progress".
-        val autoParkedInTrip = isInTrip && telemetry.gear == "P"
+        val autoParkedInTrip = isInTrip && gear == "P"
 
         val gearColor = when {
-            telemetry.gear == "R"  -> AccelerationOrange
+            gear == "R"            -> AccelerationOrange
             autoParkedInTrip       -> MaterialTheme.colorScheme.onSurfaceVariant
             isInTrip               -> MaterialTheme.colorScheme.primary
             else                   -> MaterialTheme.colorScheme.onSurfaceVariant
         }
         val statusText = when {
-            isInTrip && telemetry.speed > 0.5              -> "Driving"
-            isInTrip && telemetry.gear in listOf("D", "R") -> "Ready"
-            autoParkedInTrip                               -> "Stopped"
-            isInTrip                                        -> "Trip in Progress"
-            telemetry.gear == "D"                           -> "Ready to Drive"
-            telemetry.gear == "R"                           -> "Reverse"
-            telemetry.gear == "P"                           -> "Waiting for Trip..."
-            telemetry.gear == "N"                           -> "Neutral"
-            else                                            -> "Waiting for Trip..."
+            isInTrip && telemetry.speed > 0.5    -> "Driving"
+            isInTrip && gear in listOf("D", "R") -> "Ready"
+            autoParkedInTrip                     -> "Stopped"
+            isInTrip                             -> "Trip in Progress"
+            gear == "D"                          -> "Ready to Drive"
+            gear == "R"                          -> "Reverse"
+            gear == "P"                          -> "Waiting for Trip..."
+            gear == "N"                          -> "Neutral"
+            else                                 -> "Waiting for Trip..."
         }
 
         val autoLabel: @Composable () -> Unit = {
@@ -1579,7 +1590,7 @@ fun TripControls(
                     )
                     Spacer(modifier = Modifier.width(5.dp))
                     val subtitle = if (isInTrip) statusText
-                                   else "${telemetry.gear} · $statusText"
+                                   else "$gear · $statusText"
                     Text(
                         text = subtitle,
                         fontSize = 11.sp,
@@ -1872,18 +1883,24 @@ fun VehicleStats(
             onClick  = onShowBattery12vHistory
         )
 
+        // Prefer the live (~10 Hz) snapshot for the motor card so RPM and power refresh like speed
+        // and gear; fall back to the 1 s telemetry when the daemon isn't supplying them.
+        val liveFrontRpm = vehicleSnapshot?.engineSpeedFront ?: telemetry.engineSpeedFront
+        val liveRearRpm  = vehicleSnapshot?.engineSpeedRear  ?: telemetry.engineSpeedRear
+        val liveMotorSpeedKmh = vehicleSnapshot?.directSpeedKmh?.takeIf { it > 0.1 } ?: telemetry.speed
+        val liveEnginePower = vehicleSnapshot?.enginePower ?: telemetry.enginePower
         // Dead-band: BYD motor sensors report 1-9 RPM noise at standstill.
         // Also force to 0 when speed is zero to ignore larger noise spikes at standstill.
-        val isStopped = telemetry.speed < 0.5
-        val frontMotorRpm = if (isStopped) null else telemetry.engineSpeedFront.takeIf { it >= 10 }
-        val rearMotorRpm  = if (isStopped) null else telemetry.engineSpeedRear.takeIf  { it >= 10 }
+        val isStopped = liveMotorSpeedKmh < 0.5
+        val frontMotorRpm = if (isStopped) null else liveFrontRpm.takeIf { it >= 10 }
+        val rearMotorRpm  = if (isStopped) null else liveRearRpm.takeIf  { it >= 10 }
 
         // ── Motor card
         when (selectedCar?.drivetrain) {
             Drivetrain.FWD -> StatCard(
                 title    = "Front Motor",
                 value    = frontMotorRpm?.let { "$it RPM" } ?: "0 RPM",
-                subtitle = "${telemetry.enginePower} kW",
+                subtitle = "$liveEnginePower kW",
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1892,7 +1909,7 @@ fun VehicleStats(
             Drivetrain.RWD -> StatCard(
                 title    = "Rear Motor",
                 value    = rearMotorRpm?.let { "$it RPM" } ?: "0 RPM",
-                subtitle = "${telemetry.enginePower} kW",
+                subtitle = "$liveEnginePower kW",
                 iconRes  = R.drawable.ic_motor_axle,
                 color    = BydElectricBlue,
                 compact  = fillHeight,
@@ -1910,7 +1927,7 @@ fun VehicleStats(
                         else -> null
                     }
                 }
-                val kwLine = "${telemetry.enginePower} kW"
+                val kwLine = "$liveEnginePower kW"
                 StatCard(
                     title    = "Front / Rear Motors",
                     value    = "${frontMotorRpm ?: "0"} / ${rearMotorRpm ?: "0"} RPM",

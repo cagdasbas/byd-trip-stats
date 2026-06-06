@@ -48,6 +48,7 @@ private const val ENABLE_VERBOSE_SNAPSHOT_LOGS = false
 private const val ENABLE_VERBOSE_RAW_EVENT_LOGS = false
 private val ENABLE_MODE_STATE_LOGS = BuildConfig.SENSITIVE_DIAGNOSTICS_ENABLED && RuntimeExtensionBridge.isAvailable
 private const val VEHICLE_STATE_CACHE = "vehicle_state_cache"
+private const val KEY_CHARGER_SIGNALS_UNRELIABLE = "charger_signals_unreliable"
 // Bump this when the persisted value mapping changes so stale cached values are cleared.
 // v2: remapped an auxiliary housing sensor away from cellTempMin.
 // v3: persist last confirmed drive/regen modes so weak startup samples do not regress the UI.
@@ -83,6 +84,9 @@ private const val SPEED_PUSH_MIN_INTERVAL_MS = 100L
 // can't drive the speedometer or poison the learned event→km/h scale. In-range spikes that
 // slip under this ceiling are caught per-sample by the Max-Speed guard in TripRepository.
 private const val MAX_PLAUSIBLE_SPEED_KMH = 250.0
+// A single-poll BMS SoC step larger than this (percentage points) is treated as a glitch and
+// held once — far above any real per-second SoC change, far below the observed ~1.5 pt dips.
+private const val SOC_BMS_GLITCH_STEP = 1.0
 // Minimum GPS speed (km/h) treated as clear motion when bridging a wedged/zero speed getter.
 // Above typical standstill GPS jitter so a parked car still reads 0.
 private const val GPS_BRIDGE_MIN_KMH = 2.0
@@ -793,6 +797,8 @@ class BydVehicleDataSource(context: Context) {
     @Volatile private var lastSpeedPushElapsedMs: Long = 0L
     // Last time the daemon pushed an engine-power value — makes the 1 s poll yield to it.
     @Volatile private var lastPowerPushElapsedMs: Long = 0L
+    // Last time the daemon pushed motor RPM — makes the 1 s getter poll yield to it (realtime RPM).
+    @Volatile private var lastRpmPushElapsedMs: Long = 0L
     private var lastSpeedEventDiagMs = 0L
     // Throttle for the typed-speed-push (onSpeedChanged) confirmation diagnostic.
     private var lastSpeedPushDiagMs = 0L
@@ -812,6 +818,11 @@ class BydVehicleDataSource(context: Context) {
     // baseline when no capacity activity has been seen yet (e.g. fresh install connecting
     // to a PHEV whose BMS never cleared chargerWorkState after the last charge).
     private var chargerWorkStateSetElapsedMs: Long = 0L
+    // Latched once this car's BMS is seen reporting charger gun/work non-zero while driving — proof
+    // those flags are spurious here, so charging must thereafter be backed by power/capacity, not a
+    // bare work=1. See computeChargingActive.
+    @Volatile private var chargerSignalsUnreliable =
+        runCatching { statCache.getBoolean(KEY_CHARGER_SIGNALS_UNRELIABLE, false) }.getOrDefault(false)
     private var lastChargingPowerCandidateElapsedMs: Long = 0L
     private val _speedAccelerateDeepness = MutableStateFlow<Int?>(null)
     private val _speedBrakeDeepness = MutableStateFlow<Int?>(null)
@@ -850,6 +861,36 @@ class BydVehicleDataSource(context: Context) {
     private val _statisticBatterySoh      = MutableStateFlow<Double?>(null)
     private val _statisticSocBms          = MutableStateFlow<Double?>(null)
     private val _statisticAvailPower      = MutableStateFlow<Double?>(null)
+
+    // ── BMS SoC glitch suppression ────────────────────────────────────────────
+    // The BMS occasionally reports a single isolated SoC sample that immediately reverts
+    // (observed: 36.5 → 35.0 → 36.5 and 35.6 → 34.1 → 35.6 while driving). Real SoC moves far
+    // slower than this between polls (well under 0.1 %/s even under hard load or fast charge),
+    // so a jump larger than SOC_BMS_GLITCH_STEP from the last shown value is treated as an
+    // outlier and the previous value is held — but only ONCE: the very next reading is always
+    // accepted, so a genuine large change (gap after sleep, post-charge re-baseline) is delayed
+    // by at most one sample and the filter can never get stuck on a stale value.
+    @Volatile private var lastSocBmsFiltered: Double? = null
+    @Volatile private var socBmsHeldOnce = false
+    private var lastSocBmsGlitchDiagMs = 0L
+
+    private fun filterBmsSocGlitch(candidate: Double): Double {
+        val last = lastSocBmsFiltered
+        if (last == null || socBmsHeldOnce || kotlin.math.abs(candidate - last) <= SOC_BMS_GLITCH_STEP) {
+            lastSocBmsFiltered = candidate
+            socBmsHeldOnce = false
+            return candidate
+        }
+        // Isolated large jump and we didn't just hold — suppress this one sample.
+        socBmsHeldOnce = true
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSocBmsGlitchDiagMs > 10_000L) {
+            lastSocBmsGlitchDiagMs = now
+            runCatching { DiagLog.event(appContext, TAG, "🔋 BMS SoC glitch suppressed: held ${"%.1f".format(last)}, ignored ${"%.1f".format(candidate)}") }
+        }
+        return last
+    }
+
     private val lastDiagnosticLogs = mutableMapOf<String, String>()
     private val lastRegenDiagMessages = mutableMapOf<String, String>()
     private val listenerReferences = mutableListOf<Any>()
@@ -936,8 +977,8 @@ class BydVehicleDataSource(context: Context) {
     // authoritative over the in-process speed-inference fallback (see toTelemetry gear resolution).
     @Volatile private var daemonGearKnown: Boolean = false
     // Client for the privileged telemetry daemon (instant speed/gear the app process can't get itself).
-    private val daemonClient = com.byd.tripstats.util.TelemetryDaemonClient { speedKmh, gear, powerKw ->
-        applyDaemonTelemetry(speedKmh, gear, powerKw)
+    private val daemonClient = com.byd.tripstats.util.TelemetryDaemonClient { speedKmh, gear, powerKw, frontRpm, rearRpm ->
+        applyDaemonTelemetry(speedKmh, gear, powerKw, frontRpm, rearRpm)
     }
     private var tyreDevice:     BYDAutoTyreDevice?     = null
     private var bodyworkDevice: Any? = null
@@ -2754,7 +2795,7 @@ class BydVehicleDataSource(context: Context) {
             if (effectiveTAvg != null) _statisticCellTempAvg.value = effectiveTAvg
             if (tMax != null) _statisticCellTempMax.value = tMax
             if (soh != null) _statisticBatterySoh.value = soh
-            if (socB != null) _statisticSocBms.value = socB
+            if (socB != null) _statisticSocBms.value = filterBmsSocGlitch(socB)
             if (socPanel != null && _vehicleSnapshot.value.statisticSocBatteryPct == null) {
                 _vehicleSnapshot.value = _vehicleSnapshot.value.copy(statisticSocBatteryPct = socPanel)
             }
@@ -3144,8 +3185,11 @@ class BydVehicleDataSource(context: Context) {
                 // instead of overwriting with this slower poll getter.
                 enginePower = if (SystemClock.elapsedRealtime() - lastPowerPushElapsedMs < SPEED_EVENT_FRESHNESS_MS)
                     _vehicleSnapshot.value.enginePower else enginePower,
-                engineSpeedFront = engineSpeedFront,
-                engineSpeedRear = engineSpeedRear,
+                // Yield to fresh daemon RPM pushes (realtime); fall back to this getter poll otherwise.
+                engineSpeedFront = if (SystemClock.elapsedRealtime() - lastRpmPushElapsedMs < SPEED_EVENT_FRESHNESS_MS)
+                    _vehicleSnapshot.value.engineSpeedFront else engineSpeedFront,
+                engineSpeedRear = if (SystemClock.elapsedRealtime() - lastRpmPushElapsedMs < SPEED_EVENT_FRESHNESS_MS)
+                    _vehicleSnapshot.value.engineSpeedRear else engineSpeedRear,
             )
             publishSnapshot()
 
@@ -3348,7 +3392,7 @@ class BydVehicleDataSource(context: Context) {
             if (effectiveCellTAvg != null) _statisticCellTempAvg.value = effectiveCellTAvg
             if (cellTMax != null) _statisticCellTempMax.value = cellTMax
             if (soh != null) _statisticBatterySoh.value = soh
-            if (socBms != null) _statisticSocBms.value = socBms
+            if (socBms != null) _statisticSocBms.value = filterBmsSocGlitch(socBms)
             socPanelCandidate?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(statisticSocBatteryPct = it) }
             if (availPower != null) _statisticAvailPower.value = availPower
 
@@ -4793,7 +4837,10 @@ class BydVehicleDataSource(context: Context) {
      * Drives the live UI snapshot immediately; the 1 s poll yields to it via lastSpeedPushElapsedMs
      * (see logSpeedSnapshot) and daemonGearKnown (see toTelemetry). DB recording stays on the poll.
      */
-    fun applyDaemonTelemetry(speedKmh: Double?, gear: String?, powerKw: Double?) {
+    fun applyDaemonTelemetry(
+        speedKmh: Double?, gear: String?, powerKw: Double?,
+        frontRpm: Int? = null, rearRpm: Int? = null,
+    ) {
         val now = SystemClock.elapsedRealtime()
         var changed = false
         if (speedKmh != null && speedKmh in 0.0..MAX_PLAUSIBLE_SPEED_KMH) {
@@ -4814,11 +4861,21 @@ class BydVehicleDataSource(context: Context) {
                 changed = true
             }
         }
+        if (frontRpm != null || rearRpm != null) {
+            lastRpmPushElapsedMs = now
+            val snap = _vehicleSnapshot.value
+            val newFront = frontRpm ?: snap.engineSpeedFront
+            val newRear = rearRpm ?: snap.engineSpeedRear
+            if (newFront != snap.engineSpeedFront || newRear != snap.engineSpeedRear) {
+                _vehicleSnapshot.value = snap.copy(engineSpeedFront = newFront, engineSpeedRear = newRear)
+                changed = true
+            }
+        }
         if (changed) {
             publishSnapshot()
             if (now - lastDaemonDiagMs > 5_000L) {
                 lastDaemonDiagMs = now
-                DiagLog.event(appContext, TAG, "📡 daemon telemetry: speed=${speedKmh ?: "-"} gear=${gear ?: "-"} power=${powerKw ?: "-"}")
+                DiagLog.event(appContext, TAG, "📡 daemon telemetry: speed=${speedKmh ?: "-"} gear=${gear ?: "-"} power=${powerKw ?: "-"} rpmF=${frontRpm ?: "-"} rpmR=${rearRpm ?: "-"}")
             }
         }
     }
@@ -5154,6 +5211,10 @@ class BydVehicleDataSource(context: Context) {
         _statisticCellTempMax.value = null
         _statisticBatterySoh.value = getDouble("stat_soh")
         _statisticSocBms.value = getDouble("stat_soc_bms")
+        // Seed the glitch filter's baseline from the restored value so the first live reading
+        // isn't mistaken for a jump.
+        lastSocBmsFiltered = _statisticSocBms.value
+        socBmsHeldOnce = false
         _statisticAvailPower.value = getDouble("stat_avail_power")
         _statisticBatteryCurrent.value = getDouble("stat_current")
         statCache.getInt("drive_mode", DRIVE_MODE_UNKNOWN)
@@ -5771,8 +5832,26 @@ class BydVehicleDataSource(context: Context) {
         // been observed to miss onChargingGunStateChanged(0) when the unplug happens
         // while the car is locked and the app process isn't observing).
         val snap = _vehicleSnapshot.value
-        val driving = snap.directSpeedKmh > 5.0 && snap.gear in setOf("D", "R")
+        // A drive gear (D/R) makes charging physically impossible — you can't be plugged in and
+        // in gear. Gate on gear ALONE, not speed: on this firmware directSpeedKmh frequently reads
+        // 0 even while moving (daemon gaps / wedged getter), so the old speed>5 gate let a stuck
+        // chargerWorkState/gunState survive a slow back-and-forth and then show a phantom charging
+        // animation once parked. The daemon gear (or speed-inference fallback) is the reliable signal.
+        val driving = snap.gear in setOf("D", "R")
         if (driving) {
+            // Self-calibration: gun/work reading non-zero WHILE DRIVING is physically impossible for a
+            // real charge, so this car's BMS reports them spuriously (observed on Seal: gun=1 work=1
+            // mid-drive). Once we've seen that, those flags can't be trusted alone — a real charge must
+            // be backed by actual power or capacity activity, otherwise a stuck work=1 lights a phantom
+            // charging animation once parked (where the gear gate below can no longer clear it).
+            if (!chargerSignalsUnreliable && (_chargingGunState.value != 0 || _chargerWorkState.value != 0)) {
+                chargerSignalsUnreliable = true
+                // Persist so the guard is already armed right after an app update/restart — otherwise a
+                // stuck work=1 shows a phantom charge while parked until the next drive re-latches it.
+                runCatching { statCache.edit().putBoolean(KEY_CHARGER_SIGNALS_UNRELIABLE, true).apply() }
+                Log.i(TAG, "🔌 BMS charger gun/work seen while driving — marking them unreliable (require power/capacity)")
+                runCatching { DiagLog.event(appContext, TAG, "🔌 charger gun/work unreliable on this car (seen while driving) — phantom-charge guard on") }
+            }
             if (_chargingGunState.value != 0) _chargingGunState.value = 0
             if (_chargerWorkState.value != 0) { _chargerWorkState.value = 0; chargerWorkStateSetElapsedMs = 0L }
             lastChargingActivityElapsedMs = 0L
@@ -5827,11 +5906,26 @@ class BydVehicleDataSource(context: Context) {
             staleBaseline != 0L &&
             nowElapsedMs - staleBaseline > staleTimeoutMs) {
             Log.i(TAG, "🔋 chargerWorkState stale (${(nowElapsedMs - staleBaseline) / 60_000L}m of silence) — forcing 0")
+            // A work=1 that timed out with NO capacity ever seen was a phantom (no real charge
+            // happened) — same conclusion as seeing gun/work while driving. Latch + persist the guard
+            // so a parked user who never drove after an update still stops seeing it recur, without
+            // waiting out the timeout each time.
+            if (!hasCapacityEvidence && !chargerSignalsUnreliable) {
+                chargerSignalsUnreliable = true
+                runCatching { statCache.edit().putBoolean(KEY_CHARGER_SIGNALS_UNRELIABLE, true).apply() }
+                runCatching { DiagLog.event(appContext, TAG, "🔌 charger work=1 timed out with no real charge — marking signals unreliable") }
+            }
             _chargerWorkState.value = 0
             chargerWorkStateSetElapsedMs = 0L
             return false
         }
-        return powerActive || recentCapacityActivity || chargerWorking
+        // On cars whose gun/work flags are spurious (chargerSignalsUnreliable), don't let a bare
+        // work=1 assert charging — require corroboration by real power now or capacity activity seen
+        // this session. Real charging still trips powerActive/recentCapacityActivity (and capacity
+        // evidence keeps work trustworthy through a genuine charge); a phantom stuck work=1 after a
+        // drive has neither, so it no longer shows a charging animation while parked.
+        val workTrustworthy = !chargerSignalsUnreliable || hasCapacityEvidence
+        return powerActive || recentCapacityActivity || (chargerWorking && workTrustworthy)
     }
 
     private fun hasFreshDirectChargingPower(nowElapsedMs: Long = SystemClock.elapsedRealtime()): Boolean {
@@ -6518,7 +6612,7 @@ class BydVehicleDataSource(context: Context) {
             }
             sdf["socBms"] -> {
                 val decoded = decodeStatisticPercentRaw(v.toInt(), _vehicleSnapshot.value.statisticElecPercentageValue ?: _instrumentBatteryPercent.value)
-                if (decoded != null) _statisticSocBms.value = decoded else matched = false
+                if (decoded != null) _statisticSocBms.value = filterBmsSocGlitch(decoded) else matched = false
             }
             sdf["cellTAvg"] -> {
                 val resolved = decodeStatisticRawMinus40Temp(v.toInt())
