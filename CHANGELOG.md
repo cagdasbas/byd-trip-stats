@@ -6,6 +6,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.8.0] - 2026-Jun-06
+
+> **What's new in a nutshell**
+>
+> **Real-time speed, gear and power.** The dashboard's speed, gear and engine-power now update **instantly** (many times a second) instead of once a second — and gear is now accurate even while stationary. Also adds the **BYD Han EV** (and Han EV AWD) and fixes a handful of trip-tracking and Home Assistant / MQTT issues — including live telemetry that could freeze until a car off/on after an update, and a crash that could stop the background service from coming back up on its own. Fixed PHEV range projection.
+
+### Added
+
+- **Instant live telemetry — speed, gear, power & front motor RPM** — the dashboard speed, gear, engine power and front motor RPM now refresh in real time (≈10×/second) rather than the previous ~1-second cadence, for a smooth, responsive readout. Gear is now correct even at a standstill and while reversing (**R**), instead of being inferred from speed. (Rear motor RPM still updates about once a second — the head unit only reports it that fast.) Trip/database recording is unchanged (still sampled once per second), so this adds no database growth.
+- **BYD Han EV & Han EV AWD** — full vehicle profiles (battery, kerb mass, WLTP, reference consumption, motor power, tyre pressures 2.5 bar front / 2.5 bar rear), selectable under **BYD Han** in the car picker alongside the existing Han DM-i.
+
+### Fixed
+
+- **App not restarting on its own after an update / car wake** — the background process-start helper could be removed by release-build optimisation, so after installing a new version the service didn't always come back up by itself until the app was opened manually (leaving MQTT and the Web Companion silent while parked). The helper is now preserved, so the car can bring the service back up automatically.
+- **Live telemetry freezing until a car off/on — most often right after an update** — the vehicle data connection could stop delivering live events (speed, gear and power going silent or stuck at 0) when the app was restarted without cleanly detaching first, which is exactly what happens when a new version is installed over a running one. The app now releases the vehicle connection gracefully before an update so the new version starts on a clean channel, and if the live stream does stall it now notices and re-attaches on its own within seconds — no more switching the car off and on to get telemetry back.
+- **Momentary SoC (BMS) flicker — a brief dip that instantly recovered** — the BMS occasionally reported a single isolated SoC sample that immediately reverted (e.g. 36.5% → 35.0% → 36.5% while driving). Real SoC changes far slower than that between readings, so an isolated jump is now held for one reading and discarded if it reverts; a genuine large change is delayed by at most one sample, so the readout no longer flickers.
+- **Trip card status lagging the gear** — when parked with no trip yet, shifting **P → D** now shows **"Ready to Drive"** immediately. The trip card's gear letter and status text were updating on the once-a-second loop while the main gear indicator was already instant; they now share the same live gear.
+- **Phantom charging animation while parked** — the battery could show the charging animation when nothing was plugged in, on cars whose BMS leaves its charger "gun/working" flags stuck on after a drive. The app now self-calibrates: if it ever sees those flags set *while driving* (which is physically impossible for a real charge), it stops trusting them on their own and requires actual charging power or a rising charge level to show charging. So a stuck flag no longer lights a phantom charging animation when you park, while genuine charging is still detected normally. Cars whose flags behave correctly are unaffected.
+- **PHEV range projection always stuck at "≥ WLTP — capped at rated range"** — on plug-in hybrids the projected-range line added the petrol range on top of the electric projection, so with any fuel in the tank the total always blew past the electric WLTP ceiling and pinned at "capped," hiding the real comparison (e.g. a Sealion 6 DM-i at 65% and 19.6 kWh/100 km showed "≥ 92 km" instead of its true ~50 km electric range). The projection is now **electric-only** — it shows the EV range your actual consumption implies versus the BMS/WLTP estimate, matching what the SoC and consumption chart is about. BEVs are unaffected.
+- **A new trip segment appearing mid-drive even though the engine never stopped** — a momentary gap in telemetry (a brief service hiccup while driving) was being mistaken for the car being switched off, splitting one continuous drive into two segments. A gap is now only treated as a car-off boundary when the odometer confirms the car genuinely wasn't moving across it.
+- **Trip recording starting "from now" when the app is opened well into a drive** — opening the app 15–20 minutes into an already-moving trip started tracking (and live stats) from that moment instead of recovering the trip already in progress. The app now back-anchors to the in-progress journey on open, so distance and timing reflect the whole drive.
+- **Wrong timestamps from an out-of-range ECU clock** — the head unit's reported datetime is now sanity-checked against the phone clock and ignored when it's implausibly far off, preventing skewed trip times.
+- **Home Assistant entities stuck "Unavailable" despite MQTT data arriving** — after a WiFi drop the client reconnected internally and never re-published its "online" availability, so HA kept showing the last "offline" even while telemetry flowed into the broker. Availability is now re-published on every reconnect, and a failed publish forces a clean reconnect.
+- **MQTT not publishing while parked in "Always On" mode** — in Always-On the parked poll loop had slowed to one tick every 5 minutes, so MQTT effectively went quiet between drives. Always-On now keeps a 30-second cadence while parked so telemetry keeps flowing to the broker.
+
+---
+
 ## [2.7.0] - 2026-Jun-01
 
 > **What's new in a nutshell**
