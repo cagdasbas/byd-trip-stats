@@ -33,7 +33,8 @@ private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 @Composable
 fun EnergyConsumptionChart(
     dataPoints: List<TripDataPointEntity>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    maxPoints: Int? = null
 ) {
     if (dataPoints.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -43,13 +44,18 @@ fun EnergyConsumptionChart(
         return
     }
 
-    val values = remember(dataPoints) {
+    val fullValues = remember(dataPoints) {
         // Integrate positive instantaneous power (kW) × dt to produce a smooth discharge
         // curve from trip start. Using totalDischarge directly is unreliable: Car
         // frequently reports 0 for the first minutes of a trip and then
         // jumps to the final value at the end, producing a flat line that spikes at the
         // very end of the chart. Power-integration reflects what the car is actually
         // drawing in real time and matches the user's felt consumption.
+        //
+        // This MUST run on full-resolution samples: the gap-guard below rejects any interval
+        // longer than 60s, so integrating pre-condensed points (where neighbours are minutes
+        // apart) would discard nearly every interval and flatline the chart. Condensing
+        // therefore happens AFTER integration, on the monotone curve.
         val result = ArrayList<Float>(dataPoints.size)
         var cumulative = 0.0
         result.add(0f)
@@ -67,12 +73,29 @@ fun EnergyConsumptionChart(
         result
     }
 
-    if (values.isEmpty()) {
+    if (fullValues.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text("Insufficient data", style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
+    }
+
+    // Decimate the already-integrated curve for display. It is monotone and smooth, so
+    // index-sampling it is loss-free for an overview — and the trip-end total is preserved by
+    // always keeping the final sample. With maxPoints == null the chart renders full detail.
+    val (points, values) = remember(dataPoints, fullValues, maxPoints) {
+        if (maxPoints == null || dataPoints.size <= maxPoints) {
+            dataPoints to fullValues
+        } else {
+            val step = (dataPoints.size + maxPoints - 1) / maxPoints
+            val idx = buildList {
+                var i = 0
+                while (i < dataPoints.size) { add(i); i += step }
+                if (last() != dataPoints.lastIndex) add(dataPoints.lastIndex)
+            }
+            idx.map { dataPoints[it] } to idx.map { fullValues[it] }
+        }
     }
 
     val lineColor = ChargingYellow
@@ -81,7 +104,7 @@ fun EnergyConsumptionChart(
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
 
-    val modes    = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
+    val modes    = remember(points) { points.map { it.extractTripModes() } }
     val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
     val singleDriveMode = remember(modes) { modes.singleDriveModeOrNull() }
 
@@ -107,19 +130,19 @@ fun EnergyConsumptionChart(
         fun yOf(v: Float): Float {
             return (padT + chartH * (1.0 - (v - yMin) / (yMax - yMin))).toFloat()
         }
-        val totalDuration = if (dataPoints.size > 1)
-            (dataPoints.last().timestamp - dataPoints.first().timestamp) / 1000.0 else 0.0
+        val totalDuration = if (points.size > 1)
+            (points.last().timestamp - points.first().timestamp) / 1000.0 else 0.0
 
         // ── Drive mode background bands ──────────────────────────────────────
-        if (hasModes && dataPoints.size >= 2) {
+        if (hasModes && points.size >= 2) {
             var bandStart = 0
             var bandMode = modes[0].driveMode
-            for (i in 1..dataPoints.size) {
-                val curMode = if (i < dataPoints.size) modes[i].driveMode else -1
-                if (curMode != bandMode || i == dataPoints.size) {
+            for (i in 1..points.size) {
+                val curMode = if (i < points.size) modes[i].driveMode else -1
+                if (curMode != bandMode || i == points.size) {
                     if (bandMode != 0) {
                         val x0 = xOf(bandStart)
-                        val x1 = if (i < dataPoints.size) xOf(i) else xOf(dataPoints.size - 1)
+                        val x1 = if (i < points.size) xOf(i) else xOf(points.size - 1)
                         drawRect(
                             color = driveModeColor(bandMode).copy(alpha = 0.07f),
                             topLeft = Offset(x0, padT),
@@ -155,15 +178,15 @@ fun EnergyConsumptionChart(
         nc.drawText("kWh", 18f, padT + chartH / 2f, yAxisPaint); nc.restore()
         drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
         val labelEvery = when {
-            dataPoints.size > 200 -> 40; dataPoints.size > 100 -> 20; dataPoints.size > 50 -> 10; else -> 5
+            points.size > 200 -> 40; points.size > 100 -> 20; points.size > 50 -> 10; else -> 5
         }
         val minLabelGap = 72f
         var lastLabelX = -minLabelGap
-        dataPoints.forEachIndexed { i, _ ->
-            if (i % labelEvery == 0 || i == dataPoints.size - 1) {
+        points.forEachIndexed { i, _ ->
+            if (i % labelEvery == 0 || i == points.size - 1) {
                 val x = xOf(i)
                 if (x - lastLabelX >= minLabelGap) {
-                    val secs = if (dataPoints.size > 1) (i / (dataPoints.size - 1).toFloat()) * totalDuration else 0.0
+                    val secs = if (points.size > 1) (i / (points.size - 1).toFloat()) * totalDuration else 0.0
                     nc.drawText("%d:%02d".format((secs / 60).toInt(), (secs % 60).toInt()), x, h - 8f, xLabelPaint)
                     lastLabelX = x
                 }
@@ -190,7 +213,7 @@ fun EnergyConsumptionChart(
             if (tp.x in padL..(w - padR) && values.size > 1) {
                 val idx = ((tp.x - padL) / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
                 val secs = (idx / (values.size - 1).toFloat()) * totalDuration
-                val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
+                val realTime = timeFmt.format(Date(points[idx].timestamp))
                 val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(values[idx]), w = w,

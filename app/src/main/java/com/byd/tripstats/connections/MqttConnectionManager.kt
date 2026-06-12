@@ -287,7 +287,7 @@ class MqttConnectionManager(context: Context) {
             SensorDef("soh", "State of Health", "%", null, "measurement"),
             SensorDef("statistic_soh", "Statistic SOH", "%", null, "measurement"), // Falls back to capacity-based soh or remaining-energy-based 
             SensorDef("available_power", "Available Power", "kW", "power", "measurement"),
-            SensorDef("battery_remain_power_ev", "Battery Remain Power EV", "kW", null, "measurement"),
+            SensorDef("battery_remain_power_ev", "Battery Remaining Energy EV", "kWh", null, "measurement"),
             SensorDef("battery_pack_temp", "Battery Pack Temp", "°C", "temperature", "measurement"),
             SensorDef("battery_cell_temp_min", "Cell Temp Min", "°C", "temperature", "measurement"),
             SensorDef("battery_cell_temp_max", "Cell Temp Max", "°C", "temperature", "measurement"),
@@ -308,7 +308,7 @@ class MqttConnectionManager(context: Context) {
         for ((id, name, unit, deviceClass, stateClass, valueTemplate) in allSensors) {
 
             val discovery = JSONObject()
-                .put("name", "BYD $name")
+                .put("name", "$name")
                 .put("unique_id", "byd-trip-stats_${resolvedId}_$id")
                 .put("state_topic", stTopic)
                 .put("value_template", valueTemplate ?: "{{ value_json.$id }}")
@@ -334,7 +334,7 @@ class MqttConnectionManager(context: Context) {
         )
         for ((id, name, deviceClass, valueTemplate) in binarySensors) {
             val discovery = JSONObject()
-                .put("name", "BYD $name")
+                .put("name", "$name")
                 .put("unique_id", "byd-trip-stats_${resolvedId}_$id")
                 .put("state_topic", stTopic)
                 .put("value_template", valueTemplate ?: "{{ value_json.$id | lower }}")

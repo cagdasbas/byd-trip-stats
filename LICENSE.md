@@ -11,7 +11,7 @@
 |---|---|
 | **Licensor** | Angelos Oikonomou |
 | **Licensed Work** | BYD Trip Stats |
-| **Additional Use Grant** | You may use the Licensed Work for personal, non-commercial purposes only — specifically, installing and running the application on your own vehicle for personal data collection and analysis. Any commercial use, including but not limited to integration into vehicle firmware, commercial products, SaaS offerings, or redistribution as part of a paid service, requires a separate written licence agreement with the Licensor. |
+| **Additional Use Grant** | You may use the Licensed Work for personal, non-commercial purposes only — specifically, installing and running the application on your own vehicle for personal data collection and analysis. This grant does **not** permit removing, disabling, bypassing, or otherwise circumventing the Pro entitlement / license-key mechanism, nor accessing features gated behind a paid Pro licence without a valid licence issued by the Licensor. Any commercial use, including but not limited to integration into vehicle firmware, commercial products, SaaS offerings, or redistribution as part of a paid service, requires a separate written licence agreement with the Licensor. |
 | **Change Date** | March 8, 2030 |
 | **Change License** | MIT License |
 

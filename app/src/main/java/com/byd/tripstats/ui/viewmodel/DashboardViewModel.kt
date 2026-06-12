@@ -18,6 +18,7 @@ import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
+import com.byd.tripstats.data.repository.LiveProjectionCache
 import com.byd.tripstats.data.repository.TripRepository
 import com.byd.tripstats.data.repository.UpdateRepository
 import com.byd.tripstats.BuildConfig
@@ -28,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +64,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val batteryVoltageHistoryRepository = BatteryVoltageHistoryRepository.getInstance(application)
     private val preferencesManager  = PreferencesManager(application)
     val updateRepository            = UpdateRepository.getInstance(application)
+    // Process-scoped, disk-backed cache of the live projection curve so a reopen
+    // (back press, or cold start) shows the as-computed-live line instead of a
+    // single-rate rebuild. Display aid only — never feeds live tracking math.
+    private val liveProjectionCache = LiveProjectionCache.getInstance(application)
 
     // ── Vehicle service connection state ─────────────────────────────────────
 
@@ -565,6 +571,116 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         internal fun currentHemisphere(): Hemisphere =
             hemisphereForCountry(Locale.getDefault().country)
 
+        /**
+         * EV range projection with a PHEV-aware consumption floor.
+         *
+         * Divides the remaining traction-battery energy by the measured
+         * consumption to get electric range. The catch is PHEV-specific:
+         * whenever the ICE is propelling the car or charge-sustaining, distance
+         * keeps accruing while the traction battery barely discharges, so the
+         * measured Wh/km (battery energy ÷ *total* distance) collapses far below
+         * what the car can physically achieve on electrons alone. Dividing the
+         * remaining pack energy by that deflated rate balloons the projection to
+         * multiples of reality — e.g. 87 km projected at 19 % SoC against a BMS
+         * reading of 10 km, the bug this guards against.
+         *
+         * No PHEV sustains an EV consumption meaningfully below its rated figure,
+         * so for PHEVs we floor [whPerKm] at the catalog reference rate
+         * ([baselineWhPerKm]) before dividing. The floor only bites in the
+         * ICE-diluted regime; in genuine EV driving the measured rate sits at or
+         * above reference and passes through untouched, and an inefficient driver
+         * can still project *below* the SoC-scaled WLTP range (the useful "you're
+         * burning EV charge faster than rated" signal is preserved).
+         *
+         * BEVs are unaffected: every kilometre is an EV kilometre, so the measured
+         * rate is already honest and the chart's WLTP result-cap handles any
+         * genuine over-projection on its own.
+         */
+        internal fun projectedEvRangeKm(
+            remainingEnergyWh: Double,
+            whPerKm: Double,
+            baselineWhPerKm: Double,
+            isPhev: Boolean
+        ): Double {
+            val rate = if (isPhev) maxOf(whPerKm, baselineWhPerKm) else whPerKm
+            if (rate <= 0.0) return 0.0
+            return (remainingEnergyWh / rate).coerceAtLeast(0.0)
+        }
+
+        /**
+         * Remaining traction-battery energy (Wh) feeding the EV range projection.
+         *
+         * BEVs use catalog capacity × SoC — the whole pack is available for
+         * propulsion, so that product is honest. This path is deliberately left
+         * unchanged: a BEV never reaches the PHEV branch below.
+         *
+         * PHEVs differ near the bottom of the charge. The BMS reserves part of the
+         * pack for charge-sustaining / hybrid operation, so `usableKwh × SoC%`
+         * overstates the energy actually available for EV driving — 19 % of a
+         * 44 kWh Tang DM-i pack computes ~8 kWh, yet the car offers only ~10 km of
+         * EV range. When the BMS publishes its own remaining-EV-energy figure
+         * ([bmsRemainingEvKwh], from `power_battery_remain_power_ev`) we trust it
+         * instead, since it already nets out that reserve. The value is accepted
+         * only inside a sane envelope (0 < x ≤ pack capacity); outside it — or when
+         * the firmware never reports it — we fall back to the SoC product. So the
+         * change can only improve a PHEV numerator and can never regress one, and
+         * it never touches BEVs.
+         */
+        internal fun remainingEvEnergyWh(
+            batteryKwh: Double,
+            socPercent: Double,
+            bmsRemainingEvKwh: Double?,
+            isPhev: Boolean
+        ): Double {
+            if (isPhev && bmsRemainingEvKwh != null &&
+                bmsRemainingEvKwh > 0.0 && bmsRemainingEvKwh <= batteryKwh
+            ) {
+                return bmsRemainingEvKwh * 1000.0
+            }
+            return (batteryKwh * 1000.0 * (socPercent / 100.0)).coerceAtLeast(0.0)
+        }
+
+        // Tolerance when matching the cached curve's reach against the live distance.
+        private const val CACHE_DISTANCE_EPSILON_KM = 0.05
+
+        /**
+         * Stitch the cached live projection curve ([cached], kept by
+         * [com.byd.tripstats.data.repository.LiveProjectionCache]) together with the
+         * curve [rebuilt] from the database in restoreTripState.
+         *
+         * The cache holds the curve *as it was computed live*, point by point — far
+         * higher fidelity than the rebuild, which has to apply one consumption rate
+         * to the whole trip. But it can lag the database: if the ViewModel (or the
+         * whole process) died mid-trip, driving continued and the database kept
+         * recording while the cache did not. So we keep the cached head and append
+         * only the rebuilt tail beyond the cache's reach — preserving live fidelity
+         * for the covered portion, filling the gap with the rebuild, and never
+         * dropping or duplicating distance:
+         *
+         *  - No usable cache → return [rebuilt] unchanged (today's behaviour).
+         *  - Cache fresh (covers up to the live distance) → tail is empty, so the
+         *    curve is the cached one verbatim — the back-press reopen case.
+         *  - Cache stale (process was killed earlier) → cached head + recomputed
+         *    tail for the kilometres driven while it was dead.
+         *
+         * [cached] points beyond [liveDistanceKm] are dropped as defensive hygiene
+         * against an out-of-date cache reading ahead of reality.
+         */
+        internal fun mergeProjectionCurve(
+            cached: List<RangeDataPoint>?,
+            rebuilt: List<RangeDataPoint>,
+            liveDistanceKm: Double
+        ): List<RangeDataPoint> {
+            if (cached.isNullOrEmpty()) return rebuilt
+            val head = cached
+                .filter { it.distanceKm <= liveDistanceKm + CACHE_DISTANCE_EPSILON_KM }
+                .sortedBy { it.distanceKm }
+            if (head.isEmpty()) return rebuilt
+            val headMaxDist = head.last().distanceKm
+            val tail = rebuilt.filter { it.distanceKm > headMaxDist }
+            return head + tail
+        }
+
         internal fun seasonForMonth(month: Int, hemisphere: Hemisphere): Season = when (month) {
             3, 4, 5 -> if (hemisphere == Hemisphere.SOUTHERN) Season.AUTUMN else Season.SPRING
             6, 7, 8 -> if (hemisphere == Hemisphere.SOUTHERN) Season.WINTER else Season.SUMMER
@@ -885,6 +1001,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         suppressJourneyDistance = false
         if (!keepPoints) {
             _tripDataPoints.value = emptyList()
+            // The trip ended (or a new trip replaced it) — drop the cached curve so a
+            // later open can't restore a finished trip's line into a fresh one.
+            liveProjectionCache.clear()
         }
     }
 
@@ -1256,21 +1375,30 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         ?.times(10.0)
                         ?: FALLBACK_BASELINE_WH_PER_KM
                     val effectiveSoc = telemetry.soc.takeIf { it > 0 } ?: telemetry.socPanel.toDouble()
-                    val remainingEnergyWh = batteryKwh * 1000.0 * (effectiveSoc / 100.0)
+                    val isPhev = car?.isPhev == true
+                    // For PHEVs prefer the BMS's own remaining-EV-energy reading over
+                    // capacity × SoC, which overstates EV-usable energy near the
+                    // charge-sustaining floor (see remainingEvEnergyWh). BEVs keep the
+                    // SoC product unchanged.
+                    val remainingEnergyWh = remainingEvEnergyWh(
+                        batteryKwh, effectiveSoc, telemetry.batteryRemainPowerEV, isPhev
+                    )
                     // EV-only projection: models how your actual EV consumption affects electric range
                     // vs the BMS/WLTP EV estimate. We used to add the BMS fuel range for PHEVs, but the
                     // chart caps at the EV-only WLTP — so any PHEV with fuel in the tank projected
                     // EV+ICE combined (hundreds of km) and pinned permanently at "≥ WLTP, capped".
                     // Fuel range isn't driven by EV consumption, so it doesn't belong on this curve.
+                    // projectedEvRangeKm floors the rate at the reference consumption for PHEVs so
+                    // ICE-diluted (near-zero) measured Wh/km can't balloon the EV range — see its doc.
                     val (projectedRange, model) = when {
                         isStabilised && smoothedWhPerKm != null && smoothedWhPerKm!! > 0.0 ->
-                            (remainingEnergyWh / smoothedWhPerKm!!).coerceAtLeast(0.0) to
+                            projectedEvRangeKm(remainingEnergyWh, smoothedWhPerKm!!, baselineWhPerKm, isPhev) to
                                 RangeModel.LIVE_TRIP
                         nonBaselineWhPerKm != null ->
-                            (remainingEnergyWh / nonBaselineWhPerKm).coerceAtLeast(0.0) to
+                            projectedEvRangeKm(remainingEnergyWh, nonBaselineWhPerKm, baselineWhPerKm, isPhev) to
                                 RangeModel.HISTORICAL_BINS
                         else ->
-                            (remainingEnergyWh / baselineWhPerKm).coerceAtLeast(0.0) to
+                            projectedEvRangeKm(remainingEnergyWh, baselineWhPerKm, baselineWhPerKm, isPhev) to
                                 RangeModel.BASELINE
                     }
 
@@ -1283,6 +1411,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         projectedRangeKm = projectedRange,
                         isStabilised = isStabilised || model != RangeModel.BASELINE
                     )
+                    // Snapshot the as-computed-live curve so a reopen restores it
+                    // verbatim instead of rebuilding it (display aid only — see
+                    // LiveProjectionCache). Keyed by trip id so it can never bleed
+                    // into a different trip.
+                    currentTripId.value?.let { liveProjectionCache.update(it, _tripDataPoints.value) }
                     lastTelemetryWasCarOn = telemetry.isCarOn
                 }
                 wasInTrip = inTrip
@@ -1399,6 +1532,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         restoreTripJob = viewModelScope.launch(Dispatchers.IO) {
             val trip = tripRepository.getTripById(tripId).first() ?: return@launch
             val dataPoints = tripRepository.getDataPointsForTrip(tripId).first()
+            // Read the cached live curve here on the IO dispatcher (it may hit disk on
+            // a cold start) so the Main-thread reconstruction below never blocks on it.
+            val cachedCurve = liveProjectionCache.load(tripId)
 
             withContext(Dispatchers.Main) {
                 val freshAnchor = forceFreshAnchorNextSession
@@ -1596,7 +1732,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 // EV-only projection (matches the live path) — fuel range is excluded because it
                 // isn't driven by EV consumption and would pin PHEVs at the EV-WLTP cap.
-                _tripDataPoints.value = dataPoints.map { dp ->
+                val rebuiltPoints = dataPoints.map { dp ->
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
                     // A point is stabilised if EITHER the distance threshold has been
                     // reached OR a non-baseline projection is available — matches the
@@ -1608,14 +1744,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     // Null for non-stabilised points — matches live path behaviour so the
                     // orange projected line doesn't appear after navigation before it would
                     // appear during a fresh live drive session.
+                    // Same PHEV consumption floor as the live path (see projectedEvRangeKm).
                     val projected: Double? = when {
                         !stabilised -> null
                         restoredSmoothed != null && restoredSmoothed > 0.0 ->
-                            (remainingWh / restoredSmoothed).coerceAtLeast(0.0)
+                            projectedEvRangeKm(remainingWh, restoredSmoothed, baselineWhPerKm, car?.isPhev == true)
                         restoredBinWhPerKm != null ->
-                            (remainingWh / restoredBinWhPerKm).coerceAtLeast(0.0)
+                            projectedEvRangeKm(remainingWh, restoredBinWhPerKm, baselineWhPerKm, car?.isPhev == true)
                         else ->
-                            (remainingWh / baselineWhPerKm).coerceAtLeast(0.0)
+                            projectedEvRangeKm(remainingWh, baselineWhPerKm, baselineWhPerKm, car?.isPhev == true)
                     }
                     RangeDataPoint(
                         distanceKm             = dKm,
@@ -1625,6 +1762,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         isStabilised           = stabilised
                     )
                 }
+
+                // Prefer the cached as-computed-live curve over the single-rate
+                // rebuild when one survives for this trip (in memory after a back
+                // press, or on disk after a cold start), appending only the rebuilt
+                // tail for any distance driven while the cache was dead. Falls back
+                // to the rebuild verbatim when there's no usable cache.
+                _tripDataPoints.value = mergeProjectionCurve(
+                    cached = cachedCurve,
+                    rebuilt = rebuiltPoints,
+                    liveDistanceKm = liveDistanceKm
+                )
 
                 // Pick the same tier the live path would (line ~1077). Without checking
                 // bins, a restored trip with valid bin data but no smoothed EMA would
@@ -2212,30 +2360,76 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val avgSoh     : Double  // average SoH across all data points in the trip
     )
 
-    val sohBaselineEpochMs: StateFlow<Long?> = preferencesManager.sohBaselineEpochMs
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    // Statistical SoH shipped in v2.4.0 (2026-05-13). Trips recorded before this were
+    // produced by the legacy *calculated* method, which under-estimated SoH and creates a
+    // spurious dip-and-recover in the chart, so they are excluded by default. (= 2026-05-13
+    // 00:00 UTC in epoch ms.)
+    private val LEGACY_SOH_CUTOVER_MS = 1_778_630_400_000L
 
-    fun setSohBaselineToNow() {
-        viewModelScope.launch { preferencesManager.saveSohBaselineEpochMs(System.currentTimeMillis()) }
+    /** How the legacy SoH era is excluded from the degradation views. */
+    enum class SohExclusionMode { AUTO, CUSTOM, OFF }
+
+    /** Resolved exclusion state. [cutoffMs] is the "exclude trips before" epoch, null when OFF. */
+    data class SohExclusion(val mode: SohExclusionMode, val cutoffMs: Long?)
+
+    /**
+     * Resolves the persisted prefs (and the legacy baseline key) into an effective
+     * exclusion. Defaults to AUTO so the legacy calculated-SoH dip is hidden out of the
+     * box; an existing user's old baseline is preserved as a CUSTOM cutoff until they
+     * choose otherwise.
+     */
+    val sohExclusion: StateFlow<SohExclusion> =
+        combine(
+            preferencesManager.sohExclusionMode,
+            preferencesManager.sohCustomCutoffMs,
+            preferencesManager.sohBaselineEpochMs
+        ) { mode, custom, legacy ->
+            when (mode) {
+                "OFF"    -> SohExclusion(SohExclusionMode.OFF, null)
+                "CUSTOM" -> SohExclusion(SohExclusionMode.CUSTOM, custom ?: LEGACY_SOH_CUTOVER_MS)
+                "AUTO"   -> SohExclusion(SohExclusionMode.AUTO, LEGACY_SOH_CUTOVER_MS)
+                else     ->  // never explicitly set: migrate a legacy baseline, else default to AUTO
+                    if (legacy != null) SohExclusion(SohExclusionMode.CUSTOM, legacy)
+                    else SohExclusion(SohExclusionMode.AUTO, LEGACY_SOH_CUTOVER_MS)
+            }
+        }.stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5_000),
+            SohExclusion(SohExclusionMode.AUTO, LEGACY_SOH_CUTOVER_MS)
+        )
+
+    fun setSohExclusionAuto() {
+        viewModelScope.launch { preferencesManager.saveSohExclusionMode("AUTO") }
     }
 
-    fun clearSohBaseline() {
-        viewModelScope.launch { preferencesManager.clearSohBaselineEpochMs() }
+    fun setSohExclusionOff() {
+        viewModelScope.launch { preferencesManager.saveSohExclusionMode("OFF") }
     }
 
-    val batteryDegradationData: StateFlow<List<SohDataPoint>> =
+    fun setSohExclusionCutoff(epochMs: Long) {
+        viewModelScope.launch { preferencesManager.saveSohCustomCutoffMs(epochMs) }
+    }
+
+    /** Re-apply a previous exclusion state — used by the Snackbar UNDO action. */
+    fun restoreSohExclusion(prev: SohExclusion) {
+        when (prev.mode) {
+            SohExclusionMode.AUTO   -> setSohExclusionAuto()
+            SohExclusionMode.OFF    -> setSohExclusionOff()
+            SohExclusionMode.CUSTOM -> setSohExclusionCutoff(prev.cutoffMs ?: LEGACY_SOH_CUTOVER_MS)
+        }
+    }
+
+    /** All completed trips with usable SoH, before exclusion — source for both views below. */
+    private val eligibleSohPoints: Flow<List<SohDataPoint>> =
         combine(
             tripRepository.getAllTrips(),
-            tripRepository.getAvgSohPerTrip(),
-            preferencesManager.sohBaselineEpochMs
-        ) { trips, sohSummaries, baselineEpoch ->
-            val tripById   = trips.associateBy { it.id }
+            tripRepository.getAvgSohPerTrip()
+        ) { trips, sohSummaries ->
+            val tripById = trips.associateBy { it.id }
             sohSummaries
                 .mapNotNull { summary ->
                     val trip = tripById[summary.tripId] ?: return@mapNotNull null
                     if (trip.isActive) return@mapNotNull null          // skip live trip
                     if (summary.avgSoh < 50.0) return@mapNotNull null  // sanity filter
-                    if (baselineEpoch != null && trip.startTime < baselineEpoch) return@mapNotNull null
                     SohDataPoint(
                         tripId    = trip.id,
                         timestamp = trip.startTime,
@@ -2245,5 +2439,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 .sortedBy { it.timestamp }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val batteryDegradationData: StateFlow<List<SohDataPoint>> =
+        combine(eligibleSohPoints, sohExclusion) { points, exclusion ->
+            val cutoff = exclusion.cutoffMs ?: return@combine points
+            points.filter { it.timestamp >= cutoff }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Count of eligible trips hidden by the current exclusion (for UI + the report note). */
+    val sohExcludedTripCount: StateFlow<Int> =
+        combine(eligibleSohPoints, sohExclusion) { points, exclusion ->
+            val cutoff = exclusion.cutoffMs ?: return@combine 0
+            points.count { it.timestamp < cutoff }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 }

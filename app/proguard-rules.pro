@@ -174,6 +174,13 @@
     public static *;
 }
 
+# Pro-license code derivation, loaded reflectively by ProLicenseBridge
+# (Class.forName + getMethod). Without this R8 strips it in release and Pro
+# verification reports "unavailable".
+-keep class com.byd.tripstats.runtime.ProLicenseHooks {
+    public static *;
+}
+
 # NanoHTTPD — embedded web server for the PWA companion
 -keep class fi.iki.elonen.** { *; }
 -keepclassmembers class fi.iki.elonen.** { *; }

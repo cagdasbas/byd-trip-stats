@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
+import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
 // ── Holographic palette ───────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ private fun interpolateBmsAt(
  * @param isStabilised           False while the projection is still warming up — chart shows
  *                               a "Calibrating…" badge and falls back to BMS line.
  */
+@Serializable
 data class RangeDataPoint(
     val distanceKm:             Double,
     val soc:                    Double,

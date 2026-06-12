@@ -111,6 +111,36 @@ object CarCatalog {
         cdA = 0.682       // Cd 0.29 × A 2.35 m²
     )
 
+    val BYD_SEAGULL_ACTIVE = CarConfig(
+        id = "BYD_SEAGULL_ACTIVE",
+        displayName = "Seagull / Atto 1 Active",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 30.08,
+        estimatedKerbMassKg = 1160.0,
+        wltpKm = 190,
+        referenceConsumptionKwhPer100km = 15.8,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 55,
+        cellCount = 94,   // 30.08 kWh @ ~300V -> 94S LFP
+        cdA = 0.653
+    )
+
+    val BYD_SEAGULL_FLYING = CarConfig(
+        id = "BYD_SEAGULL_FLYING",
+        displayName = "Seagull / Atto 1 Flying",
+        drivetrain = Drivetrain.FWD,
+        batteryKwh = 38.88,
+        estimatedKerbMassKg = 1240.0,
+        wltpKm = 245,
+        referenceConsumptionKwhPer100km = 15.8,
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        frontMotorRatedKw = 55,
+        cellCount = 120,  // 38.88 kWh @ ~384V -> 120S LFP
+        cdA = 0.653
+    )
+
     val BYD_ATTO_2_ACTIVE = CarConfig(
         id = "BYD_ATTO_2_ACTIVE",
         displayName = "Atto 2 Active",

@@ -30,7 +30,9 @@ private val KEEP_SERVICE_ALIVE_WHEN_OFF  = booleanPreferencesKey("keep_service_a
 private val OFF_STATE_MODE               = stringPreferencesKey("off_state_mode")
 private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_price_per_kwh")
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
-private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms")
+private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms") // legacy; migrated
+private val SOH_EXCLUSION_MODE           = stringPreferencesKey("soh_exclusion_mode")   // AUTO|CUSTOM|OFF
+private val SOH_CUSTOM_CUTOFF_MS         = longPreferencesKey("soh_custom_cutoff_ms")
 private val UNIT_SYSTEM                  = stringPreferencesKey("unit_system")
 private val THEME_MODE                   = stringPreferencesKey("theme_mode")
 private val SOC_SOURCE                   = stringPreferencesKey("soc_source")
@@ -39,9 +41,12 @@ private val MIN_TRIP_DISTANCE_KM         = doublePreferencesKey("min_trip_distan
 private val WEB_SERVER_ENABLED           = booleanPreferencesKey("web_server_enabled")
 private val WEB_SERVER_PORT              = intPreferencesKey("web_server_port")
 private val WEB_SERVER_PIN               = stringPreferencesKey("web_server_pin")
+private val CELL_IMBALANCE_ALERT_ENABLED = booleanPreferencesKey("cell_imbalance_alert_enabled")
+private val CELL_IMBALANCE_THRESHOLD_V   = doublePreferencesKey("cell_imbalance_threshold_v")
 
 const val DEFAULT_CAR_OFF_TIMEOUT_MINUTES = 3
 const val DEFAULT_MIN_TRIP_DISTANCE_KM    = 0.0
+const val DEFAULT_CELL_IMBALANCE_THRESHOLD_V = 0.05   // 50 mV
 
 class PreferencesManager(private val context: Context) {
 
@@ -119,25 +124,27 @@ class PreferencesManager(private val context: Context) {
     //   ENABLED    — service runs 24/7 (old true)
     //   DISABLED   — service stops after 5 min, 90-min wakeup for snapshots (old false)
     //   DEEP_SLEEP — service stops after 5 min, no wakeups, car can fully deep sleep
-    // Default is DISABLED (Minimal). Backward compat: only an EXPLICIT legacy
-    // keepServiceAliveWhenOff=true is honoured as ENABLED (Always On); anyone who
-    // never explicitly chose Always On — including new installs — defaults to Minimal.
+    // Default is ENABLED (Always On) — the only mode that keeps parked telemetry and
+    // off-state charging detection working on cars that cut head-unit power at park.
+    // Backward compat: only an EXPLICIT legacy keepServiceAliveWhenOff=false is honoured
+    // as DISABLED (Minimal); everyone else — new installs and the old `true` default —
+    // gets Always On. An explicit OFF_STATE_MODE choice always wins.
 
     val offStateMode: Flow<OffStateMode> = context.dataStore.data
         .map { prefs ->
             prefs[OFF_STATE_MODE]
                 ?.let { runCatching { OffStateMode.valueOf(it) }.getOrNull() }
-                ?: if (prefs[KEEP_SERVICE_ALIVE_WHEN_OFF] == true) OffStateMode.ENABLED
-                   else OffStateMode.DISABLED
+                ?: if (prefs[KEEP_SERVICE_ALIVE_WHEN_OFF] == false) OffStateMode.DISABLED
+                   else OffStateMode.ENABLED
         }
         .onEach { cache.edit().putString("off_state_mode", it.name).apply() }
 
     fun getCachedOffStateMode(): OffStateMode =
         cache.getString("off_state_mode", null)
             ?.let { runCatching { OffStateMode.valueOf(it) }.getOrNull() }
-            ?: if (cache.contains("keep_service_alive_when_off") && getCachedKeepServiceAliveWhenOff())
-                   OffStateMode.ENABLED
-               else OffStateMode.DISABLED
+            ?: if (cache.contains("keep_service_alive_when_off") && !getCachedKeepServiceAliveWhenOff())
+                   OffStateMode.DISABLED
+               else OffStateMode.ENABLED
 
     suspend fun saveOffStateMode(mode: OffStateMode) {
         context.dataStore.edit { it[OFF_STATE_MODE] = mode.name }
@@ -180,21 +187,42 @@ class PreferencesManager(private val context: Context) {
         context.dataStore.edit { it[LAST_SEEN_VERSION_CODE] = versionCode }
     }
 
-    // ── SoH baseline epoch ────────────────────────────────────────────────────
-    // When set, the battery degradation chart only plots trips that started
-    // at or after this timestamp. Used to exclude pre-v2.0.0 data that was
-    // recorded via a different (incompatible) SoH source.
+    // ── SoH degradation exclusion ─────────────────────────────────────────────
+    // The battery degradation chart/trend/report excludes a span of early trips
+    // whose SoH was recorded by the legacy *calculated* method (it under-estimated
+    // SoH, producing a spurious dip-and-recover). This is a view filter only — it
+    // never deletes data and is fully reversible.
+    //
+    // Three modes:
+    //   AUTO   → exclude trips before the statistical-SoH cutover (the default)
+    //   CUSTOM → exclude trips before [sohCustomCutoffMs]
+    //   OFF    → include everything (legacy values may read low)
+    // The effective cutoff is resolved in DashboardViewModel.
 
-    /** Emits null if no baseline has been set (= show all trips). */
+    /** Null until the user makes an explicit choice; resolved against the legacy key. */
+    val sohExclusionMode: Flow<String?> = context.dataStore.data
+        .map { it[SOH_EXCLUSION_MODE] }
+
+    val sohCustomCutoffMs: Flow<Long?> = context.dataStore.data
+        .map { it[SOH_CUSTOM_CUTOFF_MS] }
+
+    /** Legacy "baseline" key, kept only so existing users' choice can be migrated. */
     val sohBaselineEpochMs: Flow<Long?> = context.dataStore.data
         .map { it[SOH_BASELINE_EPOCH_MS] }
 
-    suspend fun saveSohBaselineEpochMs(epochMs: Long) {
-        context.dataStore.edit { it[SOH_BASELINE_EPOCH_MS] = epochMs }
+    suspend fun saveSohExclusionMode(mode: String) {
+        context.dataStore.edit {
+            it[SOH_EXCLUSION_MODE] = mode
+            it.remove(SOH_BASELINE_EPOCH_MS) // supersede the legacy key once a choice is made
+        }
     }
 
-    suspend fun clearSohBaselineEpochMs() {
-        context.dataStore.edit { it.remove(SOH_BASELINE_EPOCH_MS) }
+    suspend fun saveSohCustomCutoffMs(epochMs: Long) {
+        context.dataStore.edit {
+            it[SOH_CUSTOM_CUTOFF_MS] = epochMs
+            it[SOH_EXCLUSION_MODE] = "CUSTOM"
+            it.remove(SOH_BASELINE_EPOCH_MS)
+        }
     }
 
     // ── Unit system ───────────────────────────────────────────────────────────
@@ -298,6 +326,38 @@ class PreferencesManager(private val context: Context) {
         val clamped = km.coerceAtLeast(0.0)
         context.dataStore.edit { it[MIN_TRIP_DISTANCE_KM] = clamped }
         cache.edit().putFloat("min_trip_distance_km", clamped.toFloat()).apply()
+    }
+
+    // ── Cell imbalance alert ──────────────────────────────────────────────────
+    // Opt-in notification fired by the telemetry service when the live cell
+    // voltage spread (batteryCellVoltageMax − batteryCellVoltageMin) stays above
+    // the configured threshold. Read synchronously on every telemetry tick, so
+    // both the enabled flag and the threshold mirror into the cache.
+
+    val cellImbalanceAlertEnabled: Flow<Boolean> = context.dataStore.data
+        .map { it[CELL_IMBALANCE_ALERT_ENABLED] ?: false }
+        .onEach { cache.edit().putBoolean("cell_imbalance_alert_enabled", it).apply() }
+
+    fun getCachedCellImbalanceAlertEnabled(): Boolean =
+        cache.getBoolean("cell_imbalance_alert_enabled", false)
+
+    suspend fun saveCellImbalanceAlertEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[CELL_IMBALANCE_ALERT_ENABLED] = enabled }
+        cache.edit().putBoolean("cell_imbalance_alert_enabled", enabled).apply()
+    }
+
+    val cellImbalanceThresholdV: Flow<Double> = context.dataStore.data
+        .map { it[CELL_IMBALANCE_THRESHOLD_V] ?: DEFAULT_CELL_IMBALANCE_THRESHOLD_V }
+        .onEach { cache.edit().putFloat("cell_imbalance_threshold_v", it.toFloat()).apply() }
+
+    fun getCachedCellImbalanceThresholdV(): Double =
+        cache.getFloat("cell_imbalance_threshold_v", DEFAULT_CELL_IMBALANCE_THRESHOLD_V.toFloat())
+            .toDouble().coerceIn(0.01, 0.5)
+
+    suspend fun saveCellImbalanceThresholdV(v: Double) {
+        val clamped = v.coerceIn(0.01, 0.5)
+        context.dataStore.edit { it[CELL_IMBALANCE_THRESHOLD_V] = clamped }
+        cache.edit().putFloat("cell_imbalance_threshold_v", clamped.toFloat()).apply()
     }
 
     // ── Web companion server ──────────────────────────────────────────────────

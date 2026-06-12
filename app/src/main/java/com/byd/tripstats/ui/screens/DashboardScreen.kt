@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -79,6 +80,9 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
+import com.byd.tripstats.data.entitlement.EntitlementManager
+import com.byd.tripstats.util.ScreenshotUtil
+import android.widget.Toast
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -97,6 +101,8 @@ fun DashboardScreen(
 ) {
     val telemetry by viewModel.displayTelemetry.collectAsState()
     val vehicleSnapshot by viewModel.displayVehicleSnapshot.collectAsState()
+    // Screenshot capture (logo tap) is a Pro feature.
+    val isPro by EntitlementManager.isPro.collectAsState()
     val batteryVoltageHistory24h by viewModel.batteryVoltageHistory24h.collectAsState()
     val isMockModeActive by viewModel.isMockModeActive.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
@@ -127,6 +133,9 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
     var showBattery12vDialog by remember { mutableStateOf(false) }
+    // Screen-flash feedback after a logo screenshot. Toggled on only once the
+    // frame has already been grabbed, so it never appears in the saved image.
+    var showScreenshotFlash by remember { mutableStateOf(false) }
     var consumptionExpanded by remember { mutableStateOf(false) }
     var showTyreUnitDialog by remember { mutableStateOf(false) }
     val tyrePrefs: SharedPreferences = remember { context.getSharedPreferences("tyre_unit_prefs", 0) }
@@ -145,15 +154,50 @@ fun DashboardScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Tapping the logo captures the current screen to Download/Screenshots/.
+                        // Indication is disabled so the ripple never bleeds into the saved image.
+                        val logoInteractionSource = remember { MutableInteractionSource() }
                         Image(
                             painter = painterResource(id = R.drawable.byd_logo),
-                            contentDescription = "BYD",
-                            modifier = Modifier.height(28.dp)
+                            contentDescription = "BYD — tap to save a screenshot",
+                            modifier = Modifier
+                                .height(28.dp)
+                                .clickable(
+                                    interactionSource = logoInteractionSource,
+                                    indication = null
+                                ) {
+                                    if (!isPro) {
+                                        // Free tier: point the user at the in-app unlock flow.
+                                        Toast.makeText(
+                                            context,
+                                            "Screenshots are a Pro feature — unlock Pro in Settings.",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        return@clickable
+                                    }
+                                    scope.launch {
+                                        try {
+                                            ScreenshotUtil.captureAndSave(
+                                                activity,
+                                                // Fires after the frame is grabbed, so the
+                                                // flash itself is never part of the screenshot.
+                                                onCaptured = { showScreenshotFlash = true }
+                                            )
+                                        } catch (e: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                "Screenshot failed: ${e.message}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                }
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
@@ -312,6 +356,12 @@ fun DashboardScreen(
         }
     }
 
+        ScreenshotFlash(
+            visible = showScreenshotFlash,
+            onFinished = { showScreenshotFlash = false }
+        )
+    }
+
     telemetry?.let { currentTelemetry ->
         if (showBattery12vDialog) {
             Battery12vHistoryDialog(
@@ -401,6 +451,27 @@ fun DashboardScreen(
             }
         )
     }
+}
+
+/**
+ * A brief white screen-flash, like a camera shutter, played after a screenshot is
+ * saved. It is shown only once the frame has already been captured, so it is never
+ * part of the saved image. Snaps to a high alpha then fades out, then reports back
+ * via [onFinished] so the caller can reset its trigger state.
+ */
+@Composable
+private fun ScreenshotFlash(visible: Boolean, onFinished: () -> Unit) {
+    if (!visible) return
+    val alpha = remember { Animatable(0.9f) }
+    LaunchedEffect(Unit) {
+        alpha.animateTo(0f, animationSpec = tween(durationMillis = 320, easing = LinearEasing))
+        onFinished()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White.copy(alpha = alpha.value))
+    )
 }
 
 /**
@@ -1020,7 +1091,11 @@ fun EnergyFlowDiagram(
                         value = run {
                             val isPhev = telemetry.fuelDrivingRangeKm > 0
                             val km = if (isPhev) {
-                                // Projection includes fuel offset — use car's EV-only estimate
+                                // PHEV: prefer the car's own electric-range readout — the app's
+                                // EV-only projection is harder to pin down on a hybrid (the
+                                // battery's share of propulsion varies with engine assist), so
+                                // the BMS figure is the steadier headline, with the projection
+                                // as fallback.
                                 telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
                                     ?: tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
                                     ?: 0.0
@@ -1076,6 +1151,19 @@ private fun TyrePressureUnit.formatValue(psi: Double): String {
 }
 
 
+/** Tyre pressure relative to the car's recommended value — always evaluated in bar. */
+enum class TyrePressureStatus { NO_DATA, LOW, NORMAL, HIGH }
+
+fun tyrePressureStatus(pressurePsi: Double, recommendedBar: Double): TyrePressureStatus {
+    if (pressurePsi < 0.1) return TyrePressureStatus.NO_DATA
+    val pressureBar = pressurePsi.toBarFromPsi()
+    return when {
+        pressureBar < recommendedBar - 0.2 -> TyrePressureStatus.LOW
+        pressureBar > recommendedBar + 0.2 -> TyrePressureStatus.HIGH
+        else                               -> TyrePressureStatus.NORMAL
+    }
+}
+
 @Composable
 fun TyrePressureIndicator(
     pressure: Double,           // Always PSI from telemetry
@@ -1094,20 +1182,16 @@ fun TyrePressureIndicator(
     val rearTyrePressureBar = car.rearTyrePressureBar
 
     // Alarm thresholds are always evaluated in bar regardless of display unit
-    val pressureBar = pressure.toBarFromPsi()
-    val recommendedPressure = if (isFront) frontTyrePressureBar else rearTyrePressureBar
-    val isNoData = pressure < 0.1
-    val isLow    = !isNoData && pressureBar < recommendedPressure - 0.2
-    val isHigh   = !isNoData && pressureBar > recommendedPressure + 0.2
+    val status = tyrePressureStatus(pressure, if (isFront) frontTyrePressureBar else rearTyrePressureBar)
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(4.dp),
-        color = when {
-            isNoData -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
-            isLow    -> AccelerationOrange.copy(alpha = 0.9f)
-            isHigh   -> BydErrorRed.copy(alpha = 0.9f)
-            else     -> RegenGreen.copy(alpha = 0.9f)
+        color = when (status) {
+            TyrePressureStatus.NO_DATA -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+            TyrePressureStatus.LOW     -> AccelerationOrange.copy(alpha = 0.9f)
+            TyrePressureStatus.HIGH    -> BydErrorRed.copy(alpha = 0.9f)
+            TyrePressureStatus.NORMAL  -> RegenGreen.copy(alpha = 0.9f)
         }
     ) {
         Column(
@@ -2441,6 +2525,13 @@ private fun TyreStatCard(
     val spacerW = 8.dp
     val cellSpacing = 4.dp
 
+    // Recommended pressures drive the low/high colouring, mirroring TyrePressureIndicator.
+    val context = LocalContext.current
+    val prefs = remember { PreferencesManager(context.applicationContext) }
+    val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
+    val frontBar = selectedCar?.frontTyrePressureBar
+    val rearBar = selectedCar?.rearTyrePressureBar
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -2469,16 +2560,16 @@ private fun TyreStatCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(cellSpacing)
                 ) {
-                    TyreCell("FL", telemetry.tyreTempLF.takeIf { it > 0 }, telemetry.tyrePressureLF, tyreUnit, modifier = Modifier.weight(1f))
-                    TyreCell("FR", telemetry.tyreTempRF.takeIf { it > 0 }, telemetry.tyrePressureRF, tyreUnit, modifier = Modifier.weight(1f))
+                    TyreCell("FL", telemetry.tyreTempLF.takeIf { it > 0 }, telemetry.tyrePressureLF, tyreUnit, frontBar, modifier = Modifier.weight(1f))
+                    TyreCell("FR", telemetry.tyreTempRF.takeIf { it > 0 }, telemetry.tyrePressureRF, tyreUnit, frontBar, modifier = Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(cellSpacing))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(cellSpacing)
                 ) {
-                    TyreCell("RL", telemetry.tyreTempLR.takeIf { it > 0 }, telemetry.tyrePressureLR, tyreUnit, modifier = Modifier.weight(1f))
-                    TyreCell("RR", telemetry.tyreTempRR.takeIf { it > 0 }, telemetry.tyrePressureRR, tyreUnit, modifier = Modifier.weight(1f))
+                    TyreCell("RL", telemetry.tyreTempLR.takeIf { it > 0 }, telemetry.tyrePressureLR, tyreUnit, rearBar, modifier = Modifier.weight(1f))
+                    TyreCell("RR", telemetry.tyreTempRR.takeIf { it > 0 }, telemetry.tyrePressureRR, tyreUnit, rearBar, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -2491,8 +2582,19 @@ private fun TyreCell(
     tempC: Int?,
     pressurePsi: Double,
     unit: TyrePressureUnit,
+    recommendedBar: Double?,    // null when no car config is selected → no colouring
     modifier: Modifier = Modifier
 ) {
+    // Match TyrePressureIndicator's colours. No data / no car config keeps the default text colour.
+    val status = recommendedBar?.let { tyrePressureStatus(pressurePsi, it) }
+    val pressureColor = when (status) {
+        TyrePressureStatus.LOW    -> AccelerationOrange
+        TyrePressureStatus.HIGH   -> BydErrorRed
+        TyrePressureStatus.NORMAL -> RegenGreen
+        else                      -> MaterialTheme.colorScheme.onSurface
+    }
+    val isAlarm = status == TyrePressureStatus.LOW || status == TyrePressureStatus.HIGH
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
@@ -2523,7 +2625,8 @@ private fun TyreCell(
             Text(
                 text = unit.formatValue(pressurePsi),
                 fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (isAlarm) FontWeight.Bold else FontWeight.Normal,
+                color = pressureColor,
                 maxLines = 1,
                 softWrap = false
             )
