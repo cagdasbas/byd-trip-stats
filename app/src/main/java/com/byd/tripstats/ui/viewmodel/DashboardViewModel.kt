@@ -536,7 +536,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // produces Wh/km of 500–1000+ that poisons the rolling window. 3km gives enough
         // real driving samples to dilute that noise (~1–3 min of normal driving).
         const val SAMPLE_INTERVAL_KM    = 0.1    // record a chart point every 100 m
-        const val ROLLING_WINDOW_KM     = 10.0   // Level 1: rolling window length
+        // Level 1 rolling window. 5 km (was 10) so the projection — live AND the
+        // per-point reconstruction, which share this constant — tracks recent driving
+        // instead of a long average. The old 10 km meant a short trip's window never
+        // slid (it stayed cumulative-from-start), which is what made a reopened curve
+        // read near-flat. EMA_ALPHA still smooths on top, so the line stays steady.
+        // Only feeds the rolling-rate projection; trip distance/energy/bins are
+        // computed independently and are unaffected.
+        const val ROLLING_WINDOW_KM     = 5.0    // Level 1: rolling window length
         const val EMA_ALPHA             = 0.15   // Level 1: EMA smoothing factor
         const val MAX_DELTA_SECONDS     = 10.0   // discard Δt > this (reconnect / wake)
         // Min consecutive off-time before an engine-on transition resets the segment.
@@ -679,6 +686,45 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val headMaxDist = head.last().distanceKm
             val tail = rebuilt.filter { it.distanceKm > headMaxDist }
             return head + tail
+        }
+
+        /**
+         * Replays the live rolling-window consumption rate across an ordered series of
+         * cumulative ([distanceKm] to [cumulativeEnergyWh]) [samples], returning the
+         * per-sample Wh/km the live loop would have held at each point — a trailing
+         * [windowKm] window with [emaAlpha] EMA smoothing. `null` where no rate exists
+         * yet (no positive consumption inside the window).
+         *
+         * This is what lets restoreTripState rebuild a projection curve that varies the
+         * way the live curve did, rather than applying one trip-average rate to every
+         * point (which renders near-flat: SoC barely moves over a short trip, so the
+         * shape lives in how the rate changes, not in SoC). [samples] must be ordered by
+         * non-decreasing distance — the caller builds them that way from stored points.
+         */
+        internal fun rollingWhPerKmSeries(
+            samples: List<Pair<Double, Double>>,
+            windowKm: Double = ROLLING_WINDOW_KM,
+            emaAlpha: Double = EMA_ALPHA
+        ): List<Double?> {
+            val out = ArrayList<Double?>(samples.size)
+            var ema: Double? = null
+            var windowStart = 0
+            for (i in samples.indices) {
+                val di = samples[i].first
+                while (windowStart < i && samples[windowStart].first < di - windowKm) {
+                    windowStart++
+                }
+                if (i > windowStart) {
+                    val wEnergy = samples[i].second - samples[windowStart].second
+                    val wDist = di - samples[windowStart].first
+                    if (wDist > 0.0 && wEnergy > 0.0) {
+                        val raw = wEnergy / wDist
+                        ema = ema?.let { emaAlpha * raw + (1.0 - emaAlpha) * it } ?: raw
+                    }
+                }
+                out.add(ema)
+            }
+            return out
         }
 
         internal fun seasonForMonth(month: Int, hemisphere: Hemisphere): Season = when (month) {
@@ -1693,12 +1739,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 }
 
-                // Initial EMA state — computed over the full restored window
-                smoothedWhPerKm = if (energySamples.size >= 2) {
-                    val wEnergy = energySamples.last().cumulativeEnergyWh - energySamples.first().cumulativeEnergyWh
-                    val wDist   = energySamples.last().distanceKm - energySamples.first().distanceKm
-                    if (wDist > 1.0) wEnergy / wDist else null
-                } else null
+                // Per-point rolling consumption rate, replayed across the stored points
+                // exactly the way the live loop derives it (trailing ROLLING_WINDOW_KM
+                // window + EMA_ALPHA smoothing). THIS is what gives the reconstructed
+                // curve its shape. SoC barely moves over a short trip, so a single trip-
+                // average rate applied to every point (the previous behaviour) renders as
+                // a near-flat line — the information lives in how the consumption rate
+                // changes along the drive (city vs motorway, climbs, regen).
+                val perPointSmoothed = rollingWhPerKmSeries(
+                    energySamples.map { it.distanceKm to it.cumulativeEnergyWh }
+                )
+
+                // Seed the live EMA from the LAST rolling value (what the live loop would
+                // hold right now) rather than the whole-trip average — so the displayed
+                // head point and the first new live tick agree, with no jump at resume.
+                // Falls back to the full-window average when no rolling value exists.
+                smoothedWhPerKm = perPointSmoothed.lastOrNull()?.takeIf { it > 0.0 }
+                    ?: if (energySamples.size >= 2) {
+                        val wEnergy = energySamples.last().cumulativeEnergyWh - energySamples.first().cumulativeEnergyWh
+                        val wDist   = energySamples.last().distanceKm - energySamples.first().distanceKm
+                        if (wDist > 1.0) wEnergy / wDist else null
+                    } else null
 
                 // Reconstruct graph points with projected range so the projection line
                 // starts from trip start, not from when the Activity opened.
@@ -1708,7 +1769,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 } ?: FALLBACK_BATTERY_KWH
                 val baselineWhPerKm = car?.referenceConsumptionKwhPer100km?.times(10.0)
                     ?: FALLBACK_BASELINE_WH_PER_KM
-                val restoredSmoothed = smoothedWhPerKm
                 // Cumulative bin Wh/km — same formula the live path uses (line ~1056).
                 // When this resolves to a non-null value we treat all restored points as
                 // stabilised, so the orange line is drawn from the start of the trip
@@ -1732,27 +1792,37 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 // EV-only projection (matches the live path) — fuel range is excluded because it
                 // isn't driven by EV consumption and would pin PHEVs at the EV-WLTP cap.
-                val rebuiltPoints = dataPoints.map { dp ->
+                // Each point is projected from the rate that was current AT THAT POINT
+                // (perPointSmoothed), not one trip-wide rate, so the rebuilt line tracks
+                // the live curve's shape instead of flattening. Tier order mirrors the
+                // live path: rolling EMA once past the stabilisation distance, then a
+                // progressive trip-cumulative fallback, then the catalog baseline.
+                val isPhevCar = car?.isPhev == true
+                val rebuiltPoints = dataPoints.mapIndexed { i, dp ->
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
-                    // A point is stabilised if EITHER the distance threshold has been
-                    // reached OR a non-baseline projection is available — matches the
-                    // live path's `isStabilised || model != BASELINE` shortcut.
-                    val stabilised = dKm >= STABILISATION_KM ||
-                        (restoredSmoothed != null && restoredSmoothed > 0.0) ||
-                        restoredBinWhPerKm != null
+                    val ppSmoothed = perPointSmoothed.getOrNull(i)?.takeIf { it > 0.0 }
+                    // Progressive trip-cumulative rate (energy so far ÷ distance so far) —
+                    // the restore analogue of the live tripWhPerKm tier; available from
+                    // ~BIN_MIN_DIST_KM so the line still reaches back toward the origin.
+                    val cumEnergyHere = energySamples.getOrNull(i)?.cumulativeEnergyWh ?: 0.0
+                    val ppTrip = if (dKm >= BIN_MIN_DIST_KM && cumEnergyHere > 0.0)
+                        cumEnergyHere / dKm else null
+                    val pastStabilisation = dKm >= STABILISATION_KM
+                    // A point is stabilised if past the distance threshold OR a non-baseline
+                    // rate exists — matches the live `isStabilised || model != BASELINE`.
+                    val stabilised = pastStabilisation || ppTrip != null
                     val remainingWh = batteryKwh * 1000.0 * ((dp.soc.takeIf { it > 0 } ?: dp.socPanel.toDouble()) / 100.0)
                     // Null for non-stabilised points — matches live path behaviour so the
-                    // orange projected line doesn't appear after navigation before it would
-                    // appear during a fresh live drive session.
+                    // orange projected line doesn't appear before it would on a live drive.
                     // Same PHEV consumption floor as the live path (see projectedEvRangeKm).
                     val projected: Double? = when {
                         !stabilised -> null
-                        restoredSmoothed != null && restoredSmoothed > 0.0 ->
-                            projectedEvRangeKm(remainingWh, restoredSmoothed, baselineWhPerKm, car?.isPhev == true)
-                        restoredBinWhPerKm != null ->
-                            projectedEvRangeKm(remainingWh, restoredBinWhPerKm, baselineWhPerKm, car?.isPhev == true)
+                        pastStabilisation && ppSmoothed != null ->
+                            projectedEvRangeKm(remainingWh, ppSmoothed, baselineWhPerKm, isPhevCar)
+                        ppTrip != null ->
+                            projectedEvRangeKm(remainingWh, ppTrip, baselineWhPerKm, isPhevCar)
                         else ->
-                            projectedEvRangeKm(remainingWh, baselineWhPerKm, baselineWhPerKm, car?.isPhev == true)
+                            projectedEvRangeKm(remainingWh, baselineWhPerKm, baselineWhPerKm, isPhevCar)
                     }
                     RangeDataPoint(
                         distanceKm             = dKm,

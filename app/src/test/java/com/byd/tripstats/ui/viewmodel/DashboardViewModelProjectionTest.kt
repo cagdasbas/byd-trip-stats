@@ -198,4 +198,37 @@ class DashboardViewModelProjectionTest {
         val merged = DashboardViewModel.mergeProjectionCurve(cached, rebuilt, liveDistanceKm = 1.0)
         assertEquals(listOf(0.0, 1.0), merged.map { it.distanceKm })
     }
+
+    // ── rollingWhPerKmSeries — per-point rate replay that un-flattens the rebuild ─
+
+    @Test
+    fun `rolling series tracks a changing consumption rate instead of one average`() {
+        // First 5 km gentle (100 Wh/km), next 5 km thirsty (300 Wh/km). The whole-trip
+        // average is 200 Wh/km; the rolling series must instead climb toward the recent
+        // rate so a reconstructed projection built from it VARIES rather than flattening.
+        val samples = ArrayList<Pair<Double, Double>>()
+        var energy = 0.0
+        var d = 0.0
+        while (d < 5.0) { samples.add(d to energy); d += 0.1; energy += 0.1 * 100.0 }
+        while (d <= 10.0 + 1e-9) { samples.add(d to energy); energy += 0.1 * 300.0; d += 0.1 }
+
+        // Use a short window so the late-trip rate isn't diluted by the gentle start.
+        val series = DashboardViewModel.rollingWhPerKmSeries(samples, windowKm = 2.0, emaAlpha = 1.0)
+
+        val early = series[20]!!   // ~2 km in, fully within the gentle stretch
+        val late = series.last()!! // end of the thirsty stretch
+        assertEquals(100.0, early, 5.0)
+        assertTrue("rate must rise on the thirsty stretch ($early -> $late)", late > early + 100.0)
+    }
+
+    @Test
+    fun `rolling series is null until the first positive consumption is seen`() {
+        // Leading flat-energy samples (no discharge yet) have no rate; once energy
+        // starts accruing a rate appears and persists.
+        val samples = listOf(0.0 to 0.0, 0.5 to 0.0, 1.0 to 0.0, 1.5 to 75.0, 2.0 to 150.0)
+        val series = DashboardViewModel.rollingWhPerKmSeries(samples, windowKm = 10.0, emaAlpha = 1.0)
+        assertEquals(null, series[0])
+        assertEquals(null, series[2])           // still no consumption by 1.0 km
+        assertTrue(series.last() != null && series.last()!! > 0.0)
+    }
 }
