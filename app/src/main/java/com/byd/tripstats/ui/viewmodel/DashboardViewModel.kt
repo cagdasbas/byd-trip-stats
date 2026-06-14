@@ -1352,11 +1352,26 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         return@collect
                     }
 
-                    // Sample (distance, cumulative net energy) for the LIVE_TRIP rolling
-                    // window. Using the power-integrated counter (rather than the BMS
-                    // discharge delta) is what makes the LIVE_TRIP tier actually engage
-                    // on cars with a lumpy / stale totalDischarge feed.
-                    energySamples.add(EnergySample(distKm, accumulatedEnergyWh))
+                    // Sample (cumulative distance, cumulative CLEAN energy) for the
+                    // LIVE_TRIP rolling window. We use liveEnergyKwh — the same BMS
+                    // total-discharge figure the CONS readout and the trip-restore
+                    // rebuild use — NOT the per-tick power-integrated accumulator.
+                    //
+                    // Why this matters: since instant telemetry arrives ~10×/s, but the
+                    // BMS totalDischarge only refreshes about once a second, the per-tick
+                    // accumulator fell back to power×dt on every intermediate fast tick
+                    // (no fresh discharge to diff against) and ADDED that on top of the
+                    // discharge captured when the counter did refresh — double-counting
+                    // energy. That inflated the rolling Wh/km and pinned the projection at
+                    // roughly half once the LIVE_TRIP tier engaged (e.g. a Seal Excellence
+                    // cruising at 15.8 kWh/100 km projecting as if it were ~30). It also
+                    // made the live line artificially smooth (power integrates smoothly)
+                    // vs the reconstruction. liveEnergyKwh is the clean end-start discharge
+                    // (with a whole-trip power-integration fallback only when the BMS total
+                    // is unavailable), so the window now matches actual consumption and the
+                    // rebuilt curve. It still engages reliably on lumpy feeds because the
+                    // end-start total grows smoothly even when the per-tick delta is 0.
+                    energySamples.add(EnergySample(distKm, liveEnergyKwh * 1000.0))
                     val windowFloor = distKm - ROLLING_WINDOW_KM
                     while (energySamples.size > 1 && energySamples[0].distanceKm < windowFloor) {
                         energySamples.removeAt(0)
@@ -1405,10 +1420,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         if (distKm >= BIN_MIN_DIST_KM && liveEnergyKwh > 0.0)
                             (liveEnergyKwh * 1000.0) / distKm
                         else null
-                    // Speed-binned rate preferred (per-regime granularity); trip-cumulative
-                    // rate as the always-available fallback. Either one engages the
-                    // HISTORICAL_BINS tier and gets the chart off the catalog baseline.
-                    val nonBaselineWhPerKm: Double? = binWhPerKm ?: tripWhPerKm
+                    // Trip-cumulative rate preferred: it's derived from the clean
+                    // liveEnergyKwh, whereas the speed-bin energy is summed from the same
+                    // per-tick power-integrated deltas that over-count on a fast feed, so
+                    // binWhPerKm would carry the same inflation the window fix just removed.
+                    // As used here the bin rate is only the summed total anyway (no real
+                    // per-regime weighting), so the clean trip-cumulative is strictly
+                    // better; binWhPerKm stays as a fallback for the brief window before
+                    // trip distance reaches BIN_MIN_DIST_KM. The restore path already
+                    // prefers the trip-cumulative the same way.
+                    val nonBaselineWhPerKm: Double? = tripWhPerKm ?: binWhPerKm
 
                     val isStabilised = distKm >= STABILISATION_KM
                     val car = selectedCarConfig.value
