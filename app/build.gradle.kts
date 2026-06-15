@@ -205,7 +205,10 @@ dependencies {
     // DataStore for preferences
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.hivemq.mqtt.client)
-    
+
+    // QR code generation (Pro licence request — encodes a pre-filled mailto)
+    implementation(libs.zxing.core)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
