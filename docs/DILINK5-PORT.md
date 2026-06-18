@@ -209,3 +209,26 @@ the consumer (`dispatchStatisticFeatureEvent`) already exists.
 
 Permission results only decide FIELD COVERAGE (e.g. collectdata/vehiclehealth signature-gated →
 derive power, omit SOH), not the architecture.
+
+---
+
+# IMPLEMENTATION STATUS
+
+**Step 1 — foundation DONE (commit 9b7f9b7).** Product flavors `dilink3` (default, unchanged) /
+`dilink5`; thin bydauto stubs moved to `src/dilink3/`; `dilink5` bundles the real D5 SDK via
+`dilink5Implementation files("app/libs/dilink5-sdk.jar")` (gitignored; `tools/make-dilink5-sdk-jar.sh`);
+`DiLink5Platform.isDiLink5`. Not build-verified locally (offline Compose build) — verify with
+`./gradlew assembleDilink3Debug` (must be unchanged) and `assembleDilink5Debug` (needs the jar).
+
+Build tasks renamed by flavors: `assembleDilink3{Debug,Release}` / `assembleDilink5{Debug,Release}`
+— update CI/release scripts.
+
+**Next (after tonight's extended capture logs):**
+- Step 2: with the real SDK bundled, the existing reflection code may already bind some D5
+  devices — confirm what works on `dilink5` as-is, fix any signature-drift compile errors.
+- Step 3: add the **statistic typed-listener** (`AbsBYDAutoStatisticListener` incl.
+  `onDataEventChanged`) in `src/dilink5/`, gated by `DiLink5Platform.isDiLink5`, feeding the
+  existing snapshot / `dispatchStatisticFeatureEvent` pipeline (per the architecture-stability note).
+- Step 4: wire the recovered fields (collectdata power/volt/current, vehiclehealth SOH, instrument
+  ext_temp) per the capture; capacity 70.5 kWh; is_dcfc inference.
+- Step 5: CarConfig TR Sealion 7 entry; flip the D3-only gates.
