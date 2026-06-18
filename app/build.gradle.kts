@@ -67,6 +67,26 @@ android {
         }
     }
 
+    // ── SDK flavor split (DiLink-3 vs DiLink-5) ──────────────────────────────────
+    // One APK cannot serve both: bydauto SDK signatures drift (getTotalMileageValue is int on
+    // D3, float on D5) and on D5 the classes are NOT on the boot classpath (must be bundled).
+    //   dilink3 — current behavior, DEFAULT. Thin bydauto stubs in src/dilink3/ are shadowed at
+    //             runtime by the D3 boot-classpath classes (as before).
+    //   dilink5 — bundles the REAL DiLink-5 bydauto SDK (libs/dilink5-sdk.jar, gitignored OEM
+    //             artifact; generate via tools/make-dilink5-sdk-jar.sh). D5 code in src/dilink5/.
+    // NOTE: flavors rename tasks: assembleRelease -> assembleDilink3Release / assembleDilink5Release.
+    flavorDimensions += "sdk"
+    productFlavors {
+        create("dilink3") {
+            dimension = "sdk"
+            isDefault = true
+        }
+        create("dilink5") {
+            dimension = "sdk"
+            versionNameSuffix = "-d5"
+        }
+    }
+
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("release")
@@ -167,6 +187,12 @@ tasks.named("preBuild") {
 }
 
 dependencies {
+    // DiLink-5 flavor only: the REAL bydauto SDK extracted from the car (com.byd.data.collect),
+    // converted dex->jar. Gitignored OEM artifact — generate via tools/make-dilink5-sdk-jar.sh.
+    // Provides android.hardware.bydauto.* at compile+runtime for the dilink5 flavor (dilink3 uses
+    // the thin stubs in src/dilink3/ instead). If absent, only the dilink5 flavor fails to build.
+    "dilink5Implementation"(files("libs/dilink5-sdk.jar"))
+
     // Core Android
     implementation(kotlin("stdlib"))
     implementation(libs.androidx.core.ktx)
