@@ -106,6 +106,7 @@ fun DashboardScreen(
     val batteryVoltageHistory24h by viewModel.batteryVoltageHistory24h.collectAsState()
     val isMockModeActive by viewModel.isMockModeActive.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
+    val pendingAutoStop by viewModel.pendingAutoStop.collectAsState()
     val updateInfo by viewModel.updateInfo.collectAsState()
     val autoTripDetection by viewModel.autoTripDetection.collectAsState()
     val tripDataPoints by viewModel.tripDataPoints.collectAsState()
@@ -372,6 +373,38 @@ fun DashboardScreen(
                 onDismiss = { showBattery12vDialog = false }
             )
         }
+    }
+
+    // Car-off auto-stop confirmation. Shown when an active trip has been parked
+    // long enough to auto-stop while the app is on screen — gives the option to
+    // keep recording (and the live projection) instead of losing it. Requires an
+    // explicit choice; auto-dismisses if the car drives again (pendingAutoStop
+    // clears) or the app leaves the foreground (trip then stops as before).
+    if (pendingAutoStop) {
+        val offTimeoutMin = remember { prefs.getCachedCarOffTimeoutMinutes() }
+        AlertDialog(
+            onDismissRequest = { /* require Keep or Stop — don't dismiss on outside tap */ },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Keep this trip going?") },
+            text = {
+                Text(
+                    "The car has been off for $offTimeoutMin min, so this trip would " +
+                    "normally stop now and the live range projection would reset. " +
+                    "Keep recording if you're staying with the car (e.g. parked on a " +
+                    "call), or stop the trip."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.keepTripAcrossOff() }) {
+                    Text("Keep recording")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.confirmAutoStop() }) {
+                    Text("Stop trip")
+                }
+            }
+        )
     }
 
     if (showCarSelectionDialog) {

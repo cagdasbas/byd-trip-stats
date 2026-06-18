@@ -547,8 +547,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         const val EMA_ALPHA             = 0.15   // Level 1: EMA smoothing factor
         const val MAX_DELTA_SECONDS     = 10.0   // discard Δt > this (reconnect / wake)
         // Min consecutive off-time before an engine-on transition resets the segment.
-        // Prevents brief stops (red lights, momentary key cycles) from wiping segment km.
-        const val SEGMENT_RESET_OFF_THRESHOLD_MS = 90_000L
+        // Prevents brief stops from wiping segment km. 5 min (was 90 s) so a long
+        // red light, a traffic-control wait, or a short stop in P doesn't fragment a
+        // continuous drive into a new segment. NOTE: only applies when the car reads
+        // OFF (gear=P or the head unit drops carOn) — staying in D keeps isCarOn true,
+        // so a red light held in D never resets the segment at any duration. This is
+        // independent of the car-off TIMEOUT that ends/prompts the trip: with the
+        // default 3 min timeout < 5 min, an off-break of 3–5 min still shows the
+        // keep/stop prompt; keeping it leaves the drive as a single segment.
+        const val SEGMENT_RESET_OFF_THRESHOLD_MS = 5 * 60_000L   // 5 min
         // Level 2: minimum *total* km accumulated across all populated speed bins
         // before the historical-bins rate is trusted. Lowered from 0.5 to 0.2 in
         // the rework that switched HISTORICAL_BINS from "current bin only" to
@@ -1584,6 +1591,28 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         manualStopResetPending = true
         forceFreshAnchorNextSession = true
         tripRepository.requestManualStop()
+    }
+
+    // ── Car-off auto-stop confirmation ──────────────────────────────────────────
+    // True while a car-off auto-stop is held awaiting the user's choice; the
+    // dashboard shows a "keep / stop" prompt off this.
+    val pendingAutoStop: StateFlow<Boolean> = tripRepository.pendingAutoStop
+
+    /** "Keep recording" on the prompt — hold the trip open across the car-off window. */
+    fun keepTripAcrossOff() {
+        tripRepository.requestKeepTripAcrossOff()
+    }
+
+    /** "Stop" on the prompt — finalise the held auto-stop. */
+    fun confirmAutoStop() {
+        manualStopResetPending = true
+        forceFreshAnchorNextSession = true
+        tripRepository.confirmAutoStop()
+    }
+
+    /** Drives whether a car-off auto-stop is held for confirmation (UI foreground). */
+    fun setUiVisible(visible: Boolean) {
+        tripRepository.setUiVisible(visible)
     }
 
     fun toggleAutoTripDetection() {

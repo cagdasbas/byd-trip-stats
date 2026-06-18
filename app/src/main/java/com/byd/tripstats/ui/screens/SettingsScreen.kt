@@ -1484,6 +1484,9 @@ private fun AppPreferencesTab(
     val carOffTimeoutMinutes by preferencesManager.carOffTimeoutMinutes.collectAsState(
         initial = preferencesManager.getCachedCarOffTimeoutMinutes()
     )
+    val confirmBeforeAutoStop by preferencesManager.confirmBeforeAutoStop.collectAsState(
+        initial = preferencesManager.getCachedConfirmBeforeAutoStop()
+    )
     val minTripDistanceKm by preferencesManager.minTripDistanceKm.collectAsState(
         initial = preferencesManager.getCachedMinTripDistanceKm()
     )
@@ -1599,7 +1602,7 @@ private fun AppPreferencesTab(
                     }
                 } else {
                     Text(
-                        "Unlock premium features like the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle. Verified on-device — nothing leaves your car.",
+                        "Unlock premium features like the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle — €9.99, lifetime, one car. Verified on-device — nothing leaves your car.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1826,6 +1829,33 @@ private fun AppPreferencesTab(
                     Icon(Icons.Filled.Timer, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Change timeout")
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "Ask before auto-stopping",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "When the timeout is reached while the app is open on screen, show a prompt to keep the trip going (and its live range projection) instead of stopping it — handy when you park but stay with the car. If you don't have the app open, or you leave it, the trip still stops automatically as usual. A kept trip ends once you drive again, tap Stop, or after ~30 min parked.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = confirmBeforeAutoStop,
+                        onCheckedChange = { enabled ->
+                            scope.launch { preferencesManager.saveConfirmBeforeAutoStop(enabled) }
+                        }
+                    )
                 }
             }
         }
@@ -2529,7 +2559,7 @@ private fun VehicleLicenseQr(deviceId: String) {
     val sizePx = with(LocalDensity.current) { 180.dp.roundToPx() }
     val qr = remember(deviceId) {
         val subject = "BYD Trip Stats Pro unlock request"
-        val body = "BYD Trip Stats Pro unlock request.\n\nVehicle ID: $deviceId\n\n" +
+        val body = "BYD Trip Stats Pro unlock request (€9.99, one-time).\n\nVehicle ID: $deviceId\n\n" +
             "Please reply with payment instructions and my unlock code. Thank you!"
         val mailto = "mailto:$licenseEmail?subject=" + android.net.Uri.encode(subject) +
             "&body=" + android.net.Uri.encode(body)
@@ -2557,7 +2587,7 @@ private fun VehicleLicenseQr(deviceId: String) {
                 .size(180.dp)
         )
         Text(
-            "Goes to $licenseEmail — you'll get a reply with payment steps and your unlock code.",
+            "Goes to $licenseEmail — you'll get a reply with payment steps (€9.99) and your unlock code.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -4070,7 +4100,8 @@ private fun buildFaqList(): List<FaqEntry> = listOf(
     FaqEntry(
         "What is BYD Trip Stats Pro and what does it include?",
         "Pro is an optional one-time unlock for premium extras — a small thank-you that helps " +
-        "support development. Everything that was free stays free; Pro only adds new features:\n\n" +
+        "support development. It's €9.99, paid once, for the lifetime of one vehicle (no " +
+        "subscription). Everything that was free stays free; Pro only adds new features:\n\n" +
         "• Cell imbalance alert — get notified when the pack's cell-voltage spread stays above a limit\n" +
         "• Battery health report — export a printable PDF/HTML of your State of Health, decline rate " +
         "and projected date to 80% (handy evidence for resale or a warranty claim)\n" +

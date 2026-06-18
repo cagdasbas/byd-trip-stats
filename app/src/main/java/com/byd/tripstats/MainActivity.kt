@@ -287,10 +287,15 @@ class MainActivity : ComponentActivity() {
         // scenario where DiLink kills and recreates the Activity while the
         // Vehicle telemetry foreground service keeps running uninterrupted.
         if (!bound) bindToTelemetryService()
+        // App is on screen → a car-off auto-stop may be held for user confirmation.
+        viewModel.setUiVisible(true)
     }
 
     override fun onStop() {
         super.onStop()
+        // App left the screen → no one can confirm, so a held auto-stop is finalised
+        // and future car-off stops happen silently (legacy behaviour).
+        viewModel.setUiVisible(false)
         // Unbind when going to background so the binding is clean on next onStart.
         // The service itself keeps running (START_STICKY + foreground notification)
         // so trip recording and vehicle telemetry collection are unaffected.

@@ -37,6 +37,7 @@ private val UNIT_SYSTEM                  = stringPreferencesKey("unit_system")
 private val THEME_MODE                   = stringPreferencesKey("theme_mode")
 private val SOC_SOURCE                   = stringPreferencesKey("soc_source")
 private val CAR_OFF_TIMEOUT_MINUTES      = intPreferencesKey("car_off_timeout_minutes")
+private val CONFIRM_BEFORE_AUTO_STOP     = booleanPreferencesKey("confirm_before_auto_stop")
 private val MIN_TRIP_DISTANCE_KM         = doublePreferencesKey("min_trip_distance_km")
 private val WEB_SERVER_ENABLED           = booleanPreferencesKey("web_server_enabled")
 private val WEB_SERVER_PORT              = intPreferencesKey("web_server_port")
@@ -45,6 +46,7 @@ private val CELL_IMBALANCE_ALERT_ENABLED = booleanPreferencesKey("cell_imbalance
 private val CELL_IMBALANCE_THRESHOLD_V   = doublePreferencesKey("cell_imbalance_threshold_v")
 
 const val DEFAULT_CAR_OFF_TIMEOUT_MINUTES = 3
+const val DEFAULT_CONFIRM_BEFORE_AUTO_STOP = true
 const val DEFAULT_MIN_TRIP_DISTANCE_KM    = 0.0
 const val DEFAULT_CELL_IMBALANCE_THRESHOLD_V = 0.05   // 50 mV
 
@@ -307,6 +309,23 @@ class PreferencesManager(private val context: Context) {
         val clamped = minutes.coerceAtLeast(1)
         context.dataStore.edit { it[CAR_OFF_TIMEOUT_MINUTES] = clamped }
         cache.edit().putInt("car_off_timeout_minutes", clamped).apply()
+    }
+
+    // When true, an active trip that hits the car-off timeout while the app is in
+    // the foreground is held (not auto-stopped) and a confirmation prompt is shown,
+    // so a parked-but-occupied stop (e.g. taking a phone call) doesn't silently end
+    // the trip. Backgrounded / screen-off parking still auto-stops as before.
+    // Read synchronously by TripRepository, so the cache mirror must stay in sync.
+    val confirmBeforeAutoStop: Flow<Boolean> = context.dataStore.data
+        .map { it[CONFIRM_BEFORE_AUTO_STOP] ?: DEFAULT_CONFIRM_BEFORE_AUTO_STOP }
+        .onEach { cache.edit().putBoolean("confirm_before_auto_stop", it).apply() }
+
+    fun getCachedConfirmBeforeAutoStop(): Boolean =
+        cache.getBoolean("confirm_before_auto_stop", DEFAULT_CONFIRM_BEFORE_AUTO_STOP)
+
+    suspend fun saveConfirmBeforeAutoStop(enabled: Boolean) {
+        context.dataStore.edit { it[CONFIRM_BEFORE_AUTO_STOP] = enabled }
+        cache.edit().putBoolean("confirm_before_auto_stop", enabled).apply()
     }
 
     // ── Minimum trip distance ─────────────────────────────────────────────────
