@@ -87,3 +87,62 @@ Mirror the byd-probe variant approach using **Gradle product flavors** so one co
    (`CarConfig.kt:610`, `InitializationScreen.kt:97`) for the Sealion 7.
 
 Status: **design only.** No runtime code changed pending step 1.
+
+---
+
+# IMPLEMENTATION PLAN (grounded in on-car capture 2026-06-18)
+
+Data source: `byd-apps/device-dump/captures/probe-log-2026-06-18.txt` (drive + charge,
+SoC 35→55%, DC charge ~47 kW). The SAVE-JSON files are empty (CAPTURE logs to text, not the
+`scan` map) — use the log.
+
+## Confirmed ABRP field → DiLink-5 source
+
+| ABRP `/tlm/send` | DiLink-5 source | notes |
+|---|---|---|
+| `soc` | `BYDAutoStatisticDevice.getElecPercentageValue()` / `onElecPercentageChanged` | % ✓ |
+| `est_battery_range` | `getElecDrivingRangeValue()` / `onElecDrivingRangeChanged` | km ✓ (==ByStandard) |
+| `capacity` | `getEVRemainingBatteryPower()` ÷ (soc/100) ≈ **70.5 kWh** | steady across SoC → hardcode 70.5 in CarConfig for the TR variant; usable energy now = `getEVRemainingBatteryPower()` (kWh) |
+| `speed` | `BYDAutoSpeedDevice.getSpeedValue()` (float km/h) | ✓ (`getCurrentSpeed` = int) |
+| `is_charging` | `BYDAutoChargingDevice.onChargerStateChanged`==1 / `onChargingPowerChanged`>0 | ✓ |
+| `power` (charging) | `-onChargingPowerChanged` (kW; **filter >150** — 359.4 spikes) | ✓ negative = into battery |
+| `power` (driving) | **no direct getter** — derive (see below) | ⚠ motor device didn't bind |
+| `odometer` | `getTotalMileageValue()` / `onTotalMileageValueChanged` | km ✓ |
+| `is_dcfc` | infer: charging & power > ~25 kW ⇒ DC | `getChargingType()` returns 0 (unpopulated) |
+| `batt_temp` | **unavailable** (`getChargeBatteryTemp()`=0) | omit |
+| `voltage`,`current` | **unavailable** (return 0) | omit |
+| `soh` | not surfaced | omit / CarConfig estimate |
+| `ext_temp`,`lat/lon/elev/heading` | Android (already in trip-stats), not BYD SDK | unchanged |
+
+Notes: `getRemainingBatteryPower()` ≈ SoC% (redundant). Fuel/HEV getters are sentinels
+(0xFFFFF / 2046 / 255) on this BEV — ignore. `statistic` getters return 0 until a listener is
+registered (registering primes the TS adapter) — register early.
+
+## Driving-power options (pick during impl)
+1. Derive: `power_kW ≈ -Δ(getEVRemainingBatteryPower)/Δt × 3600`, smoothed over ~10–30 s
+   (energy steps are ~0.6–0.8 kWh, so instantaneous is bursty — use a moving average).
+2. Investigate offline: does any non-`motor` device expose instantaneous kW (trip-stats reads
+   "live power" on DiLink-3 — check which getter, and whether a different MOTOR perm name binds
+   on D5). 
+3. Acceptable fallback: omit `power` while driving (soc+speed+is_charging still a valid ABRP feed).
+
+## Build / architecture (unchanged from design above, now de-risked)
+- Gradle product flavors `dilink3` (current, untouched) / `dilink5`.
+- `dilink5` bundles the real DiLink-5 bydauto SDK (statistic + charging classes; via the
+  `byd-apps/apps/byd-probe/stubs-dilink5` signatures + the real dex). Register **statistic +
+  charging** typed listeners (both confirmed delivering); poll `speed` getter.
+- Runtime gate `ro.vehicle.type` startsWith `Di5` (or SDK 30) selects the D5 path.
+- Wire the D5 snapshot into the EXISTING ABRP/MQTT pipeline (`AbrpConnectionManager`) — no feed
+  changes needed; only the data-source layer differs.
+
+## Step order
+1. Add `dilink3`/`dilink5` flavors; confirm `dilink3` builds identical to today.
+2. Bundle D5 SDK into `dilink5` (dex2jar the bydauto classes → `dilink5Implementation`, or reuse
+   the probe's stub-compile + bundled-dex approach).
+3. D5 data source: register statistic + charging listeners → fill the existing telemetry snapshot
+   (soc, range, usable kWh, odometer, charge power/state, speed).
+4. Capacity 70.5 kWh + driving-power derivation (option 1) + is_dcfc inference.
+5. Add the TR Sealion 7 to CarConfig; flip the D3-only gates for `ro.vehicle.type=Di5*`.
+6. On-car validate (one drive + one charge) against ABRP; iterate.
+
+Status: **plan ready, data-backed.** Implementation not started (awaiting go-ahead).
