@@ -146,3 +146,33 @@ registered (registering primes the TS adapter) — register early.
 6. On-car validate (one drive + one charge) against ABRP; iterate.
 
 Status: **plan ready, data-backed.** Implementation not started (awaiting go-ahead).
+
+---
+
+# ABRP capacity-mismatch handling (TR 71 kWh variant)
+
+Context: ABRP has no 71 kWh Sealion 7 profile, so the user selected the **82 kWh** one. On-car
+capture implies **~70.5 kWh usable** (getEVRemainingBatteryPower ÷ soc, steady across SoC 35→55%).
+
+How ABRP uses it: `/tlm/send` `soc` is the dashboard SoC % (sent as-is); ABRP computes energy &
+range from `soc × selected-car capacity`. With an 82 kWh profile, ABRP overestimates energy/range
+by ~15% (82 ÷ 71 ≈ 1.155). The **percentage stays correct** (why the level "looks consistent"),
+but kWh-derived predictions (range-to-empty, arrival SoC, energy-used) run ~15% optimistic.
+
+Rules:
+- **NEVER scale SoC.** Always send the true dashboard `soc` %. Scaling would corrupt the % display
+  and charge-target logic. (ABRP explicitly prefers dashboard SoC.)
+- **Fix capacity, not SoC.** Two layers, do both (belt-and-suspenders — uncertain whether the
+  telemetry `capacity` field overrides the profile for planning; Postman doc un-scrapable):
+  1. ABRP side (highest leverage): set the selected vehicle's **usable capacity ≈ 71 kWh** (edit
+     the profile), or pick the closest ~71 kWh model. Fixes %, energy, and range together.
+  2. Our side: set `CarConfig.batteryKwh ≈ 70.5–71` for the TR Sealion 7. trip-stats already
+     sends `capacity = carConfig.batteryKwh` (AbrpConnectionManager ~L115/121), so this sends the
+     correct value automatically.
+- **Send live `power`** so ABRP integrates real consumption from power instead of inferring it
+  from `soc × capacity` — makes live tracking accurate regardless of the profile capacity.
+  (Range-to-empty still uses capacity × soc, so the capacity match still matters.)
+- Caveat: driving `power` has no direct getter on this firmware (derive from −Δ(usable kWh)/Δt) —
+  so charging-power accuracy > driving-power accuracy until that's solid.
+
+Status: recorded for implementation; NOT yet implemented.
