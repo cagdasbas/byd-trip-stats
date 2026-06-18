@@ -138,6 +138,14 @@ img { max-width: 100%; display: block; }
   background: rgba(0,250,217,.08); border: 1px solid rgba(0,250,217,.25);
 }
 
+/* Small "PRO" tag on premium feature cards */
+.pro-badge {
+  display: inline-block; vertical-align: middle; margin-left: 8px;
+  font-size: .6rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+  color: #001a26; background: var(--grad-brand);
+  padding: 2px 7px; border-radius: 6px; line-height: 1.4;
+}
+
 .hero__cta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
 .hero__cta--center { justify-content: center; }
 
