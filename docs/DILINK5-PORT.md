@@ -176,3 +176,36 @@ Rules:
   so charging-power accuracy > driving-power accuracy until that's solid.
 
 Status: recorded for implementation; NOT yet implemented.
+
+---
+
+# Architecture stability vs the extended-probe hooks (2026-06-18)
+
+The extended CAPTURE D5 probe (more devices + feature-ID event stream) **does not change the
+port architecture** — trip-stats is already a multi-device, reflection-based, feature-ID-aware
+data source inside the foreground service, so the new findings slot into the existing model.
+
+LOCKED regardless of tonight's results:
+- Product flavors `dilink3` (untouched) / `dilink5`; `dilink5` bundles the whole real D5 SDK
+  (so every bydauto device is available at runtime — no per-device stub needed for reflection).
+- Runtime gate on `ro.vehicle.type` startsWith `Di5`.
+- Everything lives in the `VehicleTelemetryService`-owned `BydVehicleDataSource` (background
+  operation unaffected; no Activity dependency).
+
+What the hooks REFINE (within the existing architecture):
+1. Breadth: the D5 source binds more devices than the minimal statistic+charging plan —
+   also instrument (ext_temp), sensor, vehiclehealth (SOH), collectdata (motor power/temp/
+   current). Additive; same `tryDynamicDevice`/snapshot pattern trip-stats already uses on D3.
+2. Wiring: route the D5 listeners' `onDataEventChanged(featureId, BYDAutoEventValue)` into the
+   EXISTING `dispatchStatisticFeatureEvent` pipeline (the same consumer D3 uses) — not only the
+   typed `onXxxChanged` callbacks.
+3. Power source: if `collectdata` MCU bus V×A is live, `power` becomes a direct read instead of
+   the derived −Δ(usable kWh)/Δt. Data-source detail, not architecture.
+
+Only scenario that shifts emphasis (still within the architecture): if D5 delivers most data
+ONLY via the feature-ID stream (named getters stay 0), the D5 source leans on
+`onDataEventChanged` + feature-ID decode rather than getter polling — a wiring choice, since
+the consumer (`dispatchStatisticFeatureEvent`) already exists.
+
+Permission results only decide FIELD COVERAGE (e.g. collectdata/vehiclehealth signature-gated →
+derive power, omit SOH), not the architecture.
