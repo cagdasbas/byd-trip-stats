@@ -1459,6 +1459,9 @@ private fun FullscreenChartDialog(
             ChartType.MOTOR_RPM -> condenseForRpm(dataPoints, maxPoints = 480)
             ChartType.SPEED     -> condenseForSpeed(dataPoints, maxPoints = 144)
             ChartType.POWER     -> condenseForPower(dataPoints, maxPoints = 144)
+            // Energy is condensed inside EnergyConsumptionChart (after integration), so it
+            // gets the raw full-resolution points here — pre-condensing would flatline it.
+            ChartType.ENERGY    -> dataPoints
             else                -> condenseData(dataPoints, maxPoints = 144)
         }
     }
@@ -1531,7 +1534,8 @@ private fun FullscreenChartDialog(
                     when (chartType) {
                         ChartType.ENERGY -> EnergyConsumptionChart(
                             dataPoints = chartData,
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            maxPoints = 144
                         )
                         ChartType.SOC -> SocChart(
                             dataPoints = chartData,

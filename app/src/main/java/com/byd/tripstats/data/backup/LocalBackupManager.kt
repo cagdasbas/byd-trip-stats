@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.os.storage.StorageManager
 import android.provider.MediaStore
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,8 @@ class LocalBackupManager private constructor(private val context: Context) {
         const val BACKUP_EXTENSION = ".db"
         const val PRIVATE_BACKUP_DIR = "db_backup"
         const val PRIVATE_BACKUP_MAX = 5   // keep newest N backups in private dir
+        const val SD_BACKUP_MAX      = 10  // keep newest N backups on the SD card
+        const val SD_BACKUP_FOLDER   = "BydTripStats"  // fixed folder at the SD card root
 
         @Volatile private var INSTANCE: LocalBackupManager? = null
 
@@ -145,6 +148,151 @@ class LocalBackupManager private constructor(private val context: Context) {
         }
     }
 
+    // ── SD card backup (Pro) ────────────────────────────────────────────────
+    // Fully automatic: backups go to a fixed "BydTripStats" folder at the root of the
+    // removable SD card — no folder picker, nothing to configure. The folder lives at
+    // the volume root (not the app-specific Android/data dir), so backups stay
+    // user-visible and survive an app uninstall. Direct File access works because the
+    // app holds WRITE_EXTERNAL_STORAGE with requestLegacyExternalStorage=true.
+
+    /**
+     * Root of the mounted removable SD card (e.g. /storage/6786-8D8D), or null if no card
+     * is present. Tries three strategies because DiLink ROMs vary: some expose the card
+     * only at /storage/<uuid> (not via getExternalFilesDirs, which is why a plain
+     * getExternalFilesDirs check reports "no card" even with one inserted).
+     */
+    fun sdCardRoot(): File? {
+        // 1) StorageManager — the reliable path: a removable, mounted volume → /storage/<uuid>.
+        runCatching {
+            val sm = context.getSystemService(StorageManager::class.java)
+            sm?.storageVolumes?.forEach { vol ->
+                if (vol.isRemovable && vol.state == Environment.MEDIA_MOUNTED) {
+                    val uuid = vol.uuid
+                    if (!uuid.isNullOrEmpty()) {
+                        val dir = File("/storage/$uuid")
+                        if (dir.isDirectory) return dir
+                    }
+                }
+            }
+        }.onFailure { Log.w(TAG, "SD detection (StorageManager) failed: ${it.message}") }
+
+        // 2) getExternalFilesDirs — works on ROMs that expose the card's app-specific dir.
+        runCatching {
+            context.getExternalFilesDirs(null).filterNotNull().forEach { d ->
+                if (Environment.isExternalStorageRemovable(d) &&
+                    Environment.getExternalStorageState(d) == Environment.MEDIA_MOUNTED) {
+                    val idx = d.absolutePath.indexOf("/Android/")
+                    if (idx > 0) return File(d.absolutePath.substring(0, idx))
+                }
+            }
+        }.onFailure { Log.w(TAG, "SD detection (getExternalFilesDirs) failed: ${it.message}") }
+
+        // 3) Last resort: scan /storage for a UUID-style mounted volume (e.g. 6786-8D8D).
+        runCatching {
+            File("/storage").listFiles()?.forEach { vol ->
+                if (vol.name.matches(Regex("[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}")) &&
+                    vol.isDirectory &&
+                    Environment.getExternalStorageState(vol) == Environment.MEDIA_MOUNTED) {
+                    return vol
+                }
+            }
+        }.onFailure { Log.w(TAG, "SD detection (/storage scan) failed: ${it.message}") }
+
+        return null
+    }
+
+    /** The fixed SD-card backup folder (root/BydTripStats), or null if no card. */
+    private fun sdBackupDir(): File? = sdCardRoot()?.let { File(it, SD_BACKUP_FOLDER) }
+
+    /** True when a removable SD card is mounted. */
+    fun isSdCardAvailable(): Boolean = sdCardRoot() != null
+
+    /**
+     * Saves the Room database to <SD root>/BydTripStats/. Pro-gated by the caller. Fully
+     * automatic — creates the folder if needed, checks free space first, and keeps the
+     * newest [SD_BACKUP_MAX]. SD backups appear in [scanLocalBackups] (source "SD card").
+     */
+    suspend fun backupDatabaseToSdCard() = withContext(Dispatchers.IO) {
+        try {
+            _state.value = BackupState.InProgress("Preparing database…")
+
+            val dbFile = context.getDatabasePath(DATABASE_NAME)
+            if (!dbFile.exists()) {
+                _state.value = BackupState.Error("Database file not found: ${dbFile.path}")
+                return@withContext
+            }
+
+            val dir = sdBackupDir()
+            if (dir == null) {
+                _state.value = BackupState.Error("No SD card detected. Insert a card and try again.")
+                return@withContext
+            }
+
+            // Free-space pre-check: refuse if the card can't hold the backup (+ small margin).
+            val needed = dbFile.length() + 5L * 1_048_576L
+            val free = (sdCardRoot()?.usableSpace ?: 0L)
+            if (free < needed) {
+                _state.value = BackupState.Error(
+                    "Not enough space on the SD card: need %.0f MB, only %.0f MB free."
+                        .format(needed / 1_048_576.0, free / 1_048_576.0)
+                )
+                return@withContext
+            }
+
+            if (!dir.exists() && !dir.mkdirs()) {
+                _state.value = BackupState.Error("Could not create the BydTripStats folder on the SD card.")
+                return@withContext
+            }
+
+            _state.value = BackupState.InProgress("Flushing database…")
+            flushWal(dbFile)
+
+            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
+            val fileName = "byd_stats_backup_$timestamp.db"
+
+            _state.value = BackupState.InProgress("Saving to SD card…")
+            val dest = File(dir, fileName)
+            dbFile.copyTo(dest, overwrite = true)
+
+            // Prune old SD backups — keep newest SD_BACKUP_MAX
+            dir.listFiles { f -> f.extension == "db" }
+                ?.sortedByDescending { it.lastModified() }
+                ?.drop(SD_BACKUP_MAX)
+                ?.forEach { it.delete() }
+
+            val sizeMb = "%.1f".format(dbFile.length() / 1_048_576.0)
+            _state.value = BackupState.Success("Saved to SD card: $SD_BACKUP_FOLDER/$fileName ($sizeMb MB)")
+            Log.i(TAG, "SD card backup saved: ${dest.path}")
+
+            scanLocalBackups()
+        } catch (e: Exception) {
+            Log.e(TAG, "SD card backup failed", e)
+            _state.value = BackupState.Error("SD card backup failed: ${e.message}")
+        }
+    }
+
+    /** Lists .db backups in <SD root>/BydTripStats/. */
+    private fun scanSdCardBackups(): List<BackupFile> {
+        return try {
+            val dir = sdBackupDir() ?: return emptyList()
+            if (!dir.exists()) return emptyList()
+            dir.listFiles { f -> f.extension == "db" }
+                ?.sortedByDescending { it.lastModified() }
+                ?.map { f ->
+                    BackupFile(
+                        name = f.name,
+                        uri = Uri.fromFile(f),
+                        sizeBytes = f.length(),
+                        dateModified = f.lastModified(),
+                        source = "SD card"
+                    )
+                } ?: emptyList()
+        } catch (e: Exception) {
+            Log.w(TAG, "SD card backup scan failed: ${e.message}")
+            emptyList()
+        }
+    }
+
     // ── Restore from URI (file picker) ────────────────────────────────────────
 
     /**
@@ -236,13 +384,16 @@ class LocalBackupManager private constructor(private val context: Context) {
             // is lost and the cursor returns empty even though files still exist.
             val filesystemResults = scanDownloadFolderDirectly()
 
+            // Also scan the removable SD card (Pro backups land there).
+            val sdResults = scanSdCardBackups()
+
             // Merge, deduplicate by name, sort newest first
-            val merged = (results + privateResults + filesystemResults)
+            val merged = (results + privateResults + filesystemResults + sdResults)
                 .distinctBy { it.name }
                 .sortedByDescending { it.dateModified }
 
             _localBackups.value = merged
-            Log.i(TAG, "Found ${merged.size} backup(s) — MediaStore: ${results.size}, filesystem: ${filesystemResults.size}, internal: ${privateResults.size}")
+            Log.i(TAG, "Found ${merged.size} backup(s) — MediaStore: ${results.size}, filesystem: ${filesystemResults.size}, internal: ${privateResults.size}, SD: ${sdResults.size}")
             if (merged.isEmpty()) {
                 _state.value = BackupState.Error("No backups found. Run a backup first.")
             }
@@ -334,6 +485,17 @@ class LocalBackupManager private constructor(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Filesystem lookup for delete failed: ${e.message}")
+        }
+
+        // SD card BydTripStats/ folder
+        try {
+            sdBackupDir()?.let { dir ->
+                val f = File(dir, name)
+                if (f.exists()) results.add(BackupFile(name = f.name, uri = Uri.fromFile(f),
+                    sizeBytes = f.length(), dateModified = f.lastModified(), source = "SD card"))
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "SD card lookup for delete failed: ${e.message}")
         }
 
         return results

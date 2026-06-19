@@ -37,7 +37,7 @@ android {
     // A stable release always has a higher versionCode than any beta of the same
     // version, so beta testers automatically receive the stable upgrade via sideload.
     val versionMajor    = 2
-    val versionMinor    = 8
+    val versionMinor    = 9
     val versionPatch    = 0
     val versionPre      = 99  // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
 
@@ -236,7 +236,10 @@ dependencies {
     // DataStore for preferences
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.hivemq.mqtt.client)
-    
+
+    // QR code generation (Pro licence request — encodes a pre-filled mailto)
+    implementation(libs.zxing.core)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

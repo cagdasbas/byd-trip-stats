@@ -28,8 +28,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
 import com.byd.tripstats.data.backup.LocalBackupManager
 import com.byd.tripstats.data.backup.TelegramManager
+import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.worker.DatabaseTrimmer
@@ -63,6 +65,7 @@ fun LocalBackupScreen(
 
     val isBusy = backupState is LocalBackupManager.BackupState.InProgress
     val telegramBusy = telegramState is TelegramManager.TelegramState.InProgress
+    val isPro by EntitlementManager.isPro.collectAsState()  // SD card backup is Pro-gated
 
     var restoreTarget by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
     var deleteTarget  by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
@@ -222,6 +225,76 @@ fun LocalBackupScreen(
                     Text(if (isBusy) "Working…" else "Backup Now")
                 }
             }
+                    Spacer(Modifier.height(8.dp))
+                    SectionCard(title = "Backup to SD card", icon = Icons.Filled.SdCard) {
+                        Text(
+                            "Saves a copy of the database to a BydTripStats folder on the SD card. " +
+                                "Unlike the Download backup, these survive an app uninstall — off-device " +
+                                "redundancy you can pull out and read on a computer.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        if (!isPro) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Filled.Lock, null, modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    "This is a BYD Trip Stats Pro feature.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    Toast.makeText(
+                                        context,
+                                        "SD card backup is a Pro feature — unlock Pro in Settings → Preferences.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Lock, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Unlock with Pro")
+                            }
+                        } else {
+                            val sdAvailable = manager.isSdCardAvailable()
+                            if (!sdAvailable) {
+                                Text(
+                                    "No SD card detected. Insert a card, then reopen this screen.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(8.dp))
+                            }
+                            Button(
+                                onClick = {
+                                    manager.resetState()
+                                    scope.launch { manager.backupDatabaseToSdCard() }
+                                },
+                                enabled = !isBusy && sdAvailable,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isBusy) {
+                                    CircularProgressIndicator(
+                                        modifier    = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color       = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.SdCard, null, modifier = Modifier.size(20.dp))
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (isBusy) "Working…" else "Backup to SD card")
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     SectionCard(title = "Restore", icon = Icons.Filled.CloudDownload) {
                     Text(

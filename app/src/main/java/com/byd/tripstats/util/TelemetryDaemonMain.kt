@@ -185,7 +185,7 @@ object TelemetryDaemonMain {
         val subIds = (powerIds + frontIds + rearIds).toIntArray()
         var ok = false
         if (m2 != null) {
-            // Best-effort subscribe-all FIRST (Overdrive's engine strategy: empty int[]). On HALs that
+            // Best-effort subscribe-all FIRST (Other app's engine strategy: empty int[]). On HALs that
             // honour it, every engine feature arrives — so rear is delivered (and discoverable) even if
             // its id is unknown. Register the explicit ids LAST so that whatever the HAL's add/replace
             // semantics, power/front and the resolved rear stay subscribed — the working front can't regress.

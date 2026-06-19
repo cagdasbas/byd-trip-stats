@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.collectLatest
 import com.byd.tripstats.MainActivity
 import com.byd.tripstats.R
 import com.byd.tripstats.data.config.CarConfig
+import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.OffStateMode
 import com.byd.tripstats.data.preferences.PreferencesManager
@@ -173,6 +174,7 @@ class VehicleTelemetryService : Service() {
     private var carConfig: CarConfig? = null
     private var abrpConnectionManager: AbrpConnectionManager? = null
     private var mqttConnectionManager: MqttConnectionManager? = null
+    private var cellImbalanceMonitor: CellImbalanceMonitor? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var intentionalStop = false
@@ -272,6 +274,7 @@ class VehicleTelemetryService : Service() {
         batteryVoltageHistoryRepository = BatteryVoltageHistoryRepository.getInstance(applicationContext)
         abrpConnectionManager = AbrpConnectionManager(applicationContext)
         mqttConnectionManager = MqttConnectionManager(applicationContext)
+        cellImbalanceMonitor = CellImbalanceMonitor(applicationContext)
 
         // Start telemetry loop IMMEDIATELY using the synchronous SharedPreferences
         // cache — do NOT wait for DataStore async emit. The notification already
@@ -490,6 +493,10 @@ class VehicleTelemetryService : Service() {
                         chargingRepository?.onTelemetry(telemetry, carConfig)
                         abrpConnectionManager?.onTelemetry(telemetry, carConfig, serviceScope)
                         mqttConnectionManager?.onTelemetry(telemetry, serviceScope)
+                        cellImbalanceMonitor?.onTelemetry(telemetry)
+                        // Feed the vehicle id (BYD SDK "VIN") to the Pro entitlement gate so
+                        // a vehicle-bound license can confirm it's running on the right car.
+                        EntitlementManager.onDeviceIdObserved(snapshot.bodyworkAutoVin)
 
                         // Keep WiFi alive while the car is off and a charger gun is present
                         // or the charger is actively working. Without this, the MCU cuts WiFi

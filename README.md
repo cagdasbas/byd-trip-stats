@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v2.8.0-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v2.9.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
@@ -449,13 +449,14 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Self-contained HTML trip viewer + one-click "Save as HTML viewer" export ✅ *(v2.5.0)*
 - [x] Configurable engine-off trip timeout & minimum-trip-distance filter ✅ *(v2.5.0)*
 - [x] Web dashboard companion — browse trip history and charts on any browser offline-first: upload your backup file, charts render locally, nothing leaves your device; built as a PWA so it can be added to your phone's home screen for a near-native experience ✅ *(v2.7.0)*
+- [x] **Pro** unlock — optional premium tier via a short per-vehicle unlock code, verified entirely on-device (offline HMAC over the vehicle id, no account, can't be shared); single `EntitlementManager` gate. The free app is unchanged ✅ *(v2.9.0)*
+- [x] Battery cell imbalance alert *(Pro)* — opt-in notification when the cell voltage spread exceeds a configurable limit (default 50 mV), with sustained-breach debounce, once-per-episode hysteresis, and a SoC guard; surfaces the diagnostic the Cell Voltage Spread heatmap already visualises ✅ *(v2.9.0)*
 
 ### Planned (v2.0.0+)
 
 - [ ] Recurring route detection — automatically group trips that share the same route (e.g. daily commute) and compare efficiency across instances
 - [ ] Trip merging — combine two auto-split trips that were the same journey, separated by a brief stop (e.g. petrol station, red light timeout)
 - [ ] Trip tagging — label trips with a custom tag (e.g. "commute", "motorway", "errand") and filter history and analytics by tag
-- [ ] Battery cell imbalance alert — threshold-based notification when cell voltage spread exceeds a configurable limit (e.g. 0.05 V), surfacing the diagnostic the Cell Voltage Spread heatmap already visualises
 - [ ] DiLink home screen widget — quick-glance tile showing current SoC, last trip distance, and range projection without opening the app
 **Vote on features** by 👍 reacting to issues!
 

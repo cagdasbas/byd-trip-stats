@@ -41,6 +41,19 @@ sealed class TripEvent {
     object ManualStop : TripEvent()
 
     /**
+     * User tapped "Keep recording" on the auto-stop confirmation prompt — hold the
+     * current car-off window open so the trip is not auto-stopped (until they drive
+     * again, tap Stop, or the kept-off safety cap is reached).
+     */
+    object KeepTripAcrossOff : TripEvent()
+
+    /**
+     * User tapped "Stop" on the auto-stop confirmation prompt — finalise the
+     * pending car-off auto-stop now (ends exactly as the silent auto-stop would).
+     */
+    object ConfirmAutoStop : TripEvent()
+
+    /**
      * Sent by the watchdog every 60 s. The handler decides whether silence
      * has been long enough to close the active trip.
      */
@@ -51,6 +64,48 @@ sealed class TripEvent {
      * an open trip in the DB and either resumes or closes it.
      */
     object Recover : TripEvent()
+}
+
+/** What to do with an active trip that has been car-off past its continuation window. */
+internal enum class CarOffStopAction {
+    /** Still inside the continuation window — keep waiting. */
+    WITHIN_WINDOW,
+    /** End the trip now (legacy auto-stop). */
+    END,
+    /** Hold the trip open and show the confirmation prompt. */
+    HOLD_FOR_CONFIRM,
+    /** User already chose to keep this off-window — stay open silently. */
+    KEEP_HELD
+}
+
+/**
+ * Pure decision for [TripRepository.evaluateCarOffStop], extracted so it can be
+ * unit-tested without the DB/telemetry machinery. Order matters: the long-parked
+ * safety cap wins over a user "keep" so a forgotten trip can't run forever; a
+ * "keep" wins over the prompt; and with the feature off or no UI on screen we fall
+ * straight through to the legacy auto-stop.
+ */
+internal fun decideCarOffStop(
+    offDurationMs: Long,
+    timeoutMs: Long,
+    maxKeptMs: Long,
+    userKept: Boolean,
+    confirmEnabled: Boolean,
+    uiVisible: Boolean
+): CarOffStopAction {
+    // The cap must always sit above the timeout — otherwise it fires on the same
+    // tick the prompt would and ends the trip first, suppressing the dialog
+    // entirely (e.g. a user-set car-off timeout ≥ the cap, or a test that lowers
+    // the cap to the timeout). Floor it at timeout + 1 min so the prompt always
+    // has a window.
+    val effectiveCapMs = maxOf(maxKeptMs, timeoutMs + 60_000L)
+    return when {
+        offDurationMs <= timeoutMs       -> CarOffStopAction.WITHIN_WINDOW
+        offDurationMs > effectiveCapMs   -> CarOffStopAction.END
+        userKept                         -> CarOffStopAction.KEEP_HELD
+        !confirmEnabled || !uiVisible    -> CarOffStopAction.END
+        else                             -> CarOffStopAction.HOLD_FOR_CONFIRM
+    }
 }
 
 // ── Trip state machine ────────────────────────────────────────────────────────
@@ -89,6 +144,20 @@ class TripRepository private constructor(context: Context) {
 
     private val _currentTripId = MutableStateFlow<Long?>(null)
     val currentTripId: StateFlow<Long?> = _currentTripId.asStateFlow()
+
+    /**
+     * True while an active trip has hit the car-off timeout but is being HELD open
+     * awaiting the user's decision (only set when the app is in the foreground and
+     * the confirm-before-auto-stop preference is on). The UI observes this to show
+     * the "keep / stop" prompt; it clears when the trip resumes, is kept, or ends.
+     */
+    private val _pendingAutoStop = MutableStateFlow(false)
+    val pendingAutoStop: StateFlow<Boolean> = _pendingAutoStop.asStateFlow()
+
+    // Whether the dashboard UI is currently in the foreground. Set by the UI via
+    // [setUiVisible]; gates whether a car-off auto-stop is held for confirmation
+    // (no UI on screen → there's nobody to confirm, so auto-stop as before).
+    @Volatile private var uiVisible: Boolean = false
 
     // ── Event channel ─────────────────────────────────────────────────────────
 
@@ -194,12 +263,63 @@ class TripRepository private constructor(context: Context) {
     // 0L means the car is currently on (or no active trip).
     private var carOffSinceMs: Long = 0L
 
+    // Set true when the user taps "Keep recording" on the auto-stop prompt: the
+    // current car-off window is held open and won't auto-stop or re-prompt. Cleared
+    // when the car comes back on (window over) or the trip ends. In-memory only —
+    // a process death falls back to the normal stale-trip recovery on next start.
+    private var keepCurrentOffWindow: Boolean = false
+
+    // Safety cap: even a "kept" trip is auto-ended once the car has been off this
+    // long continuously, so a forgotten trip can't linger. Nobody parks with the
+    // engine on for this long, so 30 min is a safe ceiling. The trip's end time is
+    // still anchored at car-off + timeout, so the parked time isn't counted.
+    // NOTE: the prompt fires at the car-off TIMEOUT (Settings, default 3 min), not
+    // at this cap — to test the prompt quickly, lower the timeout, not this value.
+    // decideCarOffStop floors the effective cap above the timeout regardless.
+    private val MAX_KEPT_OFF_MS = 30 * 60 * 1000L   // 30 minutes
+
     // Hard timeout after engine-off before the trip is automatically ended.
     // User-configurable in Settings → Preferences (default 30 min). Read from
     // the synchronous SharedPreferences cache on every tick so a change applies
     // to the current trip without having to restart the service.
     private fun carOffTimeoutMs(): Long =
         prefsManager.getCachedCarOffTimeoutMinutes() * 60_000L
+
+    /**
+     * Decides what to do when an active trip has been car-off past the timeout.
+     * Extracted so the live telemetry handler and the watchdog share identical
+     * logic. End semantics (overrideEndTime = car-off + timeout) match the
+     * pre-existing silent auto-stop exactly, so trip stats are unchanged.
+     */
+    private suspend fun evaluateCarOffStop(now: Long) {
+        if (carOffSinceMs <= 0L) return
+        val timeoutMs = carOffTimeoutMs()
+        val confirmEnabled = prefsManager.getCachedConfirmBeforeAutoStop()
+        val action = decideCarOffStop(
+            offDurationMs  = now - carOffSinceMs,
+            timeoutMs      = timeoutMs,
+            maxKeptMs      = MAX_KEPT_OFF_MS,
+            userKept       = keepCurrentOffWindow,
+            confirmEnabled = confirmEnabled,
+            uiVisible      = uiVisible
+        )
+        if (action != CarOffStopAction.WITHIN_WINDOW) {
+            Log.i(TAG, "Car-off stop: $action (off=${(now - carOffSinceMs) / 1000}s " +
+                "timeout=${timeoutMs / 1000}s uiVisible=$uiVisible confirm=$confirmEnabled " +
+                "kept=$keepCurrentOffWindow)")
+        }
+        when (action) {
+            CarOffStopAction.WITHIN_WINDOW,
+            CarOffStopAction.KEEP_HELD     -> _pendingAutoStop.value = false
+            CarOffStopAction.HOLD_FOR_CONFIRM -> _pendingAutoStop.value = true
+            CarOffStopAction.END -> {
+                _pendingAutoStop.value = false
+                // End where the silent auto-stop always did: car-off + timeout, so
+                // the parked time isn't counted and stats are unchanged.
+                doEndTrip(overrideEndTime = carOffSinceMs + timeoutMs)
+            }
+        }
+    }
 
     // ── Timing constants ──────────────────────────────────────────────────────
 
@@ -550,6 +670,8 @@ class TripRepository private constructor(context: Context) {
             is TripEvent.Telemetry   -> handleTelemetry(event.data)
             TripEvent.ManualStart    -> handleManualStart()
             TripEvent.ManualStop     -> handleManualStop()
+            TripEvent.KeepTripAcrossOff -> handleKeepTripAcrossOff()
+            TripEvent.ConfirmAutoStop   -> handleConfirmAutoStop()
             TripEvent.WatchdogTick   -> handleWatchdogTick()
             TripEvent.Recover        -> recoverActiveTrip()
         }
@@ -633,12 +755,9 @@ class TripRepository private constructor(context: Context) {
                             lastWriteTime = now
                         }
                     }
-                    val carOffDuration = now - carOffSinceMs
-                    val timeoutMs = carOffTimeoutMs()
-                    if (carOffDuration > timeoutMs) {
-                        Log.i(TAG, "Engine off for ${carOffDuration / 60_000} min → ending trip")
-                        doEndTrip(overrideEndTime = carOffSinceMs + timeoutMs)
-                    }
+                    // Decide whether to end now, hold for confirmation, or honour a
+                    // user "keep". evaluateCarOffStop preserves the legacy end timing.
+                    evaluateCarOffStop(now)
                     lastTelemetry     = t
                     lastTelemetryTime = now
                     return
@@ -648,6 +767,10 @@ class TripRepository private constructor(context: Context) {
                 if (carOffSinceMs > 0L) {
                     Log.i(TAG, "Engine back ON after ${(now - carOffSinceMs) / 1000}s — continuing trip")
                     carOffSinceMs = 0L
+                    // The car-off window is over — drop any held auto-stop prompt and the
+                    // user's "keep" flag so a future stop is evaluated fresh.
+                    keepCurrentOffWindow = false
+                    _pendingAutoStop.value = false
                     // getTotalElecConValue resets to ~0 at car-on on resetting firmwares,
                     // so the first post-resume delta would be a large negative jump. Drop
                     // the energy anchor so that one delta is skipped (the next tick re-anchors);
@@ -804,16 +927,33 @@ class TripRepository private constructor(context: Context) {
         doEndTrip()
     }
 
+    /** User tapped "Keep recording" on the auto-stop prompt. */
+    private fun handleKeepTripAcrossOff() {
+        if (tripState != TripState.ACTIVE || carOffSinceMs <= 0L) {
+            _pendingAutoStop.value = false
+            return
+        }
+        Log.i(TAG, "Auto-stop prompt: user kept the trip across the car-off window")
+        keepCurrentOffWindow = true
+        _pendingAutoStop.value = false
+    }
+
+    /** User tapped "Stop" on the auto-stop prompt — finalise the held auto-stop. */
+    private suspend fun handleConfirmAutoStop() {
+        _pendingAutoStop.value = false
+        if (tripState != TripState.ACTIVE) return
+        // End exactly where the silent auto-stop would have: car-off + timeout.
+        val endAt = if (carOffSinceMs > 0L) carOffSinceMs + carOffTimeoutMs() else null
+        Log.i(TAG, "Auto-stop prompt: user confirmed stop")
+        manualStopCooldownUntilMs = System.currentTimeMillis() + MANUAL_STOP_COOLDOWN_MS
+        doEndTrip(overrideEndTime = endAt)
+    }
+
     private suspend fun handleWatchdogTick() {
         if (tripState != TripState.ACTIVE) return
         val now = System.currentTimeMillis()
         if (carOffSinceMs > 0L) {
-            val offDuration = now - carOffSinceMs
-            val timeoutMs = carOffTimeoutMs()
-            if (offDuration > timeoutMs) {
-                Log.w(TAG, "Watchdog: engine off for ${offDuration / 60_000} min → ending trip")
-                doEndTrip(overrideEndTime = carOffSinceMs + timeoutMs)
-            }
+            evaluateCarOffStop(now)
             return
         }
 
@@ -1282,6 +1422,8 @@ class TripRepository private constructor(context: Context) {
         batteryTempSum        = 0.0
         batteryTempSamples    = 0
         carOffSinceMs         = 0L
+        keepCurrentOffWindow  = false
+        _pendingAutoStop.value = false
         tripBestDistanceKm    = 0.0
         tripBestTotalDischarge = 0.0
         tripIntegratedDischargeKwh = 0.0
@@ -1822,6 +1964,29 @@ class TripRepository private constructor(context: Context) {
     /** Called by the UI "Stop trip" button. Non-suspend. */
     fun requestManualStop() {
         tripEvents.trySend(TripEvent.ManualStop)
+    }
+
+    /** "Keep recording" on the auto-stop prompt — hold the trip open. Non-suspend. */
+    fun requestKeepTripAcrossOff() {
+        tripEvents.trySend(TripEvent.KeepTripAcrossOff)
+    }
+
+    /** "Stop" on the auto-stop prompt — finalise the held auto-stop. Non-suspend. */
+    fun confirmAutoStop() {
+        tripEvents.trySend(TripEvent.ConfirmAutoStop)
+    }
+
+    /**
+     * Called by the UI as the dashboard enters/leaves the foreground. Only when the
+     * UI is visible is a car-off auto-stop held for confirmation; otherwise it ends
+     * as before. If the UI disappears while a stop is pending (user walked away), a
+     * watchdog tick is posted so the held trip is finalised promptly.
+     */
+    fun setUiVisible(visible: Boolean) {
+        uiVisible = visible
+        if (!visible && _pendingAutoStop.value && !keepCurrentOffWindow) {
+            tripEvents.trySend(TripEvent.WatchdogTick)
+        }
     }
 
     fun getAllTrips(): Flow<List<TripEntity>> = tripDao.getAllTrips()

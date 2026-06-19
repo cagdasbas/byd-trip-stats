@@ -145,7 +145,8 @@ fun AppNavigation(
         composable(Screen.BatteryDegradation.route) {
             BatteryDegradationScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
 

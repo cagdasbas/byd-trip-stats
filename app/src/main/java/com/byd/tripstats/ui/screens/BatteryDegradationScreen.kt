@@ -1,5 +1,6 @@
 package com.byd.tripstats.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -7,12 +8,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -20,8 +21,11 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
+import com.byd.tripstats.util.BatteryHealthReport
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.*
@@ -30,10 +34,18 @@ import kotlin.math.*
 @Composable
 fun BatteryDegradationScreen(
     viewModel: DashboardViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {}
 ) {
     val data by viewModel.batteryDegradationData.collectAsState()
-    val baselineEpoch by viewModel.sohBaselineEpochMs.collectAsState()
+    val sohExclusion by viewModel.sohExclusion.collectAsState()
+    val excludedTripCount by viewModel.sohExcludedTripCount.collectAsState()
+    // Decline rate, 80% projection and the exportable report are Pro features.
+    val isPro by EntitlementManager.isPro.collectAsState()
+    val selectedCar by viewModel.selectedCarConfig.collectAsState(initial = null)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         topBar = {
@@ -55,7 +67,8 @@ fun BatteryDegradationScreen(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         if (data.size < 2) {
             Box(
@@ -83,6 +96,23 @@ fun BatteryDegradationScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
+                    // All (or all but one) trips are legacy and currently excluded — give the
+                    // user a way out so they aren't stranded on an empty screen.
+                    if (excludedTripCount > 0) {
+                        Text(
+                            "$excludedTripCount earlier trip(s) are hidden because they were recorded " +
+                            "with a legacy method that under-reported SoH. You can include them, though " +
+                            "the chart may show a misleading dip.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        OutlinedButton(onClick = { viewModel.setSohExclusionOff() }) {
+                            Icon(Icons.Filled.Visibility, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Show all recorded data")
+                        }
+                    }
                 }
             }
             return@Scaffold
@@ -91,6 +121,57 @@ fun BatteryDegradationScreen(
         // ── Compute regression + projection ───────────────────────────────────
         val regression  = linearRegression(data)
         val stats       = degradationStats(regression)
+
+        // Assemble the report payload from the same data/stats shown on screen.
+        fun buildReportData(): BatteryHealthReport.Data {
+            val df = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+            val declineLabel = if (stats.declinePerYear < 0.01) "< 0.01% / yr"
+                else "${"%.2f".format(stats.declinePerYear)}% / yr"
+            return BatteryHealthReport.Data(
+                vehicleName = selectedCar?.displayName ?: "BYD vehicle",
+                batteryKwh = selectedCar?.batteryKwh,
+                appVersion = com.byd.tripstats.BuildConfig.VERSION_NAME,
+                currentSoh = data.last().avgSoh,
+                declinePerYearLabel = declineLabel,
+                projectedAt80Label = stats.projectedAt80Label,
+                firstDate = df.format(Date(data.first().timestamp)),
+                lastDate = df.format(Date(data.last().timestamp)),
+                tripsAnalyzed = data.size,
+                warrantyNote = "BYD's battery warranty typically covers the pack to 70% State of " +
+                    "Health for 8 years / 250,000 km. Check your vehicle's warranty booklet for " +
+                    "the exact terms.",
+                exclusionNote = if (excludedTripCount > 0)
+                    "Excludes $excludedTripCount earlier trip(s) recorded before " +
+                        "${df.format(Date(sohExclusion.cutoffMs ?: 0L))} using a legacy estimation " +
+                        "method that under-reported State of Health."
+                    else null,
+                entries = data.map {
+                    BatteryHealthReport.Entry(
+                        date = df.format(Date(it.timestamp)),
+                        odometerKm = it.odometer,
+                        soh = it.avgSoh
+                    )
+                }
+            )
+        }
+
+        // Generate the report (PDF or HTML) and toast the saved path / any error.
+        fun saveReport(asPdf: Boolean) {
+            scope.launch {
+                try {
+                    val d = buildReportData()
+                    val name = if (asPdf) BatteryHealthReport.generatePdfAndSave(context, d)
+                               else BatteryHealthReport.generateAndSave(context, d)
+                    Toast.makeText(
+                        context,
+                        "Report saved: Download/BydTripStats/$name",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Report failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
         Column(
             modifier = Modifier
@@ -115,10 +196,10 @@ fun BatteryDegradationScreen(
                 )
                 DegradationStatCard(
                     modifier  = Modifier.weight(1f),
-                    label     = "Lowest recorded",
-                    value     = "${"%.1f".format(data.minOf { it.avgSoh })}%",
-                    icon      = Icons.AutoMirrored.Filled.TrendingDown,
-                    color     = MaterialTheme.colorScheme.error
+                    label     = "Trips analysed",
+                    value     = "${data.size}",
+                    icon      = Icons.Filled.Route,
+                    color     = BatteryBlue
                 )
             }
             Row(
@@ -215,13 +296,96 @@ fun BatteryDegradationScreen(
                         color = MaterialTheme.colorScheme.error)
                     HorizontalDivider()
                     Text(
-                        "Tip: BYD's warranty covers the Seal battery to 70% SoH for 8 years / 250,000 km.",
+                        "Tip: BYD's warranty covers the battery to 70% SoH for 8 years / 250,000 km.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            // ── Data source baseline card ──────────────────────────────────────
+            // ── Battery health report card (Pro) ───────────────────────────────
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Filled.Description, null,
+                            tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                        Text("Battery health report", style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold)
+                        if (!isPro) {
+                            Spacer(Modifier.width(4.dp))
+                            ProBadge()
+                        }
+                    }
+                    Text(
+                        "Export a report of your battery's State of Health, decline rate and 80% " +
+                        "projection — useful evidence when selling the car or raising a warranty " +
+                        "claim. Saved to Download/BydTripStats/ as a print-ready PDF or as HTML " +
+                        "(opens in any browser). Generated entirely on-device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (isPro) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { saveReport(asPdf = true) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.PictureAsPdf, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("PDF")
+                            }
+                            OutlinedButton(
+                                onClick = { saveReport(asPdf = false) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.Description, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("HTML")
+                            }
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onNavigateToSettings,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Lock, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Unlock with Pro")
+                        }
+                    }
+                }
+            }
+
+            // ── SoH data range (legacy exclusion) card ─────────────────────────
+            val dateFmt = remember {
+                java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
+            }
+            var advancedOpen by remember { mutableStateOf(false) }
+            var showShowAllConfirm by remember { mutableStateOf(false) }
+
+            // Apply a change and offer an UNDO snackbar; captures the prior state first.
+            fun applyExclusion(change: () -> Unit) {
+                val prev = sohExclusion
+                change()
+                scope.launch {
+                    val res = snackbarHostState.showSnackbar(
+                        message = "Battery data range updated",
+                        actionLabel = "UNDO",
+                        duration = SnackbarDuration.Short
+                    )
+                    if (res == SnackbarResult.ActionPerformed) viewModel.restoreSohExclusion(prev)
+                }
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -237,43 +401,94 @@ fun BatteryDegradationScreen(
                     ) {
                         Icon(Icons.Filled.FilterList, null,
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Text("Data baseline", style = MaterialTheme.typography.titleMedium,
+                        Text("Battery data range", style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
                     }
-                    if (baselineEpoch != null) {
-                        val fmt = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
-                        Text(
-                            "Showing trips from ${fmt.format(java.util.Date(baselineEpoch!!))} onwards. " +
-                            "Trips before this date are excluded from the chart and trend line.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        OutlinedButton(
-                            onClick = { viewModel.clearSohBaseline() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Filled.Clear, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Show all trips (remove baseline)")
+                    val cutoffLabel = sohExclusion.cutoffMs?.let { dateFmt.format(java.util.Date(it)) }
+                    val statusText = when (sohExclusion.mode) {
+                        DashboardViewModel.SohExclusionMode.AUTO ->
+                            if (excludedTripCount > 0)
+                                "Hiding $excludedTripCount early trip(s) recorded before $cutoffLabel " +
+                                    "with the legacy estimation method (recommended)."
+                            else
+                                "Using every recorded trip — none predate the statistical SoH method."
+                        DashboardViewModel.SohExclusionMode.CUSTOM ->
+                            "Hiding $excludedTripCount trip(s) recorded before $cutoffLabel."
+                        DashboardViewModel.SohExclusionMode.OFF ->
+                            "Including every recorded trip, even early ones whose calculated SoH may read low."
+                    }
+                    Text(statusText, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "This only changes what the chart and reports use — no trips are ever " +
+                        "deleted, and you can change it back anytime.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    TextButton(onClick = { advancedOpen = !advancedOpen }) {
+                        Icon(if (advancedOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (advancedOpen) "Hide options" else "Adjust data range")
+                    }
+                    if (advancedOpen) {
+                        if (sohExclusion.mode != DashboardViewModel.SohExclusionMode.AUTO) {
+                            OutlinedButton(
+                                onClick = { applyExclusion { viewModel.setSohExclusionAuto() } },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Recommend, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Use recommended range")
+                            }
                         }
-                    } else {
-                        Text(
-                            "All recorded trips are included. If you previously used a different data source " +
-                            "(e.g. Electro/MQTT) whose SoH values are not comparable, set a baseline to " +
-                            "exclude those older trips.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Button(
-                            onClick = { viewModel.setSohBaselineToNow() },
+                        OutlinedButton(
+                            onClick = {
+                                applyExclusion { viewModel.setSohExclusionCutoff(System.currentTimeMillis()) }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Filled.RestartAlt, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Start tracking from today")
+                            Text("Start fresh from today")
+                        }
+                        if (sohExclusion.mode != DashboardViewModel.SohExclusionMode.OFF) {
+                            OutlinedButton(
+                                onClick = { showShowAllConfirm = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Visibility, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Show all recorded data")
+                            }
                         }
                     }
                 }
+            }
+
+            if (showShowAllConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showShowAllConfirm = false },
+                    icon = { Icon(Icons.Filled.Warning, null) },
+                    title = { Text("Show all recorded data?") },
+                    text = {
+                        Text(
+                            "This re-includes early trips recorded with the legacy method, which " +
+                            "under-estimated SoH — it will add a misleading dip to the chart and to " +
+                            "any report you generate. Nothing is deleted; you can switch back anytime."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showShowAllConfirm = false
+                            applyExclusion { viewModel.setSohExclusionOff() }
+                        }) { Text("Show all") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showShowAllConfirm = false }) { Text("Cancel") }
+                    }
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -495,6 +710,25 @@ private fun DegradationStatCard(
                     fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Composable
+private fun ProBadge() {
+    Box(
+        modifier = Modifier
+            .background(
+                BydElectricAzure,
+                androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(
+            "PRO",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
     }
 }
 

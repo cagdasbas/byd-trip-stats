@@ -97,7 +97,7 @@ If entities show **unavailable**:
 | State of Health | `soh` | % | — |
 | Statistic SOH | `statistic_soh` | % | — |
 | Available Power | `available_power` | kW | — |
-| Battery Remain Power EV | `battery_remain_power_ev` | kW | — |
+| Battery Remaining Energy EV | `battery_remain_power_ev` | kWh | — |
 | Battery Pack Temp | `battery_pack_temp` | °C | temperature |
 | Cell Temp Min | `battery_cell_temp_min` | °C | temperature |
 | Cell Temp Max | `battery_cell_temp_max` | °C | temperature |

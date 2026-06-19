@@ -494,16 +494,16 @@ class BydVehicleDataSource(context: Context) {
     /**
      * Decode a raw BMS battery/cell temperature value into Celsius.
      *
-     * BYD encoding (confirmed against the open-source Overdrive app's `BydDataCollector`
-     * and `BydFeatureIds`, which were decompiled from BYD's official SDK): raw values
-     * are offset-encoded as `raw - 40 = °C`, with the valid raw range being 0..120
+     * BYD encoding (confirmed against `BydDataCollector` and `BydFeatureIds`,
+     * which were decompiled from BYD's official SDK): raw values are
+     * offset-encoded as `raw - 40 = °C`, with the valid raw range being 0..120
      * (representing −40°C to 80°C). Sentinels (195, -60, BMS_UNAVAILABLE=-10011, the
      * SDK INVALID_VALUE constants) and out-of-range values are rejected.
      *
      * This replaces the earlier "direct °C vs ÷d01" dual-encoding guesser. That logic
      * was wrong: in cases where both interpretations happened to land near a plausible
      * temperature (e.g. raw 61 gives 20.3°C via ÷3 and 21°C via −40), the bug stayed
-     * invisible until a side-by-side comparison with another app (Electro/Overdrive)
+     * invisible until a side-by-side comparison with another apps
      * showed our values were off by several degrees.
      */
     private fun decodePackTempCelsius(rawValue: Double?): Double? {
@@ -513,7 +513,7 @@ class BydVehicleDataSource(context: Context) {
         if (rawValue == 195.0 || rawValue == -60.0 || rawValue == -10011.0) return null
         if (rawValue == -2147482645.0 || rawValue == -2147482648.0) return null
         val raw = rawValue
-        // Valid raw range per Overdrive: 0..120 (i.e. -40°C to 80°C decoded).
+        // Valid raw range: 0..120 (i.e. -40°C to 80°C decoded).
         if (raw < 0.0 || raw > 120.0) return null
         return raw - 40.0
     }
@@ -545,8 +545,8 @@ class BydVehicleDataSource(context: Context) {
      * cellTAux / cellTCandidate) into Celsius.
      *
      * Encoding: `raw - 40 = °C`, with valid raw range 0..120 (i.e. -40°C to 80°C).
-     * Confirmed against the open-source Overdrive app's `BydDataCollector.collectStatTemp`,
-     * which subscribes to the same statistic feature IDs and applies this exact transform.
+     * Confirmed against `BydDataCollector.collectStatTemp`, which subscribes 
+     * to the same statistic feature IDs and applies this exact transform.
      *
      * The `anchorTemp` parameter is kept for source-compatibility with existing call sites
      * but is no longer needed — the encoding is unambiguous so no anchor-based disambiguation
@@ -7009,10 +7009,10 @@ class BydVehicleDataSource(context: Context) {
                         "onSpeedChanged", "onCurrentSpeedChanged" -> {
                             // DORMANT (see CLAUDE.md): the bydauto SpeedDevice does NOT deliver this
                             // typed callback to a normal in-process app on this firmware (only the
-                            // noisy raw onDataEventChanged). Kinex gets instant speed from a different
+                            // noisy raw onDataEventChanged). Other apps get instant speed from a different
                             // API (com.ts.lib.caradapter / CarSensorAdapterManager), not bydauto. This
                             // handler is correct and harmless and would activate if the callback is ever
-                            // delivered (privileged daemon like Overdrive, or other firmware) — keep it.
+                            // delivered (privileged daemon or other firmware) — keep it.
                             //
                             // Typed speed push from the SpeedDevice — the cluster's actual
                             // km/h, delivered the instant it changes. It is clean and already in km/h,

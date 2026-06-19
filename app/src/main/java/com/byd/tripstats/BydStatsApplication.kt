@@ -3,6 +3,7 @@ package com.byd.tripstats
 import android.app.Application
 import android.util.Log
 import androidx.work.Configuration
+import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.runtimebridge.RuntimeExtensionBridge
 import com.byd.tripstats.sdk.VehicleCompatibilityProbe
@@ -51,6 +52,10 @@ class BydStatsApplication : Application(), Configuration.Provider {
         applyRuntimePatches()
         DatabaseMaintenanceWorker.schedule(this)
         VehicleCompatibilityProbe.initialize(this)
+        // Premium entitlement — single source of truth for Pro gating. Must be
+        // initialised here (before any Activity/Service touches it) so the
+        // synchronous isProNow() check is ready for the telemetry loop.
+        EntitlementManager.init(this)
         // Restore the web companion server if the user had it enabled.
         // Runs unconditionally — the server only needs the DB, not the telemetry service.
         // It doesn't run in deep sleep mode.
