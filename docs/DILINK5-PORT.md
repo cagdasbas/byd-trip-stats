@@ -232,3 +232,32 @@ Build tasks renamed by flavors: `assembleDilink3{Debug,Release}` / `assembleDili
 - Step 4: wire the recovered fields (collectdata power/volt/current, vehiclehealth SOH, instrument
   ext_temp) per the capture; capacity 70.5 kWh; is_dcfc inference.
 - Step 5: CarConfig TR Sealion 7 entry; flip the D3-only gates.
+
+---
+
+# FINAL field map (after extended capture, 2026-06-19 driving session)
+
+All 6 added devices bind fine (instrument/sensor/vehiclehealth/collectdata/energy/ota — none
+signature-gated), but on this firmware most of their getters read 0/sentinel even while driving.
+Net: one real recovery (SOH); everything else "missing" is confirmed genuinely unavailable, so
+stop chasing it (an OBD dongle is the only way to add temp/voltage/current later).
+
+| ABRP field | source | status |
+|---|---|---|
+| soc | statistic.getElecPercentageValue / onElecPercentageChanged | ✓ |
+| est_battery_range | statistic.getElecDrivingRangeValue / onElecDrivingRangeChanged | ✓ |
+| capacity | ~70.5 kWh (getEVRemainingBatteryPower ÷ soc); CarConfig.batteryKwh | ✓ |
+| speed | speed.getSpeedValue (or ota.getVehicleSpeed backup) | ✓ |
+| odometer | statistic.getTotalMileageValue / onTotalMileageValueChanged | ✓ |
+| is_charging | charging.onChargerStateChanged / power>0 | ✓ |
+| power (charging) | -charging.onChargingPowerChanged (filter >150) | ✓ |
+| **soh** | **vehiclehealth.getBatteryHealthStatus** (=100 observed) | ✓ NEW |
+| power (driving) | DERIVE: -Δ(getEVRemainingBatteryPower)/Δt, smoothed | ⚙ no direct getter |
+| is_dcfc | infer charging & power>~25 kW | ⚙ |
+| ext_temp | OUTSIDE temp = instrument.getOutCarTemperature (read 0 — needs instrument LISTENER registered to prime; only polled so far). OPTIONAL: ABRP has its own GPS weather → OMIT is fine. The BYD app's "internal temp" is the AC SETPOINT (ac.getTemprature) — do NOT send it as ext_temp. | omit (or try instrument listener) |
+| voltage / current / batt_temp | collectdata motor getters + ota.getBatteryPowerVoltage all read 0/sentinel even while driving → unavailable via SDK | ✗ omit (OBD only) |
+| cabin_temp | no measured cabin sensor getter exists (only AC setpoint) | ✗ |
+| lat/lon/elevation/heading | Android location (existing) | ✓ |
+
+Decision: implement soc/range/capacity/speed/odometer/charge-power/SOH + derived driving-power +
+is_dcfc inference; omit voltage/current/batt_temp/ext_temp (ABRP weather covers ext_temp).
