@@ -1773,7 +1773,7 @@ class BydVehicleDataSource(context: Context) {
                     delay(2_000L)
                 } else {
                     tryDevice("poll") { pollAndUpdateCellFeatures(dev) }
-                    delay(2_000L)
+                    delay(idlePollMs(2_000L))   // 2s active; backs off to 60s when parked/idle
                 }
             }
         }
@@ -1797,10 +1797,27 @@ class BydVehicleDataSource(context: Context) {
                 if (dev != null) {
                     tryDevice("hvac poll") { pollHvacState(dev) }
                 }
-                delay(3_000L)
+                delay(idlePollMs(3_000L))   // 3s active; backs off to 60s when parked/idle (HVAC off)
             }
         }
     }
+
+    /**
+     * Battery: true when the car is parked/idle — not charging, not moving, and the SDK has been
+     * silent for >60s (no events). Used to back off background polls and drop the GPS fallback;
+     * the polled values don't change while parked, so nothing is missed.
+     */
+    private fun isParkedIdle(): Boolean {
+        val s = _vehicleSnapshot.value
+        val charging = s.isChargingActive || s.chargingPower > 0.0
+        val moving = (s.directSpeedKmh ?: 0.0) > 2.0
+        val sdkSilent = lastFeatureEventElapsedMs > 0L &&
+            (android.os.SystemClock.elapsedRealtime() - lastFeatureEventElapsedMs) > 60_000L
+        return !charging && !moving && sdkSilent
+    }
+
+    /** [activeMs] while driving/charging/awake; 60s when parked-idle. */
+    private fun idlePollMs(activeMs: Long): Long = if (isParkedIdle()) 60_000L else activeMs
 
     /**
      * Called right before an in-app update commits the install. An update force-kills this process
@@ -2633,6 +2650,16 @@ class BydVehicleDataSource(context: Context) {
 
     private fun refreshSystemLocationFallback() {
         if (!hasLocationPermission() || hasDirectLocationSignal) return
+
+        // Battery: when parked/idle, drop the 1 Hz GPS fallback entirely (turns the GPS radio off).
+        // It re-registers automatically below on the next call once the car is active again — the
+        // main loop polls at 1s when the car is on, so GPS is back well before a trip starts.
+        if (systemLocationUpdatesRegistered && isParkedIdle()) {
+            runCatching { locationManager?.removeUpdates(systemLocationListener) }
+            systemLocationUpdatesRegistered = false
+            Log.i(TAG, "🔋 GPS fallback paused (parked/idle)")
+            return
+        }
 
         val manager = locationManager
             ?: (appContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager)?.also {
