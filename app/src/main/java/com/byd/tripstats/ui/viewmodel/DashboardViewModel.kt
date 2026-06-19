@@ -93,8 +93,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ── Car config ────────────────────────────────────────────────────────────
 
+    // Eagerly (not WhileSubscribed): the projection/telemetry loop reads
+    // selectedCarConfig.value directly without subscribing, and the UI subscribes to
+    // its OWN PreferencesManager flow — so under WhileSubscribed this StateFlow's
+    // upstream never started and .value stayed null, silently making the projection
+    // fall back to FALLBACK_BATTERY_KWH (82.56) with isPhev=false. That hugely
+    // inflated small-battery PHEV projections (a Sealion 6 DM-i saturating at WLTP)
+    // and only matched by luck on ~82 kWh BEVs. Eager keeps .value current.
     val selectedCarConfig = preferencesManager.selectedCarConfig
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, preferencesManager.getCachedSelectedCarConfig())
+
+    // Always-available car config for the synchronous reads in the telemetry loop:
+    // the eager StateFlow value, with the synchronous prefs cache as a startup-gap
+    // fallback. Never returns the catalog fallback unless no car was ever selected.
+    private fun currentCarConfig() =
+        selectedCarConfig.value ?: preferencesManager.getCachedSelectedCarConfig()
 
     // ── Electricity cost ──────────────────────────────────────────────────────
 
@@ -1329,7 +1342,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val tripStartTd = tripRepository.currentTripStartTotalDischarge()
                     val bmsDeltaKwh = if (tripStartTd != null)
                         telemetry.totalDischarge - tripStartTd else 0.0
-                    val sanityBatteryKwh = selectedCarConfig.value?.let {
+                    val sanityBatteryKwh = currentCarConfig()?.let {
                         if (it.isPhev) it.phevUsableBatteryKwh ?: it.batteryKwh else it.batteryKwh
                     } ?: FALLBACK_BATTERY_KWH
                     val fallbackKwh = (accumulatedEnergyWh / 1000.0).coerceAtLeast(0.0)
@@ -1439,7 +1452,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val nonBaselineWhPerKm: Double? = tripWhPerKm ?: binWhPerKm
 
                     val isStabilised = distKm >= STABILISATION_KM
-                    val car = selectedCarConfig.value
+                    val car = currentCarConfig()
                     // PHEVs: use the usable EV-only battery capacity for the EV range leg;
                     // fall back to gross batteryKwh if phevUsableBatteryKwh is not defined.
                     val batteryKwh = car?.let {
@@ -1813,7 +1826,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 // Reconstruct graph points with projected range so the projection line
                 // starts from trip start, not from when the Activity opened.
-                val car = selectedCarConfig.value
+                val car = currentCarConfig()
                 val batteryKwh = car?.let {
                     if (it.isPhev) it.phevUsableBatteryKwh ?: it.batteryKwh else it.batteryKwh
                 } ?: FALLBACK_BATTERY_KWH

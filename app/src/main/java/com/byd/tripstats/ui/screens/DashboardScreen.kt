@@ -1122,21 +1122,17 @@ fun EnergyFlowDiagram(
                     PowerMetric(
                         label = "Range",
                         value = run {
-                            val isPhev = telemetry.fuelDrivingRangeKm > 0
-                            val km = if (isPhev) {
-                                // PHEV: prefer the car's own electric-range readout — the app's
-                                // EV-only projection is harder to pin down on a hybrid (the
-                                // battery's share of propulsion varies with engine assist), so
-                                // the BMS figure is the steadier headline, with the projection
-                                // as fallback.
-                                telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
-                                    ?: tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
-                                    ?: 0.0
-                            } else {
-                                tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
-                                    ?: telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
-                                    ?: 0.0
-                            }
+                            // Prefer the app's projected range (recorded, stable, and steady while
+                            // parked since it isn't re-sampled), then the BMS readout. This applies
+                            // to BEVs and PHEVs alike: on PHEVs the BMS electric-range field can
+                            // momentarily spike while parked/idling — it appears to fold in the
+                            // combined EV+fuel range, and the field has no sane bound — which made
+                            // this metric flicker between e.g. 75, 446 and 823 km. Now that the
+                            // projection is reliable it's the headline; the BMS value is only a
+                            // fallback before a projection exists (e.g. before a trip starts).
+                            val km = tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
+                                ?: telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
+                                ?: 0.0
                             formatDistanceValue(unitSystem.convertDistance(km))
                         },
                         unit = distanceUnit,
