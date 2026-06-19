@@ -66,13 +66,37 @@ class Dilink5Client {
         speedDev    = bind(ctx, "android.hardware.bydauto.speed.BYDAutoSpeedDevice")
         healthDev   = bind(ctx, "android.hardware.bydauto.vehiclehealth.BYDAutoVehicleHealthDevice")
 
-        // 3) ~1s poll loop: charge power, speed, SOH (+ statistic getters as a backstop)
+        // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
+        //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
+        //    soc/mileage/range live regardless). Mirrors the main service loop's battery-aware cadence.
         pollThread = Thread {
+            var lastSlowMs = 0L
             while (running) {
-                try { pollOnce(ds) } catch (_: Throwable) {}
-                try { Thread.sleep(1000) } catch (e: InterruptedException) { break }
+                val now = SystemClock.elapsedRealtime()
+                val slowTick = now - lastSlowMs >= 30_000L      // statistic-getter backstop ~every 30s
+                if (slowTick) lastSlowMs = now
+                try { pollOnce(ds, slowTick) } catch (_: Throwable) {}
+                try { Thread.sleep(pollIntervalMs(ds)) } catch (e: InterruptedException) { break }
             }
         }.apply { isDaemon = true; name = "Dilink5Poll"; start() }
+    }
+
+    @Volatile private var lastActiveMs = 0L  // last time driving or charging (for idle back-off)
+
+    // Battery-aware cadence: 1s driving/DC-charge, 5s AC-charge or just-stopped, 30s parked/idle.
+    private fun pollIntervalMs(ds: BydVehicleDataSource): Long {
+        val s = ds.vehicleSnapshot.value
+        val speed = s.directSpeedKmh ?: 0.0
+        val charging = s.isChargingActive || s.chargingPower > 0.0
+        val now = SystemClock.elapsedRealtime()
+        if (speed > 2.0 || charging) lastActiveMs = now
+        return when {
+            speed > 2.0 -> 1_000L
+            charging && s.chargingPower > 23.0 -> 1_000L   // DC fast charge
+            charging -> 5_000L                             // AC charge
+            now - lastActiveMs < 120_000L -> 5_000L        // recently active (brief stop) — stay responsive
+            else -> 30_000L                                // parked/idle — back off
+        }
     }
 
     fun stop() {
@@ -84,9 +108,15 @@ class Dilink5Client {
         Log.i(tag, "stopped")
     }
 
-    private fun pollOnce(ds: BydVehicleDataSource) {
-        // statistic getters as a backstop (in case a callback is missed). Explicit getter calls
-        // (Kotlin mis-resolves getEVRemainingBatteryPower as a property name).
+    private fun pollOnce(ds: BydVehicleDataSource, slowTick: Boolean) {
+        // FAST (every tick): speed (driving) + charge power (charging) — change fast, cheap getters.
+        reflGetDouble(speedDev, "getSpeedValue")?.takeIf { it in 0.0..400.0 }
+            ?.let { ds.applyDaemonTelemetry(speedKmh = it, gear = null, powerKw = null) }
+        reflGetDouble(chargingDev, "getChargingPower")?.takeIf { it in 0.0..250.0 }
+            ?.let { ds.applyDilink5Telemetry(chargingPowerKw = it) }
+        if (!slowTick) return
+        // SLOW (~30s): the statistic LISTENER already pushes soc/mileage/range live, so these getters
+        // are only a missed-callback backstop; SOH barely changes. No need to read them every tick.
         statDevice?.let { d ->
             try {
                 val soc = d.getElecPercentageValue();        if (soc in 1.0..100.0) ds.applyDilink5Telemetry(socPct = soc)
@@ -95,13 +125,6 @@ class Dilink5Client {
                 val usb = d.getEVRemainingBatteryPower().toDouble(); if (usb in 0.5..200.0) onUsable(usb, ds)
             } catch (_: Throwable) {}
         }
-        // charge power (getter is live per capture: ~47 kW). filter spikes.
-        reflGetDouble(chargingDev, "getChargingPower")?.takeIf { it in 0.0..250.0 }
-            ?.let { ds.applyDilink5Telemetry(chargingPowerKw = it) }
-        // speed (float km/h) -> reuse the daemon speed path (first 3 params have no defaults)
-        reflGetDouble(speedDev, "getSpeedValue")?.takeIf { it in 0.0..400.0 }
-            ?.let { ds.applyDaemonTelemetry(speedKmh = it, gear = null, powerKw = null) }
-        // SOH (vehiclehealth, =100 observed)
         reflGetInt(healthDev, "getBatteryHealthStatus")?.takeIf { it in 50..110 }
             ?.let { ds.applyDilink5Telemetry(sohPct = it.toDouble()) }
     }
