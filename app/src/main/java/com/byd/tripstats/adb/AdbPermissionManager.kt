@@ -37,6 +37,30 @@ object AdbPermissionManager {
         "android.permission.ACCESS_BACKGROUND_LOCATION",
     )
 
+    // ── DiLink-5 vehicle-API access ──────────────────────────────────────────────
+    // On DiLink-5 (Sealion 7) the OEM bydauto SDK calls a hidden platform member
+    // (com.ts.lib.caradapter.CarAdapterManager.getInstance(Context)) that hidden-API
+    // enforcement blocks for a non-system app → NoSuchMethodError → all telemetry reads 0.
+    // Exempting hidden APIs lets every bydauto device bind. This is a global setting that
+    // can be re-initialised on reboot, so we re-assert it (idempotently) on every startup
+    // via the same dadb channel. Single-quote the '*' so the device shell doesn't glob it.
+    private val VEHICLE_API_SETTINGS = listOf(
+        "settings put global hidden_api_policy 1",
+        "settings put global hidden_api_blacklist_exemptions '*'",
+    )
+
+    // The runtime-gated bydauto permissions (getInstance enforces *_COMMON server-side).
+    // Granted via `pm grant` over the dadb shell (shell uid). Undeclared/ungrantable ones
+    // fail harmlessly and are logged.
+    private val BYDAUTO_COMMON_PERMISSIONS = listOf(
+        "android.permission.BYDAUTO_STATISTIC_COMMON",
+        "android.permission.BYDAUTO_CHARGING_COMMON",
+        "android.permission.BYDAUTO_SPEED_COMMON",
+        "android.permission.BYDAUTO_VEHICLEHEALTH_COMMON",
+        "android.permission.BYDAUTO_MOTOR_COMMON",
+        "android.permission.BYDAUTO_INSTRUMENT_COMMON",
+    )
+
     sealed class SetupState {
         object Idle         : SetupState()
         object Connecting   : SetupState()
@@ -204,6 +228,49 @@ object AdbPermissionManager {
         out
     }
 
+    /**
+     * Apply the DiLink-5 vehicle-API access tweaks over an already-open dadb session:
+     * exempt hidden APIs (so the bydauto SDK can bind) and grant the bydauto *_COMMON perms.
+     * Best-effort — individual failures are logged, never fatal.
+     */
+    private fun applyVehicleApiAccess(dadb: Dadb, pkg: String) {
+        VEHICLE_API_SETTINGS.forEach { cmd ->
+            runCatching {
+                val r = dadb.shell(cmd)
+                Log.i(TAG, "vehicle-api: $cmd -> exit ${r.exitCode}")
+            }.onFailure { Log.w(TAG, "vehicle-api '$cmd' failed: ${it.message}") }
+        }
+        BYDAUTO_COMMON_PERMISSIONS.forEach { perm ->
+            runCatching {
+                val r = dadb.shell("pm grant $pkg $perm")
+                val ok = r.exitCode == 0 || r.allOutput.contains("Success", ignoreCase = true)
+                if (!ok && r.allOutput.isNotBlank()) Log.d(TAG, "grant $perm: ${r.allOutput.trim()}")
+            }
+        }
+    }
+
+    /**
+     * Idempotently ensure DiLink-5 vehicle-API access (hidden-API exemption + bydauto grants).
+     * Safe to call on every app startup: connects via dadb only if adb is already authorised,
+     * otherwise silently no-ops (the full [runSetup] flow handles first-time authorisation).
+     * Returns true if the commands were applied.
+     */
+    suspend fun ensureVehicleApiAccess(context: Context): Boolean = withContext(Dispatchers.IO) {
+        if (!isPortOpen()) return@withContext false
+        val keyPair = getOrCreateKeyPair(context)
+        val dadb = tryConnect(keyPair, timeoutMs = 2_000) ?: return@withContext false
+        try {
+            applyVehicleApiAccess(dadb, context.packageName)
+            Log.i(TAG, "✅ DiLink-5 vehicle-API access ensured")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "ensureVehicleApiAccess failed: ${e.message}")
+            false
+        } finally {
+            runCatching { dadb.close() }
+        }
+    }
+
     private suspend fun grantPermissionsAndClose(dadb: Dadb, context: Context): Boolean {
         return try {
             _state.value = SetupState.Granting
@@ -220,6 +287,9 @@ object AdbPermissionManager {
             RuntimeExtensionBridge.stringList("s01", context.packageName).forEach { command ->
                 dadb.shell(command)
             }
+
+            // DiLink-5: also exempt hidden APIs + grant bydauto *_COMMON so telemetry binds.
+            applyVehicleApiAccess(dadb, pkg)
 
             dadb.close()
 

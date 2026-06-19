@@ -274,6 +274,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkSetupRequired() {
+        // Always (idempotently) re-assert DiLink-5 vehicle-API access on startup: the hidden-API
+        // exemption that lets the bydauto SDK bind can reset on reboot, and without it all
+        // telemetry reads 0. No-ops if adb isn't authorised yet (the setup flow below handles
+        // first-time authorisation, and applies the same tweaks once authorised).
+        lifecycleScope.launch {
+            AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+        }
         if (AdbPermissionManager.isSetupComplete(this)) return
         showSetupRequired.value = true
         lifecycleScope.launch {

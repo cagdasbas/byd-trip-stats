@@ -45,6 +45,7 @@
     <uses-permission android:name="android.permission.BYDAUTO_CHARGING_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_BIGDATA_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_MOTOR_GET" />
+    <uses-permission android:name="android.permission.BYDAUTO_MOTOR_COMMON" />
     <uses-permission android:name="android.permission.BYDAUTO_LOCATION_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_GEARBOX_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_BODYWORK_GET" />

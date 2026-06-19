@@ -26,10 +26,11 @@ class Dilink5Client {
     private var statDevice: BYDAutoStatisticDevice? = null
     private var statListener: AbsBYDAutoStatisticListener? = null
 
-    // reflective device handles (charging/speed/vehiclehealth)
+    // reflective device handles (charging/speed/vehiclehealth/motor)
     private var chargingDev: Any? = null
     private var speedDev: Any? = null
     private var healthDev: Any? = null
+    private var motorDev: Any? = null
 
     // derived-power state
     private var lastUsableKwh: Double = Double.NaN
@@ -65,6 +66,9 @@ class Dilink5Client {
         chargingDev = bind(ctx, "android.hardware.bydauto.charging.BYDAutoChargingDevice")
         speedDev    = bind(ctx, "android.hardware.bydauto.speed.BYDAutoSpeedDevice")
         healthDev   = bind(ctx, "android.hardware.bydauto.vehiclehealth.BYDAutoVehicleHealthDevice")
+        // Motor: D5 BYDAutoMotorDevice exposes a single getMotorSpeed() (no front/rear split).
+        // Sealion 7 is RWD → that single traction motor is the REAR motor. Needs BYDAUTO_MOTOR_COMMON.
+        motorDev    = bind(ctx, "android.hardware.bydauto.motor.BYDAutoMotorDevice")
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -104,14 +108,19 @@ class Dilink5Client {
         pollThread?.interrupt(); pollThread = null
         try { statListener?.let { statDevice?.unregisterListener(it) } } catch (_: Throwable) {}
         statListener = null; statDevice = null
-        chargingDev = null; speedDev = null; healthDev = null
+        chargingDev = null; speedDev = null; healthDev = null; motorDev = null
         Log.i(tag, "stopped")
     }
 
     private fun pollOnce(ds: BydVehicleDataSource, slowTick: Boolean) {
-        // FAST (every tick): speed (driving) + charge power (charging) — change fast, cheap getters.
-        reflGetDouble(speedDev, "getSpeedValue")?.takeIf { it in 0.0..400.0 }
-            ?.let { ds.applyDaemonTelemetry(speedKmh = it, gear = null, powerKw = null) }
+        // FAST (every tick): speed + rear-motor RPM (driving) + charge power (charging) — all change
+        // fast and are cheap getters. Push speed and RPM together so a partial update never wipes
+        // the other (applyDaemonTelemetry ignores null fields).
+        val spd = reflGetDouble(speedDev, "getSpeedValue")?.takeIf { it in 0.0..400.0 }
+        val rpm = reflGetInt(motorDev, "getMotorSpeed")?.takeIf { it in 0..30_000 }  // RWD: rear motor
+        if (spd != null || rpm != null) {
+            ds.applyDaemonTelemetry(speedKmh = spd, gear = null, powerKw = null, rearRpm = rpm)
+        }
         reflGetDouble(chargingDev, "getChargingPower")?.takeIf { it in 0.0..250.0 }
             ?.let { ds.applyDilink5Telemetry(chargingPowerKw = it) }
         if (!slowTick) return
