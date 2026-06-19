@@ -93,11 +93,13 @@ fun InitializationScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Text(
-                text = "Only DiLink 3 vehicles are supported. DiLink 4 and 5 are not yet supported.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
+            if (!com.byd.tripstats.sdk.DiLink5Platform.isDiLink5) {
+                Text(
+                    text = "Only DiLink 3 vehicles are supported. DiLink 4 is not yet supported.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

@@ -531,6 +531,23 @@ object CarCatalog {
         cdA = 0.774             // Cd 0.29 × A 2.67 m²
     )
 
+    // BYD Sealion 7 — DiLink 5 (Android 11) BEV. Supported only by the `dilink5` flavor.
+    // batteryKwh = USABLE 71.0: measured on-car as getEVRemainingBatteryPower ÷ soc ≈ 70.5 (steady,
+    // Turkey variant). Other specs are estimates — VERIFY: wltp/refConsumption/mass/motor/cdA.
+    val BYD_SEALION_7 = CarConfig(
+        id = "BYD_SEALION_7",
+        displayName = "Sealion 7 (DiLink 5)",
+        drivetrain = Drivetrain.RWD,
+        batteryKwh = 71.0,           // measured usable ~70.5 kWh (TR variant)
+        estimatedKerbMassKg = 2225.0,// estimate (RWD)
+        wltpKm = 460,                // estimate for the 71 kWh RWD variant — verify
+        referenceConsumptionKwhPer100km = 19.0, // estimate — verify
+        frontTyrePressureBar = 2.5,
+        rearTyrePressureBar = 2.5,
+        rearMotorRatedKw = 230,      // RWD rear motor — verify
+        cdA = 0.78                   // Cd ~0.29 × A ~2.7 m² — estimate
+    )
+
     val BYD_SEALION_5_DMI_COMFORT = CarConfig(
         id = "BYD_SEALION_5_DMI_COMFORT",
         displayName = "Seal 5 / Sealion 5 DM-i Comfort",
@@ -598,6 +615,7 @@ object CarCatalog {
         BYD_SEALION_6_DMI_PERFORMANCE,
         BYD_SEALION_6_EV_STANDARD,
         BYD_SEALION_6_EV_EXTENDED,
+        BYD_SEALION_7,
     )
 
     fun fromId(id: String?): CarConfig? {
@@ -607,7 +625,7 @@ object CarCatalog {
     /**
      * Cars grouped for display in selection screens.
      * Two top-level categories (BEV / PHEV), each with named model groups.
-     * Only DiLink 3 vehicles are listed — DiLink 4/5 are unsupported.
+     * Mostly DiLink 3 vehicles; the Sealion 7 (DiLink 5) is supported by the `dilink5` flavor.
      */
     val groupedBev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(
         "BYD Seal" to listOf(BYD_SEAL_DYNAMIC_RWD, BYD_SEAL_PREMIUM_RWD, BYD_SEAL_EXCELLENCE),
@@ -619,6 +637,7 @@ object CarCatalog {
         "BYD M6" to listOf(BYD_M6_STANDARD_120KW, BYD_M6_SUPERIOR_100KW, BYD_M6_SUPERIOR_150KW),
         "BYD Seal 6" to listOf(BYD_SEAL_6_PREMIUM_95KW, BYD_SEAL_6_PREMIUM_160KW),
         "BYD Sealion 6" to listOf(BYD_SEALION_6_EV_STANDARD, BYD_SEALION_6_EV_EXTENDED),
+        "BYD Sealion 7 (DiLink 5)" to listOf(BYD_SEALION_7),
         "BYD Han" to listOf(BYD_HAN_EV, BYD_HAN_EV_AWD),
         "BYD Tang" to listOf(BYD_TANG_EV),
     )
