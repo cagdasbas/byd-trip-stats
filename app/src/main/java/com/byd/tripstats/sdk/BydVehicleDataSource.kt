@@ -1999,6 +1999,14 @@ class BydVehicleDataSource(context: Context) {
             Log.w(TAG, "⚠️ $name SecurityException: ${e.message}")
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ $name failed: ${e.javaClass.simpleName}: ${e.message}")
+        } catch (e: Throwable) {
+            // MUST catch Throwable, not just Exception: on DiLink-5 the bundled OEM bydauto SDK
+            // makes getInstance() execute real code, and a firmware/SDK version skew throws a
+            // LinkageError (e.g. NoSuchMethodError: CarAdapterManager.getInstance(Context) — the
+            // OEM TsManagerImpl expects a ts-framework.jar API this head unit doesn't expose).
+            // That is an Error, not an Exception, so without this it escaped onCreate and crashed
+            // the whole service on launch. Degrade gracefully: this device just doesn't bind.
+            Log.w(TAG, "⚠️ $name link/error: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
