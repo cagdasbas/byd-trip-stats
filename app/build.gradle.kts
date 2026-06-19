@@ -187,11 +187,16 @@ tasks.named("preBuild") {
 }
 
 dependencies {
-    // DiLink-5 flavor only: the REAL bydauto SDK extracted from the car (com.byd.data.collect),
-    // converted dex->jar. Gitignored OEM artifact — generate via tools/make-dilink5-sdk-jar.sh.
-    // Provides android.hardware.bydauto.* at compile+runtime for the dilink5 flavor (dilink3 uses
-    // the thin stubs in src/dilink3/ instead). If absent, only the dilink5 flavor fails to build.
-    "dilink5Implementation"(files("libs/dilink5-sdk.jar"))
+    // DiLink-5 flavor SDK wiring:
+    //  - COMPILE against the thin bydauto stubs (D3 signatures) so the shared src/main compiles
+    //    identically to dilink3 (the D3-shaped listener overrides simply won't fire on D5; the
+    //    real D5 data path is added separately in src/dilink5).  libs/bydauto-stubs.jar is OUR
+    //    stub (committed) compiled from src/dilink3/.../bydauto.
+    //  - RUNTIME bundle the REAL DiLink-5 bydauto classes (libs/dilink5-sdk.jar, gitignored OEM;
+    //    generate via tools/make-dilink5-sdk-jar.sh). runtimeOnly => in the dex, not on the
+    //    compile classpath (avoids the double/float signature clash + duplicate classes).
+    "dilink5CompileOnly"(files("libs/bydauto-stubs.jar"))
+    "dilink5RuntimeOnly"(files("libs/dilink5-sdk.jar"))
 
     // Core Android
     implementation(kotlin("stdlib"))
