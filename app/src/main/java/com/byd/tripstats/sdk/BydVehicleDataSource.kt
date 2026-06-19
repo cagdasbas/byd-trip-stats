@@ -1260,6 +1260,9 @@ class BydVehicleDataSource(context: Context) {
         }
         restorePersistedStatisticState()
         daemonClient.start()
+        // DiLink-5: start the typed-listener client (present only in the dilink5 flavor; reflective
+        // so the dilink3 build, which lacks the class, simply no-ops). It pushes via applyDilink5Telemetry.
+        if (DiLink5Platform.isDiLink5) startDilink5Client()
         publishSnapshot()
         if (RuntimeExtensionBridge.isAvailable) {
             startReadLogsMonitor()
@@ -1824,6 +1827,7 @@ class BydVehicleDataSource(context: Context) {
     fun stop() {
         RuntimeExtensionBridge.onDataSourceStopped()
         daemonClient.stop()
+        stopDilink5Client()
         pollingJob?.cancel()
         pollingJob = null
         readLogsMonitorJob?.cancel()
@@ -4880,6 +4884,66 @@ class BydVehicleDataSource(context: Context) {
         }
     }
     private var lastDaemonDiagMs = 0L
+
+    /**
+     * Apply DiLink-5 statistic/charging telemetry pushed by the DiLink-5 client (dilink5 flavor
+     * only; started reflectively from start()). Mirrors applyDaemonTelemetry: writes the raw
+     * snapshot fields the existing toTelemetry()/ABRP path already reads, then publishes once.
+     * Speed and derived driving-power go through applyDaemonTelemetry; this handles
+     * soc / total-mileage / elec-range / usable-kWh / SOH / charge-power. Pure Kotlin (no bydauto
+     * types) so it compiles in both flavors. All inputs nullable + range-guarded.
+     */
+    fun applyDilink5Telemetry(
+        socPct: Double? = null,
+        totalMileageKm: Double? = null,
+        elecRangeKm: Int? = null,
+        usableKwh: Double? = null,
+        sohPct: Double? = null,
+        chargingPowerKw: Double? = null,
+    ) {
+        var changed = false
+        var snap = _vehicleSnapshot.value
+        if (socPct != null && socPct in 0.0..100.0) {
+            snap = snap.copy(statisticElecPercentageValue = socPct); changed = true
+        }
+        if (totalMileageKm != null && totalMileageKm in 1.0..9_999_999.0) {
+            snap = snap.copy(statisticTotalMileageDecimal = totalMileageKm,
+                             statisticTotalMileageValue = totalMileageKm.toInt()); changed = true
+        }
+        if (elecRangeKm != null && elecRangeKm in 0..2000) {
+            snap = snap.copy(statisticElecDrivingRangeValue = elecRangeKm); changed = true
+        }
+        if (usableKwh != null && usableKwh in 0.0..200.0) {
+            snap = snap.copy(powerBatteryRemainPowerEV = usableKwh); changed = true
+        }
+        if (changed) _vehicleSnapshot.value = snap
+        if (sohPct != null && sohPct in 50.0..110.0) { _statisticBatterySoh.value = sohPct; changed = true }
+        if (chargingPowerKw != null && chargingPowerKw in 0.0..250.0) {
+            _chargingPowerKw.value = chargingPowerKw; _chargingPowerRaw.value = chargingPowerKw; changed = true
+        }
+        if (changed) publishSnapshot()
+    }
+
+    // DiLink-5 client (dilink5 flavor only) — loaded reflectively so src/main stays flavor-agnostic.
+    private var dilink5Client: Any? = null
+    private fun startDilink5Client() {
+        try {
+            val cls = Class.forName("com.byd.tripstats.sdk.Dilink5Client")
+            val client = cls.getDeclaredConstructor().newInstance()
+            cls.getMethod("start", Context::class.java, BydVehicleDataSource::class.java)
+                .invoke(client, ctx, this)
+            dilink5Client = client
+            Log.i(TAG, "✅ DiLink-5 client started")
+        } catch (e: ClassNotFoundException) {
+            Log.w(TAG, "DiLink-5 client not present in this build")
+        } catch (t: Throwable) {
+            Log.w(TAG, "DiLink-5 client start failed: ${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+    private fun stopDilink5Client() {
+        dilink5Client?.let { c -> try { c.javaClass.getMethod("stop").invoke(c) } catch (_: Throwable) {} }
+        dilink5Client = null
+    }
 
     /**
      * Recover a wedged SDK event-callback channel. On this firmware the BYD SDK occasionally stops

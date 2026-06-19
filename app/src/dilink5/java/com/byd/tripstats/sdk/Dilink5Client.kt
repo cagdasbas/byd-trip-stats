@@ -1,0 +1,139 @@
+package com.byd.tripstats.sdk
+
+import android.content.Context
+import android.os.SystemClock
+import android.util.Log
+import android.hardware.bydauto.statistic.AbsBYDAutoStatisticListener
+import android.hardware.bydauto.statistic.BYDAutoStatisticDevice
+
+/**
+ * DiLink-5 (Sealion 7) telemetry client — present ONLY in the `dilink5` flavor; loaded reflectively
+ * by BydVehicleDataSource.startDilink5Client() when DiLink5Platform.isDiLink5.
+ *
+ * On DiLink-5 the statistic data comes via a typed listener (AbsBYDAutoStatisticListener), not the
+ * DiLink-3 feature-ID path. We register that listener (which also primes the TS adapter so the
+ * getters go live), and poll the other telemetry devices reflectively (charging/speed/vehiclehealth
+ * — no compile dependency on their D5 types). All values are pushed into the shared snapshot via
+ * BydVehicleDataSource.applyDilink5Telemetry(...) / applyDaemonTelemetry(...).
+ *
+ * Confirmed field map (see byd-apps DILINK5-PORT.md): soc, total-mileage, elec-range, usable-kWh,
+ * SOH, charge-power are available; driving power has no direct getter → derived from Δ(usable kWh).
+ */
+class Dilink5Client {
+    private val tag = "Dilink5Client"
+    @Volatile private var running = false
+    private var pollThread: Thread? = null
+    private var statDevice: BYDAutoStatisticDevice? = null
+    private var statListener: AbsBYDAutoStatisticListener? = null
+
+    // reflective device handles (charging/speed/vehiclehealth)
+    private var chargingDev: Any? = null
+    private var speedDev: Any? = null
+    private var healthDev: Any? = null
+
+    // derived-power state
+    private var lastUsableKwh: Double = Double.NaN
+    private var lastUsableAtMs: Long = 0L
+    private var emaPowerKw: Double = Double.NaN
+
+    fun start(ctx: Context, ds: BydVehicleDataSource) {
+        if (running) return
+        running = true
+        Log.i(tag, "starting DiLink-5 client")
+
+        // 1) statistic typed listener (push) — primes the adapter + delivers soc/mileage/range/kWh
+        try {
+            val dev = BYDAutoStatisticDevice.getInstance(ctx)
+            statDevice = dev
+            if (dev != null) {
+                val l = object : AbsBYDAutoStatisticListener() {
+                    override fun onElecPercentageChanged(v: Double) { ds.applyDilink5Telemetry(socPct = v) }
+                    override fun onTotalMileageValueChanged(v: Float) { ds.applyDilink5Telemetry(totalMileageKm = v.toDouble()) }
+                    override fun onElecDrivingRangeChanged(v: Int) { ds.applyDilink5Telemetry(elecRangeKm = v) }
+                    override fun onDrivingRangeValueChanged(v: Int) { ds.applyDilink5Telemetry(elecRangeKm = v) }
+                    override fun onEVRemainingBatteryPowerChanged(v: Float) { onUsable(v.toDouble(), ds) }
+                }
+                statListener = l
+                dev.registerListener(l)
+                Log.i(tag, "statistic listener registered")
+            } else Log.w(tag, "statistic getInstance returned null")
+        } catch (t: Throwable) {
+            Log.w(tag, "statistic listener failed: ${t.javaClass.simpleName}: ${t.message}")
+        }
+
+        // 2) bind the reflective devices once (sequential, guarded)
+        chargingDev = bind(ctx, "android.hardware.bydauto.charging.BYDAutoChargingDevice")
+        speedDev    = bind(ctx, "android.hardware.bydauto.speed.BYDAutoSpeedDevice")
+        healthDev   = bind(ctx, "android.hardware.bydauto.vehiclehealth.BYDAutoVehicleHealthDevice")
+
+        // 3) ~1s poll loop: charge power, speed, SOH (+ statistic getters as a backstop)
+        pollThread = Thread {
+            while (running) {
+                try { pollOnce(ds) } catch (_: Throwable) {}
+                try { Thread.sleep(1000) } catch (e: InterruptedException) { break }
+            }
+        }.apply { isDaemon = true; name = "Dilink5Poll"; start() }
+    }
+
+    fun stop() {
+        running = false
+        pollThread?.interrupt(); pollThread = null
+        try { statListener?.let { statDevice?.unregisterListener(it) } } catch (_: Throwable) {}
+        statListener = null; statDevice = null
+        chargingDev = null; speedDev = null; healthDev = null
+        Log.i(tag, "stopped")
+    }
+
+    private fun pollOnce(ds: BydVehicleDataSource) {
+        // statistic getters as a backstop (in case a callback is missed). Explicit getter calls
+        // (Kotlin mis-resolves getEVRemainingBatteryPower as a property name).
+        statDevice?.let { d ->
+            try {
+                val soc = d.getElecPercentageValue();        if (soc in 1.0..100.0) ds.applyDilink5Telemetry(socPct = soc)
+                val mil = d.getTotalMileageValue().toDouble(); if (mil > 1.0)        ds.applyDilink5Telemetry(totalMileageKm = mil)
+                val rng = d.getElecDrivingRangeValue();        if (rng in 1..2000)   ds.applyDilink5Telemetry(elecRangeKm = rng)
+                val usb = d.getEVRemainingBatteryPower().toDouble(); if (usb in 0.5..200.0) onUsable(usb, ds)
+            } catch (_: Throwable) {}
+        }
+        // charge power (getter is live per capture: ~47 kW). filter spikes.
+        reflGetDouble(chargingDev, "getChargingPower")?.takeIf { it in 0.0..250.0 }
+            ?.let { ds.applyDilink5Telemetry(chargingPowerKw = it) }
+        // speed (float km/h) -> reuse the daemon speed path (first 3 params have no defaults)
+        reflGetDouble(speedDev, "getSpeedValue")?.takeIf { it in 0.0..400.0 }
+            ?.let { ds.applyDaemonTelemetry(speedKmh = it, gear = null, powerKw = null) }
+        // SOH (vehiclehealth, =100 observed)
+        reflGetInt(healthDev, "getBatteryHealthStatus")?.takeIf { it in 50..110 }
+            ?.let { ds.applyDilink5Telemetry(sohPct = it.toDouble()) }
+    }
+
+    // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.
+    private fun onUsable(usableKwh: Double, ds: BydVehicleDataSource) {
+        ds.applyDilink5Telemetry(usableKwh = usableKwh)
+        val now = SystemClock.elapsedRealtime()
+        if (!lastUsableKwh.isNaN() && lastUsableAtMs > 0) {
+            val dtH = (now - lastUsableAtMs) / 3_600_000.0
+            if (dtH > 0.0008) { // ~3s minimum to avoid divide noise
+                val inst = -(usableKwh - lastUsableKwh) / dtH   // discharge => positive
+                if (kotlin.math.abs(inst) <= 400.0) {
+                    emaPowerKw = if (emaPowerKw.isNaN()) inst else 0.3 * inst + 0.7 * emaPowerKw
+                    if (emaPowerKw > 0.0) ds.applyDaemonTelemetry(speedKmh = null, gear = null, powerKw = emaPowerKw)
+                }
+                lastUsableKwh = usableKwh; lastUsableAtMs = now
+            }
+        } else { lastUsableKwh = usableKwh; lastUsableAtMs = now }
+    }
+
+    private fun bind(ctx: Context, className: String): Any? = try {
+        Class.forName(className).getMethod("getInstance", Context::class.java).invoke(null, ctx)
+            ?.also { Log.i(tag, "bound ${className.substringAfterLast('.')}") }
+    } catch (t: Throwable) {
+        Log.w(tag, "bind ${className.substringAfterLast('.')} failed: ${t.javaClass.simpleName}"); null
+    }
+
+    private fun reflGetDouble(dev: Any?, getter: String): Double? = dev?.let {
+        runCatching { (it.javaClass.getMethod(getter).invoke(it) as? Number)?.toDouble() }.getOrNull()
+    }
+    private fun reflGetInt(dev: Any?, getter: String): Int? = dev?.let {
+        runCatching { (it.javaClass.getMethod(getter).invoke(it) as? Number)?.toInt() }.getOrNull()
+    }
+}
