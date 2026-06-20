@@ -58,6 +58,14 @@ private const val KEY_CHARGER_SIGNALS_UNRELIABLE = "charger_signals_unreliable"
 //     0x44700010=low, 0x44700020=high, 0x44700038=avg.
 private const val STAT_CACHE_VERSION = 8
 private const val DIRECT_CHARGING_POWER_TIMEOUT_MS = 4_000L
+// DC-charge inference fallback: minimum |pack power| (kW flowing into the battery, read from the
+// synchronous enginePower getter) for treating a parked, car-on charge as active when the BMS
+// charging listener is silent (its pushed callbacks can wedge; a DC charge started while the head
+// unit is fully on may never populate gun/work/capacity). Sits above the 22 kW three-phase-AC
+// ceiling (AC tops out ~21 kW at the pack), so AC charging is left entirely to the listener path,
+// and matches the service's existing >23 kW DC-fast cadence threshold. BEV-only at the call site
+// to avoid a PHEV's engine-charging-in-Park reading as a plug-in charge. See toTelemetry().
+private const val DC_CHARGE_INFER_MIN_KW = 23.0
 // Some firmwares (notably DM-i PHEV) don't return chargerWorkState to 0 after
 // charging completes — the BMS only resets it when the user manually clears
 // charging-data in the car UI. If we've seen capacity activity during this
@@ -341,16 +349,48 @@ data class VehicleTelemetrySnapshot(
         val odometerValue = odometerCandidate
             ?: statisticTotalMileageValue?.toDouble()
             ?: 0.0
-        val chargingActive = isChargingActive ||
-            chargingPower > 0.0
-        val inferredChargingPower = when {
-            chargingPower > 0.0 -> chargingPower
-            else -> 0.0
-        }
         val currentDatetime = Instant.now().toString()
         val derivedCarOn = powerStateRaw?.coerceIn(0, 2)
             ?: powerMcuStatus?.coerceIn(0, 2)
             ?: 0
+
+        // DC-charge synchronous fallback. The BMS charging listener (gun/work/capacity) is the
+        // primary detector, but its *pushed* callbacks can go silent — the SDK event-delivery
+        // channel wedges on this firmware, and a DC charge begun while the head unit is fully on
+        // has been observed to never populate them: the charge runs, yet isChargingActive stays
+        // false and chargingPower stays 0, so no session is ever opened. The one signal that
+        // survives is the *synchronous* pack-power getter (enginePower), which reads strongly
+        // negative while current flows into the pack. In Park there is no regen and the 12 V DC-DC
+        // draw is sub-kW, so a large sustained negative pack power can only be a charge. Gated to:
+        //   • gear P  — charging requires Park (the reliable gear reading; never wedges to D/R here);
+        //   • BEV     — a PHEV can push power into the pack from its engine while parked, which is
+        //               not a plug-in charge;
+        //   • |power| above the 22 kW three-phase-AC ceiling, so AC charging is left to the listener;
+        //   • listener silent (isChargingActive false, chargingPower 0), so a working detection is
+        //     never overridden.
+        // NB: deliberately NOT gated on carOn — an on-car AC test showed the power-state device
+        // reports null (carOn=-) throughout a charge, so a carOn>0 gate would defeat this in the very
+        // scenario it exists for. The threshold is self-validating instead: a sustained pack power
+        // below -23 kW in Park requires a live HV system pushing big power, which only a charge does,
+        // and enginePower reads ~0 once current stops (it tracked reality at -5 kW during a 3 kW AC
+        // charge), so a value can't latch a phantom after the car powers off.
+        // chargingPower is taken straight from the pack reading so DC sessions get a real power
+        // curve instead of the 0 kW the listener path records when it can't see the magnitude.
+        val packPowerKw = enginePower ?: 0
+        val dcChargeInferred = gear == "P" &&
+            carConfig?.isPhev != true &&
+            !isChargingActive &&
+            chargingPower <= 0.0 &&
+            packPowerKw <= -DC_CHARGE_INFER_MIN_KW
+
+        val chargingActive = isChargingActive ||
+            chargingPower > 0.0 ||
+            dcChargeInferred
+        val inferredChargingPower = when {
+            chargingPower > 0.0 -> chargingPower
+            dcChargeInferred -> -packPowerKw.toDouble()
+            else -> 0.0
+        }
 
         // Use GPS speed as fallback when SpeedDevice returns 0 — ensures
         // shouldAutoStart and trip recording have a valid speed even if
@@ -728,6 +768,11 @@ class BydVehicleDataSource(context: Context) {
     private val _chargingPowerKw   = MutableStateFlow(0.0)
     private val _chargingPowerRaw  = MutableStateFlow(0.0)
     private val _chargingPowerCandidateKw = MutableStateFlow(0.0)
+    // Charging device getChargingPower() (m33) — instantaneous pack power (V×I, up to 500 kW), the
+    // only source that sees DC (the instrument getter is clamped 0.1..50, onChargingPowerChanged is
+    // inert). Kept separate from _chargingPowerRaw so the instrument path's null-clears can't wipe a
+    // live DC reading.
+    private val _packChargingPowerKw = MutableStateFlow(0.0)
     private val _chargingCapacity  = MutableStateFlow(0.0)
     private val _chargingCapState  = MutableStateFlow(0)
     private val _chargingCapValue  = MutableStateFlow(0)
@@ -824,6 +869,8 @@ class BydVehicleDataSource(context: Context) {
     @Volatile private var chargerSignalsUnreliable =
         runCatching { statCache.getBoolean(KEY_CHARGER_SIGNALS_UNRELIABLE, false) }.getOrDefault(false)
     private var lastChargingPowerCandidateElapsedMs: Long = 0L
+    private var lastPackChargingPowerElapsedMs: Long = 0L
+    private var lastChargingDiagMs: Long = 0L
     private val _speedAccelerateDeepness = MutableStateFlow<Int?>(null)
     private val _speedBrakeDeepness = MutableStateFlow<Int?>(null)
     private val _gearboxBrakePedalState = MutableStateFlow<Int?>(null)
@@ -2115,6 +2162,13 @@ class BydVehicleDataSource(context: Context) {
             val chargingMode = m34["chargingMode"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
 
             state?.let { _chargeState.value = it }
+            // m33 = getChargingPower() — instantaneous pack power (V×I, up to 500 kW) and the only
+            // getter that sees DC (the instrument getter is clamped 0.1..50, onChargingPowerChanged
+            // is inert). Feed it as the pack-power source while parked: idle pack power is ~0 so it
+            // can't assert a phantom charge, and the driving gate in computeChargingActive clears it.
+            // This drives both powerActive (so a DC-while-on charge is detected even when the pushed
+            // callbacks are silent) and the session's real kW.
+            if (_vehicleSnapshot.value.gear !in setOf("D", "R")) updatePackChargingPower(power)
             // Prefer the instrument external-charging-power path over charging-device
             // callbacks, which can stay stale on some firmware.
             chargingCapState?.first?.let { _chargingCapState.value = it }
@@ -2171,6 +2225,32 @@ class BydVehicleDataSource(context: Context) {
                         "gunState=${chargingGunState ?: "n/a"} type=${chargingType ?: "n/a"} " +
                         "mode=${chargingMode ?: "n/a"} cap=${chargingCapacity ?: "n/a"}"
                 )
+            }
+
+            // Persisted charging diagnostic (survives DiLink's ~7-min logcat shred) — records the raw
+            // charging getters incl. m33 getChargingPower() so an on-car charge can be validated from
+            // diag.log. Throttled to 10 s; fires while any charge signal is live, *including* the
+            // silent-callback case (parked + meaningful power into the pack) that the DC-while-on bug
+            // exhibited — so the file captures exactly what the SDK reported either way.
+            run {
+                val snap = _vehicleSnapshot.value
+                val parked = snap.gear !in setOf("D", "R")
+                val chargingDiagActive = (power?.let { it > 0.1 } == true) ||
+                    (chargingGunState ?: 0) != 0 || (chargerWorkState ?: 0) != 0 ||
+                    (chargingCapacity?.let { it > 0.0 } == true) ||
+                    (parked && (snap.enginePower ?: 0) <= -3)
+                val nowMs = SystemClock.elapsedRealtime()
+                if (chargingDiagActive && nowMs - lastChargingDiagMs > 10_000L) {
+                    lastChargingDiagMs = nowMs
+                    runCatching {
+                        DiagLog.event(appContext, TAG,
+                            "🔌 charge getters: m33Power=${power ?: "-"} gun=${chargingGunState ?: "-"} " +
+                                "work=${chargerWorkState ?: "-"} type=${chargingType ?: "-"} mode=${chargingMode ?: "-"} " +
+                                "cap=${chargingCapacity ?: "-"} chargeState=${state ?: "-"} " +
+                                "gear=${snap.gear} enginePower=${snap.enginePower} " +
+                                "carOn=${snap.powerStateRaw ?: snap.powerMcuStatus ?: "-"}")
+                    }
+                }
             }
 
             if (
@@ -4931,10 +5011,12 @@ class BydVehicleDataSource(context: Context) {
 
     private fun publishSnapshotNow() {
         val nowElapsedMs = SystemClock.elapsedRealtime()
+        val recentPackPower = hasFreshPackChargingPower(nowElapsedMs)
         val recentDirectPower = hasFreshDirectChargingPower(nowElapsedMs)
         val recentCapacityActivity = lastChargingActivityElapsedMs != 0L &&
             nowElapsedMs - lastChargingActivityElapsedMs <= 8_000L
         val effectiveChargingPowerKw = when {
+            recentPackPower -> _packChargingPowerKw.value     // m33 pack power — authoritative, sees DC (to 500 kW)
             recentDirectPower -> _chargingPowerRaw.value
             recentCapacityActivity -> _chargingPowerKw.value
             else -> 0.0
@@ -5856,9 +5938,14 @@ class BydVehicleDataSource(context: Context) {
             if (_chargerWorkState.value != 0) { _chargerWorkState.value = 0; chargerWorkStateSetElapsedMs = 0L }
             lastChargingActivityElapsedMs = 0L
             updateDirectChargingPower(null)
+            lastPackChargingPowerElapsedMs = 0L
             return false
         }
-        val powerActive = hasFreshDirectChargingPower(nowElapsedMs)
+        // Pack power (m33) is the authoritative DC source; OR it in so a DC charge started while the
+        // car is on trips powerActive even when the instrument/event power paths are silent. Purely
+        // additive — it only contributes when getChargingPower() actually reports > 0.1 kW.
+        val powerActive = hasFreshDirectChargingPower(nowElapsedMs) ||
+            hasFreshPackChargingPower(nowElapsedMs)
         val recentCapacityActivity = lastChargingActivityElapsedMs != 0L &&
             nowElapsedMs - lastChargingActivityElapsedMs <= 3_000L
         // chargerWorkState is set by AbsBYDAutoChargingListener.onChargerWorkStateChanged,
@@ -5944,6 +6031,21 @@ class BydVehicleDataSource(context: Context) {
             _chargingPowerRaw.value = 0.0
             lastChargingPowerRawElapsedMs = 0L
         }
+    }
+
+    private fun hasFreshPackChargingPower(nowElapsedMs: Long = SystemClock.elapsedRealtime()): Boolean {
+        return lastPackChargingPowerElapsedMs != 0L &&
+            nowElapsedMs - lastPackChargingPowerElapsedMs <= DIRECT_CHARGING_POWER_TIMEOUT_MS &&
+            _packChargingPowerKw.value > 0.1
+    }
+
+    // Charging device getChargingPower() (m33), pack V×I up to 500 kW. Unlike updateDirectChargingPower
+    // this never clears on a missing read — it self-expires via the 4 s freshness window — so a brief
+    // poll gap during a DC charge can't drop the session. Cleared explicitly only by the driving gate.
+    private fun updatePackChargingPower(power: Double?) {
+        val sanitized = power?.takeIf { it.isFinite() && it in 0.1..500.0 } ?: return
+        _packChargingPowerKw.value = sanitized
+        lastPackChargingPowerElapsedMs = SystemClock.elapsedRealtime()
     }
 
     private fun handleChargingEvent(eventId: Int, value: BYDAutoEventValue) {
