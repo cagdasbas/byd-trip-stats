@@ -112,6 +112,10 @@ data class TripDataPointEntity(
     val tyrePressureLR: Double = 0.0,
     val tyrePressureRR: Double = 0.0,
     val soh: Int = 0,
+    /** Precise SoH (statistic-feature float, e.g. 97.6) when the car exposes it; 0.0 when unknown.
+     *  Promoted from rawJson in 2.9.1 so the degradation chart/report keep the decimal the
+     *  dashboard shows. AVG queries fall back to the integer [soh] for pre-2.9.1 rows. */
+    val sohPrecise: Double = 0.0,
     val batteryTotalVoltage: Int = 0,
     val battery12vVoltage: Double = 0.0,
     val batteryCellVoltageMax: Double = 0.0,

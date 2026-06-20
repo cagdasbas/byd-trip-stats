@@ -98,16 +98,39 @@ interface TripDataPointDao {
     suspend fun deleteDataPointsByIds(ids: List<Long>)
 
     /**
-     * Returns the average SoH recorded across all data points for each trip,
-     * filtering out zero values (default before first telemetry with soh field).
-     * Used by battery degradation tracking to plot SoH over time.
+     * Returns the average SoH recorded across all data points for each trip.
+     * Prefers the precise statistic SoH (sohPrecise, e.g. 97.6) recorded since 2.9.1 so the
+     * degradation chart/report stay decimal-accurate and match the dashboard; falls back to the
+     * rounded integer soh for pre-2.9.1 rows. Zero values are filtered (default before first
+     * telemetry with an SoH field). Used by battery degradation tracking to plot SoH over time.
      */
-    @Query("SELECT tripId, AVG(soh) as avgSoh FROM trip_data_points WHERE soh > 0 GROUP BY tripId")
+    @Query(
+        "SELECT tripId, AVG(CASE WHEN sohPrecise > 0 THEN sohPrecise ELSE soh END) as avgSoh " +
+        "FROM trip_data_points WHERE sohPrecise > 0 OR soh > 0 GROUP BY tripId"
+    )
     fun getAvgSohPerTrip(): Flow<List<TripSohSummary>>
+
+    // ── One-time precise-SoH backfill (2.9.1) ─────────────────────────────────
+    // Recovers the precise statistic_battery_soh that older rows already carry inside
+    // rawJson (it just wasn't a queryable column before v8) into sohPrecise, so the
+    // degradation chart/report are decimal-accurate across all history.
+    /** Data points (paged by id) not yet backfilled whose rawJson holds the precise value. */
+    @Query(
+        "SELECT id, rawJson FROM trip_data_points " +
+        "WHERE sohPrecise = 0 AND id > :afterId AND rawJson LIKE '%statistic_battery_soh%' " +
+        "ORDER BY id LIMIT :limit"
+    )
+    suspend fun pointsNeedingSohBackfill(afterId: Long, limit: Int): List<SohBackfillRow>
+
+    @Query("UPDATE trip_data_points SET sohPrecise = :value WHERE id = :id")
+    suspend fun setSohPrecise(id: Long, value: Double)
 }
 
 /** Lightweight projection returned by [TripDataPointDao.getAvgSohPerTrip]. */
 data class TripSohSummary(val tripId: Long, val avgSoh: Double)
+
+/** Projection for the one-time precise-SoH backfill (id + rawJson). */
+data class SohBackfillRow(val id: Long, val rawJson: String)
 
 @Dao
 interface TripStatsDao {

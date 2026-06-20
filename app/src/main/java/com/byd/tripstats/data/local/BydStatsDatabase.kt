@@ -32,7 +32,7 @@ import java.io.IOException
         ChargingSessionEntity::class,
         ChargingDataPointEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -70,7 +70,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
                 )
                     // .fallbackToDestructiveMigration()
                     // .fallbackToDestructiveMigrationOnDowngrade()
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance
@@ -210,6 +210,15 @@ abstract class BydStatsDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE trips ADD COLUMN isFavourite INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE charging_sessions ADD COLUMN isFavourite INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        // v8 (2.9.1): precise SoH (statistic-feature float) promoted from rawJson to its own
+        // column so the degradation chart/report keep the decimal the dashboard shows. Old rows
+        // stay 0 and fall back to the integer `soh` in getAvgSohPerTrip.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN sohPrecise REAL NOT NULL DEFAULT 0")
             }
         }
 

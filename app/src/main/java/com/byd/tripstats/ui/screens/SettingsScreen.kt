@@ -1524,7 +1524,8 @@ private fun AppPreferencesTab(
             "£" to "GBP",
             "$" to "USD",
             "A$" to "AUD",
-            "฿" to "THB"
+            "฿" to "THB",
+            "R$" to "BRL"
         )
     }
     var currencyMenuExpanded by remember { mutableStateOf(false) }

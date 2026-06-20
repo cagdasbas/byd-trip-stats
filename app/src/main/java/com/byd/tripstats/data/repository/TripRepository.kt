@@ -1653,6 +1653,7 @@ class TripRepository private constructor(context: Context) {
                     tyreTempLR             = t.tyreTempLR,
                     tyreTempRR             = t.tyreTempRR,
                     soh                    = t.soh,
+                    sohPrecise             = t.statisticBatterySoh ?: 0.0,
                     batteryTotalVoltage    = t.batteryTotalVoltage,
                     battery12vVoltage      = t.battery12vVoltage.safe(),
                     batteryCellVoltageMax  = t.batteryCellVoltageMax.safe(),
@@ -2002,6 +2003,35 @@ class TripRepository private constructor(context: Context) {
     fun getAllTripStats(): Flow<List<TripStatsEntity>> = statsDao.getAllTripStats()
 
     fun getAvgSohPerTrip(): Flow<List<TripSohSummary>> = dataPointDao.getAvgSohPerTrip()
+
+    /**
+     * One-time (2.9.1): recover the precise statistic_battery_soh that older data points already
+     * carry inside their rawJson into the new [sohPrecise] column, so the degradation chart/report
+     * are decimal-accurate across all history and never show a false up-tick where rounded data
+     * meets precise. Id-paginated + transactional so it scales to a large database without loading
+     * it all at once. Caller guards this to run only once (see DashboardViewModel.init).
+     */
+    suspend fun backfillPreciseSoh() = withContext(Dispatchers.IO) {
+        val regex = Regex("\"statistic_battery_soh\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)")
+        var afterId = 0L
+        var updated = 0
+        while (true) {
+            val rows = dataPointDao.pointsNeedingSohBackfill(afterId, 2000)
+            if (rows.isEmpty()) break
+            afterId = rows.last().id
+            val parsed = rows.mapNotNull { r ->
+                val v = regex.find(r.rawJson)?.groupValues?.getOrNull(1)?.toDoubleOrNull()
+                if (v != null && v > 0.0) r.id to v else null
+            }
+            if (parsed.isNotEmpty()) {
+                database.withTransaction {
+                    parsed.forEach { (id, v) -> dataPointDao.setSohPrecise(id, v) }
+                }
+                updated += parsed.size
+            }
+        }
+        if (updated > 0) Log.i(TAG, "Precise-SoH backfill updated $updated data point(s)")
+    }
 
     fun getSegmentsForTrip(tripId: Long) = segmentDao.getSegmentsForTrip(tripId)
 

@@ -1076,6 +1076,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // ── Init ──────────────────────────────────────────────────────────────────
 
     init {
+        // One-time (2.9.1): backfill precise SoH from each data point's rawJson into the
+        // sohPrecise column so the degradation chart/report are decimal-accurate across all
+        // history (no false up-tick where rounded data meets the new precise recording).
+        // Runs off the main thread and only once — cheap no-op on later launches.
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val prefs = getApplication<Application>()
+                    .getSharedPreferences("maintenance", android.content.Context.MODE_PRIVATE)
+                if (!prefs.getBoolean("soh_precise_backfill_done", false)) {
+                    tripRepository.backfillPreciseSoh()
+                    prefs.edit().putBoolean("soh_precise_backfill_done", true).apply()
+                }
+            }
+        }
+
         viewModelScope.launch {
             var wasInTrip = false
             var wasTripOpen = false
