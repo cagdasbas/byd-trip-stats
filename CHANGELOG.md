@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [2.9.1] - 2026-Jun-20
+
+### Added
+
+- **Brazilian Real (R$ / BRL)** added to the electricity-tariff currency options (Settings → Preferences → Electricity tariff), alongside €, £, $, A$ and ฿.
+
+### Fixed
+
+- **A DC fast charge started while the car was switched on wasn't recorded as a charging session** — charging detection leaned on the car's *pushed* BMS charging signals (charge-gun / charger-work state, delivered-capacity), and on this firmware that channel can stall: a DC charge begun with the head unit fully powered left them silent, so the dashboard showed the live charge but no session opened. The app now also recognises a charge straight from the **battery's own power flow** — a large, sustained power flowing *into* the pack while parked (above the ~22 kW three-phase-AC ceiling, so **AC charging is untouched**) is recorded as a charging session with its real power, even when the BMS signals are silent. It additionally reads the car's dedicated charge-power meter where the firmware reports it. Pure-EV only — so a plug-in hybrid charging its pack from the engine in Park is never mistaken for a plug-in charge. Charging while the car is **off** is unchanged — still reconstructed from the State-of-Charge gain on the next wake-up.
+- **PHEV projected range wildly too high (saturating at the WLTP cap, and a "Range" readout that jumped between values like 75, 446 and 823 km)** — the projection was being computed with a fallback battery size of ~82.56 kWh and as if the car were a pure EV, because the live trip loop wasn't reading the selected car correctly (it relied on a value that was only populated while a specific screen was observing it, and otherwise stayed empty). On a small-battery plug-in hybrid like the Sealion 6 DM-i that hugely inflated the projection — so it pinned at "≥ WLTP" and the Range figure swung around — while it happened to look right on ~82 kWh electric cars. The trip loop now always reads the real selected car (battery size, PHEV status and rated consumption), so the projection uses the correct usable EV capacity and consumption floor again. The **Range** readout under the chart also now prefers the app's stable projected EV range over the car's raw BMS electric-range field (which on PHEVs can briefly report a combined electric **+ fuel** range). BEVs are unaffected.
+- **Battery Degradation showed a rounded SoH (e.g. 97.0%) while the dashboard showed the precise value (97.6%)** — the degradation chart and the battery-health report averaged the rounded *integer* SoH stored per data point, losing the decimal the dashboard reads from the car's precise statistic value. The precise SoH is now recorded in its own column and used for the chart, the "Current SoH" card and the exported report, so they match the dashboard to one decimal. Your existing history is upgraded automatically: a one-time background backfill recovers the precise value that was already saved inside each older data point, so the whole SoH series becomes decimal-accurate — and the line no longer ticks *up* (which SoH should never do) where the old rounded data met the new precise recording.
+
+---
+
 ## [2.9.0] - 2026-Jun-19
 
 > **What's new in a nutshell**
