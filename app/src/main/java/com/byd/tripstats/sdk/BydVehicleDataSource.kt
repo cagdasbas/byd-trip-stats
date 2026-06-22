@@ -4959,6 +4959,46 @@ class BydVehicleDataSource(context: Context) {
         if (changed) publishSnapshot()
     }
 
+    /**
+     * DiLink-5 tyre data (TICKET-003). Source: BYDAutoTyreDevice.getTyrePressureValueByType(area)
+     * for area LF=1/RF=2/LR=3/RR=4. Confirmed on-car: that getter returns the per-wheel pressure in
+     * TENTHS OF PSI (e.g. 401 → 40.1 psi → 2.77 bar; rear > front, matching the Sealion 7 spec). The
+     * plain getTyrePressureValue ignores the area arg, so we use ByType. Temps are direct °C; state
+     * is 0=normal/1=over/2=under. Raw psi×10 guarded to a sane 10–90 psi to reject garbage.
+     */
+    fun applyDilink5Tyre(
+        lfRaw: Int?, rfRaw: Int?, lrRaw: Int?, rrRaw: Int?,
+        lfState: Int?, rfState: Int?, lrState: Int?, rrState: Int?,
+        lfTemp: Int?, rfTemp: Int?, lrTemp: Int?, rrTemp: Int?,
+    ) {
+        fun psi(raw: Int?): Double? = raw?.takeIf { it in 100..900 }?.let { it / 10.0 }
+        fun temp(t: Int?): Int? = t?.takeIf { it in -40..120 }
+        fun state(s: Int?): Int? = s?.takeIf { it in 0..3 }
+        val psiToBar = 0.0689476
+        val lfP = psi(lfRaw); val rfP = psi(rfRaw); val lrP = psi(lrRaw); val rrP = psi(rrRaw)
+        if (lfP == null && rfP == null && lrP == null && rrP == null) return  // nothing usable
+        val s = _vehicleSnapshot.value
+        _vehicleSnapshot.value = s.copy(
+            tyrePressureLFPsi = lfP ?: s.tyrePressureLFPsi,
+            tyrePressureRFPsi = rfP ?: s.tyrePressureRFPsi,
+            tyrePressureLRPsi = lrP ?: s.tyrePressureLRPsi,
+            tyrePressureRRPsi = rrP ?: s.tyrePressureRRPsi,
+            tyrePressureLFBar = lfP?.let { it * psiToBar } ?: s.tyrePressureLFBar,
+            tyrePressureRFBar = rfP?.let { it * psiToBar } ?: s.tyrePressureRFBar,
+            tyrePressureLRBar = lrP?.let { it * psiToBar } ?: s.tyrePressureLRBar,
+            tyrePressureRRBar = rrP?.let { it * psiToBar } ?: s.tyrePressureRRBar,
+            tyrePressureLFState = state(lfState) ?: s.tyrePressureLFState,
+            tyrePressureRFState = state(rfState) ?: s.tyrePressureRFState,
+            tyrePressureLRState = state(lrState) ?: s.tyrePressureLRState,
+            tyrePressureRRState = state(rrState) ?: s.tyrePressureRRState,
+            tyreTempLF = temp(lfTemp) ?: s.tyreTempLF,
+            tyreTempRF = temp(rfTemp) ?: s.tyreTempRF,
+            tyreTempLR = temp(lrTemp) ?: s.tyreTempLR,
+            tyreTempRR = temp(rrTemp) ?: s.tyreTempRR,
+        )
+        publishSnapshot()
+    }
+
     // DiLink-5 client (dilink5 flavor only) — loaded reflectively so src/main stays flavor-agnostic.
     private var dilink5Client: Any? = null
     private fun startDilink5Client() {
