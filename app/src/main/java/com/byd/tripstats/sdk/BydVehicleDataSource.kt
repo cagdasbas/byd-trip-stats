@@ -4963,21 +4963,26 @@ class BydVehicleDataSource(context: Context) {
      * DiLink-5 tyre data (TICKET-003). Source: BYDAutoTyreDevice.getTyrePressureValueByType(area)
      * for area LF=1/RF=2/LR=3/RR=4. Confirmed on-car: that getter returns the per-wheel pressure in
      * TENTHS OF PSI (e.g. 401 → 40.1 psi → 2.77 bar; rear > front, matching the Sealion 7 spec). The
-     * plain getTyrePressureValue ignores the area arg, so we use ByType. Temps are direct °C; state
-     * is 0=normal/1=over/2=under. Raw psi×10 guarded to a sane 10–90 psi to reject garbage.
+     * plain getTyrePressureValue ignores the area arg, so we use ByType. State is 0=normal/1=over/
+     * 2=under. Raw psi×10 guarded to a sane 10–90 psi to reject garbage.
+     *
+     * TEMPERATURE is intentionally NOT populated: the SDK only exposes getTyreTemperatureValue(area)
+     * (no per-wheel "ByType" variant), and on-car it ignores the area arg — returns one value for all
+     * four wheels, which reads an unreliable default (e.g. 19 °C on all wheels) that doesn't match the
+     * cluster. Painting a single bogus value onto 4 wheels is worse than showing none, so we leave the
+     * _tyreTemp* StateFlows null (the UI hides the per-wheel temp line). Revisit if a real per-wheel
+     * temp source turns up.
      */
     fun applyDilink5Tyre(
         lfRaw: Int?, rfRaw: Int?, lrRaw: Int?, rrRaw: Int?,
         lfState: Int?, rfState: Int?, lrState: Int?, rrState: Int?,
-        lfTemp: Int?, rfTemp: Int?, lrTemp: Int?, rrTemp: Int?,
     ) {
         fun psi(raw: Int?): Double? = raw?.takeIf { it in 100..900 }?.let { it / 10.0 }
-        fun temp(t: Int?): Int? = t?.takeIf { it in -40..120 }
         fun state(s: Int?): Int? = s?.takeIf { it in 0..3 }
         val psiToBar = 0.0689476
         val lfP = psi(lfRaw); val rfP = psi(rfRaw); val lrP = psi(lrRaw); val rrP = psi(rrRaw)
         if (lfP == null && rfP == null && lrP == null && rrP == null) return  // nothing usable
-        // IMPORTANT: write the _tyrePressure*/_tyreTemp* StateFlows, NOT the snapshot fields directly.
+        // IMPORTANT: write the _tyrePressure* StateFlows, NOT the snapshot fields directly.
         // publishSnapshot() rebuilds the snapshot from these StateFlows, so a direct snapshot.copy()
         // here is immediately clobbered (that's why RR — whose D3 StateFlow stayed 0 — showed grey
         // NO_DATA while the others happened to carry values).
@@ -4989,10 +4994,6 @@ class BydVehicleDataSource(context: Context) {
         state(rfState)?.let { _tyrePressureRFState.value = it }
         state(lrState)?.let { _tyrePressureLRState.value = it }
         state(rrState)?.let { _tyrePressureRRState.value = it }
-        temp(lfTemp)?.let { _tyreTempLF.value = it }
-        temp(rfTemp)?.let { _tyreTempRF.value = it }
-        temp(lrTemp)?.let { _tyreTempLR.value = it }
-        temp(rrTemp)?.let { _tyreTempRR.value = it }
         publishSnapshot()
     }
 
