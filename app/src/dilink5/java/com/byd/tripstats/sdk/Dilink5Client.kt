@@ -174,7 +174,11 @@ class Dilink5Client {
         Class.forName(className).getMethod("getInstance", Context::class.java).invoke(null, ctx)
             ?.also { Log.i(tag, "bound ${className.substringAfterLast('.')}") }
     } catch (t: Throwable) {
-        Log.w(tag, "bind ${className.substringAfterLast('.')} failed: ${t.javaClass.simpleName}"); null
+        // Unwrap InvocationTargetException so the *real* failure (e.g. the platform manager throwing)
+        // is visible — bare "InvocationTargetException" tells us nothing about why a device won't bind.
+        val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
+        Log.w(tag, "bind ${className.substringAfterLast('.')} failed: ${c.javaClass.simpleName}: ${c.message}")
+        null
     }
 
     private fun reflGetDouble(dev: Any?, getter: String): Double? = dev?.let {
