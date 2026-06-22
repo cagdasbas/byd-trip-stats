@@ -4977,25 +4977,22 @@ class BydVehicleDataSource(context: Context) {
         val psiToBar = 0.0689476
         val lfP = psi(lfRaw); val rfP = psi(rfRaw); val lrP = psi(lrRaw); val rrP = psi(rrRaw)
         if (lfP == null && rfP == null && lrP == null && rrP == null) return  // nothing usable
-        val s = _vehicleSnapshot.value
-        _vehicleSnapshot.value = s.copy(
-            tyrePressureLFPsi = lfP ?: s.tyrePressureLFPsi,
-            tyrePressureRFPsi = rfP ?: s.tyrePressureRFPsi,
-            tyrePressureLRPsi = lrP ?: s.tyrePressureLRPsi,
-            tyrePressureRRPsi = rrP ?: s.tyrePressureRRPsi,
-            tyrePressureLFBar = lfP?.let { it * psiToBar } ?: s.tyrePressureLFBar,
-            tyrePressureRFBar = rfP?.let { it * psiToBar } ?: s.tyrePressureRFBar,
-            tyrePressureLRBar = lrP?.let { it * psiToBar } ?: s.tyrePressureLRBar,
-            tyrePressureRRBar = rrP?.let { it * psiToBar } ?: s.tyrePressureRRBar,
-            tyrePressureLFState = state(lfState) ?: s.tyrePressureLFState,
-            tyrePressureRFState = state(rfState) ?: s.tyrePressureRFState,
-            tyrePressureLRState = state(lrState) ?: s.tyrePressureLRState,
-            tyrePressureRRState = state(rrState) ?: s.tyrePressureRRState,
-            tyreTempLF = temp(lfTemp) ?: s.tyreTempLF,
-            tyreTempRF = temp(rfTemp) ?: s.tyreTempRF,
-            tyreTempLR = temp(lrTemp) ?: s.tyreTempLR,
-            tyreTempRR = temp(rrTemp) ?: s.tyreTempRR,
-        )
+        // IMPORTANT: write the _tyrePressure*/_tyreTemp* StateFlows, NOT the snapshot fields directly.
+        // publishSnapshot() rebuilds the snapshot from these StateFlows, so a direct snapshot.copy()
+        // here is immediately clobbered (that's why RR — whose D3 StateFlow stayed 0 — showed grey
+        // NO_DATA while the others happened to carry values).
+        lfP?.let { _tyrePressureLF.value = it; _tyrePressureLFBar.value = it * psiToBar }
+        rfP?.let { _tyrePressureRF.value = it; _tyrePressureRFBar.value = it * psiToBar }
+        lrP?.let { _tyrePressureLR.value = it; _tyrePressureLRBar.value = it * psiToBar }
+        rrP?.let { _tyrePressureRR.value = it; _tyrePressureRRBar.value = it * psiToBar }
+        state(lfState)?.let { _tyrePressureLFState.value = it }
+        state(rfState)?.let { _tyrePressureRFState.value = it }
+        state(lrState)?.let { _tyrePressureLRState.value = it }
+        state(rrState)?.let { _tyrePressureRRState.value = it }
+        temp(lfTemp)?.let { _tyreTempLF.value = it }
+        temp(rfTemp)?.let { _tyreTempRF.value = it }
+        temp(lrTemp)?.let { _tyreTempLR.value = it }
+        temp(rrTemp)?.let { _tyreTempRR.value = it }
         publishSnapshot()
     }
 
