@@ -76,6 +76,10 @@ interface TripDataPointDao {
     @Query("DELETE FROM trip_data_points WHERE tripId = :tripId")
     suspend fun deleteDataPointsForTrip(tripId: Long)
 
+    /** Re-points every data point of [oldTripId] onto [newTripId]. Used by trip merge. */
+    @Query("UPDATE trip_data_points SET tripId = :newTripId WHERE tripId = :oldTripId")
+    suspend fun reassignTripId(oldTripId: Long, newTripId: Long)
+
     @Query("SELECT COUNT(*) FROM trip_data_points WHERE tripId = :tripId")
     suspend fun getDataPointCount(tripId: Long): Int
 
@@ -168,4 +172,8 @@ interface TripSegmentDao {
     /** Called by deleteTrip to keep segment data in sync with the trip row. */
     @Query("DELETE FROM trip_segments WHERE tripId = :tripId")
     suspend fun deleteSegmentsForTrip(tripId: Long)
+
+    /** Re-points every segment of [oldTripId] onto [newTripId]. Used by trip merge. */
+    @Query("UPDATE trip_segments SET tripId = :newTripId WHERE tripId = :oldTripId")
+    suspend fun reassignTripId(oldTripId: Long, newTripId: Long)
 }

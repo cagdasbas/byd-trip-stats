@@ -19,6 +19,8 @@ import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.LiveProjectionCache
+import com.byd.tripstats.data.repository.MergeEligibility
+import com.byd.tripstats.data.repository.MergeResult
 import com.byd.tripstats.data.repository.TripRepository
 import com.byd.tripstats.data.repository.UpdateRepository
 import com.byd.tripstats.BuildConfig
@@ -2268,6 +2270,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteTrips(tripIds: List<Long>) {
         viewModelScope.launch { tripRepository.deleteTrips(tripIds) }
+    }
+
+    // ── Trip merging ────────────────────────────────────────────────────────────
+
+    /** Pure eligibility check the UI uses to gate the merge action / show a reason. */
+    fun checkMergeEligibility(a: TripEntity, b: TripEntity): MergeEligibility =
+        TripRepository.checkMergeEligibility(a, b)
+
+    /**
+     * Merges exactly two completed trips into one (earlier survives). [onResult] is
+     * invoked on the main thread so the caller can surface success/failure.
+     */
+    fun mergeTrips(tripIds: List<Long>, onResult: (MergeResult) -> Unit) {
+        viewModelScope.launch {
+            val result = if (tripIds.size != 2) {
+                MergeResult.Failure("Select exactly two trips to merge")
+            } else {
+                tripRepository.mergeTrips(tripIds[0], tripIds[1])
+            }
+            onResult(result)
+        }
     }
 
     // --- Delete charging sessions

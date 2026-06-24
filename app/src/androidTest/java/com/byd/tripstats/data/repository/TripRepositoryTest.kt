@@ -499,4 +499,137 @@ class TripRepositoryTest {
         assertEquals(31, trip.maxBatteryCellTemp)
         assertEquals(27, trip.minBatteryCellTemp)
     }
+
+    // ── Trip merging ───────────────────────────────────────────────────────────
+
+    private val BASE_TIME = 1_700_000_000_000L   // fixed past timestamp
+
+    private suspend fun insertCompletedTrip(
+        startTime: Long,
+        endTime: Long,
+        startOdometer: Double,
+        endOdometer: Double,
+        startSoc: Double,
+        endSoc: Double,
+        startTotalDischarge: Double,
+        endTotalDischarge: Double,
+        maxSpeed: Double = 0.0,
+        isFavourite: Boolean = false
+    ): Long {
+        val id = db.tripDao().insertTrip(
+            com.byd.tripstats.data.local.entity.TripEntity(
+                startTime           = startTime,
+                endTime             = endTime,
+                startOdometer       = startOdometer,
+                endOdometer         = endOdometer,
+                startSoc            = startSoc,
+                endSoc              = endSoc,
+                startTotalDischarge = startTotalDischarge,
+                endTotalDischarge   = endTotalDischarge,
+                isActive            = false,
+                maxSpeed            = maxSpeed,
+                isFavourite         = isFavourite
+            )
+        )
+        // Two data points so re-pointing and stats have something to work with.
+        listOf(startTime to startOdometer, endTime to endOdometer).forEach { (ts, odo) ->
+            db.tripDataPointDao().insertDataPoint(
+                com.byd.tripstats.data.local.entity.TripDataPointEntity(
+                    tripId = id, timestamp = ts, latitude = 0.0, longitude = 0.0,
+                    altitude = 0.0, speed = 10.0, power = 10.0, soc = startSoc,
+                    odometer = odo, batteryTemp = 25.0, totalDischarge = startTotalDischarge,
+                    gear = "D", isRegenerating = false
+                )
+            )
+        }
+        return id
+    }
+
+    @Test fun mergeCombinesContiguousTripsWithRealSummedValues() = runBlocking {
+        // trip1: 10 km, 2 kWh, 10 min. trip2: 15 km, 3 kWh, 10 min, 5-min gap after.
+        // trip2's discharge counter has RESET (300 < trip1's 502) — proves the merge
+        // sums each trip's own energy rather than doing end−start across the reset.
+        val id1 = insertCompletedTrip(
+            startTime = BASE_TIME, endTime = BASE_TIME + 10 * 60_000L,
+            startOdometer = 1000.0, endOdometer = 1010.0,
+            startSoc = 80.0, endSoc = 75.0,
+            startTotalDischarge = 500.0, endTotalDischarge = 502.0,
+            maxSpeed = 60.0
+        )
+        val id2 = insertCompletedTrip(
+            startTime = BASE_TIME + 15 * 60_000L, endTime = BASE_TIME + 25 * 60_000L,
+            startOdometer = 1010.0, endOdometer = 1025.0,
+            startSoc = 75.0, endSoc = 68.0,
+            startTotalDischarge = 300.0, endTotalDischarge = 303.0,
+            maxSpeed = 80.0, isFavourite = true
+        )
+
+        // Pass them in reverse order to confirm the earlier trip is auto-selected as survivor.
+        val result = repo.mergeTrips(id2, id1)
+        assertTrue("Contiguous trips should merge", result is MergeResult.Success)
+        assertEquals(id1, (result as MergeResult.Success).mergedTripId)
+
+        val merged = db.tripDao().getTripById(id1)!!
+        assertNull("Absorbed trip row should be gone", db.tripDao().getTripById(id2))
+
+        assertEquals("Distance is the sum of both trips", 25.0, merged.distance!!, 0.001)
+        assertEquals("Energy is the sum of both trips (survives counter reset)",
+            5.0, merged.energyConsumed!!, 0.001)
+        assertEquals("Duration is dur1 + dur2, not the wallclock span",
+            20 * 60_000L, merged.duration!!)
+        assertEquals("Off-state absorbs the inter-trip gap",
+            5 * 60_000L, merged.offStateDurationMs)
+        assertEquals("Start anchor kept from the earlier trip", 1000.0, merged.startOdometer, 0.001)
+        assertEquals("Start SoC kept from the earlier trip", 80.0, merged.startSoc, 0.001)
+        assertEquals("End SoC kept from the later trip", 68.0, merged.endSoc!!, 0.001)
+        assertEquals("End time kept from the later trip", BASE_TIME + 25 * 60_000L, merged.endTime)
+        assertEquals("Max speed is the max of both", 80.0, merged.maxSpeed, 0.001)
+        assertTrue("Favourite flag is OR of both", merged.isFavourite)
+
+        // Data points re-pointed onto the survivor; none orphaned on the absorbed id.
+        assertEquals(4, db.tripDataPointDao().getDataPointsForTripSync(id1).size)
+        assertEquals(0, db.tripDataPointDao().getDataPointsForTripSync(id2).size)
+        // Stats rebuilt for the merged trip.
+        assertNotNull(db.tripStatsDao().getStatsForTrip(id1))
+    }
+
+    @Test fun mergeRejectsTripsTooFarApart() = runBlocking {
+        val id1 = insertCompletedTrip(
+            startTime = BASE_TIME, endTime = BASE_TIME + 10 * 60_000L,
+            startOdometer = 1000.0, endOdometer = 1010.0,
+            startSoc = 80.0, endSoc = 75.0,
+            startTotalDischarge = 500.0, endTotalDischarge = 502.0
+        )
+        // Starts a full day later — clearly a different journey.
+        val id2 = insertCompletedTrip(
+            startTime = BASE_TIME + 24 * 60 * 60_000L, endTime = BASE_TIME + 24 * 60 * 60_000L + 10 * 60_000L,
+            startOdometer = 1010.0, endOdometer = 1025.0,
+            startSoc = 90.0, endSoc = 80.0,
+            startTotalDischarge = 600.0, endTotalDischarge = 603.0
+        )
+
+        val result = repo.mergeTrips(id1, id2)
+        assertTrue("Trips a day apart must not merge", result is MergeResult.Failure)
+        assertNotNull("Both trips survive a rejected merge", db.tripDao().getTripById(id1))
+        assertNotNull(db.tripDao().getTripById(id2))
+    }
+
+    @Test fun mergeRejectsNonContiguousOdometer() = runBlocking {
+        val id1 = insertCompletedTrip(
+            startTime = BASE_TIME, endTime = BASE_TIME + 10 * 60_000L,
+            startOdometer = 1000.0, endOdometer = 1010.0,
+            startSoc = 80.0, endSoc = 75.0,
+            startTotalDischarge = 500.0, endTotalDischarge = 502.0
+        )
+        // 40 km of untracked driving between the two trips → not a clean merge.
+        val id2 = insertCompletedTrip(
+            startTime = BASE_TIME + 15 * 60_000L, endTime = BASE_TIME + 25 * 60_000L,
+            startOdometer = 1050.0, endOdometer = 1065.0,
+            startSoc = 70.0, endSoc = 60.0,
+            startTotalDischarge = 300.0, endTotalDischarge = 303.0
+        )
+
+        val result = repo.mergeTrips(id1, id2)
+        assertTrue("Odometer-discontinuous trips must not merge", result is MergeResult.Failure)
+    }
 }

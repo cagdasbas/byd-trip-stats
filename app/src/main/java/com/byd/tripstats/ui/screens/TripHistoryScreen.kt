@@ -22,9 +22,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.widget.Toast
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +39,8 @@ import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
 import com.byd.tripstats.data.preferences.speedUnit
+import com.byd.tripstats.data.repository.MergeEligibility
+import com.byd.tripstats.data.repository.MergeResult
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripFilterState
@@ -68,6 +72,7 @@ fun TripHistoryScreen(
     var showSortSheet           by remember { mutableStateOf(false) }
     var showFilterSheet         by remember { mutableStateOf(false) }
     var showCompareSheet        by remember { mutableStateOf(false) }
+    var showMergeDialog         by remember { mutableStateOf(false) }
 
     val activeFilters = filterState.activeFilterCount
 
@@ -120,6 +125,17 @@ fun TripHistoryScreen(
                                 Icon(
                                     Icons.AutoMirrored.Filled.CompareArrows,
                                     contentDescription = "Compare trips",
+                                    tint = BydElectricAzure,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        // Merge — only for exactly 2 completed trips
+                        if (comparableSelected.size == 2) {
+                            IconButton(onClick = { showMergeDialog = true }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.CallMerge,
+                                    contentDescription = "Merge trips",
                                     tint = BydElectricAzure,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -328,6 +344,62 @@ fun TripHistoryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteSelectedDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // ── Merge selected dialog ─────────────────────────────────────────────────
+    if (showMergeDialog) {
+        val context = LocalContext.current
+        val mergeIds = selectedTrips.filter { id ->
+            trips.firstOrNull { it.id == id }?.isActive == false
+        }
+        val tripA = trips.firstOrNull { it.id == mergeIds.getOrNull(0) }
+        val tripB = trips.firstOrNull { it.id == mergeIds.getOrNull(1) }
+        val eligibility = if (tripA != null && tripB != null)
+            viewModel.checkMergeEligibility(tripA, tripB)
+        else
+            MergeEligibility(false, "Select exactly two completed trips to merge")
+
+        AlertDialog(
+            onDismissRequest = { showMergeDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Merge Trips?") },
+            text = {
+                Text(
+                    if (eligibility.eligible)
+                        "The two selected trips will be combined into one. Distance, " +
+                            "energy and driving time are added together; the start of the " +
+                            "earlier trip and the end of the later trip are kept. This " +
+                            "cannot be undone."
+                    else
+                        eligibility.reason ?: "These trips can't be merged."
+                )
+            },
+            confirmButton = {
+                if (eligibility.eligible) {
+                    TextButton(
+                        onClick = {
+                            viewModel.mergeTrips(mergeIds) { result ->
+                                val msg = when (result) {
+                                    is MergeResult.Success -> "Trips merged"
+                                    is MergeResult.Failure -> result.reason
+                                }
+                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                            }
+                            showMergeDialog = false
+                            selectionMode = false
+                            selectedTrips = setOf()
+                        }
+                    ) {
+                        Text("Merge", color = BydElectricAzure)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMergeDialog = false }) {
+                    Text(if (eligibility.eligible) "Cancel" else "OK")
+                }
             }
         )
     }

@@ -108,6 +108,19 @@ internal fun decideCarOffStop(
     }
 }
 
+// ── Trip merge ──────────────────────────────────────────────────────────────
+
+/** Whether two trips may be merged, and — when not — a user-facing reason. */
+data class MergeEligibility(val eligible: Boolean, val reason: String? = null)
+
+/** Outcome of [TripRepository.mergeTrips]. */
+sealed class MergeResult {
+    /** The two trips were combined; [mergedTripId] is the surviving (earlier) trip. */
+    data class Success(val mergedTripId: Long) : MergeResult()
+    /** The merge did not happen; [reason] is suitable for display. */
+    data class Failure(val reason: String) : MergeResult()
+}
+
 // ── Trip state machine ────────────────────────────────────────────────────────
 
 private enum class TripState { IDLE, ACTIVE }
@@ -1802,7 +1815,12 @@ class TripRepository private constructor(context: Context) {
 
         val totalRegenEnergy = if (dataPoints.size < 2) 0.0 else {
             dataPoints.zipWithNext { a, b ->
-                if (a.isRegenerating) abs(a.power) * (b.timestamp - a.timestamp) / 3_600_000.0
+                val gap = b.timestamp - a.timestamp
+                // Skip pairs that straddle an off-state / inter-segment boundary (also
+                // the seam between two merged trips): the parked gap isn't regen time,
+                // and integrating a.power across it would invent energy.
+                if (gap > OFFSTATE_GAP_THRESHOLD_MS) 0.0
+                else if (a.isRegenerating) abs(a.power) * gap / 3_600_000.0
                 else 0.0
             }.sum()
         }
@@ -1822,6 +1840,12 @@ class TripRepository private constructor(context: Context) {
         for (i in 1 until dataPoints.size) {
             val a  = dataPoints[i - 1]
             val b  = dataPoints[i]
+            // Skip pairs that straddle an off-state / inter-segment boundary (also the
+            // seam between two merged trips). Across such a gap the discharge counter
+            // may have reset (b.totalDischarge − a.totalDischarge goes wildly negative)
+            // and integrating power over the parked time would invent energy — both
+            // would poison the per-speed-bin energy/efficiency and the mech/regen totals.
+            if (b.timestamp - a.timestamp > OFFSTATE_GAP_THRESHOLD_MS) continue
             val dt = (b.timestamp - a.timestamp) / 3_600_000.0
 
             if (a.power > 0) mechanicalEnergy += a.power * dt
@@ -2055,6 +2079,129 @@ class TripRepository private constructor(context: Context) {
         }
     }
 
+    /**
+     * Combines two recorded trips that were really one journey split by a brief
+     * stop (petrol/charge/red-light timeout) into a single trip.
+     *
+     * The earlier trip (by start time) survives — its id and favourite flag are
+     * kept; the later trip's data points and segments are re-pointed onto it and
+     * the later trip row + its stats are deleted.
+     *
+     * Crucially, the merged trip carries *real* numbers, not timeline-derived ones:
+     *   • boundary anchors come from the real endpoints — start of the earlier trip,
+     *     end (SoC / SoC-panel / position) of the later trip;
+     *   • cumulative quantities are the SUM of each trip's own recorded value, so a
+     *     mid-merge discharge-counter reset (BYD resets it every car-on cycle) can't
+     *     corrupt energy, and untracked driving in the gap can't inflate distance.
+     *     The end odometer/discharge anchors are synthesised from those sums so the
+     *     [TripEntity] getters stay self-consistent;
+     *   • duration is dur1 + dur2 (active driving time), realised by inflating
+     *     [TripEntity.offStateDurationMs] to absorb the inter-trip gap — exactly the
+     *     "addition, not wallclock" rule the duration getter already follows.
+     *
+     * Only contiguous trips are accepted (see [checkMergeEligibility]); the call is
+     * a no-op Failure otherwise.
+     */
+    suspend fun mergeTrips(tripIdA: Long, tripIdB: Long): MergeResult = withContext(Dispatchers.IO) {
+        if (tripIdA == tripIdB) return@withContext MergeResult.Failure("Cannot merge a trip with itself")
+        val a = tripDao.getTripById(tripIdA)
+            ?: return@withContext MergeResult.Failure("Trip not found")
+        val b = tripDao.getTripById(tripIdB)
+            ?: return@withContext MergeResult.Failure("Trip not found")
+
+        val eligibility = checkMergeEligibility(a, b)
+        if (!eligibility.eligible) {
+            return@withContext MergeResult.Failure(eligibility.reason ?: "Trips cannot be merged")
+        }
+
+        // Earlier trip survives; later trip is absorbed.
+        val first  = if (a.startTime <= b.startTime) a else b
+        val second = if (a.startTime <= b.startTime) b else a
+
+        // Cumulative quantities: each trip's OWN recorded value, then summed.
+        val dist1   = first.distance        ?: 0.0
+        val dist2   = second.distance       ?: 0.0
+        val energy1 = first.energyConsumed  ?: 0.0
+        val energy2 = second.energyConsumed ?: 0.0
+        val dur1    = first.duration        ?: 0L
+        val dur2    = second.duration       ?: 0L
+
+        val mergedEndTime   = second.endTime ?: first.endTime ?: first.startTime
+        val mergedWallclock = (mergedEndTime - first.startTime).coerceAtLeast(0L)
+        val mergedActiveMs  = (dur1 + dur2).coerceAtLeast(0L)
+        // offState absorbs the inter-trip gap (and each trip's own off windows) so
+        // the duration getter = dur1 + dur2 rather than the full wallclock span.
+        val mergedOffStateMs = (mergedWallclock - mergedActiveMs).coerceAtLeast(0L)
+
+        // Synthesise end anchors so the getters return the summed cumulative values
+        // while the start anchors stay at the real start of the earlier trip.
+        val mergedEndOdometer = first.startOdometer + dist1 + dist2
+        val mergedEndDischarge = first.startTotalDischarge + energy1 + energy2
+
+        // Aggregate min/max metrics across both trips.
+        val mergedMaxSpeed      = maxOf(first.maxSpeed, second.maxSpeed)
+        val mergedMaxPower      = maxOf(first.maxPower, second.maxPower)
+        val mergedMaxRegenPower = maxOf(first.maxRegenPower, second.maxRegenPower)
+        val mergedMinSoc        = minOf(first.minSoc, second.minSoc)
+        val mergedMaxCellTemp   = maxOf(first.maxBatteryCellTemp, second.maxBatteryCellTemp)
+        val mergedMinCellTemp   = minOf(first.minBatteryCellTemp, second.minBatteryCellTemp)
+        // avgBatteryTemp: duration-weighted mean of whatever each trip recorded.
+        val mergedAvgBatteryTemp = run {
+            val t1 = first.avgBatteryTemp
+            val t2 = second.avgBatteryTemp
+            val w1 = dur1.coerceAtLeast(0L)
+            val w2 = dur2.coerceAtLeast(0L)
+            when {
+                t1 > 0.0 && t2 > 0.0 && (w1 + w2) > 0L -> (t1 * w1 + t2 * w2) / (w1 + w2)
+                t1 > 0.0 && t2 > 0.0                    -> (t1 + t2) / 2.0
+                t1 > 0.0                                -> t1
+                else                                    -> t2
+            }
+        }
+
+        val merged = first.copy(
+            endTime            = mergedEndTime,
+            endOdometer        = mergedEndOdometer,
+            endSoc             = second.endSoc,
+            endSocPanel        = second.endSocPanel,
+            endTotalDischarge  = mergedEndDischarge,
+            isActive           = false,
+            maxSpeed           = mergedMaxSpeed,
+            maxPower           = mergedMaxPower,
+            maxRegenPower      = mergedMaxRegenPower,
+            avgBatteryTemp     = mergedAvgBatteryTemp,
+            minSoc             = mergedMinSoc,
+            maxBatteryCellTemp = mergedMaxCellTemp,
+            minBatteryCellTemp = mergedMinCellTemp,
+            offStateDurationMs = mergedOffStateMs,
+            isFavourite        = first.isFavourite || second.isFavourite
+        )
+
+        database.withTransaction {
+            // Move the later trip's points/segments onto the survivor, then update
+            // the survivor row and drop the now-empty later trip + its stats.
+            dataPointDao.reassignTripId(second.id, first.id)
+            segmentDao.reassignTripId(second.id, first.id)
+            tripDao.updateTrip(merged)
+            statsDao.deleteStatsForTrip(second.id)
+            tripDao.deleteTripById(second.id)
+        }
+
+        // Rebuild the derived stats (route, histograms, avg speed) from the combined
+        // points/segments. Reads trip.distance/duration/energyConsumed — now the
+        // summed values — so headline figures stay consistent with the anchors above.
+        try {
+            calculateTripStats(first.id)
+        } catch (e: Exception) {
+            Log.e(TAG, "Stats calculation failed for merged trip ${first.id}", e)
+        }
+
+        Log.i(TAG, "Merged trip ${second.id} into ${first.id} " +
+            "(dist=${"%.2f".format(dist1 + dist2)}km energy=${"%.2f".format(energy1 + energy2)}kWh " +
+            "duration=${mergedActiveMs / 60_000}min)")
+        MergeResult.Success(first.id)
+    }
+
     /** Flags/unflags a trip as favourite — favourites are exempt from all trimming. */
     suspend fun setTripFavourite(tripId: Long, favourite: Boolean) {
         tripDao.setFavourite(tripId, favourite)
@@ -2167,6 +2314,52 @@ class TripRepository private constructor(context: Context) {
          * above the noise floor and below any plausible mid-traffic event.
          */
         private const val OFFSTATE_GAP_THRESHOLD_MS = 20_000L
+
+        /**
+         * Largest time gap between the end of the earlier trip and the start of the
+         * later one for the two to still count as the same journey. Covers petrol /
+         * charging / meal stops while still rejecting an accidental merge of trips
+         * from different parts of the day or different days.
+         */
+        private const val MERGE_MAX_TIME_GAP_MS = 6L * 60L * 60L * 1000L   // 6 hours
+
+        /**
+         * Largest odometer gap (km) between the earlier trip's end and the later
+         * trip's start. A genuine brief stop leaves the odometer unchanged; a small
+         * tolerance allows for repositioning / GPS-vs-odometer drift. A larger gap
+         * means real untracked driving happened between them — not a clean merge.
+         */
+        private const val MERGE_MAX_ODO_GAP_KM = 5.0
+
+        /**
+         * Decides whether two completed trips may be merged. Pure so the UI can use
+         * it to gate the merge action and surface a reason without touching the DB.
+         * Order-independent: the earlier trip (by start time) is treated as first.
+         */
+        fun checkMergeEligibility(a: TripEntity, b: TripEntity): MergeEligibility {
+            if (a.id == b.id) return MergeEligibility(false, "Cannot merge a trip with itself")
+            if (a.isActive || b.isActive)
+                return MergeEligibility(false, "Cannot merge an active trip")
+            if (a.endTime == null || b.endTime == null)
+                return MergeEligibility(false, "Both trips must be completed")
+
+            val first  = if (a.startTime <= b.startTime) a else b
+            val second = if (a.startTime <= b.startTime) b else a
+            val firstEnd = first.endTime ?: return MergeEligibility(false, "Both trips must be completed")
+
+            if (second.startTime < firstEnd)
+                return MergeEligibility(false, "These trips overlap in time")
+            if (second.startTime - firstEnd > MERGE_MAX_TIME_GAP_MS)
+                return MergeEligibility(false, "These trips are too far apart to be one journey")
+
+            val firstEndOdo = first.endOdometer
+            if (firstEndOdo != null) {
+                val odoGap = second.startOdometer - firstEndOdo
+                if (odoGap < -0.5 || odoGap > MERGE_MAX_ODO_GAP_KM)
+                    return MergeEligibility(false, "These trips aren't continuous on the odometer")
+            }
+            return MergeEligibility(true)
+        }
 
         /**
          * Sum of gaps in the data-point stream — and the gap between the last
