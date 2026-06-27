@@ -632,4 +632,82 @@ class TripRepositoryTest {
         val result = repo.mergeTrips(id1, id2)
         assertTrue("Odometer-discontinuous trips must not merge", result is MergeResult.Failure)
     }
+
+    // ── Tags ───────────────────────────────────────────────────────────────────
+
+    private suspend fun aTrip(startTime: Long = BASE_TIME) = insertCompletedTrip(
+        startTime = startTime, endTime = startTime + 10 * 60_000L,
+        startOdometer = 1000.0, endOdometer = 1010.0,
+        startSoc = 80.0, endSoc = 75.0,
+        startTotalDischarge = 500.0, endTotalDischarge = 502.0
+    )
+
+    @Test fun createOrGetTagIsCaseInsensitiveAndAssignsDistinctColors() = runBlocking {
+        val a = repo.createOrGetTag("Commute")!!
+        val again = repo.createOrGetTag("commute")!!         // case-insensitive match
+        assertEquals(a.id, again.id)
+        val b = repo.createOrGetTag("Motorway")!!
+        assertNotEquals(a.id, b.id)
+        assertNotEquals(a.colorIndex, b.colorIndex)          // next palette colour
+        assertEquals(2, repo.getAllTags().first().size)
+    }
+
+    @Test fun addAndRemoveTagOnTrip() = runBlocking {
+        val tripId = aTrip()
+        val tag = repo.createOrGetTag("commute")!!
+        repo.addTagToTrip(tripId, tag.id)
+        assertEquals(listOf(tag.id), repo.getTagsForTrip(tripId).first().map { it.id })
+        repo.removeTagFromTrip(tripId, tag.id)
+        assertTrue(repo.getTagsForTrip(tripId).first().isEmpty())
+    }
+
+    @Test fun applyTagToTripsBulkAndDeleteTripClearsLinks() = runBlocking {
+        val t1 = aTrip(BASE_TIME)
+        val t2 = aTrip(BASE_TIME + 60 * 60_000L)
+        val tag = repo.createOrGetTag("errand")!!
+        repo.applyTagToTrips(tag.id, listOf(t1, t2))
+        assertEquals(2, repo.getAllTripTagRefs().first().count { it.tagId == tag.id })
+
+        repo.deleteTrip(t1)
+        assertEquals(1, repo.getAllTripTagRefs().first().count { it.tagId == tag.id })
+        // Tag definition itself survives a trip deletion.
+        assertEquals(1, repo.getAllTags().first().size)
+    }
+
+    @Test fun deletingTagRemovesAllItsLinks() = runBlocking {
+        val tripId = aTrip()
+        val tag = repo.createOrGetTag("motorway")!!
+        repo.addTagToTrip(tripId, tag.id)
+        repo.deleteTag(tag.id)
+        assertTrue(repo.getAllTags().first().isEmpty())
+        assertTrue(repo.getTagsForTrip(tripId).first().isEmpty())
+    }
+
+    @Test fun mergeTransfersTagsAsUnion() = runBlocking {
+        val first = insertCompletedTrip(
+            startTime = BASE_TIME, endTime = BASE_TIME + 10 * 60_000L,
+            startOdometer = 1000.0, endOdometer = 1010.0,
+            startSoc = 80.0, endSoc = 75.0,
+            startTotalDischarge = 500.0, endTotalDischarge = 502.0
+        )
+        val second = insertCompletedTrip(
+            startTime = BASE_TIME + 15 * 60_000L, endTime = BASE_TIME + 25 * 60_000L,
+            startOdometer = 1010.0, endOdometer = 1025.0,
+            startSoc = 75.0, endSoc = 68.0,
+            startTotalDischarge = 300.0, endTotalDischarge = 303.0
+        )
+        val commute = repo.createOrGetTag("commute")!!
+        val scenic  = repo.createOrGetTag("scenic")!!
+        repo.addTagToTrip(first, commute.id)
+        repo.addTagToTrip(second, commute.id)   // shared (dedup on merge)
+        repo.addTagToTrip(second, scenic.id)    // only on the absorbed trip
+
+        val result = repo.mergeTrips(first, second)
+        assertTrue(result is MergeResult.Success)
+
+        val mergedTagIds = repo.getTagsForTrip(first).first().map { it.id }.toSet()
+        assertEquals(setOf(commute.id, scenic.id), mergedTagIds)
+        // No links left dangling on the absorbed trip.
+        assertTrue(repo.getAllTripTagRefs().first().none { it.tripId == second })
+    }
 }

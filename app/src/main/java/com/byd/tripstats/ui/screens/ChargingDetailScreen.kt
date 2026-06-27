@@ -1005,10 +1005,15 @@ private fun ChargingTempTab(
                     val chartW = w - padL - padR
                     val chartH = h - padT - padB
 
-                    val avgVals = dataPoints.map { it.batteryTempAvgC }
-                    val minVals = dataPoints.map { it.batteryCellTempMinC }
-                    val maxVals = dataPoints.map { it.batteryCellTempMaxC }
-                    val allVals = avgVals + minVals + maxVals
+                    // Build each series only from points where the value is actually reported (> 0).
+                    // Cell min/max read 0 until the BMS starts exposing the per-cell temperature range
+                    // (it often reports only the average early in a charge); plotting those 0s would
+                    // anchor the line to the bottom and squash the real range. Skipping them lets each
+                    // line start where its data begins and scales the axis to the values that exist.
+                    val avgPts = dataPoints.mapNotNull { p -> p.batteryTempAvgC.takeIf { it > 0.0 }?.let { p.timestamp to it } }
+                    val minPts = dataPoints.mapNotNull { p -> p.batteryCellTempMinC.takeIf { it > 0.0 }?.let { p.timestamp to it } }
+                    val maxPts = dataPoints.mapNotNull { p -> p.batteryCellTempMaxC.takeIf { it > 0.0 }?.let { p.timestamp to it } }
+                    val allVals = (avgPts + minPts + maxPts).map { it.second }
                     val rawMin  = allVals.minOrNull() ?: 0.0
                     val rawMax  = allVals.maxOrNull()?.coerceAtLeast(rawMin + 1.0) ?: 1.0
                     val yStep   = niceStep(rawMax - rawMin)
@@ -1075,17 +1080,15 @@ private fun ChargingTempTab(
 
                     // Draw three series
                     fun drawSeries(
-                        vals: List<Double>,
+                        pts: List<Pair<Long, Double>>,
                         color: androidx.compose.ui.graphics.Color,
                         width: Float = 2.5f
                     ) {
-                        if (vals.size < 2) return
+                        if (pts.size < 2) return
                         val path =
                             Path().apply {
-                                moveTo(xOf(dataPoints.first().timestamp), yOf(vals.first()))
-                                vals.drop(1).forEachIndexed { i, v ->
-                                    lineTo(xOf(dataPoints[i + 1].timestamp), yOf(v))
-                                }
+                                moveTo(xOf(pts.first().first), yOf(pts.first().second))
+                                pts.drop(1).forEach { (ts, v) -> lineTo(xOf(ts), yOf(v)) }
                             }
                         drawPath(
                             path,
@@ -1099,9 +1102,9 @@ private fun ChargingTempTab(
                         )
                     }
 
-                    drawSeries(minVals, minColor, 2f)
-                    drawSeries(maxVals, maxColor, 2f)
-                    drawSeries(avgVals, avgColor, 3f) // avg on top
+                    drawSeries(minPts, minColor, 2f)
+                    drawSeries(maxPts, maxColor, 2f)
+                    drawSeries(avgPts, avgColor, 3f) // avg on top
 
                     // Crosshair overlay (tracking average temp)
                     touchPos?.let { tp ->

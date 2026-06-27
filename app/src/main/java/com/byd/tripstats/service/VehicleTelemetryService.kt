@@ -515,6 +515,14 @@ class VehicleTelemetryService : Service() {
                         // a false negative (missing telemetry mid-charge because WiFi got cut) is
                         // expensive. This is deliberately more inclusive than computeChargingActive,
                         // which drives UI state and prefers a single authoritative signal.
+                        //
+                        // NOTE (2026-06-26): do NOT broaden this to fire for all parked time in
+                        // Always On to keep WiFi up. b01 only
+                        // *momentarily* wakes the MCU; it does NOT hold the WiFi link at park —
+                        // verified on a real car, parked-not-charging stays dark with it. The
+                        // mechanism other apps use is privileged , which we deliberately do
+                        // not implement. Broadening this just wakes the MCU every 10 min for no
+                        // connectivity gain (pure drain). See the parked-power-cut memory note.
                         val snap = vehicleDataSource.vehicleSnapshot.value
                         val chargingGunPresent = snap.chargingGunState != 0
                         val chargerWorking = snap.chargerWorkState != 0

@@ -2,6 +2,8 @@ package com.byd.tripstats.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -41,6 +43,8 @@ import com.byd.tripstats.data.preferences.distanceUnit
 import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.data.repository.MergeEligibility
 import com.byd.tripstats.data.repository.MergeResult
+import com.byd.tripstats.ui.components.ApplyTagDialog
+import com.byd.tripstats.ui.components.TagChip
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripFilterState
@@ -54,7 +58,9 @@ fun TripHistoryScreen(
     viewModel: DashboardViewModel,
     onTripClick: (Long) -> Unit,
     onNavigateBack: () -> Unit,
-    onNavigateToSeasonalAnalysis: () -> Unit = {}
+    onNavigateToSeasonalAnalysis: () -> Unit = {},
+    onNavigateToRoutes: () -> Unit = {},
+    onNavigateToTags: () -> Unit = {}
 ) {
     val trips         by viewModel.sortedFilteredTrips.collectAsState()
     val displayMetrics by viewModel.tripDisplayMetrics.collectAsState()
@@ -65,6 +71,8 @@ fun TripHistoryScreen(
     val sortField     by viewModel.sortField.collectAsState()
     val sortOrder     by viewModel.sortOrder.collectAsState()
     val filterState   by viewModel.filterState.collectAsState()
+    val allTags       by viewModel.allTags.collectAsState()
+    val tripTagsMap   by viewModel.tripTagsMap.collectAsState()
 
     var selectedTrips           by remember { mutableStateOf(setOf<Long>()) }
     var selectionMode           by remember { mutableStateOf(false) }
@@ -73,6 +81,7 @@ fun TripHistoryScreen(
     var showFilterSheet         by remember { mutableStateOf(false) }
     var showCompareSheet        by remember { mutableStateOf(false) }
     var showMergeDialog         by remember { mutableStateOf(false) }
+    var showApplyTagDialog      by remember { mutableStateOf(false) }
 
     val activeFilters = filterState.activeFilterCount
 
@@ -141,6 +150,17 @@ fun TripHistoryScreen(
                                 )
                             }
                         }
+                        // Tag — apply a tag to all selected completed trips
+                        if (comparableSelected.isNotEmpty()) {
+                            IconButton(onClick = { showApplyTagDialog = true }) {
+                                Icon(
+                                    Icons.Filled.LocalOffer,
+                                    contentDescription = "Tag selected trips",
+                                    tint = BydElectricAzure,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
                         IconButton(onClick = { showDeleteSelectedDialog = true }) {
                             Icon(
                                 Icons.Filled.Delete,
@@ -196,6 +216,16 @@ fun TripHistoryScreen(
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
+                        }
+                        // Tags
+                        IconButton(onClick = onNavigateToTags) {
+                            Icon(Icons.Filled.LocalOffer, "Tags",
+                                modifier = Modifier.size(22.dp))
+                        }
+                        // Recurring routes
+                        IconButton(onClick = onNavigateToRoutes) {
+                            Icon(Icons.Filled.Route, "Recurring routes",
+                                modifier = Modifier.size(22.dp))
                         }
                         // Seasonal analysis
                         IconButton(onClick = onNavigateToSeasonalAnalysis) {
@@ -270,6 +300,7 @@ fun TripHistoryScreen(
                     val metrics = displayMetrics[trip.id]
                     TripItem(
                         trip = trip,
+                        tags = tripTagsMap[trip.id] ?: emptyList(),
                         avgSpeedKmh = metrics?.avgSpeedKmh,
                         tripScore = metrics?.tripScore,
                         regenEfficiencyPct = metrics?.regenEfficiencyPct,
@@ -404,6 +435,29 @@ fun TripHistoryScreen(
         )
     }
 
+    // ── Apply-tag dialog (bulk) ───────────────────────────────────────────────
+    if (showApplyTagDialog) {
+        val taggable = selectedTrips.filter { id ->
+            trips.firstOrNull { it.id == id }?.isActive == false
+        }
+        ApplyTagDialog(
+            allTags = allTags,
+            onPick = { tag ->
+                viewModel.applyTagToTrips(tag.id, taggable)
+                showApplyTagDialog = false
+                selectionMode = false
+                selectedTrips = setOf()
+            },
+            onCreate = { name ->
+                viewModel.addNewTagToTrips(taggable, name)
+                showApplyTagDialog = false
+                selectionMode = false
+                selectedTrips = setOf()
+            },
+            onDismiss = { showApplyTagDialog = false }
+        )
+    }
+
     // ── Sort bottom sheet ─────────────────────────────────────────────────────
     if (showSortSheet) {
         ModalBottomSheet(
@@ -431,6 +485,7 @@ fun TripHistoryScreen(
             FilterSheetContent(
                 current     = filterState,
                 unitSystem  = unitSystem,
+                allTags     = allTags,
                 onApply     = { viewModel.setFilter(it); showFilterSheet = false },
                 onClear     = { viewModel.clearFilters(); showFilterSheet = false }
             )
@@ -517,13 +572,16 @@ private fun SortSheetContent(
 // ── Filter sheet ──────────────────────────────────────────────────────────────
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun FilterSheetContent(
     current: TripFilterState,
     unitSystem: UnitSystem = UnitSystem.METRIC,
+    allTags: List<com.byd.tripstats.data.local.entity.TagEntity> = emptyList(),
     onApply: (TripFilterState) -> Unit,
     onClear: () -> Unit
 ) {
     // Local mutable draft — only applied when the user taps Apply
+    var selectedTagIds by remember { mutableStateOf(current.tagIds) }
     var distMin    by remember { mutableStateOf(current.distanceMin?.toString()    ?: "") }
     var distMax    by remember { mutableStateOf(current.distanceMax?.toString()    ?: "") }
     var durMin     by remember { mutableStateOf(current.durationMin?.toString()    ?: "") }
@@ -553,6 +611,24 @@ private fun FilterSheetContent(
         FilterRangeRow("Regen Efficiency (%)",              regenMin, regenMax) { a, b -> regenMin = a; regenMax = b }
         FilterRangeRow("Max Speed (${unitSystem.speedUnit})", speedMin, speedMax) { a, b -> speedMin = a; speedMax = b }
 
+        if (allTags.isNotEmpty()) {
+            Text("Tags", style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                allTags.forEach { tag ->
+                    TagChip(
+                        tag = tag,
+                        selected = tag.id in selectedTagIds,
+                        onClick = {
+                            selectedTagIds = if (tag.id in selectedTagIds)
+                                selectedTagIds - tag.id else selectedTagIds + tag.id
+                        }
+                    )
+                }
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -574,7 +650,9 @@ private fun FilterSheetContent(
                         regenEffMin    = regenMin.toFloatOrNull(),
                         regenEffMax    = regenMax.toFloatOrNull(),
                         maxSpeedMin    = speedMin.toFloatOrNull(),
-                        maxSpeedMax    = speedMax.toFloatOrNull()
+                        maxSpeedMax    = speedMax.toFloatOrNull(),
+                        favouritesOnly = current.favouritesOnly,
+                        tagIds         = selectedTagIds
                     ))
                 },
                 modifier = Modifier.weight(1f)
@@ -620,10 +698,11 @@ private fun FilterRangeRow(
 
 // ── TripItem ──────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun TripItem(
     trip: com.byd.tripstats.data.local.entity.TripEntity,
+    tags: List<com.byd.tripstats.data.local.entity.TagEntity> = emptyList(),
     avgSpeedKmh: Int?,
     tripScore: Int?,
     regenEfficiencyPct: Double?,
@@ -758,6 +837,17 @@ fun TripItem(
                             )
                         }
                     }
+                }
+            }
+
+            if (tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    tags.forEach { tag -> TagChip(tag = tag) }
                 }
             }
 

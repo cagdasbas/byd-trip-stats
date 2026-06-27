@@ -3,6 +3,7 @@ package com.byd.tripstats.ui.screens
 import android.util.Log
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -52,6 +53,8 @@ import com.byd.tripstats.ui.components.RouteAnalysisTab
 import com.byd.tripstats.ui.components.TripHeatmapsTab
 import com.byd.tripstats.ui.components.SocChart
 import com.byd.tripstats.ui.components.SpeedChart
+import com.byd.tripstats.ui.components.TagChip
+import com.byd.tripstats.ui.components.ManageTripTagsDialog
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
@@ -91,8 +94,11 @@ fun TripDetailScreen(
     val chargingSessions by viewModel.allChargingSessions.collectAsState()
     val tripAdditionalChargingCosts by viewModel.tripAdditionalChargingCosts.collectAsState()
     val selectedCarConfig by viewModel.selectedCarConfig.collectAsState(initial = null)
+    val tripTags by remember(tripId) { viewModel.tagsForTrip(tripId) }.collectAsState(initial = emptyList())
+    val allTags by viewModel.allTags.collectAsState()
 
     var selectedTab by remember { mutableStateOf(0) }
+    var showTagDialog by remember { mutableStateOf(false) }
     val tabs = listOf("Overview", "Charts", "Heatmaps", "Route", "Analysis")
 
     // Capture data snapshot ONCE when dialog is requested
@@ -164,6 +170,13 @@ fun TripDetailScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
+                // Tags bar — persistent across tabs
+                TripTagsBar(
+                    tags = tripTags,
+                    onRemove = { tag -> viewModel.removeTagFromTrip(tripId, tag.id) },
+                    onAdd = { showTagDialog = true }
+                )
+
                 // Tab selector
                 TabRow(
                     selectedTabIndex = selectedTab,
@@ -231,6 +244,46 @@ fun TripDetailScreen(
             onDismiss = { dialogData = null },
             unitSystem = unitSystem,
             socSource = socSource
+        )
+    }
+
+    if (showTagDialog) {
+        val selected = tripTags.map { it.id }.toSet()
+        ManageTripTagsDialog(
+            allTags = allTags,
+            selectedIds = selected,
+            onToggle = { tag ->
+                if (tag.id in selected) viewModel.removeTagFromTrip(tripId, tag.id)
+                else viewModel.addTagToTrip(tripId, tag.id)
+            },
+            onCreate = { name -> viewModel.addNewTagToTrip(tripId, name) },
+            onDismiss = { showTagDialog = false }
+        )
+    }
+}
+
+/** Horizontally-scrolling strip of a trip's tags with an "add tag" affordance. */
+@Composable
+private fun TripTagsBar(
+    tags: List<com.byd.tripstats.data.local.entity.TagEntity>,
+    onRemove: (com.byd.tripstats.data.local.entity.TagEntity) -> Unit,
+    onAdd: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        tags.forEach { tag ->
+            TagChip(tag = tag, onRemove = { onRemove(tag) })
+        }
+        AssistChip(
+            onClick = onAdd,
+            label = { Text(if (tags.isEmpty()) "Add tag" else "Tag") },
+            leadingIcon = { Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp)) }
         )
     }
 }

@@ -10,6 +10,9 @@ data class MqttConnectionConfig(
     val password: String = "",
     val friendlyName: String = "",
     val publishIntervalSeconds: Int = 1,
+    val useTls: Boolean = false,
+    val useWebSocket: Boolean = false,
+    val webSocketPath: String = "/mqtt",
     val lastStatus: String = "Not configured",
     val lastPublishAtMs: Long = 0L,
 )
@@ -23,6 +26,9 @@ object MqttConnectionStore {
     private const val KEY_PASSWORD = "password"
     private const val KEY_FRIENDLY_NAME = "device_id"
     private const val KEY_PUBLISH_INTERVAL = "publish_interval_seconds"
+    private const val KEY_USE_TLS = "use_tls"
+    private const val KEY_USE_WEBSOCKET = "use_websocket"
+    private const val KEY_WEBSOCKET_PATH = "websocket_path"
     private const val KEY_LAST_STATUS = "last_status"
     private const val KEY_LAST_PUBLISH_AT_MS = "last_publish_at_ms"
 
@@ -30,14 +36,19 @@ object MqttConnectionStore {
 
     fun load(context: Context): MqttConnectionConfig {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val port = prefs.getInt(KEY_BROKER_PORT, 1883)
         return MqttConnectionConfig(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             brokerUrl = prefs.getString(KEY_BROKER_URL, "") ?: "",
-            brokerPort = prefs.getInt(KEY_BROKER_PORT, 1883),
+            brokerPort = port,
             username = prefs.getString(KEY_USERNAME, "") ?: "",
             password = prefs.getString(KEY_PASSWORD, "") ?: "",
             friendlyName = prefs.getString(KEY_FRIENDLY_NAME, "") ?: "",
             publishIntervalSeconds = prefs.getInt(KEY_PUBLISH_INTERVAL, DEFAULT_INTERVAL_SECONDS).coerceIn(1, 120),
+            // Back-compat: configs saved before the TLS flag existed used port 8883 as the TLS signal.
+            useTls = prefs.getBoolean(KEY_USE_TLS, port == 8883),
+            useWebSocket = prefs.getBoolean(KEY_USE_WEBSOCKET, false),
+            webSocketPath = prefs.getString(KEY_WEBSOCKET_PATH, "/mqtt") ?: "/mqtt",
             lastStatus = prefs.getString(KEY_LAST_STATUS, "Not configured") ?: "Not configured",
             lastPublishAtMs = prefs.getLong(KEY_LAST_PUBLISH_AT_MS, 0L)
         )
@@ -53,6 +64,9 @@ object MqttConnectionStore {
             .putString(KEY_PASSWORD, config.password)
             .putString(KEY_FRIENDLY_NAME, config.friendlyName.trim())
             .putInt(KEY_PUBLISH_INTERVAL, config.publishIntervalSeconds.coerceIn(1, 120))
+            .putBoolean(KEY_USE_TLS, config.useTls)
+            .putBoolean(KEY_USE_WEBSOCKET, config.useWebSocket)
+            .putString(KEY_WEBSOCKET_PATH, config.webSocketPath.trim().ifBlank { "/mqtt" })
             .putString(KEY_LAST_STATUS, config.lastStatus)
             .putLong(KEY_LAST_PUBLISH_AT_MS, config.lastPublishAtMs)
             .apply()

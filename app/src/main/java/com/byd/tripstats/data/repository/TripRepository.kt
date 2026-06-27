@@ -8,8 +8,11 @@ import com.byd.tripstats.data.local.dao.TripSohSummary
 import com.byd.tripstats.data.local.entity.LatLng
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
+import com.byd.tripstats.data.local.entity.TagEntity
 import com.byd.tripstats.data.local.entity.TripSegmentEntity
 import com.byd.tripstats.data.local.entity.TripStatsEntity
+import com.byd.tripstats.data.local.entity.TripTagCrossRef
+import com.byd.tripstats.data.local.entity.TAG_PALETTE_SIZE
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
 import kotlinx.coroutines.*
@@ -139,6 +142,7 @@ class TripRepository private constructor(context: Context) {
     private val dataPointDao = database.tripDataPointDao()
     private val statsDao     = database.tripStatsDao()
     private val segmentDao   = database.tripSegmentDao()
+    private val tagDao       = database.tagDao()
 
     private val prefs = context.getSharedPreferences("trip_prefs", Context.MODE_PRIVATE)
     private val telemetryCachePrefs = context.getSharedPreferences("telemetry_cache", Context.MODE_PRIVATE)
@@ -2066,6 +2070,7 @@ class TripRepository private constructor(context: Context) {
                 dataPointDao.deleteDataPointsForTrip(tripId)
                 statsDao.deleteStatsForTrip(tripId)
                 segmentDao.deleteSegmentsForTrip(tripId)
+                tagDao.clearTagsForTrip(tripId)
             }
         }
     }
@@ -2076,6 +2081,68 @@ class TripRepository private constructor(context: Context) {
         dataPointDao.deleteDataPointsForTrip(tripId)
         statsDao.deleteStatsForTrip(tripId)
         segmentDao.deleteSegmentsForTrip(tripId)
+        tagDao.clearTagsForTrip(tripId)
+        }
+    }
+
+    // ── Tags ────────────────────────────────────────────────────────────────────
+
+    fun getAllTags(): Flow<List<TagEntity>> = tagDao.getAllTags()
+
+    fun getAllTripTagRefs(): Flow<List<TripTagCrossRef>> = tagDao.getAllTripTagRefs()
+
+    fun getTagsForTrip(tripId: Long): Flow<List<TagEntity>> = tagDao.getTagsForTrip(tripId)
+
+    /**
+     * Returns the tag named [name] (case-insensitive), creating it if absent. New
+     * tags get the next palette colour by tag count, so distinct tags get distinct
+     * colours until the palette wraps.
+     */
+    suspend fun createOrGetTag(name: String): TagEntity? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return null
+        tagDao.getTagByName(trimmed)?.let { return it }
+        val colorIndex = tagDao.getTagCount() % TAG_PALETTE_SIZE
+        val id = tagDao.insertTag(TagEntity(name = trimmed, colorIndex = colorIndex))
+        // insert(IGNORE) returns -1 on a unique-name race — re-read the winner.
+        return if (id > 0) TagEntity(id = id, name = trimmed, colorIndex = colorIndex)
+               else tagDao.getTagByName(trimmed)
+    }
+
+    suspend fun addTagToTrip(tripId: Long, tagId: Long) =
+        tagDao.addTagToTrip(TripTagCrossRef(tripId, tagId))
+
+    suspend fun removeTagFromTrip(tripId: Long, tagId: Long) =
+        tagDao.removeTagFromTrip(tripId, tagId)
+
+    /** Bulk-applies [tagId] to every trip in [tripIds] (History selection mode). */
+    suspend fun applyTagToTrips(tagId: Long, tripIds: List<Long>) {
+        database.withTransaction {
+            tripIds.forEach { tagDao.addTagToTrip(TripTagCrossRef(it, tagId)) }
+        }
+    }
+
+    /** Renames [tagId] to [newName] unless another tag already holds that name. */
+    suspend fun renameTag(tagId: Long, newName: String): Boolean {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return false
+        val existing = tagDao.getTagByName(trimmed)
+        if (existing != null && existing.id != tagId) return false
+        val current = tagDao.getAllTags().first().firstOrNull { it.id == tagId } ?: return false
+        tagDao.updateTag(current.copy(name = trimmed))
+        return true
+    }
+
+    suspend fun recolorTag(tagId: Long, colorIndex: Int) {
+        val current = tagDao.getAllTags().first().firstOrNull { it.id == tagId } ?: return
+        tagDao.updateTag(current.copy(colorIndex = colorIndex))
+    }
+
+    /** Deletes a tag and all its trip links. */
+    suspend fun deleteTag(tagId: Long) {
+        database.withTransaction {
+            tagDao.clearTripsForTag(tagId)
+            tagDao.deleteTagById(tagId)
         }
     }
 
@@ -2178,10 +2245,12 @@ class TripRepository private constructor(context: Context) {
         )
 
         database.withTransaction {
-            // Move the later trip's points/segments onto the survivor, then update
-            // the survivor row and drop the now-empty later trip + its stats.
+            // Move the later trip's points/segments/tags onto the survivor, then
+            // update the survivor row and drop the now-empty later trip + its stats.
             dataPointDao.reassignTripId(second.id, first.id)
             segmentDao.reassignTripId(second.id, first.id)
+            tagDao.reassignTripTags(second.id, first.id)  // union of both trips' tags
+            tagDao.clearTagsForTrip(second.id)            // drop any leftover duplicates
             tripDao.updateTrip(merged)
             statsDao.deleteStatsForTrip(second.id)
             tripDao.deleteTripById(second.id)
@@ -2405,7 +2474,8 @@ class TripRepository private constructor(context: Context) {
                 "tripDao"      to db.tripDao(),
                 "dataPointDao" to db.tripDataPointDao(),
                 "statsDao"     to db.tripStatsDao(),
-                "segmentDao"   to db.tripSegmentDao()
+                "segmentDao"   to db.tripSegmentDao(),
+                "tagDao"       to db.tagDao()
             ).forEach { (name, value) ->
                 TripRepository::class.java.getDeclaredField(name)
                     .also { it.isAccessible = true }

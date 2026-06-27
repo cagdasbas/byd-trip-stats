@@ -659,10 +659,11 @@ private fun WebCompanionSection(context: Context, scope: CoroutineScope) {
 
             if (enabled) {
                 Text(
-                    "Reachable only while the telemetry service is alive: continuously with " +
-                        "\"Always On\", only during the brief ~90-min wake blips with \"Minimal\", " +
-                        "and never while parked with \"Deep Sleep\" (set under Background activity " +
-                        "when car is off).",
+                    "Served over your local WiFi, so it's reachable while the car is on and the " +
+                        "telemetry service is alive. Once parked, most BYD units cut WiFi ~15 min " +
+                        "after the car is off — after that the companion is unreachable (there's no " +
+                        "mobile-data fallback for a local server) until the car powers on again, in " +
+                        "every Background activity mode.\nNote: Electro app has an option to keep WiFi alive indefinitely",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -905,6 +906,9 @@ private fun ConnectionsTab() {
     var mqttPasswordInput by rememberSaveable { mutableStateOf(mqttSettings.password) }
     var mqttFriendlyNameInput by rememberSaveable { mutableStateOf(mqttSettings.friendlyName) }
     var mqttEnabled by rememberSaveable { mutableStateOf(mqttSettings.enabled) }
+    var mqttUseTls by rememberSaveable { mutableStateOf(mqttSettings.useTls) }
+    var mqttUseWebSocket by rememberSaveable { mutableStateOf(mqttSettings.useWebSocket) }
+    var mqttWsPathInput by rememberSaveable { mutableStateOf(mqttSettings.webSocketPath) }
     var mqttIntervalInput by rememberSaveable { mutableStateOf(mqttSettings.publishIntervalSeconds.toString()) }
     var mqttResult by remember { mutableStateOf<String?>(null) }
     var mqttTesting by remember { mutableStateOf(false) }
@@ -927,6 +931,9 @@ private fun ConnectionsTab() {
         mqttPasswordInput = mqttSettings.password
         mqttFriendlyNameInput = mqttSettings.friendlyName
         mqttEnabled = mqttSettings.enabled
+        mqttUseTls = mqttSettings.useTls
+        mqttUseWebSocket = mqttSettings.useWebSocket
+        mqttWsPathInput = mqttSettings.webSocketPath
         mqttIntervalInput = mqttSettings.publishIntervalSeconds.toString()
     }
 
@@ -1261,6 +1268,83 @@ private fun ConnectionsTab() {
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Use TLS",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        "Encrypted connection (mqtts / wss). Typically port 8883.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = mqttUseTls,
+                                    onCheckedChange = { mqttUseTls = it },
+                                    thumbContent = if (!mqttUseTls) {
+                                        { Box(modifier = Modifier.size(12.dp).background(ToggleUncheckedTrack, CircleShape)) }
+                                    } else null,
+                                    colors = SwitchDefaults.colors(
+                                        uncheckedThumbColor = Color.White,
+                                        uncheckedTrackColor = ToggleUncheckedTrack,
+                                        uncheckedBorderColor = ToggleUncheckedTrack
+                                    )
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Use WebSocket",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        "MQTT over WebSocket so the broker can sit behind an HTTP reverse proxy.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = mqttUseWebSocket,
+                                    onCheckedChange = { mqttUseWebSocket = it },
+                                    thumbContent = if (!mqttUseWebSocket) {
+                                        { Box(modifier = Modifier.size(12.dp).background(ToggleUncheckedTrack, CircleShape)) }
+                                    } else null,
+                                    colors = SwitchDefaults.colors(
+                                        uncheckedThumbColor = Color.White,
+                                        uncheckedTrackColor = ToggleUncheckedTrack,
+                                        uncheckedBorderColor = ToggleUncheckedTrack
+                                    )
+                                )
+                            }
+                            AnimatedVisibility(visible = mqttUseWebSocket, enter = expandVertically(), exit = shrinkVertically()) {
+                                OutlinedTextField(
+                                    value = mqttWsPathInput,
+                                    onValueChange = { mqttWsPathInput = it.trim() },
+                                    label = { Text("WebSocket path") },
+                                    placeholder = { Text("/mqtt") },
+                                    singleLine = true,
+                                    supportingText = {
+                                        val scheme = if (mqttUseTls) "wss" else "ws"
+                                        val host = mqttBrokerInput.ifBlank { "broker" }
+                                        val portTxt = mqttPortInput.ifBlank { "<port>" }
+                                        val path = mqttWsPathInput.ifBlank { "/mqtt" }.let { if (it.startsWith("/")) it else "/$it" }
+                                        Text("$scheme://$host:$portTxt$path", style = MaterialTheme.typography.bodySmall)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                             OutlinedTextField(
                                 value = mqttFriendlyNameInput,
                                 onValueChange = { mqttFriendlyNameInput = it.trim() },
@@ -1298,9 +1382,13 @@ private fun ConnectionsTab() {
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
-                                "While parked, publishing depends on the Background activity mode: " +
-                                    "Always On keeps publishing (including off-state charging), " +
-                                    "Minimal only during the ~90-min wake blips, and Deep Sleep not at all.",
+                                "While parked, publishing depends on the Background activity mode " +
+                                    "and your broker. In Always On the service keeps running, but most " +
+                                    "BYD units cut WiFi ~15 min after the car is off — so a broker on " +
+                                    "your home network stops receiving until the car powers on, while " +
+                                    "an internet-reachable broker (e.g. HiveMQ Cloud) usually keeps " +
+                                    "getting data over mobile data. Minimal publishes only during the " +
+                                    "~90-min wake blips, and Deep Sleep not at all.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1316,7 +1404,10 @@ private fun ConnectionsTab() {
                                             username = mqttUsernameInput,
                                             password = mqttPasswordInput,
                                             friendlyName = mqttFriendlyNameInput,
-                                            publishIntervalSeconds = interval
+                                            publishIntervalSeconds = interval,
+                                            useTls = mqttUseTls,
+                                            useWebSocket = mqttUseWebSocket,
+                                            webSocketPath = mqttWsPathInput
                                         )
                                         MqttConnectionStore.save(context, mqttSettings)
                                         mqttResult = "MQTT settings saved"
@@ -1342,7 +1433,10 @@ private fun ConnectionsTab() {
                                             username = mqttUsernameInput,
                                             password = mqttPasswordInput,
                                             friendlyName = mqttFriendlyNameInput,
-                                            publishIntervalSeconds = interval
+                                            publishIntervalSeconds = interval,
+                                            useTls = mqttUseTls,
+                                            useWebSocket = mqttUseWebSocket,
+                                            webSocketPath = mqttWsPathInput
                                         )
                                         MqttConnectionStore.save(context, current)
                                         mqttTesting = true
@@ -2223,7 +2317,7 @@ private fun AppPreferencesTab(
                     }
                 }
                 listOf(
-                    OffStateMode.ENABLED    to "Always On (recommended default): service runs 24/7. Continuous 12V/SoC samples in battery history, ADB-over-WiFi stays reachable, and the Web Companion (PWA) + MQTT keep publishing while parked — including off-state (e.g. overnight) charging. Small additional load on top of BYD's own stock background drain.",
+                    OffStateMode.ENABLED    to "Always On (recommended default): service runs 24/7, taking continuous 12V/SoC samples into battery history and capturing off-state (e.g. overnight) charging. Small additional load on top of BYD's own stock background drain.\n\nNote: most BYD units cut WiFi ~15 min after the car is switched off, and the app can't override that. So while parked, ADB-over-WiFi, the Web Companion (PWA) and MQTT to a broker on your home network stop until the car powers on. MQTT to an internet-reachable broker (e.g. HiveMQ Cloud) usually keeps publishing while parked, because the car stays on mobile data.\nNote2: Electro app can override the above and keep the WiFi indefinitely when car is off",
                     OffStateMode.DISABLED   to "Minimal: service self-stops 5 min after the car turns off, then a 90-min alarm briefly wakes it for a charging snapshot. Lower drain, but off-state samples are sparse, ADB is not always on, the Web Companion (PWA) is only reachable during the brief wake blip, and MQTT is idle between blips. Off-state charging is caught within ~90 min, after which it publishes for the rest of the charge.",
                     OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep. The Web Companion (PWA) is unreachable and MQTT is silent the whole time the car is parked; off-state charging is not captured live — only reconstructed from the SoC delta when the car next turns on.",
                 ).forEach { (mode, description) ->
@@ -4247,6 +4341,8 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
     val lastCapture by VehicleCompatibilityProbe.lastCaptureAt.collectAsState()
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var privacyExpanded by rememberSaveable { mutableStateOf(false) }
+    var qrUrl by remember { mutableStateOf<String?>(null) }
+    var uploadInProgress by remember { mutableStateOf(false) }
     val telegram = remember { TelegramManager.getInstance(context) }
     val telegramConfig by telegram.config.collectAsState()
     val telegramState by telegram.state.collectAsState()
@@ -4301,7 +4397,9 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
                     "GPS latitude and longitude are NOT included.\n\n" +
                     "Everything else is included: battery state, motor data, gear, speed, " +
                     "drive modes, climate state, charging state, PHEV-specific values, etc.\n\n" +
-                    "The report stays on your device until you send it. Nothing is sent automatically.",
+                    "Nothing is sent automatically. “Email via QR code” uploads the report to a " +
+                    "temporary public host (litterbox) and shows a link that auto-deletes after 12 hours; " +
+                    "anyone with the link can read it until then. The other options keep the report on your device.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -4438,6 +4536,43 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
                 }
             }
 
+            // Recommended path: upload the report and show a QR the user scans with
+            // their phone to email the download link — no Telegram/adb/file transfer.
+            Button(
+                onClick = {
+                    scope.launch(Dispatchers.IO) {
+                        launch(Dispatchers.Main) { uploadInProgress = true; statusMessage = null }
+                        try {
+                            val url = VehicleCompatibilityProbe.uploadReport(retention = "12h")
+                            launch(Dispatchers.Main) {
+                                uploadInProgress = false
+                                qrUrl = url
+                            }
+                        } catch (e: Exception) {
+                            launch(Dispatchers.Main) {
+                                uploadInProgress = false
+                                statusMessage = "Upload failed: ${e.message}"
+                            }
+                        }
+                    }
+                },
+                enabled = entryCount > 0 && !uploadInProgress && !isSending,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+            ) {
+                if (uploadInProgress) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Icon(Icons.Filled.QrCode2, null, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(if (uploadInProgress) "Uploading…" else "Email via QR code")
+            }
+
             if (telegramConfig == null) {
                 Text(
                     "Telegram not configured — set it up under Backup & Restore first.",
@@ -4451,7 +4586,7 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
                 Text(
                     msg,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (msg.startsWith("Telegram send failed"))
+                    color = if (msg.startsWith("Telegram send failed") || msg.startsWith("Upload failed"))
                         MaterialTheme.colorScheme.error
                     else
                         MaterialTheme.colorScheme.primary
@@ -4459,6 +4594,82 @@ private fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope)
             }
         }
     }
+
+    qrUrl?.let { url ->
+        ProbeEmailQrDialog(downloadUrl = url, onDismiss = { qrUrl = null })
+    }
+}
+
+/**
+ * Shows a QR code encoding a pre-filled `mailto:bydtripstats@gmail.com` whose body carries
+ * the probe download link. The head unit has no mail app, so the user scans this with their
+ * phone, picks an account and presses Send — the report link reaches support, and the link
+ * expires in 12h. Falls back to showing the raw URL with a copy button.
+ */
+@Composable
+private fun ProbeEmailQrDialog(downloadUrl: String, onDismiss: () -> Unit) {
+    val supportEmail = "bydtripstats@gmail.com"
+    val clipboard = LocalClipboardManager.current
+    val sizePx = with(LocalDensity.current) { 220.dp.roundToPx() }
+    val qr = remember(downloadUrl) {
+        val subject = "BYD Trip Stats — vehicle compatibility probe"
+        val body = "Vehicle compatibility probe report.\n\n" +
+            "Download (expires in 12h):\n$downloadUrl\n\n" +
+            "Sent from BYD Trip Stats."
+        val mailto = "mailto:$supportEmail?subject=" + Uri.encode(subject) +
+            "&body=" + Uri.encode(body)
+        QrCodeGenerator.generate(mailto, sizePx)?.asImageBitmap()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
+        },
+        dismissButton = {
+            TextButton(onClick = { clipboard.setText(AnnotatedString(downloadUrl)) }) {
+                Text("Copy link")
+            }
+        },
+        title = { Text("Scan to email the report") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "Scan with your phone — it opens a pre-filled email to $supportEmail. " +
+                        "Just choose your account and press Send. The link expires in 12 hours.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (qr != null) {
+                    Image(
+                        bitmap = qr,
+                        contentDescription = "QR code that opens a pre-filled email with the probe download link",
+                        filterQuality = FilterQuality.None,
+                        modifier = Modifier
+                            .background(Color.White, RoundedCornerShape(8.dp))
+                            .padding(10.dp)
+                            .size(220.dp)
+                    )
+                } else {
+                    Text(
+                        "Couldn't render the QR code. Use “Copy link” and email it to $supportEmail.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Text(
+                    downloadUrl,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+    )
 }
 
 @Composable

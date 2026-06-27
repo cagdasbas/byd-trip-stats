@@ -11,6 +11,8 @@ import com.byd.tripstats.ui.screens.DashboardScreen
 import com.byd.tripstats.ui.screens.BatteryDegradationScreen
 import com.byd.tripstats.ui.screens.ChargingHistoryScreen
 import com.byd.tripstats.ui.screens.ChargingDetailScreen
+import com.byd.tripstats.ui.screens.RoutesScreen
+import com.byd.tripstats.ui.screens.TagsScreen
 import com.byd.tripstats.ui.screens.SeasonalAnalysisScreen
 import com.byd.tripstats.ui.screens.TripGoalsScreen
 import com.byd.tripstats.ui.screens.LocalBackupScreen
@@ -33,6 +35,8 @@ sealed class Screen(val route: String) {
     }
     object BatteryDegradation : Screen("battery_degradation")
     object SeasonalAnalysis : Screen("seasonal_analysis")
+    object Routes : Screen("routes")
+    object Tags : Screen("tags")
     object TripGoals : Screen("trip_goals")
 }
 
@@ -76,6 +80,12 @@ fun AppNavigation(
                 },
                 onNavigateToSeasonalAnalysis = {
                     navController.navigate(Screen.SeasonalAnalysis.route)
+                },
+                onNavigateToRoutes = {
+                    navController.navigate(Screen.Routes.route)
+                },
+                onNavigateToTags = {
+                    navController.navigate(Screen.Tags.route)
                 }
             )
         }
@@ -153,6 +163,29 @@ fun AppNavigation(
         composable(Screen.SeasonalAnalysis.route) {
             SeasonalAnalysisScreen(
                 viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Routes.route) {
+            RoutesScreen(
+                viewModel = viewModel,
+                onTripClick = { tripId ->
+                    navController.navigate(Screen.TripDetail.createRoute(tripId))
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Tags.route) {
+            TagsScreen(
+                viewModel = viewModel,
+                onOpenInHistory = { tagId ->
+                    viewModel.setTagFilter(setOf(tagId))
+                    navController.navigate(Screen.TripHistory.route) {
+                        popUpTo(Screen.TripHistory.route) { inclusive = true }
+                    }
+                },
                 onNavigateBack = { navController.popBackStack() }
             )
         }

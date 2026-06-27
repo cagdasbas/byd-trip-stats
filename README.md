@@ -10,7 +10,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.22-purple?style=flat-square&logo=kotlin)](https://kotlinlang.org)
 [![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange?style=flat-square)](https://developer.android.com)
 [![License](https://img.shields.io/badge/license-BUSL--1.1-blue?style=flat-square)](LICENSE.md)
-[![Changelog](https://img.shields.io/badge/changelog-v2.9.1-informational?style=flat-square)](CHANGELOG.md)
+[![Changelog](https://img.shields.io/badge/changelog-v2.10.0-informational?style=flat-square)](CHANGELOG.md)
 [![GitHub release](https://img.shields.io/github/v/release/angoikon/byd-trip-stats?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/angoikon/byd-trip-stats/total?style=flat-square)](https://github.com/angoikon/byd-trip-stats/releases)
 [![Unit Tests](https://img.shields.io/github/actions/workflow/status/angoikon/byd-trip-stats/unit-tests.yml?branch=main&label=unit%20tests&style=flat-square&logo=github)](https://github.com/angoikon/byd-trip-stats/actions/workflows/unit-tests.yml)
@@ -46,6 +46,10 @@ No Electro setup, MQTT broker, or topic configuration is required for normal ope
 
 - **Some fields are still inferred or unresolved.** SoH is currently shown as an estimate, there is no cabin temperature present in the SDK.
 - **Background persistence depends on DiLink firmware behaviour.** The app uses a foreground service, wake lock, boot receiver, and watchdog, but some BYD firmware builds are still aggressive about killing third-party apps while the car is off.
+- **Parked WiFi depends on the head unit, and the app cannot force it to stay on.** Many BYD units cut the WiFi module ~15 minutes after the car is switched off. The Android-level WiFi lock the app holds cannot prevent this, and the BYD "keep accessory alive" mechanism that some other apps use requires system/shell privileges this app intentionally does not take. Practical consequences for **parked** publishing:
+  - A **cloud/internet-reachable broker** (e.g. HiveMQ Cloud) often keeps receiving telemetry while parked, because the unit can stay on cellular (4G) even after WiFi is cut.
+  - A **LAN-only broker** (e.g. a self-hosted Mosquitto on your home network) becomes unreachable once WiFi is cut, so parked publishing stops until the car powers on again. To get parked telemetry to a home broker, either expose it to the internet (see the WebSocket/reverse-proxy support above) or run a dedicated WiFi-keepalive app alongside.
+  - Either way, telemetry resumes when the car powers on, and any charging that happened while parked is reconstructed from the State-of-Charge change.
 
 ---
 
@@ -291,7 +295,7 @@ Two complementary mechanisms cover all charging scenarios with no user interacti
 The app remains standalone for normal use, but can optionally forward live telemetry to external tools:
 
 - **ABRP** — upload live car telemetry to ABRP via Link Generic token
-- **MQTT** — publish Electro-compatible JSON to an external broker and topic, with drive/regen modes exported as readable names
+- **MQTT** — publish Electro-compatible JSON to an external broker and topic, with drive/regen modes exported as readable names. Supports plain TCP, TLS (mqtts), and MQTT-over-WebSocket (ws/wss) so the broker can sit behind an HTTP reverse proxy. *(WebSocket requires a WebSocket listener enabled on the broker itself — e.g. Mosquitto needs a `listener` with `protocol websockets`; the reverse proxy forwards to that listener, it does not create one.)*
 
 Both integrations are opt-in and can be disabled without affecting local trip recording, charts, backups, or dashboard telemetry.
 
@@ -451,12 +455,12 @@ If you are running BYD Trip Stats on a **Dolphin, Atto3, or any other BYD model*
 - [x] Web dashboard companion — browse trip history and charts on any browser offline-first: upload your backup file, charts render locally, nothing leaves your device; built as a PWA so it can be added to your phone's home screen for a near-native experience ✅ *(v2.7.0)*
 - [x] **Pro** unlock — optional premium tier via a short per-vehicle unlock code, verified entirely on-device (offline HMAC over the vehicle id, no account, can't be shared); single `EntitlementManager` gate. The free app is unchanged ✅ *(v2.9.0)*
 - [x] Battery cell imbalance alert *(Pro)* — opt-in notification when the cell voltage spread exceeds a configurable limit (default 50 mV), with sustained-breach debounce, once-per-episode hysteresis, and a SoC guard; surfaces the diagnostic the Cell Voltage Spread heatmap already visualises ✅ *(v2.9.0)*
+- [x] Trip merging — combine two auto-split trips that were the same journey, separated by a brief stop (e.g. petrol station, red light timeout). Select two contiguous completed trips in History → Merge; the earlier trip survives and the later one is absorbed. Cumulative figures (distance, energy, driving time) are the **sum of each trip's own recorded values** — robust to the BYD discharge counter resetting between trips — while the real start of the earlier trip and the real end of the later trip are kept ✅ *(v2.10.0)*
+- [x] Recurring route detection — automatically groups completed trips that share the same journey (same start, end and ~distance; direction-sensitive, so the commute *to* work and *home* are tracked separately) once it's been driven 3+ times. A new **Routes** screen (toolbar icon in History) lists each recurring route with its average/best/worst efficiency and a per-trip efficiency trend, so you can compare how each run of your daily commute performed ✅ *(v2.10.0)*
+- [x] Trip tagging — label trips with reusable, auto-coloured custom tags (e.g. "commute", "motorway", "errand"). Add/remove tags on a trip's detail screen, or bulk-tag several at once from History's selection mode; tags show as chips in the History list. Filter the list by tag (in the filter sheet), and a dedicated **Tags** screen rolls up each tag's trip count, total distance and average efficiency so you can compare categories ✅ *(v2.10.0)*
 
 ### Planned (v2.0.0+)
 
-- [ ] Recurring route detection — automatically group trips that share the same route (e.g. daily commute) and compare efficiency across instances
-- [ ] Trip merging — combine two auto-split trips that were the same journey, separated by a brief stop (e.g. petrol station, red light timeout)
-- [ ] Trip tagging — label trips with a custom tag (e.g. "commute", "motorway", "errand") and filter history and analytics by tag
 - [ ] DiLink home screen widget — quick-glance tile showing current SoC, last trip distance, and range projection without opening the app
 **Vote on features** by 👍 reacting to issues!
 

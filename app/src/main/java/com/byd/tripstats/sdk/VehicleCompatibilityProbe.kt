@@ -398,6 +398,40 @@ object VehicleCompatibilityProbe {
         }
     }
 
+    /**
+     * Records a pushed (listener-delivered) feature-ID event under "[label]-dispatched".
+     *
+     * Unlike [recordFeatureIdGetters] (synchronous polls), this captures the event channel —
+     * the only place SoH actually arrives on these firmwares. Keyed by hex feature ID so each
+     * ID's latest raw value is kept; includes a tenths-decode hint (e.g. 1000 → 100.0) so a
+     * SoH-looking register is easy to spot. Capturing EVERY id (matched or not) is the point:
+     * the real SoH register is one we don't currently map.
+     */
+    fun recordDispatchedFeature(label: String, featureId: Int, raw: Number) {
+        if (!_isEnabled.value) return
+        try {
+            val snapshot = deviceSnapshots.getOrPut("$label-dispatched") { LinkedHashMap() }
+            val d = raw.toDouble()
+            val pctHint = when {
+                d in 0.0..100.0 -> " (pct≈${"%.1f".format(d)})"
+                d in 100.0..1100.0 -> " (÷10≈${"%.1f".format(d / 10.0)})"
+                else -> ""
+            }
+            val key = "0x%08X".format(featureId)
+            val value = "${if (d == Math.floor(d)) d.toLong().toString() else d.toString()}$pctHint"
+            val prev = snapshot.put(key, value)
+            val now = Instant.now().toString()
+            _lastCaptureAt.value = now
+            _entryCount.value = deviceSnapshots.values.sumOf { it.size }
+            if (prev != value) {
+                changeLog.offer("[$now][$label-dispatched] $key=$value")
+                while (changeLog.size > CHANGE_LOG_MAX) changeLog.poll()
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "recordDispatchedFeature($label) failed: ${t.message}")
+        }
+    }
+
     // ── Export ────────────────────────────────────────────────────────────────
 
     /**
@@ -602,6 +636,38 @@ object VehicleCompatibilityProbe {
             obj.put("statisticFeatureSummary", featSummary)
         }
 
+        // ── SoH candidate analysis (report-only) ─────────────────────────────
+        // Scans the pushed statistic events for any feature ID whose value decodes to a
+        // plausible SoH (90–110%), so the report names the SoH register(s) directly. This is
+        // purely descriptive — it reads probe data and never feeds the live SoH the app shows.
+        val dispatched = deviceSnapshots["statistic-dispatched"]
+        if (dispatched != null && dispatched.isNotEmpty()) {
+            val sohAnalysis = JSONObject()
+            val candidates = JSONArray()
+            dispatched.forEach { (idHex, valueStr) ->
+                // valueStr looks like "939 (÷10≈93.9)"; parse the leading raw number.
+                val raw = valueStr.substringBefore(' ').toDoubleOrNull() ?: return@forEach
+                val decoded = when {
+                    raw in 0.0..110.0 -> raw                       // whole percent
+                    raw in 900.0..1100.0 -> raw / 10.0             // tenths
+                    else -> null
+                }
+                if (decoded != null && decoded in 90.0..110.0) {
+                    val c = JSONObject()
+                    c.put("featureId", idHex)
+                    c.put("raw", valueStr)
+                    c.put("decodedSoh", "%.1f".format(decoded))
+                    candidates.put(c)
+                }
+            }
+            sohAnalysis.put("dispatchedFeatureCount", dispatched.size)
+            sohAnalysis.put("candidates", candidates)
+            sohAnalysis.put("note",
+                "Feature IDs whose pushed value decodes to 90–110% — likely SoH registers. " +
+                "Compare against the SoH shown in-app and in Electro to pick the correct one.")
+            obj.put("sohAnalysis", sohAnalysis)
+        }
+
         // ── Charging analysis ─────────────────────────────────────────────────
         val chargingSnap = deviceSnapshots["charging"]
         val chargingAnalysis = JSONObject()
@@ -645,6 +711,22 @@ object VehicleCompatibilityProbe {
         }
 
         return obj
+    }
+
+    /**
+     * Upload the current report to litterbox and return the public download URL.
+     *
+     * Blocking network call — invoke from a background dispatcher. The URL is meant to
+     * be embedded in a `mailto:` QR code so the user can email the link from their phone;
+     * litterbox auto-deletes the file after [retention] (default 12h).
+     */
+    fun uploadReport(retention: String = "12h"): String {
+        val json = buildReportJson()
+        return com.byd.tripstats.util.LitterboxUploader.upload(
+            fileName = "byd_compat_probe.json",
+            content = json,
+            retention = retention
+        )
     }
 
     /**

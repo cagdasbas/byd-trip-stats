@@ -1423,13 +1423,21 @@ class BydVehicleDataSource(context: Context) {
             }
         }
 
-        tryDynamicDevice(
+        // Bodywork is the only device exposing getBatteryCapacity(), which is how other apps
+        // derive SoH on PHEV/DM-i (where the statistic "soh" feature is bogus). On these
+        // firmwares the reflective s10 class name doesn't resolve, so also try the canonical
+        // SDK class directly (Electro registers it this way). BEV-safe: purely additive — BEV
+        // SoH still comes from the statistic feature, this only adds a capacity source.
+        tryDynamicDeviceCandidates(
             label = "Bodywork",
-            className = RuntimeExtensionBridge.stringList("s10").firstOrNull().orEmpty(),
+            classNames = (RuntimeExtensionBridge.stringList("s10") +
+                "android.hardware.bydauto.bodywork.BYDAutoBodyworkDevice")
+                .filter { it.isNotEmpty() }
+                .distinct(),
             listenerInterfaceName = null,
             onRegistered = { device ->
                 bodyworkDevice = device
-                Log.i(TAG, "✅ BodyworkDevice registered")
+                Log.i(TAG, "✅ BodyworkDevice registered (${device.javaClass.name})")
                 dumpForCompatProbe("bodywork", device)
                 logBodyworkSnapshot(device)
                 registerEventMirrorListener(device, "Bodywork")
@@ -2410,7 +2418,10 @@ class BydVehicleDataSource(context: Context) {
         try {
             val autoSystemState = m29["autoSystemState"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
             val autoVin = m29["autoVin"]?.takeIf { it.isNotEmpty() }?.let { invokeStringGetter(device, it) }
-            val batteryCapacity = m29["batteryCapacity"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
+            // Prefer the private-extension mapping; fall back to the canonical SDK getter name
+            // so PHEV/DM-i bodywork capacity (other apps' SoH source) flows even without an s10 map.
+            val batteryCapacity = (m29["batteryCapacity"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) })
+                ?: invokeIntGetter(device, "getBatteryCapacity")
             val batteryPowerHev = m29["batteryPowerHEV"]?.takeIf { it.isNotEmpty() }?.let { invokeDoubleGetter(device, it) }
             val batteryPowerValue = m29["batteryPowerValue"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
             val batteryVoltageLevel = m29["batteryVoltageLevel"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
@@ -6686,6 +6697,12 @@ class BydVehicleDataSource(context: Context) {
      * Updates the backing field and rebuilds the snapshot before persistence.
      */
     private fun dispatchStatisticFeatureEvent(featureId: Int, rawNumber: Number) {
+        // Capture the pushed event channel for the compat probe — this is where SoH actually
+        // arrives (synchronous polls return null on these firmwares). Records EVERY id incl.
+        // ones we don't map, so an unmapped real-SoH register (e.g. other apps' 100%) shows up.
+        if (VehicleCompatibilityProbe.isEnabled.value) {
+            VehicleCompatibilityProbe.recordDispatchedFeature("statistic", featureId, rawNumber)
+        }
         val v = rawNumber.toDouble()
         val sdf = statisticDispatchFields
         var matched = true

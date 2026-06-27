@@ -6,11 +6,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.byd.tripstats.data.local.BydStatsDatabase
 import com.byd.tripstats.data.local.dao.TripSohSummary
+import com.byd.tripstats.data.analysis.RouteGroup
+import com.byd.tripstats.data.analysis.RouteGrouping
+import com.byd.tripstats.data.analysis.RouteTripInput
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
+import com.byd.tripstats.data.local.entity.TagEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripStatsEntity
+import com.byd.tripstats.data.local.entity.TripTagCrossRef
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
@@ -39,6 +44,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine as combineFlows
@@ -259,6 +265,23 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // WhileSubscribed so Room only queries when a screen is actually showing stats.
     private val allTripStats: StateFlow<List<TripStatsEntity>> = tripRepository.getAllTripStats()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Tags ──────────────────────────────────────────────────────────────────
+    val allTags: StateFlow<List<TagEntity>> = tripRepository.getAllTags()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val tripTagRefs: StateFlow<List<TripTagCrossRef>> = tripRepository.getAllTripTagRefs()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** tripId → its tags (name-sorted). Drives the History chips and tag filter. */
+    val tripTagsMap: StateFlow<Map<Long, List<TagEntity>>> =
+        combine(allTags, tripTagRefs) { tags, refs ->
+            val tagsById = tags.associateBy { it.id }
+            refs.groupBy { it.tripId }
+                .mapValues { (_, rs) ->
+                    rs.mapNotNull { tagsById[it.tagId] }.sortedBy { it.name.lowercase() }
+                }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     // ── Selected trip — single source of truth for detail screens ────────────
 
@@ -2098,13 +2121,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val maxSpeedMax:    Float? = null,
         // Quick toggle (separate star chip in the UI) — not part of the numeric
         // range-filter sheet, so deliberately excluded from activeFilterCount.
-        val favouritesOnly: Boolean = false
+        val favouritesOnly: Boolean = false,
+        // Tag filter (chosen inside the filter sheet). A trip passes when it carries
+        // at least one of these tags (OR). Empty = no tag filter.
+        val tagIds: Set<Long> = emptySet()
     ) {
         val activeFilterCount: Int get() = listOf(
             distanceMin, distanceMax, durationMin, durationMax,
             consumptionMin, consumptionMax, regenEffMin, regenEffMax,
             maxSpeedMin, maxSpeedMax
-        ).count { it != null }
+        ).count { it != null } + (if (tagIds.isEmpty()) 0 else 1)
     }
 
     private val historyPrefs: SharedPreferences by lazy {
@@ -2144,7 +2170,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             regenEffMax    = getFloatOrNull("f_regen_max"),
             maxSpeedMin    = getFloatOrNull("f_speed_min"),
             maxSpeedMax    = getFloatOrNull("f_speed_max"),
-            favouritesOnly = getBoolean("f_favourites_only", false)
+            favouritesOnly = getBoolean("f_favourites_only", false),
+            tagIds         = getString("f_tag_ids", "")
+                ?.split(",")?.mapNotNull { it.toLongOrNull() }?.toSet() ?: emptySet()
         )
     }
 
@@ -2201,12 +2229,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             putFloatOrRemove("f_regen_min", f.regenEffMin);    putFloatOrRemove("f_regen_max", f.regenEffMax)
             putFloatOrRemove("f_speed_min", f.maxSpeedMin);    putFloatOrRemove("f_speed_max", f.maxSpeedMax)
             putBoolean("f_favourites_only", f.favouritesOnly)
+            if (f.tagIds.isEmpty()) remove("f_tag_ids")
+            else putString("f_tag_ids", f.tagIds.joinToString(","))
             apply()
         }
     }
 
     /** Clears only the numeric range filters; preserves the favourites-only toggle. */
     fun clearFilters() = setFilter(TripFilterState(favouritesOnly = _filterState.value.favouritesOnly))
+
+    /** Sets the History tag filter (used by the Tags screen's "view trips" action). */
+    fun setTagFilter(tagIds: Set<Long>) =
+        setFilter(_filterState.value.copy(tagIds = tagIds))
 
     fun toggleFavouritesOnly() {
         setFilter(_filterState.value.copy(favouritesOnly = !_filterState.value.favouritesOnly))
@@ -2220,10 +2254,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { chargingRepository.setFavourite(sessionId, favourite) }
     }
 
-    val sortedFilteredTrips: StateFlow<List<TripEntity>> =
-        combine(allTrips, tripDisplayMetrics, _sortField, _sortOrder, _filterState) {
-            trips, metrics, field, order, filter ->
+    // Folded so sortedFilteredTrips stays within combine's 5-flow arity while still
+    // seeing per-trip tag membership for the tag filter.
+    private val filterAndTags = combine(_filterState, tripTagsMap) { f, m -> f to m }
 
+    val sortedFilteredTrips: StateFlow<List<TripEntity>> =
+        combine(allTrips, tripDisplayMetrics, _sortField, _sortOrder, filterAndTags) {
+            trips, metrics, field, order, filterTags ->
+
+            val (filter, tagMap) = filterTags
             val active    = trips.filter { it.isActive }
             val completed = trips.filter { !it.isActive }
 
@@ -2245,7 +2284,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 (filter.regenEffMax    == null || regen  <= filter.regenEffMax)    &&
                 (filter.maxSpeedMin    == null || spd    >= filter.maxSpeedMin)    &&
                 (filter.maxSpeedMax    == null || spd    <= filter.maxSpeedMax)    &&
-                (!filter.favouritesOnly || trip.isFavourite)
+                (!filter.favouritesOnly || trip.isFavourite)                       &&
+                (filter.tagIds.isEmpty() ||
+                    tagMap[trip.id]?.any { it.id in filter.tagIds } == true)
             }
 
             val sorted = when (field) {
@@ -2428,6 +2469,125 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Recurring route detection ───────────────────────────────────────────────
+
+    /**
+     * Completed trips grouped into recurring routes (same start, end and ~distance;
+     * direction-sensitive), each driven at least [RouteGrouping.DEFAULT_MIN_INSTANCES]
+     * times. Joins [allTrips] (efficiency / distance / duration) with [allTripStats]
+     * (start/end coordinates). The clustering runs on Dispatchers.Default so a large
+     * history doesn't block the main thread. See [RouteGrouping].
+     */
+    val recurringRoutes: StateFlow<List<RouteGroup>> =
+        combine(allTrips, allTripStats) { trips, stats ->
+            val statsById = stats.associateBy { it.tripId }
+            val inputs = trips.mapNotNull { trip ->
+                if (trip.isActive) return@mapNotNull null
+                val s = statsById[trip.id] ?: return@mapNotNull null
+                val eff = trip.efficiency ?: return@mapNotNull null
+                val dist = trip.distance ?: return@mapNotNull null
+                val dur = trip.duration ?: return@mapNotNull null
+                if (dist < 0.5) return@mapNotNull null
+                if (!RouteGrouping.hasValidGps(s.startLatitude, s.startLongitude)) return@mapNotNull null
+                if (!RouteGrouping.hasValidGps(s.endLatitude, s.endLongitude)) return@mapNotNull null
+                RouteTripInput(
+                    tripId = trip.id,
+                    startTime = trip.startTime,
+                    startLat = s.startLatitude,
+                    startLon = s.startLongitude,
+                    endLat = s.endLatitude,
+                    endLon = s.endLongitude,
+                    distanceKm = dist,
+                    efficiencyKwhPer100km = eff,
+                    durationMs = dur,
+                    energyKwh = trip.energyConsumed ?: 0.0
+                )
+            }
+            RouteGrouping.group(inputs)
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Tag operations & per-tag analytics ──────────────────────────────────────
+
+    /** Tags on a single trip — observed by the Trip Detail screen. */
+    fun tagsForTrip(tripId: Long): Flow<List<TagEntity>> = tripRepository.getTagsForTrip(tripId)
+
+    /** Creates [name] if needed (case-insensitive) and applies it to [tripId]. */
+    fun addNewTagToTrip(tripId: Long, name: String) {
+        viewModelScope.launch {
+            tripRepository.createOrGetTag(name)?.let { tripRepository.addTagToTrip(tripId, it.id) }
+        }
+    }
+
+    fun addTagToTrip(tripId: Long, tagId: Long) {
+        viewModelScope.launch { tripRepository.addTagToTrip(tripId, tagId) }
+    }
+
+    fun removeTagFromTrip(tripId: Long, tagId: Long) {
+        viewModelScope.launch { tripRepository.removeTagFromTrip(tripId, tagId) }
+    }
+
+    /** Bulk-applies an existing tag to several trips (History selection mode). */
+    fun applyTagToTrips(tagId: Long, tripIds: List<Long>) {
+        viewModelScope.launch { tripRepository.applyTagToTrips(tagId, tripIds) }
+    }
+
+    /** Creates [name] if needed and bulk-applies it to [tripIds]. */
+    fun addNewTagToTrips(tripIds: List<Long>, name: String) {
+        viewModelScope.launch {
+            tripRepository.createOrGetTag(name)?.let {
+                tripRepository.applyTagToTrips(it.id, tripIds)
+            }
+        }
+    }
+
+    fun renameTag(tagId: Long, newName: String) {
+        viewModelScope.launch { tripRepository.renameTag(tagId, newName) }
+    }
+
+    fun recolorTag(tagId: Long, colorIndex: Int) {
+        viewModelScope.launch { tripRepository.recolorTag(tagId, colorIndex) }
+    }
+
+    fun deleteTag(tagId: Long) {
+        viewModelScope.launch {
+            tripRepository.deleteTag(tagId)
+            // Drop the now-stale tag from any active filter so it can't hide trips.
+            if (tagId in _filterState.value.tagIds) {
+                setFilter(_filterState.value.copy(tagIds = _filterState.value.tagIds - tagId))
+            }
+        }
+    }
+
+    data class TagStat(
+        val tag: TagEntity,
+        val tripCount: Int,
+        val totalDistanceKm: Double,
+        val avgConsumption: Double,   // kWh/100km; 0 when no trip carries an efficiency
+        val totalKwh: Double
+    )
+
+    /** Per-tag rollups for the Tags screen (count, distance, avg efficiency). */
+    val tagStats: StateFlow<List<TagStat>> =
+        combine(allTrips, tripTagRefs, allTags) { trips, refs, tags ->
+            val completedById = trips.filter { !it.isActive }.associateBy { it.id }
+            val tripsByTag = refs.groupBy { it.tagId }
+            tags.map { tag ->
+                val tagTrips = tripsByTag[tag.id].orEmpty().mapNotNull { completedById[it.tripId] }
+                val effs = tagTrips.mapNotNull { it.efficiency }
+                TagStat(
+                    tag             = tag,
+                    tripCount       = tagTrips.size,
+                    totalDistanceKm = tagTrips.sumOf { it.distance ?: 0.0 },
+                    avgConsumption  = if (effs.isNotEmpty()) effs.average() else 0.0,
+                    totalKwh        = tagTrips.sumOf { it.energyConsumed ?: 0.0 }
+                )
+            }.sortedWith(compareByDescending<TagStat> { it.tripCount }.thenBy { it.tag.name.lowercase() })
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // ── Trip goals ────────────────────────────────────────────────────────────
 
