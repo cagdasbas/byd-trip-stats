@@ -2932,7 +2932,7 @@ class BydVehicleDataSource(context: Context) {
                 "statisticPoll",
                 "🔬 poll: cellVMin=$vMin cellVMax=$vMax cellTMin=$tMin cellTAvg=$effectiveTAvg cellTMax=$tMax " +
                     "cellTCandidate=$tCandidate " +
-                    "sohRaw=$sohRaw soh=$soh socBms=$socB socPanel=$socPanel availPower=$availPower"
+                    "sohRaw=$sohRaw soh=$soh socBms=$socB socPanel=$socPanel availPowerRaw=$availPowerRaw availPower=$availPower"
             )
             logInfoIfChanged(
                 "statisticVoltageValues",
