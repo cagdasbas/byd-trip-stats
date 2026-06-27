@@ -37,8 +37,8 @@ android {
     // A stable release always has a higher versionCode than any beta of the same
     // version, so beta testers automatically receive the stable upgrade via sideload.
     val versionMajor    = 2
-    val versionMinor    = 9
-    val versionPatch    = 1
+    val versionMinor    = 10
+    val versionPatch    = 0
     val versionPre      = 99  // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
 
     val computedVersionCode = versionMajor * 1_000_000 +
