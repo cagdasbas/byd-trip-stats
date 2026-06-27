@@ -1284,6 +1284,13 @@ private fun ConnectionsTab() {
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    if (mqttPortInput == "8883" && !mqttUseTls) {
+                                        Text(
+                                            "Port 8883 normally requires TLS — without it the connection is unencrypted and will likely fail.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                 }
                                 Switch(
                                     checked = mqttUseTls,
@@ -1483,8 +1490,9 @@ private fun ConnectionsTab() {
                             Text(
                                 mqttResult!!,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (mqttResult!!.contains("succeeded", ignoreCase = true)) {
-                                    MaterialTheme.colorScheme.primary
+                                color = if (mqttResult!!.contains("saved", ignoreCase = true) ||
+                                    mqttResult!!.contains("succeeded", ignoreCase = true)) {
+                                    RegenGreen
                                 } else {
                                     MaterialTheme.colorScheme.error
                                 }
@@ -1636,92 +1644,15 @@ private fun AppPreferencesTab(
     ) {
         SectionHeader(icon = Icons.Filled.Tune, title = "Preferences")
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.WorkspacePremium, null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "BYD Trip Stats Pro",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (isPro) {
-                        Spacer(Modifier.width(8.dp))
-                        ProBadge()
-                    }
-                }
-                if (isPro) {
-                    var showRemoveCodeConfirm by remember { mutableStateOf(false) }
-                    Text(
-                        "Active — Pro unlocked for this vehicle (lifetime).",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(onClick = { showRemoveCodeConfirm = true }) {
-                        Text("Remove code")
-                    }
-                    if (showRemoveCodeConfirm) {
-                        AlertDialog(
-                            onDismissRequest = { showRemoveCodeConfirm = false },
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            icon = {
-                                Icon(Icons.Filled.Warning, null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(32.dp))
-                            },
-                            title = { Text("Remove Pro unlock code?", fontWeight = FontWeight.Bold) },
-                            text = {
-                                Text(
-                                    "This turns Pro off on this vehicle and disables the Pro features " +
-                                    "(cell imbalance alert, battery health report, screenshots, SD card " +
-                                    "backup). Your code isn't lost — you can re-enter it anytime to unlock again."
-                                )
-                            },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    showRemoveCodeConfirm = false
-                                    EntitlementManager.clear()
-                                }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showRemoveCodeConfirm = false }) { Text("Cancel") }
-                            }
-                        )
-                    }
-                } else {
-                    Text(
-                        "Unlock premium features like the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle — €9.99, lifetime, one car. Verified on-device — nothing leaves your car.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    // Codes are derived from this vehicle's id — the buyer sends it at purchase.
-                    VehicleIdRow(currentDeviceId)
-                    currentDeviceId?.let { VehicleLicenseQr(it) }
-                    if (hasSavedCode) {
-                        // A saved code that isn't unlocking here → it was issued for another vehicle.
-                        Text(
-                            "A saved code doesn't match this vehicle.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    Button(
-                        onClick = { showLicenseDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                    ) {
-                        Icon(Icons.Filled.Key, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Enter unlock code")
-                    }
-                }
-            }
+        // Locked → show the Pro upsell at the very top (prominent). Once unlocked it's just
+        // status + a rarely-used "Remove code", so it's rendered at the bottom of the page instead.
+        if (!isPro) {
+            ProUnlockCard(
+                isPro = isPro,
+                currentDeviceId = currentDeviceId,
+                hasSavedCode = hasSavedCode,
+                onEnterCode = { showLicenseDialog = true },
+            )
         }
 
         SettingsGroupLabel("General")
@@ -2355,6 +2286,17 @@ private fun AppPreferencesTab(
                 )
             }
         }
+
+        // Unlocked → Pro is just status + the rarely-used "Remove code", so it lives at the
+        // bottom of the page (out of the way) rather than up top where the upsell sits when locked.
+        if (isPro) {
+            ProUnlockCard(
+                isPro = isPro,
+                currentDeviceId = currentDeviceId,
+                hasSavedCode = hasSavedCode,
+                onEnterCode = { showLicenseDialog = true },
+            )
+        }
     }
 
     if (showTariffDialog) {
@@ -2620,6 +2562,107 @@ private fun AppPreferencesTab(
                 TextButton(onClick = { showLicenseDialog = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+/**
+ * Pro card. Self-contained so it can be placed at the top of Preferences when locked (upsell)
+ * or at the bottom once unlocked (status + the rarely-used "Remove code"). [onEnterCode] opens
+ * the unlock-code dialog owned by the caller.
+ */
+@Composable
+private fun ProUnlockCard(
+    isPro: Boolean,
+    currentDeviceId: String?,
+    hasSavedCode: Boolean,
+    onEnterCode: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.WorkspacePremium, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "BYD Trip Stats Pro",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                if (isPro) {
+                    Spacer(Modifier.width(8.dp))
+                    ProBadge()
+                }
+            }
+            if (isPro) {
+                var showRemoveCodeConfirm by remember { mutableStateOf(false) }
+                Text(
+                    "Active — Pro unlocked for this vehicle (lifetime).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = { showRemoveCodeConfirm = true }) {
+                    Text("Remove code")
+                }
+                if (showRemoveCodeConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showRemoveCodeConfirm = false },
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        icon = {
+                            Icon(Icons.Filled.Warning, null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(32.dp))
+                        },
+                        title = { Text("Remove Pro unlock code?", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text(
+                                "This turns Pro off on this vehicle and disables the Pro features " +
+                                "(cell imbalance alert, battery health report, screenshots, SD card " +
+                                "backup). Your code isn't lost — you can re-enter it anytime to unlock again."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showRemoveCodeConfirm = false
+                                EntitlementManager.clear()
+                            }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showRemoveCodeConfirm = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+            } else {
+                Text(
+                    "Unlock premium features like the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle — €9.99, lifetime, one car. Verified on-device — nothing leaves your car.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                // Codes are derived from this vehicle's id — the buyer sends it at purchase.
+                VehicleIdRow(currentDeviceId)
+                currentDeviceId?.let { VehicleLicenseQr(it) }
+                if (hasSavedCode) {
+                    // A saved code that isn't unlocking here → it was issued for another vehicle.
+                    Text(
+                        "A saved code doesn't match this vehicle.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Button(
+                    onClick = onEnterCode,
+                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
+                ) {
+                    Icon(Icons.Filled.Key, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Enter unlock code")
+                }
+            }
+        }
     }
 }
 

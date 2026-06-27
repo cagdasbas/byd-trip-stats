@@ -12,6 +12,7 @@ import android.hardware.bydauto.gearbox.BYDAutoGearboxDevice
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.os.Looper
 import android.os.SystemClock
 import android.hardware.bydauto.tyre.AbsBYDAutoTyreListener
@@ -47,6 +48,7 @@ private val ENABLE_LAB_DIAGNOSTICS = BuildConfig.SENSITIVE_DIAGNOSTICS_ENABLED
 private const val ENABLE_VERBOSE_SNAPSHOT_LOGS = false
 private const val ENABLE_VERBOSE_RAW_EVENT_LOGS = false
 private val ENABLE_MODE_STATE_LOGS = BuildConfig.SENSITIVE_DIAGNOSTICS_ENABLED && RuntimeExtensionBridge.isAvailable
+private const val WIFI_SSID_TTL_MS = 30_000L
 private const val VEHICLE_STATE_CACHE = "vehicle_state_cache"
 private const val KEY_CHARGER_SIGNALS_UNRELIABLE = "charger_signals_unreliable"
 // Bump this when the persisted value mapping changes so stale cached values are cleared.
@@ -254,6 +256,8 @@ data class VehicleTelemetrySnapshot(
     val tecControlTempRaw: Int? = null,
     val hvacEstimatedKw: Double? = null,
     val roadSlopeDeg: Double? = null,
+    /** Connected Wi-Fi SSID (head unit), populated by the data source; "" if unavailable. */
+    val wifiSsid: String = "",
 ) {
     private fun estimateSohFromBodyworkCapacity(carConfig: CarConfig?): Double? {
         val capacityAh = bodyworkBatteryCapacity?.toDouble()?.takeIf { it > 0.0 } ?: return null
@@ -433,7 +437,7 @@ data class VehicleTelemetrySnapshot(
             energyMode = energyMode,
             regenMode = regenMode,
             drivetrainState = drivetrainState,
-            wifiSsid = "",
+            wifiSsid = wifiSsid,
             // Derive HV from live cell voltage × cell count if Battery Device is silent
             batteryTotalVoltage = inferredPackVoltage ?: 0,
             electricDrivingRangeKm = statisticElecDrivingRangeValue ?: 0,
@@ -510,6 +514,27 @@ class BydVehicleDataSource(context: Context) {
 
     // Wrap the real context so BYD permission checks become no-ops
     private val appContext = context.applicationContext
+
+    // Connected Wi-Fi SSID, read at most once per TTL (the telemetry build is a hot path).
+    // Reading the SSID needs ACCESS_FINE_LOCATION (granted) — without it, or with location
+    // off, the system returns "<unknown ssid>", which we normalise to blank.
+    @Volatile private var cachedWifiSsid: String = ""
+    @Volatile private var lastWifiSsidReadMs: Long = 0L
+
+    private fun currentWifiSsid(): String {
+        val now = SystemClock.elapsedRealtime()
+        if (lastWifiSsidReadMs != 0L && now - lastWifiSsidReadMs < WIFI_SSID_TTL_MS) return cachedWifiSsid
+        lastWifiSsidReadMs = now
+        cachedWifiSsid = try {
+            val wm = appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            @Suppress("DEPRECATION")
+            val raw = wm?.connectionInfo?.ssid?.trim('"').orEmpty()
+            if (raw.isBlank() || raw.equals("<unknown ssid>", ignoreCase = true)) "" else raw
+        } catch (e: Exception) {
+            ""
+        }
+        return cachedWifiSsid
+    }
 
     private val runtimeScale01: Double by lazy { RuntimeExtensionBridge.doubleValue("d01", 3.0) }
 
@@ -5033,6 +5058,7 @@ class BydVehicleDataSource(context: Context) {
             else -> 0.0
         }
         _vehicleSnapshot.value = VehicleTelemetrySnapshot(
+            wifiSsid = currentWifiSsid(),
             isChargingActive = computeChargingActive(),
             chargingPower = effectiveChargingPowerKw,
             chargingPowerRaw = _chargingPowerRaw.value,
