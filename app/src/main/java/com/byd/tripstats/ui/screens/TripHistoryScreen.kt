@@ -1,19 +1,8 @@
 package com.byd.tripstats.ui.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -21,36 +10,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.widget.Toast
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
-import com.byd.tripstats.data.preferences.consumptionUnit
-import com.byd.tripstats.data.preferences.convertDistance
-import com.byd.tripstats.data.preferences.convertEfficiency
-import com.byd.tripstats.data.preferences.distanceUnit
-import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.data.repository.MergeEligibility
 import com.byd.tripstats.data.repository.MergeResult
 import com.byd.tripstats.ui.components.ApplyTagDialog
-import com.byd.tripstats.ui.components.TagChip
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
-import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripFilterState
-import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripSortField
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripSortOrder
-import kotlin.math.abs
+import com.byd.tripstats.ui.screens.triphistory.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +98,6 @@ fun TripHistoryScreen(
                 },
                 actions = {
                     if (selectionMode && selectedTrips.size >= 1) {
-                        // Compare — only for 2-3 completed trips
                         val comparableSelected = selectedTrips.filter { id ->
                             trips.firstOrNull { it.id == id }?.isActive == false
                         }
@@ -139,7 +114,6 @@ fun TripHistoryScreen(
                                 )
                             }
                         }
-                        // Merge — only for exactly 2 completed trips
                         if (comparableSelected.size == 2) {
                             IconButton(onClick = { showMergeDialog = true }) {
                                 Icon(
@@ -150,7 +124,6 @@ fun TripHistoryScreen(
                                 )
                             }
                         }
-                        // Tag — apply a tag to all selected completed trips
                         if (comparableSelected.isNotEmpty()) {
                             IconButton(onClick = { showApplyTagDialog = true }) {
                                 Icon(
@@ -175,7 +148,6 @@ fun TripHistoryScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                     } else if (!selectionMode) {
-                        // Favourites-only quick filter — star toggle
                         IconButton(onClick = { viewModel.toggleFavouritesOnly() }) {
                             Icon(
                                 imageVector = if (filterState.favouritesOnly)
@@ -187,7 +159,6 @@ fun TripHistoryScreen(
                                 modifier = Modifier.size(22.dp)
                             )
                         }
-                        // Sort button — icon reflects current direction
                         IconButton(onClick = { showSortSheet = true }) {
                             Icon(
                                 imageVector = if (sortOrder == TripSortOrder.DESC)
@@ -196,7 +167,6 @@ fun TripHistoryScreen(
                                 modifier = Modifier.size(22.dp)
                             )
                         }
-                        // Filter button — BadgedBox shows active filter count
                         BadgedBox(
                             modifier = Modifier.padding(end = 8.dp),
                             badge = {
@@ -217,20 +187,14 @@ fun TripHistoryScreen(
                                 )
                             }
                         }
-                        // Tags
                         IconButton(onClick = onNavigateToTags) {
-                            Icon(Icons.Filled.LocalOffer, "Tags",
-                                modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.LocalOffer, "Tags", modifier = Modifier.size(22.dp))
                         }
-                        // Recurring routes
                         IconButton(onClick = onNavigateToRoutes) {
-                            Icon(Icons.Filled.Route, "Recurring routes",
-                                modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.Route, "Recurring routes", modifier = Modifier.size(22.dp))
                         }
-                        // Seasonal analysis
                         IconButton(onClick = onNavigateToSeasonalAnalysis) {
-                            Icon(Icons.Filled.WbSunny, "Seasonal analysis",
-                                modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.WbSunny, "Seasonal analysis", modifier = Modifier.size(22.dp))
                         }
                     }
                 },
@@ -286,7 +250,6 @@ fun TripHistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                // Monthly cost summary — only shown when price is configured
                 if (monthlyCosts.isNotEmpty()) {
                     item(key = "monthly_cost_summary") {
                         MonthlyCostSummaryCard(
@@ -313,7 +276,6 @@ fun TripHistoryScreen(
                         isActive = trip.isActive,
                         onClick = {
                             if (selectionMode) {
-                                // Don't allow selecting active trips
                                 if (!trip.isActive) {
                                     selectedTrips = if (selectedTrips.contains(trip.id))
                                         selectedTrips - trip.id
@@ -324,7 +286,6 @@ fun TripHistoryScreen(
                             }
                         },
                         onLongClick = {
-                            // Don't allow long-press on active trips
                             if (!selectionMode && !trip.isActive) {
                                 selectionMode = true
                                 selectedTrips = setOf(trip.id)
@@ -491,672 +452,4 @@ fun TripHistoryScreen(
             )
         }
     }
-}
-
-// ── Sort sheet ────────────────────────────────────────────────────────────────
-
-@Composable
-private fun SortSheetContent(
-    currentField: TripSortField,
-    currentOrder: TripSortOrder,
-    onFieldSelected: (TripSortField) -> Unit,
-    onOrderToggle: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val fields = listOf(
-        TripSortField.DATE        to "Date",
-        TripSortField.DISTANCE    to "Distance",
-        TripSortField.DURATION    to "Duration",
-        TripSortField.CONSUMPTION to "Avg Consumption",
-        TripSortField.REGEN_EFF   to "Regen Efficiency",
-        TripSortField.MAX_SPEED   to "Max Speed"
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Sort by", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            // Direction toggle
-            FilledTonalButton(onClick = onOrderToggle) {
-                Icon(
-                    imageVector = if (currentOrder == TripSortOrder.DESC)
-                        Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(if (currentOrder == TripSortOrder.DESC) "Descending" else "Ascending")
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        fields.forEach { (field, label) ->
-            val selected = field == currentField
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.medium)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primaryContainer
-                        else Color.Transparent
-                    )
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = selected,
-                    onClick = { onFieldSelected(field); onDismiss() }
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                )
-            }
-        }
-    }
-}
-
-// ── Filter sheet ──────────────────────────────────────────────────────────────
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun FilterSheetContent(
-    current: TripFilterState,
-    unitSystem: UnitSystem = UnitSystem.METRIC,
-    allTags: List<com.byd.tripstats.data.local.entity.TagEntity> = emptyList(),
-    onApply: (TripFilterState) -> Unit,
-    onClear: () -> Unit
-) {
-    // Local mutable draft — only applied when the user taps Apply
-    var selectedTagIds by remember { mutableStateOf(current.tagIds) }
-    var distMin    by remember { mutableStateOf(current.distanceMin?.toString()    ?: "") }
-    var distMax    by remember { mutableStateOf(current.distanceMax?.toString()    ?: "") }
-    var durMin     by remember { mutableStateOf(current.durationMin?.toString()    ?: "") }
-    var durMax     by remember { mutableStateOf(current.durationMax?.toString()    ?: "") }
-    var consMin    by remember { mutableStateOf(current.consumptionMin?.toString() ?: "") }
-    var consMax    by remember { mutableStateOf(current.consumptionMax?.toString() ?: "") }
-    var regenMin   by remember { mutableStateOf(current.regenEffMin?.toString()    ?: "") }
-    var regenMax   by remember { mutableStateOf(current.regenEffMax?.toString()    ?: "") }
-    var speedMin   by remember { mutableStateOf(current.maxSpeedMin?.toString()    ?: "") }
-    var speedMax   by remember { mutableStateOf(current.maxSpeedMax?.toString()    ?: "") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 32.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text("Filter trips", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-
-        FilterRangeRow("Distance (${unitSystem.distanceUnit})", distMin, distMax) { a, b -> distMin = a; distMax = b }
-        FilterRangeRow("Duration (min)",                    durMin,  durMax)  { a, b -> durMin  = a; durMax  = b }
-        FilterRangeRow("Avg Consumption (${unitSystem.consumptionUnit})", consMin, consMax) { a, b -> consMin = a; consMax = b }
-        FilterRangeRow("Regen Efficiency (%)",              regenMin, regenMax) { a, b -> regenMin = a; regenMax = b }
-        FilterRangeRow("Max Speed (${unitSystem.speedUnit})", speedMin, speedMax) { a, b -> speedMin = a; speedMax = b }
-
-        if (allTags.isNotEmpty()) {
-            Text("Tags", style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                allTags.forEach { tag ->
-                    TagChip(
-                        tag = tag,
-                        selected = tag.id in selectedTagIds,
-                        onClick = {
-                            selectedTagIds = if (tag.id in selectedTagIds)
-                                selectedTagIds - tag.id else selectedTagIds + tag.id
-                        }
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = onClear,
-                modifier = Modifier.weight(1f)
-            ) { Text("Clear all") }
-
-            Button(
-                onClick = {
-                    onApply(TripFilterState(
-                        distanceMin    = distMin.toFloatOrNull(),
-                        distanceMax    = distMax.toFloatOrNull(),
-                        durationMin    = durMin.toFloatOrNull(),
-                        durationMax    = durMax.toFloatOrNull(),
-                        consumptionMin = consMin.toFloatOrNull(),
-                        consumptionMax = consMax.toFloatOrNull(),
-                        regenEffMin    = regenMin.toFloatOrNull(),
-                        regenEffMax    = regenMax.toFloatOrNull(),
-                        maxSpeedMin    = speedMin.toFloatOrNull(),
-                        maxSpeedMax    = speedMax.toFloatOrNull(),
-                        favouritesOnly = current.favouritesOnly,
-                        tagIds         = selectedTagIds
-                    ))
-                },
-                modifier = Modifier.weight(1f)
-            ) { Text("Apply") }
-        }
-    }
-}
-
-@Composable
-private fun FilterRangeRow(
-    label: String,
-    minVal: String,
-    maxVal: String,
-    onValuesChange: (String, String) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = minVal,
-                onValueChange = { onValuesChange(it, maxVal) },
-                modifier = Modifier.weight(1f),
-                label = { Text("Min") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
-            Text("–", style = MaterialTheme.typography.bodyLarge)
-            OutlinedTextField(
-                value = maxVal,
-                onValueChange = { onValuesChange(minVal, it) },
-                modifier = Modifier.weight(1f),
-                label = { Text("Max") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
-        }
-    }
-}
-
-// ── TripItem ──────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
-@Composable
-fun TripItem(
-    trip: com.byd.tripstats.data.local.entity.TripEntity,
-    tags: List<com.byd.tripstats.data.local.entity.TagEntity> = emptyList(),
-    avgSpeedKmh: Int?,
-    tripScore: Int?,
-    regenEfficiencyPct: Double?,
-    tripCost: Double? = null,
-    currencySymbol: String = "€",
-    unitSystem: UnitSystem = UnitSystem.METRIC,
-    socSource: SocSource = SocSource.PANEL,
-    isSelected: Boolean = false,
-    selectionMode: Boolean = false,
-    isActive: Boolean = false,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit = {},
-    onToggleFavourite: () -> Unit = {},
-    onDelete: () -> Unit
-) {
-    var showDeleteDialog by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-                enabled = !isActive || !selectionMode
-            )
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(12.dp)
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = when {
-                isActive && selectionMode -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                else -> MaterialTheme.colorScheme.primaryContainer
-            },
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Header row: checkbox (left) + date + "In Progress" badge + delete (right)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Checkbox - always reserve space so date doesn't shift
-                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                    if (selectionMode) {
-                        Checkbox(
-                            checked = isSelected,
-                            onCheckedChange = { onClick() },
-                            enabled = !isActive,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = if (trip.endTime != null)
-                            "${formatTimestamp(trip.startTime)}  ->  ${formatTimestamp(trip.endTime)}   | "
-                        else
-                            formatTimestamp(trip.startTime),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    if (trip.endTime != null) {
-                        Spacer(modifier = Modifier.width(12.dp))
-                        ScoreChip(score = tripScore)
-                    }
-                }
-                if (trip.endTime == null) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text(
-                            text = "In Progress",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-                // Favourite star — reserve space; only actionable for completed trips
-                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                    if (!selectionMode && trip.endTime != null) {
-                        IconButton(
-                            onClick = onToggleFavourite,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (trip.isFavourite)
-                                    Icons.Filled.Star else Icons.Filled.StarBorder,
-                                contentDescription = if (trip.isFavourite)
-                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
-                                modifier = Modifier.size(20.dp),
-                                tint = if (trip.isFavourite)
-                                    ChargingYellow
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-                // Delete icon - always reserve space so date doesn't shift
-                Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-                    if (!selectionMode) {
-                        IconButton(
-                            onClick = { showDeleteDialog = true },
-                            enabled = !isActive,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                "Delete",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (isActive)
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                                else
-                                    MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (tags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    tags.forEach { tag -> TagChip(tag = tag) }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // ── Row 1: Distance | Duration | Avg Consumption
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TripMetricChip(
-                    icon = Icons.Filled.Route,
-                    label = "Distance",
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    value = "${String.format("%.1f", unitSystem.convertDistance(trip.distance ?: 0.0))} ${unitSystem.distanceUnit}",
-                    modifier = Modifier.weight(1f)
-                )
-                TripMetricChip(
-                    icon = Icons.Filled.Timer,
-                    label = "Duration",
-                    value = if (trip.endTime == null) "Ongoing…"
-                            else formatDuration(trip.duration ?: 0),
-                    modifier = Modifier.weight(1f)
-                )
-                TripMetricChip(
-                    icon = Icons.Filled.Eco,
-                    label = "Avg Consumption",
-                    value = trip.efficiency
-                        ?.let { "${String.format("%.1f", unitSystem.convertEfficiency(it))} kWh/100${unitSystem.distanceUnit}" } ?: "—",
-                    iconTint = RegenGreen,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Row 2: Energy | Max Regen | Regeneration Efficiency
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TripMetricChip(
-                    icon = Icons.Filled.BatteryChargingFull,
-                    label = "Energy consumed",
-                    value = trip.energyConsumed?.let {
-                        val kwh = "${String.format("%.2f", it)} kWh"
-                        if (tripCost != null)
-                            "$kwh ($currencySymbol${String.format("%.2f", tripCost)})"
-                        else kwh
-                    } ?: "—",
-                    iconTint = AccelerationOrange,
-                    modifier = Modifier.weight(1f)
-                )
-                TripMetricChip(
-                    icon = Icons.Filled.BatteryChargingFull,
-                    label = "Max Regen",
-                    value = "${abs(trip.maxRegenPower).toInt()} kW",
-                    iconTint = RegenGreen,
-                    modifier = Modifier.weight(1f)
-                )
-                TripMetricChip(
-                    icon = Icons.Filled.VolunteerActivism,
-                    label = "Regen Eff.",
-                    value = regenEfficiencyPct?.let { "%.1f%%".format(it) } ?: "—",
-                    iconTint = RegenGreen,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── Row 3: Avg Speed | Max Speed | SoC
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                TripMetricChip(
-                    icon = Icons.Filled.Speed,
-                    label = "Avg Speed",
-                    iconTint = BydEcoTealDim,
-                    value = if (avgSpeedKmh != null) "$avgSpeedKmh ${unitSystem.speedUnit}" else "—",
-                    modifier = Modifier.weight(1f)
-                )
-                TripMetricChip(
-                    icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    label = "Max Speed",
-                    iconTint = BydErrorRed,
-                    value = "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}",
-                    modifier = Modifier.weight(1f)
-                )
-                TripMetricChip(
-                    icon = Icons.Filled.Battery4Bar,
-                    label = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)",
-                    value = if (socSource == SocSource.PANEL) {
-                        if (trip.endSocPanel != null)
-                            "${trip.startSocPanel.toInt()}% → ${trip.endSocPanel.toInt()}%"
-                        else "—"
-                    } else {
-                        if (trip.endSoc != null)
-                            "${trip.startSoc.toInt()}% → ${trip.endSoc.toInt()}%"
-                        else "—"
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete Trip?") },
-            text = { Text("This action cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDelete()
-                        showDeleteDialog = false
-                    }
-                ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
-}
-
-/**
- * Score chip - displays trip score 0-100 with colour feedback.
- * Green >=80, Yellow 60-79, Orange 40-59, Red <40
- */
-@Composable
-fun ScoreChip(
-    score: Int?,
-    modifier: Modifier = Modifier
-) {
-    val scoreColor = when {
-        score == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        score >= 80   -> RegenGreen
-        score >= 60   -> BatteryBlue
-        score >= 40   -> AccelerationOrange
-        else          -> BydErrorRed
-    }
-    val grade = when {
-        score == null -> "—"
-        score >= 80   -> "A"
-        score >= 60   -> "B"
-        score >= 40   -> "C"
-        else          -> "D"
-    }
-
-    val bgColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f)
-    Box(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(bgColor)
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-    ) {
-        Column(horizontalAlignment = Alignment.Start) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
-                Icon(Icons.Filled.Star, null, Modifier.size(14.dp), tint = scoreColor)
-                Spacer(Modifier.width(3.dp))
-                Text("Score", style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(2.dp))
-            if (score != null) {
-                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Start) {
-                    Text("$score", style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold, color = scoreColor)
-                    Spacer(Modifier.width(3.dp))
-                    Text("($grade)", style = MaterialTheme.typography.labelSmall, color = scoreColor)
-                }
-            } else {
-                Text("—", style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun MonthlyCostSummaryCard(
-    months         : List<DashboardViewModel.MonthlyCost>,
-    currencySymbol : String
-) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val shown = if (expanded) months else months.take(1)
-    val hiddenCount = (months.size - 1).coerceAtLeast(0)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(12.dp)
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.AttachMoney, null,
-                        tint = AccelerationOrange, modifier = Modifier.size(20.dp))
-                    Text("Monthly Cost", style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold)
-                }
-                if (months.size > 1) {
-                    TextButton(onClick = { expanded = !expanded }) {
-                        Text(if (expanded) "Show less" else "Show $hiddenCount more")
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-            shown.forEach { month ->
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(month.label, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text(
-                            "${"%.1f".format(month.kwhTotal)} kWh",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "$currencySymbol${"%.2f".format(month.costAmount)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = AccelerationOrange
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Compact labelled metric cell used inside TripItem rows.
- * Uses Box + background instead of Surface to avoid unnecessary composition overhead
- * when rendering many chips inside a LazyColumn.
- */
-@Composable
-fun TripMetricChip(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    iconTint: Color = MaterialTheme.colorScheme.primary
-) {
-    Box(
-        modifier = modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
-    ) {
-        Column(horizontalAlignment = Alignment.Start) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
-                Icon(icon, null, Modifier.size(14.dp), tint = iconTint)
-                Spacer(Modifier.width(3.dp))
-                Text(label, style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(value, style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface)
-        }
-    }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-private fun formatDuration(milliseconds: Long): String {
-    val seconds = milliseconds / 1000
-    val hours = seconds / 3600
-    val minutes = (seconds % 3600) / 60
-    return if (hours > 0) String.format("%dh %dmin", hours, minutes)
-    else String.format("%dmin", minutes)
-}
-
-private fun formatTimestamp(timestamp: Long): String {
-    val instant = java.time.Instant.ofEpochMilli(timestamp)
-    val formatter = java.time.format.DateTimeFormatter
-        .ofPattern("MMM dd, yyyy HH:mm")
-        .withZone(java.time.ZoneId.systemDefault())
-    return formatter.format(instant)
 }

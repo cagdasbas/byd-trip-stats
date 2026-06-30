@@ -2,6 +2,7 @@ package com.byd.tripstats.ui.components
 
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
+import com.byd.tripstats.ui.components.routeanalysis.buildDriveModeSummaries
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

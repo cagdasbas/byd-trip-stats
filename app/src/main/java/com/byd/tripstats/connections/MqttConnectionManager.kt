@@ -297,6 +297,9 @@ class MqttConnectionManager(context: Context) {
             SensorDef("engine_power", "Engine Power", "kW", "power", "measurement"),
             SensorDef("engine_speed_front", "Engine Speed Front", "rpm", null, "measurement"),
             SensorDef("engine_speed_rear", "Engine Speed Rear", "rpm", null, "measurement"),
+            // Gross charge power on cars with a working m33 getter (e.g. Seal); on m33-dead cars
+            // (e.g. Atto 3) it falls back to a NET-into-battery rate that reads lower than engine_power
+            // and dips with accessory/aircon load. See effectiveChargingPowerKw in BydVehicleDataSource.
             SensorDef("charging_power", "Charging Power", "kW", "power", "measurement"),
             SensorDef("fuel_percentage", "Fuel Percentage", "%", null, "measurement"),
             SensorDef("fuel_driving_range_km", "Fuel Driving Range", "km", null, "measurement"),

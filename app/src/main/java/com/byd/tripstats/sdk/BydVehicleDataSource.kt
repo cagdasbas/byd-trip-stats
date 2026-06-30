@@ -5051,10 +5051,21 @@ class BydVehicleDataSource(context: Context) {
         val recentDirectPower = hasFreshDirectChargingPower(nowElapsedMs)
         val recentCapacityActivity = lastChargingActivityElapsedMs != 0L &&
             nowElapsedMs - lastChargingActivityElapsedMs <= 8_000L
+        // Charging-power source priority. NOTE the last tier measures a DIFFERENT physical quantity:
+        //   recentPackPower (m33) and recentDirectPower are GROSS charge power
+        //     (what the charger pushes), matching the BYD app's figure. Available on e.g. the Seal.
+        //   recentCapacityActivity falls back to _chargingPowerKw, derived from the chargingCapacity
+        //     counter's rate. That counter accrues NET energy reaching the cells, i.e. gross minus
+        //     whatever accessories divert. So on cars where m33 returns 0 the whole charge (verified
+        //     on an Atto 3: m33Power=0.0 throughout, enginePower=-4 ≈ 4 kW gross, cap-rate ≈ 2.2 kW),
+        //     charging_power reads LOWER than engine_power and visibly dips with load — e.g. the owner
+        //     saw 4.1→2.1 kW with aircon on, 4.1→3.5 kW with the car powered on without aircon.
+        //   This is intentional/known, not a bug. If a future change should report gross on those
+        //   cars instead, add a tier here sourcing |enginePower| (m23) while charging.
         val effectiveChargingPowerKw = when {
             recentPackPower -> _packChargingPowerKw.value     // m33 pack power — authoritative, sees DC (to 500 kW)
             recentDirectPower -> _chargingPowerRaw.value
-            recentCapacityActivity -> _chargingPowerKw.value
+            recentCapacityActivity -> _chargingPowerKw.value  // capacity-rate = NET into battery (see note above)
             else -> 0.0
         }
         _vehicleSnapshot.value = VehicleTelemetrySnapshot(
