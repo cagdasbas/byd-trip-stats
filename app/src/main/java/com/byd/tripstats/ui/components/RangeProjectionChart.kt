@@ -149,11 +149,11 @@ fun RangeProjectionChart(
         val maxDistanceKm = points.lastOrNull()?.distanceKm?.coerceAtLeast(1.0) ?: 1.0
 
         // Include every point that has a non-null projectedRangeKm — both the
-        // stabilised ones (LIVE_TRIP / HISTORICAL_BINS) and the pre-stabilisation
+        // stabilised ones (LIVE_TRIP / TRIP_AVERAGE) and the pre-stabilisation
         // baseline-tier ones at the very start of a drive. The earlier filter
         // (isStabilised only) was put in place when BASELINE-only could persist
         // for an entire trip — that risk is gone now that bin distance counts
-        // every tick and HISTORICAL_BINS engages within ~0.2 km — so dropping
+        // every tick and TRIP_AVERAGE engages within ~0.2 km — so dropping
         // the filter is safe and lets the orange line touch the origin instead
         // of starting at the first stabilised point.
         val projectedPoints: List<Pair<Double, Double>> = remember(points) {
@@ -220,13 +220,13 @@ fun RangeProjectionChart(
         Column(modifier = modifier.fillMaxSize()) {
             val modelLabel = when (activeRangeModel) {
                 DashboardViewModel.RangeModel.LIVE_TRIP        -> "● Live trip"
-                DashboardViewModel.RangeModel.HISTORICAL_BINS  -> "● Speed bins"
+                DashboardViewModel.RangeModel.TRIP_AVERAGE  -> "● Trip average"
                 DashboardViewModel.RangeModel.LIFETIME_AVERAGE -> "● Lifetime avg"
                 DashboardViewModel.RangeModel.BASELINE         -> "● Baseline"
             }
             val modelColor = when (activeRangeModel) {
                 DashboardViewModel.RangeModel.LIVE_TRIP       -> RegenGreen
-                DashboardViewModel.RangeModel.HISTORICAL_BINS -> AccelerationOrange
+                DashboardViewModel.RangeModel.TRIP_AVERAGE -> AccelerationOrange
                 else                                          -> MaterialTheme.colorScheme.onSurfaceVariant
             }
 

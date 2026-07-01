@@ -381,8 +381,8 @@ data class VehicleTelemetrySnapshot(
         // chargingPower is taken straight from the pack reading so DC sessions get a real power
         // curve instead of the 0 kW the listener path records when it can't see the magnitude.
         val packPowerKw = enginePower ?: 0
-        val dcChargeInferred = gear == "P" &&
-            carConfig?.isPhev != true &&
+        val parkedBev = gear == "P" && carConfig?.isPhev != true
+        val dcChargeInferred = parkedBev &&
             !isChargingActive &&
             chargingPower <= 0.0 &&
             packPowerKw <= -DC_CHARGE_INFER_MIN_KW
@@ -390,9 +390,22 @@ data class VehicleTelemetrySnapshot(
         val chargingActive = isChargingActive ||
             chargingPower > 0.0 ||
             dcChargeInferred
+
+        // Charging-power magnitude. While parked and charging (BEV), enginePower is the pack's own
+        // V×I reading — the true rate energy enters the battery. The dedicated charging-power getters
+        // under-report badly on several firmwares: the Seal's capacity-derived value read ~3.3 kW for
+        // a charge whose pack power was −5 kW, and an Atto 3 reported a flat ~2 kW for a ~4 kW charge
+        // (independently confirmed by its wall socket at 4.6 kW). enginePower tracks the real rate and
+        // even follows aux draw — it correctly drops when the AC compressor runs. So whenever power is
+        // flowing into the pack while parked-charging, prefer the pack reading over the dedicated
+        // getter; fall back to the getter only when enginePower isn't showing a charge (e.g. car fully
+        // off → the pack getter reads idle, and off-state charging is reconstructed from SoC anyway).
+        // This subsumes the DC case above; kwhAdded still comes from the SoC delta, so the energy
+        // total is unaffected — only the live/recorded power curve and the MQTT charging_power sensor.
+        val packChargeKw = if (chargingActive && parkedBev && packPowerKw < 0) -packPowerKw.toDouble() else 0.0
         val inferredChargingPower = when {
+            packChargeKw > 0.0 -> packChargeKw
             chargingPower > 0.0 -> chargingPower
-            dcChargeInferred -> -packPowerKw.toDouble()
             else -> 0.0
         }
 

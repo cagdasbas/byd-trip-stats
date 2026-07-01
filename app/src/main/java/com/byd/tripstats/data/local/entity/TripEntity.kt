@@ -127,6 +127,13 @@ data class TripDataPointEntity(
     val tyreTempRF: Int = 0,
     val tyreTempLR: Int = 0,
     val tyreTempRR: Int = 0,
+    // ── DB v10 — EV-only remaining energy (PHEV charge-sustaining aware) ───────
+    /** BMS-reported remaining EV-usable energy (kWh), from `battery_remain_power_ev`.
+     *  Null on BEVs / firmwares that don't report it and on pre-v10 rows. Lets
+     *  restoreTripState reproduce the live EV-range projection exactly — the BMS
+     *  value already nets out the PHEV charge-sustaining reserve — instead of
+     *  capacity × SoC, which overstates EV energy near the charge-sustaining floor. */
+    val batteryRemainPowerEV: Double? = null,
     // Escape hatch for future telemetry keys that don't yet have a first-class column.
     // Store as JSON: {"hvacPower": 1.2, ...}
     // When a new key becomes stable/important, promote it to its own column

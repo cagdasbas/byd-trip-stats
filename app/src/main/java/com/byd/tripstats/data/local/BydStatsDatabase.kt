@@ -37,7 +37,7 @@ import java.io.IOException
         TagEntity::class,
         TripTagCrossRef::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -76,7 +76,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
                 )
                     // .fallbackToDestructiveMigration()
                     // .fallbackToDestructiveMigrationOnDowngrade()
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                 INSTANCE = instance
                 instance
@@ -248,6 +248,17 @@ abstract class BydStatsDatabase : RoomDatabase() {
                         "PRIMARY KEY(`tripId`, `tagId`))"
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_trip_tags_tagId` ON `trip_tags` (`tagId`)")
+            }
+        }
+
+        // v10: persist the BMS remaining-EV-energy reading (battery_remain_power_ev) per
+        // data point so restoreTripState can reproduce the live EV-range projection exactly
+        // for PHEVs instead of falling back to capacity × SoC (which overstates EV energy
+        // near the charge-sustaining floor). Nullable — old rows and BEV/non-reporting
+        // firmwares stay NULL and transparently fall back to the SoC product, as before.
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN batteryRemainPowerEV REAL")
             }
         }
 

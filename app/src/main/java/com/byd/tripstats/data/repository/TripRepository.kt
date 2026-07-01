@@ -1675,6 +1675,7 @@ class TripRepository private constructor(context: Context) {
                     battery12vVoltage      = t.battery12vVoltage.safe(),
                     batteryCellVoltageMax  = t.batteryCellVoltageMax.safe(),
                     batteryCellVoltageMin  = t.batteryCellVoltageMin.safe(),
+                    batteryRemainPowerEV   = t.batteryRemainPowerEV?.takeIf { it.isFinite() },
                     rawJson                = rawJson
                 )
             )
