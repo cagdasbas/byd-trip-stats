@@ -7,9 +7,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
 import com.byd.tripstats.ui.theme.BydElectricAzure
@@ -32,17 +34,17 @@ internal fun DirectBydTelemetryCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(Icons.Filled.SettingsRemote, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
-                Text("Direct BYD", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.direct_byd_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
             if (snapshot == null) {
                 Text(
-                    "Waiting for direct BYD probes.",
+                    stringResource(R.string.waiting_direct_probes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                SettingsGroupLabel("Remote-only")
+                SettingsGroupLabel(stringResource(R.string.remote_only_label))
                 SettingsDetailRow(
                     "Battery remain",
                     snapshot.powerBatteryRemainPowerEV?.let { "%.1f kWh".format(it) } ?: "n/a"
@@ -173,7 +175,7 @@ internal fun VehicleSnapshotCard(
     telemetry: VehicleTelemetry?,
     snapshot: VehicleTelemetrySnapshot?
 ) {
-    val chargingLabel = if (snapshot == null) "Waiting for vehicle data" else {
+    val chargingLabel = if (snapshot == null) stringResource(R.string.waiting_vehicle_data_msg) else {
         val hrs = snapshot.remainHours
         val mins = snapshot.remainMinutes
         if (hrs > 0 || mins > 0) "${hrs}h ${mins}m"
@@ -194,7 +196,7 @@ internal fun VehicleSnapshotCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(Icons.Filled.DirectionsCar, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
-                Text("Vehicle Snapshot", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.vehicle_snapshot_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
             if (snapshot == null) {
@@ -249,17 +251,17 @@ internal fun TelemetryComparisonCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(Icons.Filled.Timeline, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
-                Text("Telemetry Compare", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.telemetry_compare_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
             Text(
-                "Auto-refreshes while the App tab is open.",
+                stringResource(R.string.auto_refreshes_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             if (telemetry == null && snapshot == null) {
                 Text(
-                    "Waiting for live telemetry and vehicle snapshot.",
+                    stringResource(R.string.waiting_telemetry_msg),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -292,7 +294,7 @@ internal fun TelemetryComparisonCard(
                         "time=${snapshot?.instrumentCurrentJourneyDriveTime?.let { "%.1f".format(it) } ?: "n/a"}"
                 )
                 HorizontalDivider()
-                SettingsGroupLabel("Remote-only")
+                SettingsGroupLabel(stringResource(R.string.remote_only_label))
                 SettingsDetailRow(
                     "Battery remain (kWh)",
                     "Live: n/a   |   Car: ${snapshot?.powerBatteryRemainPowerEV?.let { "%.1f kWh".format(it) } ?: "n/a"}"
@@ -365,17 +367,17 @@ internal fun CoreTelemetryCard(telemetry: VehicleTelemetry?) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Icon(Icons.Filled.Dashboard, null, tint = BydElectricAzure, modifier = Modifier.size(22.dp))
-                Text("Core Telemetry", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.core_telemetry_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
 
             if (telemetry == null) {
                 Text(
-                    "Waiting for live telemetry.",
+                    stringResource(R.string.waiting_live_msg),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                SettingsGroupLabel("Core")
+                SettingsGroupLabel(stringResource(R.string.core_section_label))
                 SettingsDetailRow("SoC", "%.1f%%".format(telemetry.soc))
                 SettingsDetailRow("SoC panel", "${telemetry.socPanel}%")
                 SettingsDetailRow("Car on", telemetry.isCarOn.toString())
@@ -406,7 +408,7 @@ internal fun CoreTelemetryCard(telemetry: VehicleTelemetry?) {
                     "Battery cells",
                     "Vmax ${"%.3f".format(telemetry.batteryCellVoltageMax)} / Vmin ${"%.3f".format(telemetry.batteryCellVoltageMin)}"
                 )
-                SettingsGroupLabel("Battery")
+                SettingsGroupLabel(stringResource(R.string.stat_battery))
                 SettingsDetailRow("Cell V max", "%.3f V".format(telemetry.batteryCellVoltageMax))
                 SettingsDetailRow("Cell V min", "%.3f V".format(telemetry.batteryCellVoltageMin))
                 SettingsDetailRow("Current date", if (telemetry.currentDatetime.isBlank()) "n/a" else telemetry.currentDatetime)

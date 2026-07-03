@@ -1,6 +1,8 @@
 package com.byd.tripstats.ui.screens.chargingdetail
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.AccelerationOrange
 
@@ -16,10 +18,11 @@ internal fun ChargingPowerSocTab(
     xAxisMode  : ChargingXAxisMode,
     onXAxisModeChange: (ChargingXAxisMode) -> Unit,
 ) {
+    val chargePowerLabel = stringResource(R.string.charging_chart_charge_power)
     ChargingSeriesChart(
         dataPoints  = dataPoints,
         isSynthetic = isSynthetic,
-        title       = "Charge Power",
+        title       = chargePowerLabel,
         yAxisLabel  = "Power (kW)",
         socSource   = socSource,
         xAxisMode   = xAxisMode,

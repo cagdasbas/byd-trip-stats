@@ -8,8 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.preferences.SocSource
@@ -77,12 +79,12 @@ internal fun ChargingOverviewTab(
             colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OverviewRow("Started",  dateFmt.format(Date(session.startTime)))
+                OverviewRow(stringResource(R.string.started_label),  dateFmt.format(Date(session.startTime)))
                 session.endTime?.let {
-                    OverviewRow("Ended",  dateFmt.format(Date(it)))
+                    OverviewRow(stringResource(R.string.ended_label),  dateFmt.format(Date(it)))
                 }
                 session.durationSeconds?.let {
-                    OverviewRow("Duration", formatDurationLong(it))
+                    OverviewRow(stringResource(R.string.stat_duration), formatDurationLong(it))
                 }
             }
         }
@@ -92,19 +94,19 @@ internal fun ChargingOverviewTab(
             colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Energy", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.section_energy), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 val usePanelSoc = socSource == SocSource.PANEL && session.socStartPanel > 0.0
                 val displaySocStart = if (usePanelSoc) session.socStartPanel else session.socStart
                 val displaySocEnd   = if (usePanelSoc) session.socEndPanel else session.socEnd
-                OverviewRow("SoC start", "%.1f%%".format(displaySocStart))
+                OverviewRow(stringResource(R.string.soc_start_label), "%.1f%%".format(displaySocStart))
                 displaySocEnd?.let {
-                    OverviewRow("SoC end",  "%.1f%%".format(it))
-                    OverviewRow("SoC added","%.1f%%".format(it - displaySocStart))
+                    OverviewRow(stringResource(R.string.soc_end_label),  "%.1f%%".format(it))
+                    OverviewRow(stringResource(R.string.soc_added_label),"%.1f%%".format(it - displaySocStart))
                 }
                 session.kwhAdded?.let {
-                    OverviewRow("kWh added", "%.2f kWh".format(it), valueColor = RegenGreen)
+                    OverviewRow(stringResource(R.string.kwh_added_label), "%.2f kWh".format(it), valueColor = RegenGreen)
                 }
-                OverviewRow("Battery (car)", "%.1f kWh".format(session.batteryKwh))
+                OverviewRow(stringResource(R.string.battery_car_label), "%.1f kWh".format(session.batteryKwh))
             }
         }
 
@@ -113,17 +115,17 @@ internal fun ChargingOverviewTab(
             colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Power", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.tab_power), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (displayPeakKw > 0.0) {
-                    OverviewRow("Peak power", "%.1f kW".format(displayPeakKw), valueColor = AccelerationOrange)
+                    OverviewRow(stringResource(R.string.peak_power_label), "%.1f kW".format(displayPeakKw), valueColor = AccelerationOrange)
                 }
                 if (displayAvgKw > 0.0) {
-                    OverviewRow("Average power", "%.1f kW".format(displayAvgKw))
+                    OverviewRow(stringResource(R.string.average_power_label), "%.1f kW".format(displayAvgKw))
                 }
                 session.durationSeconds?.let { secs ->
                     if (session.kwhAdded != null && secs > 0) {
                         val rate = session.kwhAdded / (secs / 3600.0)
-                        OverviewRow("Charge rate", "%.1f kW (avg)".format(rate))
+                        OverviewRow(stringResource(R.string.charge_rate_label), "%.1f kW (avg)".format(rate))
                     }
                 }
             }
@@ -135,13 +137,13 @@ internal fun ChargingOverviewTab(
                 colors   = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Battery Temperature", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    OverviewRow("At start", "%.1f °C".format(displayTempStart))
+                    Text(stringResource(R.string.battery_temperature_section), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    OverviewRow(stringResource(R.string.at_start_label), "%.1f °C".format(displayTempStart))
                     displayTempEnd?.let {
-                        OverviewRow("At end",   "%.1f °C".format(it))
+                        OverviewRow(stringResource(R.string.at_end_label),   "%.1f °C".format(it))
                         val delta = it - displayTempStart
                         val sign  = if (delta >= 0) "+" else ""
-                        OverviewRow("Rise",     "$sign%.1f °C".format(delta),
+                        OverviewRow(stringResource(R.string.rise_label),     "$sign%.1f °C".format(delta),
                             valueColor = if (delta > 10) BydErrorRed else MaterialTheme.colorScheme.onSurface)
                     }
                 }
@@ -150,7 +152,7 @@ internal fun ChargingOverviewTab(
 
         if (dataPoints.isNotEmpty()) {
             Text(
-                "${dataPoints.size} telemetry points recorded",
+                stringResource(R.string.telemetry_points_label, dataPoints.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 4.dp)
@@ -194,13 +196,13 @@ internal fun ActiveChargingPowerTab(latestKw: Double?) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    "Charge Power",
+                    stringResource(R.string.charging_chart_charge_power),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 latestKw?.takeIf { it > 0.1 }?.let {
                     Text(
-                        "%.1f kW current estimate".format(it),
+                        stringResource(R.string.current_power_estimate, it),
                         style = MaterialTheme.typography.headlineSmall,
                         color = AccelerationOrange,
                         fontWeight = FontWeight.Bold
@@ -209,7 +211,7 @@ internal fun ActiveChargingPowerTab(latestKw: Double?) {
                 latestKw?.takeIf { it > 0.1 }?.let {
                     HorizontalDivider()
                     Text(
-                        "The live chart will appear as soon as enough charging-power samples are recorded.",
+                        stringResource(R.string.live_chart_notice),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

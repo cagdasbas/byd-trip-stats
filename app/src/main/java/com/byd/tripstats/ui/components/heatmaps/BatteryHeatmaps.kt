@@ -5,6 +5,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.preferences.SocSource
 import kotlin.math.abs
@@ -29,7 +31,7 @@ internal fun BatteryTempVsPowerHeatmap(
     if (tempPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No battery temperature data recorded on this trip.",
+                stringResource(R.string.heatmap_no_battery_temp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -78,7 +80,7 @@ internal fun SocVsConsumptionHeatmap(
     if (consPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "Not enough driving samples for this heatmap.",
+                stringResource(R.string.heatmap_no_samples),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -122,7 +124,7 @@ internal fun SocVsRegenHeatmap(
     if (points.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No regenerative braking data recorded on this trip.",
+                stringResource(R.string.heatmap_no_regen),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -167,7 +169,7 @@ internal fun CellVoltageSpreadVsSocHeatmap(
     if (points.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No cell voltage data recorded on this trip.",
+                stringResource(R.string.heatmap_no_cell_voltage),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -14,10 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.ChargingYellow
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.screens.charginghistory.*
@@ -45,13 +47,13 @@ fun ChargingHistoryScreen(
                 title = {
                     if (selectionMode) {
                         Text(
-                            "${selectedSessions.size} selected",
+                            stringResource(R.string.selected_count, selectedSessions.size),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     } else {
                         Text(
-                            "Charging History",
+                            stringResource(R.string.charging_history_title),
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -73,7 +75,7 @@ fun ChargingHistoryScreen(
                             if (selectionMode) Icons.Filled.Close
                             else Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription =
-                            if (selectionMode) "Cancel" else "Back",
+                            if (selectionMode) stringResource(R.string.cancel) else stringResource(R.string.back),
                         modifier = Modifier.size(28.dp)
                     )
                     }
@@ -83,7 +85,7 @@ fun ChargingHistoryScreen(
                         IconButton(onClick = { showDeleteSelectedDialog = true }) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Delete selected",
+                                contentDescription = stringResource(R.string.delete_selected_sessions),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -94,7 +96,7 @@ fun ChargingHistoryScreen(
                                 imageVector = if (favouritesOnly)
                                     Icons.Filled.Star else Icons.Filled.StarBorder,
                                 contentDescription = if (favouritesOnly)
-                                    "Show all sessions" else "Show favourites only",
+                                    stringResource(R.string.show_all_sessions) else "Show favourites only",
                                 tint = if (favouritesOnly)
                                     ChargingYellow else LocalContentColor.current,
                                 modifier = Modifier.size(22.dp)
@@ -123,16 +125,16 @@ fun ChargingHistoryScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        if (favouritesOnly) "No favourite sessions yet" else "No charging sessions yet",
+                        if (favouritesOnly) stringResource(R.string.no_favourite_sessions) else stringResource(R.string.no_charging_sessions),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         if (favouritesOnly)
-                            "Tap the ☆ on a session to mark it a favourite"
+                            stringResource(R.string.mark_session_favourite_hint)
                         else
-                            "Sessions are reconstructed automatically\nfrom SoC changes on each car wake-up",
+                            stringResource(R.string.sessions_reconstructed_note),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center
@@ -224,12 +226,12 @@ fun ChargingHistoryScreen(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = {
                 Text(
-                    "Delete ${selectedSessions.size} Session${if (selectedSessions.size > 1) "s" else ""}?"
+                    stringResource(R.string.delete_sessions_title, selectedSessions.size)
                 )
             },
             text = {
                 Text(
-                    "This will permanently delete the selected charging sessions and all their data. This action cannot be undone."
+                    stringResource(R.string.delete_sessions_msg)
                 )
             },
             confirmButton = {
@@ -240,10 +242,10 @@ fun ChargingHistoryScreen(
                         selectionMode = false
                         selectedSessions = setOf()
                     }
-                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteSelectedDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteSelectedDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

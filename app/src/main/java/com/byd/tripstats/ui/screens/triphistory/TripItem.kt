@@ -24,6 +24,8 @@ import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
 import com.byd.tripstats.data.preferences.speedUnit
 import com.byd.tripstats.ui.components.TagChip
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.*
 import kotlin.math.abs
 
@@ -117,7 +119,7 @@ fun TripItem(
                         shape = MaterialTheme.shapes.small
                     ) {
                         Text(
-                            text = "In Progress",
+                            text = stringResource(R.string.in_progress_label),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -135,7 +137,7 @@ fun TripItem(
                                 imageVector = if (trip.isFavourite)
                                     Icons.Filled.Star else Icons.Filled.StarBorder,
                                 contentDescription = if (trip.isFavourite)
-                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                    stringResource(R.string.remove_favourite_action) else stringResource(R.string.mark_favourite_action),
                                 modifier = Modifier.size(20.dp),
                                 tint = if (trip.isFavourite)
                                     ChargingYellow
@@ -154,7 +156,7 @@ fun TripItem(
                         ) {
                             Icon(
                                 Icons.Filled.Delete,
-                                "Delete",
+                                stringResource(R.string.delete),
                                 modifier = Modifier.size(18.dp),
                                 tint = if (isActive)
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
@@ -186,21 +188,21 @@ fun TripItem(
             ) {
                 TripMetricChip(
                     icon = Icons.Filled.Route,
-                    label = "Distance",
+                    label = stringResource(R.string.stat_distance),
                     iconTint = MaterialTheme.colorScheme.secondary,
                     value = "${String.format("%.1f", unitSystem.convertDistance(trip.distance ?: 0.0))} ${unitSystem.distanceUnit}",
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
                     icon = Icons.Filled.Timer,
-                    label = "Duration",
-                    value = if (trip.endTime == null) "Ongoing…"
+                    label = stringResource(R.string.stat_duration),
+                    value = if (trip.endTime == null) stringResource(R.string.ongoing_label)
                             else formatDuration(trip.duration ?: 0),
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
                     icon = Icons.Filled.Eco,
-                    label = "Avg Consumption",
+                    label = stringResource(R.string.stat_avg_consumption),
                     value = trip.efficiency
                         ?.let { "${String.format("%.1f", unitSystem.convertEfficiency(it))} kWh/100${unitSystem.distanceUnit}" } ?: "—",
                     iconTint = RegenGreen,
@@ -217,7 +219,7 @@ fun TripItem(
             ) {
                 TripMetricChip(
                     icon = Icons.Filled.BatteryChargingFull,
-                    label = "Energy consumed",
+                    label = stringResource(R.string.stat_energy_consumed),
                     value = trip.energyConsumed?.let {
                         val kwh = "${String.format("%.2f", it)} kWh"
                         if (tripCost != null)
@@ -229,14 +231,14 @@ fun TripItem(
                 )
                 TripMetricChip(
                     icon = Icons.Filled.BatteryChargingFull,
-                    label = "Max Regen",
+                    label = stringResource(R.string.stat_max_regen),
                     value = "${abs(trip.maxRegenPower).toInt()} kW",
                     iconTint = RegenGreen,
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
                     icon = Icons.Filled.VolunteerActivism,
-                    label = "Regen Eff.",
+                    label = stringResource(R.string.stat_regen_eff),
                     value = regenEfficiencyPct?.let { "%.1f%%".format(it) } ?: "—",
                     iconTint = RegenGreen,
                     modifier = Modifier.weight(1f)
@@ -252,21 +254,21 @@ fun TripItem(
             ) {
                 TripMetricChip(
                     icon = Icons.Filled.Speed,
-                    label = "Avg Speed",
+                    label = stringResource(R.string.stat_avg_speed),
                     iconTint = BydEcoTealDim,
                     value = if (avgSpeedKmh != null) "$avgSpeedKmh ${unitSystem.speedUnit}" else "—",
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    label = "Max Speed",
+                    label = stringResource(R.string.stat_max_speed),
                     iconTint = BydErrorRed,
                     value = "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}",
                     modifier = Modifier.weight(1f)
                 )
                 TripMetricChip(
                     icon = Icons.Filled.Battery4Bar,
-                    label = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)",
+                    label = if (socSource == SocSource.PANEL) stringResource(R.string.stat_soc_panel) else stringResource(R.string.stat_soc_bms),
                     value = if (socSource == SocSource.PANEL) {
                         if (trip.endSocPanel != null)
                             "${trip.startSocPanel.toInt()}% → ${trip.endSocPanel.toInt()}%"
@@ -286,8 +288,8 @@ fun TripItem(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete Trip?") },
-            text = { Text("This action cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_trip_confirm_title)) },
+            text = { Text(stringResource(R.string.cannot_be_undone)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -295,11 +297,11 @@ fun TripItem(
                         showDeleteDialog = false
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

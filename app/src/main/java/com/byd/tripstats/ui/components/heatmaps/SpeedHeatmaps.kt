@@ -5,6 +5,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.config.Drivetrain
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import kotlin.math.abs
@@ -102,7 +104,7 @@ internal fun RegenVsSpeedHeatmap(
     if (regenPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No regenerative braking data recorded on this trip.",
+                stringResource(R.string.heatmap_no_regen),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -152,7 +154,7 @@ internal fun RpmVsSpeedHeatmap(
     if (rpmPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No motor RPM data recorded on this trip.",
+                stringResource(R.string.chart_no_motor_data),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -204,7 +206,7 @@ internal fun AccelerationVsSpeedHeatmap(
     if (accelPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "Not enough speed transitions for this heatmap.",
+                stringResource(R.string.heatmap_no_speed_transitions),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -252,7 +254,7 @@ internal fun TimeOfDayVsSpeedHeatmap(
     if (timePoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "Not enough data for time-of-day heatmap.",
+                stringResource(R.string.heatmap_no_time_of_day),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -296,7 +298,7 @@ internal fun SpeedVsBatteryTempHeatmap(
     if (points.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No battery temperature data recorded on this trip.",
+                stringResource(R.string.heatmap_no_battery_temp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

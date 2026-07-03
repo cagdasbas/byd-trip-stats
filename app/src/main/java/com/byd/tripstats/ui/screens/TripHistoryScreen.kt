@@ -26,6 +26,8 @@ import com.byd.tripstats.ui.components.ApplyTagDialog
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripSortOrder
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.screens.triphistory.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,11 +71,11 @@ fun TripHistoryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Trip History", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.nav_trip_history), fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         if (!selectionMode) {
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                "(Touch trip for analytics, long-press for multiple selection)",
+                                stringResource(R.string.trip_history_hint),
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -91,7 +93,7 @@ fun TripHistoryScreen(
                     }) {
                         Icon(
                             imageVector = if (selectionMode) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = if (selectionMode) "Cancel" else "Back",
+                            contentDescription = if (selectionMode) stringResource(R.string.cancel) else stringResource(R.string.back),
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -108,7 +110,7 @@ fun TripHistoryScreen(
                             }) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.CompareArrows,
-                                    contentDescription = "Compare trips",
+                                    contentDescription = stringResource(R.string.compare_trips_action),
                                     tint = BydElectricAzure,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -118,7 +120,7 @@ fun TripHistoryScreen(
                             IconButton(onClick = { showMergeDialog = true }) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.CallMerge,
-                                    contentDescription = "Merge trips",
+                                    contentDescription = stringResource(R.string.merge_trips_action),
                                     tint = BydElectricAzure,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -128,7 +130,7 @@ fun TripHistoryScreen(
                             IconButton(onClick = { showApplyTagDialog = true }) {
                                 Icon(
                                     Icons.Filled.LocalOffer,
-                                    contentDescription = "Tag selected trips",
+                                    contentDescription = stringResource(R.string.tag_selected_action),
                                     tint = BydElectricAzure,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -137,13 +139,13 @@ fun TripHistoryScreen(
                         IconButton(onClick = { showDeleteSelectedDialog = true }) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Delete selected trips",
+                                contentDescription = stringResource(R.string.delete_selected_action),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
                         Text(
-                            text = "${selectedTrips.size} selected",
+                            text = stringResource(R.string.selected_count, selectedTrips.size),
                             modifier = Modifier.padding(end = 16.dp),
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -153,7 +155,7 @@ fun TripHistoryScreen(
                                 imageVector = if (filterState.favouritesOnly)
                                     Icons.Filled.Star else Icons.Filled.StarBorder,
                                 contentDescription = if (filterState.favouritesOnly)
-                                    "Show all trips" else "Show favourites only",
+                                    stringResource(R.string.show_all_trips) else stringResource(R.string.show_favourites_only),
                                 tint = if (filterState.favouritesOnly)
                                     ChargingYellow else LocalContentColor.current,
                                 modifier = Modifier.size(22.dp)
@@ -163,7 +165,7 @@ fun TripHistoryScreen(
                             Icon(
                                 imageVector = if (sortOrder == TripSortOrder.DESC)
                                     Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
-                                contentDescription = "Sort",
+                                contentDescription = stringResource(R.string.sort_label),
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -178,7 +180,7 @@ fun TripHistoryScreen(
                             IconButton(onClick = { showFilterSheet = true }) {
                                 Icon(
                                     imageVector = Icons.Filled.FilterList,
-                                    contentDescription = "Filter",
+                                    contentDescription = stringResource(R.string.filter_label),
                                     tint = if (activeFilters > 0)
                                         MaterialTheme.colorScheme.primary
                                     else
@@ -188,13 +190,13 @@ fun TripHistoryScreen(
                             }
                         }
                         IconButton(onClick = onNavigateToTags) {
-                            Icon(Icons.Filled.LocalOffer, "Tags", modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.LocalOffer, stringResource(R.string.tags_label), modifier = Modifier.size(22.dp))
                         }
                         IconButton(onClick = onNavigateToRoutes) {
-                            Icon(Icons.Filled.Route, "Recurring routes", modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.Route, stringResource(R.string.recurring_routes_nav), modifier = Modifier.size(22.dp))
                         }
                         IconButton(onClick = onNavigateToSeasonalAnalysis) {
-                            Icon(Icons.Filled.WbSunny, "Seasonal analysis", modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.WbSunny, stringResource(R.string.seasonal_analysis_nav), modifier = Modifier.size(22.dp))
                         }
                     }
                 },
@@ -222,18 +224,18 @@ fun TripHistoryScreen(
                     val filtersOrFav = activeFilters > 0 || filterState.favouritesOnly
                     Text(
                         text = when {
-                            filterState.favouritesOnly && activeFilters == 0 -> "No favourite trips yet"
-                            filtersOrFav -> "No trips match your filters"
-                            else -> "No trips yet"
+                            filterState.favouritesOnly && activeFilters == 0 -> stringResource(R.string.no_favourite_trips)
+                            filtersOrFav -> stringResource(R.string.no_matching_trips)
+                            else -> stringResource(R.string.no_trips_yet)
                         },
                         style = MaterialTheme.typography.titleLarge,
                         textAlign = TextAlign.Center
                     )
                     Text(
                         text = when {
-                            filterState.favouritesOnly && activeFilters == 0 -> "Tap the ☆ on a trip to mark it a favourite"
-                            filtersOrFav -> "Try adjusting or clearing the filters"
-                            else -> "Start driving to record your first trip!"
+                            filterState.favouritesOnly && activeFilters == 0 -> stringResource(R.string.mark_favourite_hint)
+                            filtersOrFav -> stringResource(R.string.adjust_filters_hint)
+                            else -> stringResource(R.string.start_driving_hint)
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -320,8 +322,8 @@ fun TripHistoryScreen(
         AlertDialog(
             onDismissRequest = { showDeleteSelectedDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete ${selectedTrips.size} Trip${if (selectedTrips.size > 1) "s" else ""}?") },
-            text = { Text("This will permanently delete the selected trips and all their data. This action cannot be undone.") },
+            title = { Text(if (selectedTrips.size > 1) stringResource(R.string.delete_trips_plural, selectedTrips.size) else stringResource(R.string.delete_trip_single)) },
+            text = { Text(stringResource(R.string.delete_trips_msg)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -331,11 +333,11 @@ fun TripHistoryScreen(
                         selectedTrips = setOf()
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteSelectedDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteSelectedDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -356,14 +358,11 @@ fun TripHistoryScreen(
         AlertDialog(
             onDismissRequest = { showMergeDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Merge Trips?") },
+            title = { Text(stringResource(R.string.merge_trips_title)) },
             text = {
                 Text(
                     if (eligibility.eligible)
-                        "The two selected trips will be combined into one. Distance, " +
-                            "energy and driving time are added together; the start of the " +
-                            "earlier trip and the end of the later trip are kept. This " +
-                            "cannot be undone."
+                        stringResource(R.string.merge_trips_msg)
                     else
                         eligibility.reason ?: "These trips can't be merged."
                 )
@@ -384,13 +383,13 @@ fun TripHistoryScreen(
                             selectedTrips = setOf()
                         }
                     ) {
-                        Text("Merge", color = BydElectricAzure)
+                        Text(stringResource(R.string.merge), color = BydElectricAzure)
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showMergeDialog = false }) {
-                    Text(if (eligibility.eligible) "Cancel" else "OK")
+                    Text(if (eligibility.eligible) stringResource(R.string.cancel) else "OK")
                 }
             }
         )

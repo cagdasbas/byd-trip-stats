@@ -20,6 +20,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.ui.theme.BydElectricAzure
 import com.byd.tripstats.util.QrCodeGenerator
@@ -48,7 +50,7 @@ internal fun ProUnlockCard(
                 Icon(Icons.Filled.WorkspacePremium, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "BYD Trip Stats Pro",
+                    stringResource(R.string.pro_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -60,12 +62,12 @@ internal fun ProUnlockCard(
             if (isPro) {
                 var showRemoveCodeConfirm by remember { mutableStateOf(false) }
                 Text(
-                    "Active — Pro unlocked for this vehicle (lifetime).",
+                    stringResource(R.string.pro_active_label),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedButton(onClick = { showRemoveCodeConfirm = true }) {
-                    Text("Remove code")
+                    Text(stringResource(R.string.remove_code_action))
                 }
                 if (showRemoveCodeConfirm) {
                     AlertDialog(
@@ -76,28 +78,24 @@ internal fun ProUnlockCard(
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(32.dp))
                         },
-                        title = { Text("Remove Pro unlock code?", fontWeight = FontWeight.Bold) },
+                        title = { Text(stringResource(R.string.remove_code_title), fontWeight = FontWeight.Bold) },
                         text = {
-                            Text(
-                                "This turns Pro off on this vehicle and disables the Pro features " +
-                                "(cell imbalance alert, battery health report, screenshots, SD card " +
-                                "backup). Your code isn't lost — you can re-enter it anytime to unlock again."
-                            )
+                            Text(stringResource(R.string.remove_code_msg))
                         },
                         confirmButton = {
                             TextButton(onClick = {
                                 showRemoveCodeConfirm = false
                                 EntitlementManager.clear()
-                            }) { Text("Remove", color = MaterialTheme.colorScheme.error) }
+                            }) { Text(stringResource(R.string.remove_code_action), color = MaterialTheme.colorScheme.error) }
                         },
                         dismissButton = {
-                            TextButton(onClick = { showRemoveCodeConfirm = false }) { Text("Cancel") }
+                            TextButton(onClick = { showRemoveCodeConfirm = false }) { Text(stringResource(R.string.cancel)) }
                         }
                     )
                 }
             } else {
                 Text(
-                    "Unlock premium features like the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle — €9.99, lifetime, one car. Verified on-device — nothing leaves your car.",
+                    stringResource(R.string.pro_unlock_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -107,7 +105,7 @@ internal fun ProUnlockCard(
                 if (hasSavedCode) {
                     // A saved code that isn't unlocking here → it was issued for another vehicle.
                     Text(
-                        "A saved code doesn't match this vehicle.",
+                        stringResource(R.string.saved_code_mismatch),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -118,7 +116,7 @@ internal fun ProUnlockCard(
                 ) {
                     Icon(Icons.Filled.Key, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Enter unlock code")
+                    Text(stringResource(R.string.enter_unlock_code_label))
                 }
             }
         }
@@ -169,8 +167,7 @@ private fun VehicleLicenseQr(deviceId: String) {
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            "Scan this with your phone to email your Vehicle ID — " +
-                "just choose your email account and press Send.",
+            stringResource(R.string.scan_to_email_label),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -184,7 +181,7 @@ private fun VehicleLicenseQr(deviceId: String) {
                 .size(180.dp)
         )
         Text(
-            "Goes to $licenseEmail — you'll get a reply with payment steps (€9.99) and your unlock code.",
+            stringResource(R.string.email_info_label, licenseEmail),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -198,13 +195,13 @@ private fun VehicleIdRow(deviceId: String?) {
     val context = LocalContext.current
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            "This vehicle's ID (send this when buying a licence):",
+            stringResource(R.string.vehicle_id_section_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                deviceId ?: "Reading… start the car, then reopen Settings",
+                deviceId ?: stringResource(R.string.vehicle_id_reading),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
@@ -213,7 +210,7 @@ private fun VehicleIdRow(deviceId: String?) {
                 IconButton(onClick = {
                     clipboard.setText(AnnotatedString(deviceId))
                     android.widget.Toast.makeText(
-                        context, "Vehicle ID copied", android.widget.Toast.LENGTH_SHORT
+                        context, context.getString(R.string.vehicle_id_copied_msg), android.widget.Toast.LENGTH_SHORT
                     ).show()
                 }) {
                     Icon(

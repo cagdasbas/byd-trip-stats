@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.*
 
 /**
@@ -51,7 +53,7 @@ fun ScoreChip(
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
                 Icon(Icons.Filled.Star, null, Modifier.size(14.dp), tint = scoreColor)
                 Spacer(Modifier.width(3.dp))
-                Text("Score", style = MaterialTheme.typography.labelSmall,
+                Text(stringResource(R.string.filter_score), style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(2.dp))

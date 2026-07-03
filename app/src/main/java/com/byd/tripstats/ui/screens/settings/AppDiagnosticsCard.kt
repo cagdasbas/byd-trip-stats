@@ -33,9 +33,11 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.byd.tripstats.R
 import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.ui.theme.BydElectricAzure
@@ -308,7 +310,7 @@ internal fun AppDiagnosticsCard() {
         AppDiagnosticsMonitor.initialize(context)
     }
 
-    SectionHeader(icon = Icons.Filled.Memory, title = "App Diagnostics")
+    SectionHeader(icon = Icons.Filled.Memory, title = stringResource(R.string.app_diagnostics_label))
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -325,15 +327,15 @@ internal fun AppDiagnosticsCard() {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Show diagnostic details",
+                        stringResource(R.string.show_diagnostic_details_label),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         if (diagnosticsEnabled) {
-                            "Live process, memory, frame, permission, and ADB tools are visible."
+                            stringResource(R.string.diagnostic_enabled_desc)
                         } else {
-                            "Off by default so this screen does not keep polling while you are just checking backups."
+                            stringResource(R.string.diagnostic_disabled_desc)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -372,7 +374,7 @@ internal fun AppDiagnosticsCard() {
                         telegram.config.value == null ->
                             android.widget.Toast.makeText(
                                 context,
-                                "Telegram not configured — set it up under Backup & Restore first.",
+                                context.getString(R.string.no_telegram_configured),
                                 android.widget.Toast.LENGTH_LONG,
                             ).show()
                         !f.exists() || f.length() == 0L ->
@@ -390,7 +392,7 @@ internal fun AppDiagnosticsCard() {
                                 ).show()
                             } catch (e: Exception) {
                                 android.widget.Toast.makeText(
-                                    context, "Telegram send failed: ${e.message}",
+                                    context, context.getString(R.string.telegram_send_failed, e.message),
                                     android.widget.Toast.LENGTH_LONG,
                                 ).show()
                             }
@@ -400,7 +402,7 @@ internal fun AppDiagnosticsCard() {
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Send diagnostics log to Telegram")
+                Text(stringResource(R.string.send_diag_log_action))
             }
             Text(
                 "Sends the full diagnostics log (speed-stall and 'telemetry refresh wedged' events) straight to your connected Telegram bot — nothing is saved or shared locally. Connect a bot under Backup & Restore → Telegram Backup first.",
@@ -410,14 +412,14 @@ internal fun AppDiagnosticsCard() {
 
             if (!diagnosticsEnabled) {
                 Text(
-                    "Enable this only when troubleshooting; the history charts sample every 2 seconds while visible.",
+                    stringResource(R.string.enable_troubleshooting_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
 
                 // ── Background readiness ────────────────────────────────────────
-                SettingsGroupLabel("Background Readiness")
+                SettingsGroupLabel(stringResource(R.string.background_readiness_label))
                 val hasWriteSecureSettings = ContextCompat.checkSelfPermission(
                     context, Manifest.permission.WRITE_SECURE_SETTINGS
                 ) == PackageManager.PERMISSION_GRANTED
@@ -428,18 +430,18 @@ internal fun AppDiagnosticsCard() {
                     context, Manifest.permission.READ_LOGS
                 ) == PackageManager.PERMISSION_GRANTED
                 SettingsDetailRow(
-                    "Write settings",
-                    if (hasWriteSecureSettings) "✅ granted" else "⚠️ NOT granted — run install script"
+                    stringResource(R.string.write_settings_perm_label),
+                    if (hasWriteSecureSettings) stringResource(R.string.perm_granted) else stringResource(R.string.perm_not_granted_install)
                 )
                 SettingsDetailRow(
-                    "Background location",
-                    if (hasBackgroundLocation) "✅ granted" else "⚠️ NOT granted — run install script"
+                    stringResource(R.string.bg_location_perm_label),
+                    if (hasBackgroundLocation) stringResource(R.string.perm_granted) else stringResource(R.string.perm_not_granted_install)
                 )
                 SettingsDetailRow(
-                    "Read logs",
-                    if (hasReadLogs) "✅ granted" else "⚠️ NOT granted"
+                    stringResource(R.string.read_logs_perm_label),
+                    if (hasReadLogs) stringResource(R.string.perm_granted) else stringResource(R.string.perm_not_granted)
                 )
-                SettingsDetailRow("Startup safeguards", "Applied automatically on app start")
+                SettingsDetailRow(stringResource(R.string.startup_safeguards_label), stringResource(R.string.safeguards_auto_label))
                 if (!hasWriteSecureSettings || !hasBackgroundLocation) {
                     androidx.compose.material3.Card(
                         colors = androidx.compose.material3.CardDefaults.cardColors(
@@ -448,8 +450,7 @@ internal fun AppDiagnosticsCard() {
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     ) {
                         Text(
-                            text = "⚠️ Background permissions not granted. " +
-                                "Open the app fresh to trigger the ADB setup dialog",
+                            text = stringResource(R.string.perm_warning_msg),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.padding(12.dp)
@@ -475,12 +476,12 @@ internal fun AppDiagnosticsCard() {
                         diagnostics.systemMemoryTotalMb
                     )
                 )
-                SettingsDetailRow("Threads", diagnostics.threadCount.toString())
+                SettingsDetailRow(stringResource(R.string.threads_label), diagnostics.threadCount.toString())
                 SettingsDetailRow("App uptime", "${diagnostics.uptimeMinutes} min")
 
-                SettingsGroupLabel("60-second history")
+                SettingsGroupLabel(stringResource(R.string.history_60s_label))
             DiagnosticsHistoryChart(
-                title = "CPU usage",
+                title = stringResource(R.string.cpu_chart_title_label),
                 leftLabel = "App",
                 rightLabel = "System",
                 leftColor = BydElectricAzure,
@@ -492,7 +493,7 @@ internal fun AppDiagnosticsCard() {
                 rightSuffix = "%"
             )
                 DiagnosticsHistoryChart(
-                    title = "Memory usage",
+                    title = stringResource(R.string.memory_chart_title_label),
                 leftLabel = "App PSS",
                 rightLabel = "System",
                 leftColor = BatteryBlue,
@@ -505,16 +506,16 @@ internal fun AppDiagnosticsCard() {
                 normalizeSeparately = true
                 )
 
-                SettingsGroupLabel("ADB shell")
+                SettingsGroupLabel(stringResource(R.string.adb_shell_label))
                 Text(
-                    "Runs through the authorized local ADB daemon. Enter the command exactly as you would after `adb shell`.",
+                    stringResource(R.string.adb_shell_desc_text),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedTextField(
                     value = adbCommand,
                     onValueChange = { adbCommand = it },
-                    label = { Text("Shell command") },
+                    label = { Text(stringResource(R.string.shell_command_label)) },
                     singleLine = false,
                     minLines = 1,
                     maxLines = 3,
@@ -535,7 +536,7 @@ internal fun AppDiagnosticsCard() {
                 ) {
                     Icon(Icons.Filled.Terminal, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (adbRunning) "Running..." else "Run shell command")
+                    Text(if (adbRunning) "Running..." else stringResource(R.string.run_shell_cmd_action))
                 }
                 if (adbOutput.isNotBlank()) {
                     Card(
@@ -551,7 +552,7 @@ internal fun AppDiagnosticsCard() {
                 }
 
                 Text(
-                    text = "Samples refresh every 2 seconds while this screen is open.",
+                    text = stringResource(R.string.samples_refresh_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -597,7 +598,7 @@ private fun DiagnosticsHistoryChart(
             ) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "last 60s",
+                    stringResource(R.string.last_60s_label),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

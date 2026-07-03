@@ -9,10 +9,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
 
 /**
@@ -61,21 +63,19 @@ internal fun ChartEmptyState(isSynthetic: Boolean) {
             if (isSynthetic) {
                 Text("⚡", fontSize = 40.sp)
                 Text(
-                    "Reconstructed session",
+                    stringResource(R.string.reconstructed_session_label),
                     style      = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "This session was recorded while the car was off — " +
-                    "live telemetry charts are only available for sessions " +
-                    "started while you are in the car with it powered on.",
+                    stringResource(R.string.reconstructed_session_desc),
                     style     = MaterialTheme.typography.bodyMedium,
                     color     = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             } else {
                 Text(
-                    "Not enough data",
+                    stringResource(R.string.not_enough_data_label),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

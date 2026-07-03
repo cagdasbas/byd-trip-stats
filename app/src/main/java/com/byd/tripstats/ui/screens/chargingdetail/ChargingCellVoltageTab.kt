@@ -1,6 +1,8 @@
 package com.byd.tripstats.ui.screens.chargingdetail
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.*
 
@@ -17,10 +19,11 @@ internal fun ChargingCellVoltageTab(
     xAxisMode   : ChargingXAxisMode,
     onXAxisModeChange: (ChargingXAxisMode) -> Unit,
 ) {
+    val cellVoltageTitle = stringResource(R.string.charging_chart_cell_voltage)
     ChargingSeriesChart(
         dataPoints  = dataPoints,
         isSynthetic = isSynthetic,
-        title       = "Cell Voltage",
+        title       = cellVoltageTitle,
         yAxisLabel  = "V",
         socSource   = socSource,
         xAxisMode   = xAxisMode,

@@ -1,6 +1,8 @@
 package com.byd.tripstats.ui.screens.settings
 
+import android.app.Activity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,9 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
+import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.data.entitlement.RedeemResult
 import com.byd.tripstats.data.preferences.DEFAULT_CAR_OFF_TIMEOUT_MINUTES
@@ -81,6 +86,8 @@ internal fun AppPreferencesTab(
     var showCarOffTimeoutDialog by remember { mutableStateOf(false) }
     var showMinTripDistanceDialog by remember { mutableStateOf(false) }
     var showCellImbalanceThresholdDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var currentLanguageTag by remember { mutableStateOf(LocaleHelper.getSelectedTag(context)) }
     val isPro by EntitlementManager.isPro.collectAsState()
     val hasSavedCode by EntitlementManager.hasSavedCode.collectAsState()
     val currentDeviceId by EntitlementManager.currentDeviceId.collectAsState()
@@ -110,7 +117,7 @@ internal fun AppPreferencesTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        SectionHeader(icon = Icons.Filled.Tune, title = "Preferences")
+        SectionHeader(icon = Icons.Filled.Tune, title = stringResource(R.string.settings_tab_preferences))
 
         // Locked → show the Pro upsell at the very top (prominent). Once unlocked it's just
         // status + a rarely-used "Remove code", so it's rendered at the bottom of the page instead.
@@ -123,7 +130,7 @@ internal fun AppPreferencesTab(
             )
         }
 
-        SettingsGroupLabel("General")
+        SettingsGroupLabel(stringResource(R.string.section_general))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -134,12 +141,12 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Theme",
+                    stringResource(R.string.pref_theme),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Choose how the app looks. System default follows your device's dark/light setting.",
+                    stringResource(R.string.theme_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -148,9 +155,9 @@ internal fun AppPreferencesTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        ThemeMode.SYSTEM to "System",
-                        ThemeMode.LIGHT  to "Light",
-                        ThemeMode.DARK   to "Dark",
+                        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
+                        ThemeMode.LIGHT  to stringResource(R.string.theme_light),
+                        ThemeMode.DARK   to stringResource(R.string.theme_dark),
                     ).forEach { (mode, label) ->
                         Button(
                             onClick = { scope.launch { preferencesManager.saveThemeMode(mode) } },
@@ -182,12 +189,43 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Units",
+                    stringResource(R.string.pref_language),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Choose how distances and speeds are displayed. Your vehicle's odometer and speed values come from the BMS and are already in the correct unit for your market.",
+                    stringResource(R.string.language_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    stringResource(R.string.current_language_label, LocaleHelper.displayNameForTag(currentLanguageTag)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(onClick = { showLanguageDialog = true }) {
+                    Icon(Icons.Filled.Language, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.change_language_action))
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    stringResource(R.string.pref_units),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    stringResource(R.string.units_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -209,7 +247,7 @@ internal fun AppPreferencesTab(
                                 MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     ) {
-                        Text("Metric", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.units_metric), fontWeight = FontWeight.Bold)
                     }
                     Button(
                         onClick = { scope.launch { viewModel.saveUnitSystem(UnitSystem.IMPERIAL) } },
@@ -225,14 +263,14 @@ internal fun AppPreferencesTab(
                                 MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     ) {
-                        Text("Imperial", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.units_imperial), fontWeight = FontWeight.Bold)
                     }
                 }
                 Text(
                     if (unitSystem == UnitSystem.IMPERIAL)
-                        "Imperial: miles, mph, kWh/100mi"
+                        stringResource(R.string.units_imperial_display)
                     else
-                        "Metric: km, km/h, kWh/100km",
+                        stringResource(R.string.units_metric_display),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -257,12 +295,12 @@ internal fun AppPreferencesTab(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            "Dashboard icons & animations",
+                            stringResource(R.string.pref_dashboard_icons),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "When enabled, the range-projection card shows a liquid-fill battery icon, an AWD/axle drawing with tyre pressure/temperature overlays, and an animated consumption thumbnail above the chart. When disabled, those move into the top bar (battery and consumption icons) and a dedicated Tyres stat card on the side panel — freeing vertical space for the range chart and skipping all animations.",
+                            stringResource(R.string.dashboard_icons_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -294,7 +332,7 @@ internal fun AppPreferencesTab(
             }
         }
 
-        SettingsGroupLabel("Trips")
+        SettingsGroupLabel(stringResource(R.string.section_trips))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -305,24 +343,24 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Engine-off trip timeout",
+                    stringResource(R.string.pref_engine_off_timeout),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "How long the trip stays open after the car turns off. If the car comes back on within this window the recording resumes seamlessly (same trip, a new segment appears along with the cumulative distance in parenthesis). Past the window the trip ends and the next drive starts a new one. Default is 3 minutes.",
+                    stringResource(R.string.engine_off_timeout_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Current: $carOffTimeoutMinutes min",
+                    stringResource(R.string.current_timeout_value, carOffTimeoutMinutes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedButton(onClick = { showCarOffTimeoutDialog = true }) {
                     Icon(Icons.Filled.Timer, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Change timeout")
+                    Text(stringResource(R.string.change_timeout_action))
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
@@ -333,12 +371,12 @@ internal fun AppPreferencesTab(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            "Ask before auto-stopping",
+                            stringResource(R.string.pref_auto_stop_prompt),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "When the timeout is reached while the app is open on screen, show a prompt to keep the trip going (and its live range projection) instead of stopping it — handy when you park but stay with the car. If you don't have the app open, or you leave it, the trip still stops automatically as usual. A kept trip ends once you drive again, tap Stop, or after ~30 min parked.",
+                            stringResource(R.string.auto_stop_prompt_desc),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -363,28 +401,29 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Minimum trip distance",
+                    stringResource(R.string.pref_min_trip_distance),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Auto-discard trips shorter than this when they end (datapoints, segments and stats are removed too). Useful for filtering out moving the car a few meters in the driveway or very short distances. Set to 0 to disable.",
+                    stringResource(R.string.min_trip_distance_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Heads-up: discarded trips disappear from everything that reads the trip table — history list, weekly/monthly/yearly consumption charts, monthly distance and energy totals, seasonal analysis, and the SoH degradation series. A high threshold over a quiet day means no point will be plotted for that day. The chart already ignores trips under 0.5 km, so only thresholds above that change the chart further.",
+                    stringResource(R.string.min_trip_distance_warning),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     if (minTripDistanceKm > 0.0) {
-                        "Current: %.2f %s".format(
-                            unitSystem.convertDistance(minTripDistanceKm),
+                        stringResource(
+                            R.string.current_minimum_value,
+                            "%.2f".format(unitSystem.convertDistance(minTripDistanceKm)),
                             unitSystem.distanceUnit
                         )
                     } else {
-                        "Current: disabled"
+                        stringResource(R.string.current_minimum_disabled)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -392,7 +431,7 @@ internal fun AppPreferencesTab(
                 OutlinedButton(onClick = { showMinTripDistanceDialog = true }) {
                     Icon(Icons.Filled.Straighten, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (minTripDistanceKm > 0.0) "Change minimum" else "Set minimum")
+                    Text(if (minTripDistanceKm > 0.0) stringResource(R.string.change_minimum_action) else stringResource(R.string.set_minimum_action))
                 }
             }
         }
@@ -406,47 +445,51 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "Goals & personal bests",
+                    stringResource(R.string.pref_goals_label),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Consumption goal: ${
-                        tripGoals.targetConsumptionKwhPer100km?.let { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it)) } ?: "Not set"
-                    }",
+                    stringResource(
+                        R.string.goal_consumption_value,
+                        tripGoals.targetConsumptionKwhPer100km?.let { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it)) } ?: stringResource(R.string.not_set)
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Monthly distance goal: ${
-                        tripGoals.targetDistanceKmPerMonth?.let { "%.0f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it)) } ?: "Not set"
-                    }",
+                    stringResource(
+                        R.string.goal_monthly_distance_value,
+                        tripGoals.targetDistanceKmPerMonth?.let { "%.0f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it)) } ?: stringResource(R.string.not_set)
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Best consumption: ${
+                    stringResource(
+                        R.string.best_consumption_value,
                         personalBests.bestConsumption?.let { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it)) } ?: "—"
-                    }",
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Best distance: ${
+                    stringResource(
+                        R.string.best_distance_value,
                         personalBests.bestDistance?.let { "%.1f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it)) } ?: "—"
-                    }",
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedButton(onClick = onNavigateToTripGoals) {
                     Icon(Icons.Filled.EmojiEvents, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Open goals & personal bests")
+                    Text(stringResource(R.string.open_goals_action))
                 }
             }
         }
 
-        SettingsGroupLabel("Battery & telemetry")
+        SettingsGroupLabel(stringResource(R.string.section_battery))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -457,12 +500,12 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "SoC source",
+                    stringResource(R.string.pref_soc_source),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Choose which battery percentage reading to display on the dashboard.",
+                    stringResource(R.string.soc_source_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -471,8 +514,8 @@ internal fun AppPreferencesTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        SocSource.PANEL to "Panel",
-                        SocSource.BMS   to "BMS",
+                        SocSource.PANEL to stringResource(R.string.soc_panel_option),
+                        SocSource.BMS   to stringResource(R.string.soc_bms_option),
                     ).forEach { (source, label) ->
                         Button(
                             onClick = { scope.launch { preferencesManager.saveSocSource(source) } },
@@ -504,7 +547,7 @@ internal fun AppPreferencesTab(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        "On PHEVs the BMS SoC is usually not reported — use Panel if BMS shows 0.\nBMS is more accurate (float) than Panel (integer). Also, larger divergence from Panel is a great indication that it is time for either 100% charge or charging calibration",
+                        stringResource(R.string.soc_source_info),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -528,7 +571,7 @@ internal fun AppPreferencesTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "Cell imbalance alert",
+                                stringResource(R.string.pref_cell_imbalance),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -538,7 +581,7 @@ internal fun AppPreferencesTab(
                             }
                         }
                         Text(
-                            "Notify me when the pack's cell voltage spread stays above the limit.",
+                            stringResource(R.string.cell_imbalance_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -567,44 +610,42 @@ internal fun AppPreferencesTab(
                     } else {
                         // Locked — tapping the lock opens the unlock prompt.
                         IconButton(onClick = { showLicenseDialog = true }) {
-                            Icon(Icons.Filled.Lock, contentDescription = "Unlock with Pro")
+                            Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.unlock_pro_action))
                         }
                     }
                 }
                 Text(
-                    "Spread = highest cell − lowest cell. A healthy pack stays under ~20 mV; a " +
-                        "persistently high spread can flag a weak cell. Alerts are suppressed below " +
-                        "5% and above 95% SoC, where a wide spread is normal.",
+                    stringResource(R.string.cell_imbalance_info),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (isPro && cellImbalanceAlertEnabled) {
                     Text(
-                        "Current limit: %.0f mV".format(cellImbalanceThresholdV * 1000),
+                        stringResource(R.string.current_limit_value, "%.0f".format(cellImbalanceThresholdV * 1000)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedButton(onClick = { showCellImbalanceThresholdDialog = true }) {
                         Icon(Icons.Filled.BatteryAlert, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Change limit")
+                        Text(stringResource(R.string.change_limit_action))
                     }
                 } else if (!isPro) {
                     Text(
-                        "This is a BYD Trip Stats Pro feature. Unlock Pro to receive imbalance alerts.",
+                        stringResource(R.string.pro_feature_imbalance_msg),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedButton(onClick = { showLicenseDialog = true }) {
                         Icon(Icons.Filled.Lock, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Unlock with Pro")
+                        Text(stringResource(R.string.unlock_pro_action))
                     }
                 }
             }
         }
 
-        SettingsGroupLabel("Costs")
+        SettingsGroupLabel(stringResource(R.string.section_costs))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -615,15 +656,15 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Electricity tariff",
+                    stringResource(R.string.pref_electricity_tariff),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     if (electricityPrice > 0.0) {
-                        "Current rate: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh"
+                        stringResource(R.string.current_rate_value, "%.4f".format(electricityPrice), currencySymbol)
                     } else {
-                        "Set your home charging tariff so trip costs can be estimated consistently."
+                        stringResource(R.string.tariff_not_set_desc)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -631,12 +672,12 @@ internal fun AppPreferencesTab(
                 OutlinedButton(onClick = { showTariffDialog = true }) {
                     Icon(Icons.Filled.Euro, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (electricityPrice > 0.0) "Edit tariff" else "Set tariff")
+                    Text(if (electricityPrice > 0.0) stringResource(R.string.edit_tariff_action) else stringResource(R.string.set_tariff_action))
                 }
             }
         }
 
-        SettingsGroupLabel("Power & background")
+        SettingsGroupLabel(stringResource(R.string.section_power))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -647,12 +688,12 @@ internal fun AppPreferencesTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Background activity when car is off",
+                    stringResource(R.string.pref_background_activity),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Controls whether the telemetry service keeps running after the car is parked.",
+                    stringResource(R.string.background_activity_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -661,9 +702,9 @@ internal fun AppPreferencesTab(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        OffStateMode.ENABLED    to "Always On",
-                        OffStateMode.DISABLED   to "Minimal",
-                        OffStateMode.DEEP_SLEEP to "Deep Sleep",
+                        OffStateMode.ENABLED    to stringResource(R.string.bg_always_on),
+                        OffStateMode.DISABLED   to stringResource(R.string.bg_minimal),
+                        OffStateMode.DEEP_SLEEP to stringResource(R.string.bg_deep_sleep),
                     ).forEach { (mode, label) ->
                         Button(
                             onClick = {
@@ -708,7 +749,7 @@ internal fun AppPreferencesTab(
                                 // Empty second line on the other two keeps all buttons the
                                 // same height while marking Always On as the default.
                                 Text(
-                                    if (mode == OffStateMode.ENABLED) "Default" else "",
+                                    if (mode == OffStateMode.ENABLED) stringResource(R.string.bg_default_label) else "",
                                     style = MaterialTheme.typography.labelSmall
                                 )
                             }
@@ -716,9 +757,9 @@ internal fun AppPreferencesTab(
                     }
                 }
                 listOf(
-                    OffStateMode.ENABLED    to "Always On (recommended default): service runs 24/7, taking continuous 12V/SoC samples into battery history and capturing off-state (e.g. overnight) charging. Small additional load on top of BYD's own stock background drain.\n\nNote: most BYD units cut WiFi ~15 min after the car is switched off, and the app can't override that. So while parked, ADB-over-WiFi, the Web Companion (PWA) and MQTT to a broker on your home network stop until the car powers on. MQTT to an internet-reachable broker (e.g. HiveMQ Cloud) usually keeps publishing while parked, because the car stays on mobile data.\nNote2: Electro app can override the above and keep the WiFi indefinitely when car is off",
-                    OffStateMode.DISABLED   to "Minimal: service self-stops 5 min after the car turns off, then a 90-min alarm briefly wakes it for a charging snapshot. Lower drain, but off-state samples are sparse, ADB is not always on, the Web Companion (PWA) is only reachable during the brief wake blip, and MQTT is idle between blips. Off-state charging is caught within ~90 min, after which it publishes for the rest of the charge.",
-                    OffStateMode.DEEP_SLEEP to "Deep Sleep: service self-stops 5 min after the car turns off with no further wakeups. Allows the car's ECUs to reach full deep sleep. The Web Companion (PWA) is unreachable and MQTT is silent the whole time the car is parked; off-state charging is not captured live — only reconstructed from the SoC delta when the car next turns on.",
+                    OffStateMode.ENABLED    to stringResource(R.string.bg_always_on_desc),
+                    OffStateMode.DISABLED   to stringResource(R.string.bg_minimal_desc),
+                    OffStateMode.DEEP_SLEEP to stringResource(R.string.bg_deep_sleep_desc),
                 ).forEach { (mode, description) ->
                     Text(
                         description,
@@ -737,14 +778,14 @@ internal fun AppPreferencesTab(
                 val kaLastFired = OffStateKeepaliveReceiver.lastFiredMs(context)
                 val kaCount     = OffStateKeepaliveReceiver.fireCount(context)
                 val kaArmed     = OffStateKeepaliveReceiver.isScheduled(context)
+                val armedSuffix = if (kaArmed) stringResource(R.string.keepalive_armed) else ""
+                val notArmedSuffix = if (kaArmed) "" else stringResource(R.string.keepalive_not_armed)
                 val kaStatus = if (kaLastFired <= 0L) {
-                    "Keepalive: never fired yet${if (kaArmed) " (armed)" else ""}. If this stays " +
-                        "\"never\" after the car has been parked a while, your head unit powers off " +
-                        "fully at park — Minimal then behaves like Deep Sleep, so use Always On for parked data."
+                    stringResource(R.string.keepalive_never_fired, armedSuffix)
                 } else {
                     val agoMin = ((System.currentTimeMillis() - kaLastFired) / 60_000L).coerceAtLeast(0)
                     val ago = if (agoMin < 60) "$agoMin min ago" else "${agoMin / 60}h ${agoMin % 60}m ago"
-                    "Keepalive: last fired $ago • $kaCount total${if (kaArmed) " • armed" else " • not armed"}"
+                    stringResource(R.string.keepalive_fired, ago, kaCount, notArmedSuffix)
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
                 Text(
@@ -771,18 +812,18 @@ internal fun AppPreferencesTab(
         AlertDialog(
             onDismissRequest = { showTariffDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Electricity tariff", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.tariff_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Enter your home charging price so trip costs can use your fixed tariff as the baseline.",
+                        stringResource(R.string.tariff_input_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = priceInput,
                         onValueChange = { priceInput = it },
-                        label = { Text("Price per kWh") },
+                        label = { Text(stringResource(R.string.price_per_kwh_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
@@ -790,12 +831,12 @@ internal fun AppPreferencesTab(
                         OutlinedTextField(
                             value = "${selectedCurrency.first} (${selectedCurrency.second})",
                             onValueChange = { },
-                            label = { Text("Currency") },
+                            label = { Text(stringResource(R.string.currency_label)) },
                             singleLine = true,
                             readOnly = true,
                             trailingIcon = {
                                 IconButton(onClick = { currencyMenuExpanded = !currencyMenuExpanded }) {
-                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Select currency")
+                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = stringResource(R.string.currency_label))
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -819,7 +860,7 @@ internal fun AppPreferencesTab(
                     }
                     if (electricityPrice > 0.0) {
                         Text(
-                            "Active: ${"%.4f".format(electricityPrice)} $currencySymbol / kWh",
+                            stringResource(R.string.active_tariff_value, "%.4f".format(electricityPrice), currencySymbol),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -834,10 +875,10 @@ internal fun AppPreferencesTab(
                         showTariffDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showTariffDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showTariffDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -849,19 +890,18 @@ internal fun AppPreferencesTab(
         AlertDialog(
             onDismissRequest = { showCarOffTimeoutDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Engine-off trip timeout", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.timeout_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Trip stays open for this many minutes after the engine turns off. " +
-                            "Default is $DEFAULT_CAR_OFF_TIMEOUT_MINUTES min.",
+                        stringResource(R.string.timeout_input_desc, DEFAULT_CAR_OFF_TIMEOUT_MINUTES),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = minutesInput,
                         onValueChange = { minutesInput = it.filter { c -> c.isDigit() } },
-                        label = { Text("Minutes") },
+                        label = { Text(stringResource(R.string.minutes_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
@@ -876,10 +916,10 @@ internal fun AppPreferencesTab(
                         showCarOffTimeoutDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showCarOffTimeoutDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showCarOffTimeoutDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -896,18 +936,18 @@ internal fun AppPreferencesTab(
         AlertDialog(
             onDismissRequest = { showMinTripDistanceDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Minimum trip distance", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.min_distance_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Trips shorter than this are discarded when they end. Set to 0 (or leave empty) to keep every trip.",
+                        stringResource(R.string.min_distance_input_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = distanceInput,
                         onValueChange = { distanceInput = it },
-                        label = { Text("Distance (${unitSystem.distanceUnit})") },
+                        label = { Text(stringResource(R.string.distance_unit_label, unitSystem.distanceUnit)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
@@ -922,10 +962,10 @@ internal fun AppPreferencesTab(
                         showMinTripDistanceDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showMinTripDistanceDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showMinTripDistanceDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -970,6 +1010,57 @@ internal fun AppPreferencesTab(
             },
             dismissButton = {
                 TextButton(onClick = { showCellImbalanceThresholdDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showLanguageDialog) {
+        val activity = context as? Activity
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            title = { Text("Language", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    LocaleHelper.supportedLanguages.forEach { lang ->
+                        val selected = lang.tag == currentLanguageTag
+                        Row(
+                            modifier = Modifier.clickable {
+                                if (!selected) {
+                                    LocaleHelper.saveTag(context, lang.tag)
+                                    currentLanguageTag = lang.tag
+                                    showLanguageDialog = false
+                                    activity?.recreate()
+                                } else {
+                                    showLanguageDialog = false
+                                }
+                            }
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = {
+                                    if (!selected) {
+                                        LocaleHelper.saveTag(context, lang.tag)
+                                        currentLanguageTag = lang.tag
+                                        showLanguageDialog = false
+                                        activity?.recreate()
+                                    } else {
+                                        showLanguageDialog = false
+                                    }
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(lang.displayName, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) { Text("Cancel") }
             }
         )
     }

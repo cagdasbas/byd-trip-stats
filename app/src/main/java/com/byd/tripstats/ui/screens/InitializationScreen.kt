@@ -42,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.config.CarCatalog
 import com.byd.tripstats.data.config.CarConfig
 import kotlinx.coroutines.launch
@@ -62,7 +64,7 @@ fun InitializationScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Initialization screen",
+                        text = stringResource(R.string.select_car_label),
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -83,18 +85,18 @@ fun InitializationScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Choose the BYD model you drive",
+                text = stringResource(R.string.choose_model_title),
                 style = MaterialTheme.typography.titleMedium
             )
 
             Text(
-                text = "This selection will be saved and used to load the correct car configuration.",
+                text = stringResource(R.string.model_saved_info),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Text(
-                text = "Only DiLink 3 vehicles are supported. DiLink 4 and 5 are not yet supported.",
+                text = stringResource(R.string.dilink3_only_notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
             )
@@ -103,8 +105,8 @@ fun InitializationScreen(
 
             CarSelectionPicker(
                 categories = listOf(
-                    "Battery Electric (BEV)" to CarCatalog.groupedBev,
-                    "Plug-in Hybrid (PHEV / DM-i)" to CarCatalog.groupedPhev
+                    stringResource(R.string.car_type_bev) to CarCatalog.groupedBev,
+                    stringResource(R.string.car_type_phev) to CarCatalog.groupedPhev
                 ),
                 selectedCarId = selectedCar?.id,
                 onCarSelected = { selectedCar = it }
@@ -122,7 +124,7 @@ fun InitializationScreen(
                 enabled = canContinue,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Continue")
+                Text(stringResource(R.string.continue_action))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -316,7 +318,7 @@ private fun CompactCarRow(
                 text = car.displayName,
                 style = MaterialTheme.typography.bodyLarge
             )
-            val rangeLabel = if (car.isPhev) "EV range" else "WLTP"
+            val rangeLabel = if (car.isPhev) stringResource(R.string.ev_range_label) else stringResource(R.string.wltp_label)
             Text(
                 text = "$rangeLabel: ${car.wltpKm} km | ${car.drivetrain}",
                 style = MaterialTheme.typography.bodySmall,
@@ -363,10 +365,12 @@ private fun CarOptionCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
+                val evRangeLabel = stringResource(R.string.ev_range_label)
+                val wltpLabel = stringResource(R.string.wltp_label)
                 val subtitle = if (car.isPhev) {
-                    "EV range: ${car.wltpKm} km | ${car.phevUsableBatteryKwh ?: car.batteryKwh} kWh | ${car.drivetrain}"
+                    "$evRangeLabel: ${car.wltpKm} km | ${car.phevUsableBatteryKwh ?: car.batteryKwh} kWh | ${car.drivetrain}"
                 } else {
-                    "WLTP: ${car.wltpKm} km | ${car.batteryKwh} kWh | ${car.drivetrain}"
+                    "$wltpLabel: ${car.wltpKm} km | ${car.batteryKwh} kWh | ${car.drivetrain}"
                 }
                 Text(
                     text = subtitle,

@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -176,7 +177,7 @@ fun EnergyFlowDiagram(
                         ) {
                             Image(
                                 bitmap = awdBitmap,
-                                contentDescription = "AWD drivetrain — tap to change pressure unit",
+                                contentDescription = stringResource(R.string.awd_tap_hint),
                                 modifier = Modifier
                                     .size(90.dp)
                                     .clickable { onShowTyreDialog() },
@@ -245,7 +246,7 @@ fun EnergyFlowDiagram(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "consumption charts",
+                                text = stringResource(R.string.nav_consumption_charts),
                                 fontSize = 9.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontWeight = FontWeight.SemiBold
@@ -287,7 +288,7 @@ fun EnergyFlowDiagram(
                         power.roundToInt().toString()
                     }
                     PowerMetric(
-                        label = "Power",
+                        label = stringResource(R.string.tab_power),
                         value = powerDisplay,
                         unit = "kW",
                         color = when {
@@ -303,7 +304,7 @@ fun EnergyFlowDiagram(
                         color = BydEcoTealDim
                     )
                     PowerMetric(
-                        label = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)",
+                        label = if (socSource == SocSource.PANEL) stringResource(R.string.stat_soc_panel) else stringResource(R.string.stat_soc_bms),
                         value = if (socSource == SocSource.PANEL) "${telemetry.socPanel}" else "${"%.1f".format(telemetry.soc)}",
                         unit = "%",
                         color = BatteryBlue
@@ -320,7 +321,7 @@ fun EnergyFlowDiagram(
                         color = MaterialTheme.extendedColors.range
                     )
                     PowerMetric(
-                        label = "Distance",
+                        label = stringResource(R.string.stat_distance),
                         value = formatDistanceDisplay(unitSystem.convertDistance(sessionDistanceKm), unitSystem.convertDistance(tripDistanceKm), isFullScreen),
                         unit = distanceUnit,
                         color = MaterialTheme.colorScheme.secondary

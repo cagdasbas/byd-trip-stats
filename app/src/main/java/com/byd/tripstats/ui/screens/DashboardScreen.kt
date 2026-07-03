@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -107,8 +108,8 @@ fun DashboardScreen(
 
     val carCategories = remember {
         listOf(
-            "Battery Electric (BEV)" to CarCatalog.groupedBev,
-            "Plug-in Hybrid (PHEV / DM-i)" to CarCatalog.groupedPhev
+            context.getString(R.string.car_type_bev) to CarCatalog.groupedBev,
+            context.getString(R.string.car_type_phev) to CarCatalog.groupedPhev
         )
     }
 
@@ -131,7 +132,7 @@ fun DashboardScreen(
                                     if (!isPro) {
                                         Toast.makeText(
                                             context,
-                                            "Screenshots are a Pro feature — unlock Pro in Settings.",
+                                            context.getString(R.string.screenshots_pro_only),
                                             Toast.LENGTH_LONG
                                         ).show()
                                         return@clickable
@@ -145,7 +146,7 @@ fun DashboardScreen(
                                         } catch (e: Exception) {
                                             Toast.makeText(
                                                 context,
-                                                "Screenshot failed: ${e.message}",
+                                                context.getString(R.string.screenshot_failed, e.message),
                                                 Toast.LENGTH_SHORT
                                             ).show()
                                         }
@@ -332,23 +333,18 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { /* require Keep or Stop — don't dismiss on outside tap */ },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Keep this trip going?") },
+            title = { Text(stringResource(R.string.keep_trip_going_title)) },
             text = {
-                Text(
-                    "The car has been off for $offTimeoutMin min, so this trip would " +
-                    "normally stop now and the live range projection would reset. " +
-                    "Keep recording if you're staying with the car (e.g. parked on a " +
-                    "call), or stop the trip."
-                )
+                Text(stringResource(R.string.keep_recording_body, offTimeoutMin))
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.keepTripAcrossOff() }) {
-                    Text("Keep recording")
+                    Text(stringResource(R.string.keep_recording_action))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.confirmAutoStop() }) {
-                    Text("Stop trip")
+                    Text(stringResource(R.string.stop_trip_action))
                 }
             }
         )
@@ -359,7 +355,7 @@ fun DashboardScreen(
             onDismissRequest = { showCarSelectionDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             title = {
-                Text("Select car")
+                Text(stringResource(R.string.select_car_label))
             },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -379,7 +375,7 @@ fun DashboardScreen(
                 TextButton(
                     onClick = { showCarSelectionDialog = false }
                 ) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -389,7 +385,7 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { showTyreUnitDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Tyre Pressure Unit") },
+            title = { Text(stringResource(R.string.tyre_pressure_unit_title)) },
             text = {
                 Column {
                     TyrePressureUnit.entries.forEach { u ->
@@ -415,9 +411,9 @@ fun DashboardScreen(
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = when (u) {
-                                    TyrePressureUnit.BAR -> "Bar  (default, e.g. 2.6)"
-                                    TyrePressureUnit.PSI -> "PSI  (e.g. 37.7)"
-                                    TyrePressureUnit.KPA -> "kPa  (e.g. 260)"
+                                    TyrePressureUnit.BAR -> stringResource(R.string.tyre_unit_bar)
+                                    TyrePressureUnit.PSI -> stringResource(R.string.tyre_unit_psi)
+                                    TyrePressureUnit.KPA -> stringResource(R.string.tyre_unit_kpa)
                                 },
                                 style = MaterialTheme.typography.bodyLarge
                             )
@@ -427,7 +423,7 @@ fun DashboardScreen(
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showTyreUnitDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showTyreUnitDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -466,13 +462,12 @@ private fun SpeedWedgeBanner(modifier: Modifier = Modifier) {
             Icon(Icons.Filled.WarningAmber, contentDescription = null)
             Column {
                 Text(
-                    "Live telemetry paused",
+                    stringResource(R.string.live_telemetry_paused),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "Speed, power and gear can't update after an app update mid-drive. " +
-                        "Turn the car off and on once to restore them.",
+                    stringResource(R.string.speed_wedge_banner),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

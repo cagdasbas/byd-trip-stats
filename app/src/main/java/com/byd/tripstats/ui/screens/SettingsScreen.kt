@@ -9,9 +9,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.ui.screens.settings.AboutTab
 import com.byd.tripstats.ui.screens.settings.AppManagementTab
@@ -34,17 +36,22 @@ fun SettingsScreen(
 
     val snackbarHostState  = remember { SnackbarHostState() }
     var selectedTab       by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("App", "Connections", "Preferences", "About & FAQ")
+    val tabs = listOf(
+        stringResource(R.string.settings_tab_app),
+        stringResource(R.string.settings_tab_connections),
+        stringResource(R.string.settings_tab_preferences),
+        stringResource(R.string.settings_tab_about)
+    )
 
     val updateInfo by viewModel.updateInfo.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.nav_settings), fontSize = 24.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(28.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(28.dp))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

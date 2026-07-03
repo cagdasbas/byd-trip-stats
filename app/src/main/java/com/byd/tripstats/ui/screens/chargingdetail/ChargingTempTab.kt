@@ -1,6 +1,8 @@
 package com.byd.tripstats.ui.screens.chargingdetail
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.*
 
@@ -17,18 +19,22 @@ internal fun ChargingTempTab(
     xAxisMode   : ChargingXAxisMode,
     onXAxisModeChange: (ChargingXAxisMode) -> Unit,
 ) {
+    val batteryTempTitle = stringResource(R.string.battery_temperature_section)
+    val avgLabel = stringResource(R.string.charging_chart_avg_temp)
+    val cellMinLabel = stringResource(R.string.charging_chart_cell_min_temp)
+    val cellMaxLabel = stringResource(R.string.charging_chart_cell_max_temp)
     ChargingSeriesChart(
         dataPoints  = dataPoints,
         isSynthetic = isSynthetic,
-        title       = "Battery Temperature",
+        title       = batteryTempTitle,
         yAxisLabel  = "°C",
         socSource   = socSource,
         xAxisMode   = xAxisMode,
         onXAxisModeChange = onXAxisModeChange,
         series = listOf(
-            ChargingSeriesSpec("Avg", BydErrorRed, 3f) { it.batteryTempAvgC },
-            ChargingSeriesSpec("Cell min", BydElectricAzure, 2f) { it.batteryCellTempMinC },
-            ChargingSeriesSpec("Cell max", AccelerationOrange, 2f) { it.batteryCellTempMaxC },
+            ChargingSeriesSpec(avgLabel, BydErrorRed, 3f) { it.batteryTempAvgC },
+            ChargingSeriesSpec(cellMinLabel, BydElectricAzure, 2f) { it.batteryCellTempMinC },
+            ChargingSeriesSpec(cellMaxLabel, AccelerationOrange, 2f) { it.batteryCellTempMaxC },
         ),
         crosshairFor = { p ->
             p.batteryTempAvgC.takeIf { it > 0.0 }?.let {

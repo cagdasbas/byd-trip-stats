@@ -20,6 +20,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.ui.theme.ToggleUncheckedTrack
 import kotlinx.coroutines.CoroutineScope
@@ -70,7 +72,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
         }
     }
 
-    SectionHeader(icon = Icons.Filled.Language, title = "Web Companion")
+    SectionHeader(icon = Icons.Filled.Language, title = stringResource(R.string.web_companion_label))
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -87,15 +89,15 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Web companion",
+                        stringResource(R.string.web_companion_label),
                         style      = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         if (enabled)
-                            "Browse trips & charging from any device on the same WiFi."
+                            stringResource(R.string.web_companion_desc)
                         else
-                            "Start a local server so you can open trip history in a browser.",
+                            stringResource(R.string.web_companion_disabled_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -118,11 +120,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
 
             if (enabled) {
                 Text(
-                    "Served over your local WiFi, so it's reachable while the car is on and the " +
-                        "telemetry service is alive. Once parked, most BYD units cut WiFi ~15 min " +
-                        "after the car is off — after that the companion is unreachable (there's no " +
-                        "mobile-data fallback for a local server) until the car powers on again, in " +
-                        "every Background activity mode.\nNote: Electro app has an option to keep WiFi alive indefinitely",
+                    stringResource(R.string.web_companion_wifi_info),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -137,7 +135,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                 OutlinedTextField(
                     value = portInput,
                     onValueChange = { portInput = it.filter(Char::isDigit).take(5) },
-                    label = { Text("Port") },
+                    label = { Text(stringResource(R.string.port_field_label)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f)
@@ -149,10 +147,10 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                     },
                     enabled = portInput.toIntOrNull()?.let { it in 1024..65535 } == true &&
                               portInput.toIntOrNull() != port
-                ) { Text("Apply") }
+                ) { Text(stringResource(R.string.apply)) }
             }
             Text(
-                "Try 8081, 8888, 9090 if a port is blocked. Changes restart the server.",
+                stringResource(R.string.port_hint_text),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

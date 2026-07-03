@@ -12,8 +12,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
@@ -64,7 +66,7 @@ fun TripCompareSheet(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Comparing ${trips.size} trips",
+                    stringResource(R.string.comparing_trips_label, trips.size),
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -109,7 +111,7 @@ fun TripCompareSheet(
                         Icon(
                             imageVector        = if (visible) Icons.Filled.Visibility
                             else         Icons.Filled.VisibilityOff,
-                            contentDescription = if (visible) "Hide trip" else "Show trip",
+                            contentDescription = if (visible) stringResource(R.string.hide_trip_action) else stringResource(R.string.show_trip_action),
                             tint     = if (visible) tripColor(i)
                             else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
                             modifier = Modifier.size(16.dp)

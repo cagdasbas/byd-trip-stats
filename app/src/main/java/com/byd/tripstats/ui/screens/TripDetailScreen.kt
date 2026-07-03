@@ -24,6 +24,8 @@ import com.byd.tripstats.ui.components.TagChip
 import com.byd.tripstats.ui.components.TripHeatmapsTab
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.screens.tripdetail.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +52,13 @@ fun TripDetailScreen(
 
     var selectedTab by remember { mutableStateOf(0) }
     var showTagDialog by remember { mutableStateOf(false) }
-    val tabs = listOf("Overview", "Charts", "Heatmaps", "Route", "Analysis")
+    val tabs = listOf(
+        stringResource(R.string.tab_overview),
+        stringResource(R.string.tab_charts),
+        stringResource(R.string.tab_heatmaps),
+        stringResource(R.string.tab_route),
+        stringResource(R.string.tab_analysis)
+    )
 
     var dialogData by remember {
         mutableStateOf<Pair<TripEntity, List<TripDataPointEntity>>?>(null)
@@ -59,10 +67,10 @@ fun TripDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Trip Details", fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.nav_trip_details), fontSize = 24.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(28.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(28.dp))
                     }
                 },
                 actions = {
@@ -74,7 +82,7 @@ fun TripDetailScreen(
                                 imageVector = if (currentTrip.isFavourite)
                                     Icons.Filled.Star else Icons.Filled.StarBorder,
                                 contentDescription = if (currentTrip.isFavourite)
-                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                    stringResource(R.string.remove_favourite_action) else stringResource(R.string.mark_favourite_action),
                                 tint = if (currentTrip.isFavourite)
                                     ChargingYellow else LocalContentColor.current,
                                 modifier = Modifier.size(24.dp)
@@ -90,7 +98,7 @@ fun TripDetailScreen(
                     ) {
                         Icon(
                             Icons.Filled.Share,
-                            contentDescription = "Export trip data",
+                            contentDescription = stringResource(R.string.export_trip_data_action),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -223,7 +231,7 @@ private fun TripTagsBar(
         }
         AssistChip(
             onClick = onAdd,
-            label = { Text(if (tags.isEmpty()) "Add tag" else "Tag") },
+            label = { Text(if (tags.isEmpty()) stringResource(R.string.add_tag_action) else stringResource(R.string.tags_label)) },
             leadingIcon = { Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp)) }
         )
     }

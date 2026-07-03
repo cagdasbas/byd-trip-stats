@@ -22,6 +22,8 @@ import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.speedUnit
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.BydElectricAzure
 import com.byd.tripstats.ui.theme.BydErrorRed
 import com.byd.tripstats.ui.theme.ToggleUncheckedTrack
@@ -58,11 +60,11 @@ fun TripControls(
                     modifier = Modifier.size(32.dp)
                 )
             },
-            title = { Text("Stop recording?", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.stop_recording_title), fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     buildString {
-                        append("The current trip will be saved and closed. This cannot be undone.")
+                        append(stringResource(R.string.stop_recording_msg))
                         if (autoTripDetection) {
                             append("\n\nAutomatic trip recording will be turned off and future trips will be manual until you switch it back on.")
                         }
@@ -80,10 +82,10 @@ fun TripControls(
                         onEndTrip()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BydErrorRed)
-                ) { Text("Stop trip") }
+                ) { Text(stringResource(R.string.stop_trip_action)) }
             },
             dismissButton = {
-                TextButton(onClick = { showStopConfirmDialog = false }) { Text("Keep recording") }
+                TextButton(onClick = { showStopConfirmDialog = false }) { Text(stringResource(R.string.keep_recording_action)) }
             }
         )
     }
@@ -127,17 +129,14 @@ fun TripControls(
                         tint = MaterialTheme.colorScheme.error)
                 },
                 title = {
-                    Text("Switch to Manual Tracking?",
+                    Text(stringResource(R.string.stop_recording_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold)
                 },
                 text = {
                     Text(
-                        "With manual tracking enabled, trip data will not be recorded " +
-                                "automatically when you start driving. You will need to start " +
-                                "and stop each trip yourself.\n\n" +
-                                "Trips that are not recorded will be absent from your daily, " +
-                                "weekly, and monthly consumption statistics.",
+                        stringResource(R.string.manual_tracking_warning) + "\n\n" +
+                                stringResource(R.string.manual_tracking_note),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
@@ -146,14 +145,14 @@ fun TripControls(
                         showManualWarning = false
                         onToggleAutoDetection()
                     }) {
-                        Text("Switch to Manual",
+                        Text(stringResource(R.string.switch_to_manual),
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.SemiBold)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showManualWarning = false }) {
-                        Text("Keep Auto")
+                        Text(stringResource(R.string.keep_auto))
                     }
                 }
             )
@@ -169,19 +168,19 @@ fun TripControls(
             else                   -> MaterialTheme.colorScheme.onSurfaceVariant
         }
         val statusText = when {
-            isInTrip && telemetry.speed > 0.5    -> "Driving"
-            isInTrip && gear in listOf("D", "R") -> "Ready"
-            autoParkedInTrip                     -> "Stopped"
-            isInTrip                             -> "Trip in Progress"
-            gear == "D"                          -> "Ready to Drive"
-            gear == "R"                          -> "Reverse"
-            gear == "P"                          -> "Waiting for Trip..."
-            gear == "N"                          -> "Neutral"
-            else                                 -> "Waiting for Trip..."
+            isInTrip && telemetry.speed > 0.5    -> stringResource(R.string.state_driving)
+            isInTrip && gear in listOf("D", "R") -> stringResource(R.string.state_ready)
+            autoParkedInTrip                     -> stringResource(R.string.state_stopped)
+            isInTrip                             -> stringResource(R.string.state_trip_in_progress)
+            gear == "D"                          -> stringResource(R.string.state_ready_to_drive)
+            gear == "R"                          -> stringResource(R.string.state_reverse)
+            gear == "P"                          -> stringResource(R.string.state_waiting)
+            gear == "N"                          -> stringResource(R.string.state_neutral)
+            else                                 -> stringResource(R.string.state_waiting)
         }
 
         val autoLabel: @Composable () -> Unit = {
-            Text(text = "Auto", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(text = stringResource(R.string.auto_short), fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
         val autoSwitch: @Composable () -> Unit = {
             Switch(
@@ -256,7 +255,7 @@ fun TripControls(
                     )
                     Spacer(modifier = Modifier.width(if (compact) 4.dp else 6.dp))
                     Text(
-                        text = if (isInTrip) "Stop" else "Record",
+                        text = if (isInTrip) stringResource(R.string.btn_stop) else stringResource(R.string.btn_record),
                         fontSize = if (compact) 11.sp else 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -266,7 +265,7 @@ fun TripControls(
             val titles: @Composable () -> Unit = {
                 Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
-                        text = "Trip Tracking",
+                        text = stringResource(R.string.trip_tracking_label),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -305,11 +304,11 @@ fun TripControls(
                     ) {
                         Box(modifier = Modifier.weight(1f)) { titles() }
                         Box(modifier = Modifier.weight(1f)) {
-                            DenseStat("TIME", elapsedStr, "")
+                            DenseStat(stringResource(R.string.stat_time), elapsedStr, "")
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         Box(modifier = Modifier.weight(1f)) {
-                            DenseStat("AVG", "%.0f".format(avgSpeedDisplay), unitSystem.speedUnit)
+                            DenseStat(stringResource(R.string.stat_avg_abbr), "%.0f".format(avgSpeedDisplay), unitSystem.speedUnit)
                         }
                         Box(
                             modifier = Modifier.weight(1f),
@@ -322,12 +321,12 @@ fun TripControls(
                     ) {
                         Box(modifier = Modifier.weight(1f)) { recordStopButton(true) }
                         Box(modifier = Modifier.weight(1f)) {
-                            DenseStat("ENERGY", "%.1f".format(liveAccumulatedKwh), "kWh")
+                            DenseStat(stringResource(R.string.stat_energy), "%.1f".format(liveAccumulatedKwh), "kWh")
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         Box(modifier = Modifier.weight(1f)) {
                             DenseStat(
-                                "CONS.",
+                                stringResource(R.string.stat_consumption_abbr),
                                 if (effDisplay > 0) "%.1f".format(effDisplay) else "—",
                                 unitSystem.consumptionUnit
                             )
@@ -355,11 +354,11 @@ fun TripControls(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            DenseStat("TIME", elapsedStr, "")
-                            DenseStat("AVG", "%.0f".format(avgSpeedDisplay), unitSystem.speedUnit)
-                            DenseStat("ENERGY", "%.1f".format(liveAccumulatedKwh), "kWh")
+                            DenseStat(stringResource(R.string.stat_time), elapsedStr, "")
+                            DenseStat(stringResource(R.string.stat_avg_abbr), "%.0f".format(avgSpeedDisplay), unitSystem.speedUnit)
+                            DenseStat(stringResource(R.string.stat_energy), "%.1f".format(liveAccumulatedKwh), "kWh")
                             DenseStat(
-                                "CONS.",
+                                stringResource(R.string.stat_consumption_abbr),
                                 if (effDisplay > 0) "%.1f".format(effDisplay) else "—",
                                 unitSystem.consumptionUnit
                             )
@@ -367,9 +366,9 @@ fun TripControls(
                     } else {
                         Text(
                             text = if (autoTripDetection)
-                                "Auto detection will start a trip when you drive"
+                                stringResource(R.string.auto_detection_desc)
                             else
-                                "Press Record to begin manual tracking",
+                                stringResource(R.string.press_record_hint),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

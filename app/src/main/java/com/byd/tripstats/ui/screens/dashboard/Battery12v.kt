@@ -24,6 +24,8 @@ import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.theme.BatteryBlue
 import com.byd.tripstats.ui.theme.MotorViolet
@@ -93,9 +95,9 @@ internal fun Battery12vHistoryDialog(
                 TopAppBar(
                     title = {
                         Column {
-                            Text("HV / 12V Batteries - Last 48 Hours")
+                            Text(stringResource(R.string.hv_12v_history_title))
                             Text(
-                                "Recorded telemetry samples plus the current live reading",
+                                stringResource(R.string.battery_history_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -117,10 +119,10 @@ internal fun Battery12vHistoryDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Battery12vSummaryChip("Latest", latest?.let { "%.2f V".format(it.battery12vVoltage) } ?: "—", Modifier.weight(1f))
-                        Battery12vSummaryChip("Min", min12v?.let { "%.2f V".format(it) } ?: "—", Modifier.weight(1f))
-                        Battery12vSummaryChip("Max", max12v?.let { "%.2f V".format(it) } ?: "—", Modifier.weight(1f))
-                        Battery12vSummaryChip("Delta", delta12v?.let { "%+.2f V".format(it) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip(stringResource(R.string.stat_latest), latest?.let { "%.2f V".format(it.battery12vVoltage) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip(stringResource(R.string.stat_min), min12v?.let { "%.2f V".format(it) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip(stringResource(R.string.stat_max), max12v?.let { "%.2f V".format(it) } ?: "—", Modifier.weight(1f))
+                        Battery12vSummaryChip(stringResource(R.string.stat_delta), delta12v?.let { "%+.2f V".format(it) } ?: "—", Modifier.weight(1f))
                     }
                     Battery12vHistoryChart(
                         points = mergedPoints,
@@ -170,7 +172,7 @@ private fun Battery12vHistoryChart(
     if (points.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No 12V history recorded yet.",
+                stringResource(R.string.no_12v_history),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -191,6 +193,8 @@ private fun Battery12vHistoryChart(
     val axisColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val strChargingSample = stringResource(R.string.legend_charging_sample)
+    val strDriveSample = stringResource(R.string.legend_drive_sample)
 
     Card(
         modifier = modifier,
@@ -202,18 +206,18 @@ private fun Battery12vHistoryChart(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("12V / SOC chart (If offline mode, values are reconstructed)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.chart_12v_soc_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
                         drawLine(chartColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 4f, cap = StrokeCap.Round)
                     }
-                    Text("12V", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.legend_12v), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Canvas(modifier = Modifier.size(width = 18.dp, height = 8.dp)) {
                         drawLine(socColor, Offset(0f, size.height / 2f), Offset(size.width, size.height / 2f), 3f,
                             cap = StrokeCap.Round,
                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 4f)))
                     }
-                    Text("SoC", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.legend_soc_short), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -362,7 +366,7 @@ private fun Battery12vHistoryChart(
                             padT = padT,
                             chartH = chartH,
                             line1 = "12V: ${"%.2f".format(closest.battery12vVoltage)} V${pointSoc(closest).takeIf { it > 0.0 }?.let { "  |  SoC: ${"%.1f".format(it)}%" } ?: ""}",
-                            line2 = if (closest.isChargingSample) "charging sample" else "drive/live sample",
+                            line2 = if (closest.isChargingSample) strChargingSample else strDriveSample,
                             line3 = timeFormatter.format(Date(closest.timestamp)),
                             accentColor = chartColor
                         )

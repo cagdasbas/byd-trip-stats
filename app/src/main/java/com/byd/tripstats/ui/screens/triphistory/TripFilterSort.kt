@@ -22,6 +22,8 @@ import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.distanceUnit
 import com.byd.tripstats.data.preferences.speedUnit
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.components.TagChip
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripFilterState
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripSortField
@@ -36,12 +38,12 @@ internal fun SortSheetContent(
     onDismiss: () -> Unit
 ) {
     val fields = listOf(
-        TripSortField.DATE        to "Date",
-        TripSortField.DISTANCE    to "Distance",
-        TripSortField.DURATION    to "Duration",
-        TripSortField.CONSUMPTION to "Avg Consumption",
-        TripSortField.REGEN_EFF   to "Regen Efficiency",
-        TripSortField.MAX_SPEED   to "Max Speed"
+        TripSortField.DATE        to stringResource(R.string.sort_date),
+        TripSortField.DISTANCE    to stringResource(R.string.sort_distance),
+        TripSortField.DURATION    to stringResource(R.string.sort_duration),
+        TripSortField.CONSUMPTION to stringResource(R.string.sort_avg_consumption),
+        TripSortField.REGEN_EFF   to stringResource(R.string.sort_regen_eff),
+        TripSortField.MAX_SPEED   to stringResource(R.string.sort_max_speed)
     )
 
     Column(
@@ -57,7 +59,7 @@ internal fun SortSheetContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Sort by", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.sort_by), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             FilledTonalButton(onClick = onOrderToggle) {
                 Icon(
                     imageVector = if (currentOrder == TripSortOrder.DESC)
@@ -66,7 +68,7 @@ internal fun SortSheetContent(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.width(6.dp))
-                Text(if (currentOrder == TripSortOrder.DESC) "Descending" else "Ascending")
+                Text(if (currentOrder == TripSortOrder.DESC) stringResource(R.string.sort_descending) else stringResource(R.string.sort_ascending))
             }
         }
 
@@ -131,16 +133,16 @@ internal fun FilterSheetContent(
             .background(MaterialTheme.colorScheme.surfaceVariant),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Filter trips", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.filter_trips_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-        FilterRangeRow("Distance (${unitSystem.distanceUnit})", distMin, distMax) { a, b -> distMin = a; distMax = b }
-        FilterRangeRow("Duration (min)",                    durMin,  durMax)  { a, b -> durMin  = a; durMax  = b }
-        FilterRangeRow("Avg Consumption (${unitSystem.consumptionUnit})", consMin, consMax) { a, b -> consMin = a; consMax = b }
-        FilterRangeRow("Regen Efficiency (%)",              regenMin, regenMax) { a, b -> regenMin = a; regenMax = b }
-        FilterRangeRow("Max Speed (${unitSystem.speedUnit})", speedMin, speedMax) { a, b -> speedMin = a; speedMax = b }
+        FilterRangeRow(stringResource(R.string.filter_distance, unitSystem.distanceUnit), distMin, distMax) { a, b -> distMin = a; distMax = b }
+        FilterRangeRow(stringResource(R.string.filter_duration),                    durMin,  durMax)  { a, b -> durMin  = a; durMax  = b }
+        FilterRangeRow(stringResource(R.string.filter_consumption, unitSystem.consumptionUnit), consMin, consMax) { a, b -> consMin = a; consMax = b }
+        FilterRangeRow(stringResource(R.string.filter_regen_eff),              regenMin, regenMax) { a, b -> regenMin = a; regenMax = b }
+        FilterRangeRow(stringResource(R.string.filter_max_speed, unitSystem.speedUnit), speedMin, speedMax) { a, b -> speedMin = a; speedMax = b }
 
         if (allTags.isNotEmpty()) {
-            Text("Tags", style = MaterialTheme.typography.labelLarge,
+            Text(stringResource(R.string.tags_label), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             androidx.compose.foundation.layout.FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -163,7 +165,7 @@ internal fun FilterSheetContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedButton(onClick = onClear, modifier = Modifier.weight(1f)) { Text("Clear all") }
+            OutlinedButton(onClick = onClear, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.clear_all)) }
             Button(
                 onClick = {
                     onApply(TripFilterState(
@@ -182,7 +184,7 @@ internal fun FilterSheetContent(
                     ))
                 },
                 modifier = Modifier.weight(1f)
-            ) { Text("Apply") }
+            ) { Text(stringResource(R.string.apply)) }
         }
     }
 }
@@ -205,7 +207,7 @@ private fun FilterRangeRow(
                 value = minVal,
                 onValueChange = { onValuesChange(it, maxVal) },
                 modifier = Modifier.weight(1f),
-                label = { Text("Min") },
+                label = { Text(stringResource(R.string.filter_min)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )
@@ -214,7 +216,7 @@ private fun FilterRangeRow(
                 value = maxVal,
                 onValueChange = { onValuesChange(minVal, it) },
                 modifier = Modifier.weight(1f),
-                label = { Text("Max") },
+                label = { Text(stringResource(R.string.filter_max)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
             )

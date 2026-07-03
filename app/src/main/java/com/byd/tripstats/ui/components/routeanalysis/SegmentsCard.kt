@@ -7,8 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.AccelerationOrange
@@ -32,7 +34,7 @@ internal fun RouteSegmentsCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Route Segments",
+                text = stringResource(R.string.route_segments_label),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -55,7 +57,7 @@ internal fun RouteSegmentsCard(
                     speedUnit     = speedUnit,
                     avgPower      = avgPower.toInt(),
                     socChange     = socChange,
-                    socLabel      = if (socSource == SocSource.PANEL) "SoC (Panel)" else "SoC (BMS)"
+                    socLabel      = if (socSource == SocSource.PANEL) stringResource(R.string.stat_soc_panel) else stringResource(R.string.stat_soc_bms)
                 )
 
                 if (index < segments.size - 1) {
@@ -89,7 +91,7 @@ private fun SegmentItem(
     ) {
         Column {
             Text(
-                text = "Segment $segmentNumber",
+                text = stringResource(R.string.segment_number_label, segmentNumber),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )

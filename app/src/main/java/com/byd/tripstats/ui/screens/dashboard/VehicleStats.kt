@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,7 +76,7 @@ fun VehicleStats(
                 telemetry.soh in 1..110 -> "~est"
                 else -> ""
             }
-            if (pct == "—") "SoH: —" else "SoH: $pct${if (src.isNotEmpty()) " ($src)" else ""}"
+            if (pct == "—") stringResource(R.string.soh_value, "—") else stringResource(R.string.soh_value, "$pct${if (src.isNotEmpty()) " ($src)" else ""}")
         }
         val batteryTempSubtitle: String? = run {
             val cellMin = telemetry.batteryCellTempMin.toDouble().takeIf { it > 0.0 }
@@ -87,10 +88,10 @@ fun VehicleStats(
             } else {
                 vehicleSnapshot?.statisticCellTempAvg
             }
-            avg?.takeIf { it.isFinite() && it in -40.0..120.0 }?.let { "Temp: ${it.toInt()} °C" }
+            avg?.takeIf { it.isFinite() && it in -40.0..120.0 }?.let { stringResource(R.string.battery_temp_value, it.toInt()) }
         }
         StatCard(
-            title    = "Battery",
+            title    = stringResource(R.string.stat_battery),
             value    = sohDisplay,
             subtitle = batteryTempSubtitle,
             icon     = Icons.Filled.BatteryChargingFull,
@@ -100,17 +101,17 @@ fun VehicleStats(
             onClick  = onNavigateToBatteryDegradation
         )
         StatCard(
-            title    = "Environment",
+            title    = stringResource(R.string.stat_environment),
             value    = run {
                 val externalTemp = vehicleSnapshot?.instrumentOutCarTemperature
                     ?: telemetry.instrumentOutCarTemperature
-                if (externalTemp != null) "Ambient: $externalTemp °C" else "Ambient: — °C"
+                if (externalTemp != null) stringResource(R.string.ambient_temp_value, externalTemp) else stringResource(R.string.ambient_temp_value, "—")
             },
             subtitle = run {
                 val pm25In = vehicleSnapshot?.pm25InCar
                 val pm25Out = vehicleSnapshot?.pm25OutCar
                 if (pm25In != null || pm25Out != null)
-                    "PM2.5: ${pm25In ?: "—"}/${pm25Out ?: "—"} μg/m³"
+                    stringResource(R.string.pm25_value, pm25In ?: "—", pm25Out ?: "—")
                 else null
             },
             icon     = Icons.Filled.Public,
@@ -119,7 +120,7 @@ fun VehicleStats(
             modifier = cardMod
         )
         StatCard(
-            title    = "HV / 12V",
+            title    = stringResource(R.string.stat_hv_12v),
             value    = run {
                 val cellMin  = vehicleSnapshot?.statisticCellVoltageMin
                     ?: telemetry.statisticCellVoltageMin
@@ -138,7 +139,7 @@ fun VehicleStats(
                 }
                 val hvStr    = if (hvVolts != null) "$hvVolts V" else "— V"
                 val v12Str   = if (telemetry.battery12vVoltage > 0.0) String.format("%.2f", telemetry.battery12vVoltage) + " V" else "— V"
-                "$hvStr / $v12Str"
+                stringResource(R.string.hv_12v_pair, hvStr, v12Str)
             },
             subtitle = run {
                 val cellMin = vehicleSnapshot?.statisticCellVoltageMin
@@ -149,12 +150,12 @@ fun VehicleStats(
                     ?: telemetry.batteryCellVoltageMax.takeIf { it > 0.0 }
                 when {
                     cellMin != null && cellMax != null ->
-                        "Cells: ${String.format("%.3f", cellMin)} – ${String.format("%.3f", cellMax)} V"
+                        stringResource(R.string.cells_range, String.format("%.3f", cellMin), String.format("%.3f", cellMax))
                     cellMin != null ->
-                        "Cells: ${String.format("%.3f", cellMin)} V"
+                        stringResource(R.string.cells_min_only, String.format("%.3f", cellMin))
                     cellMax != null ->
-                        "Cells: ${String.format("%.3f", cellMax)} V"
-                    else -> "Cells: awaiting data…"
+                        stringResource(R.string.cells_min_only, String.format("%.3f", cellMax))
+                    else -> stringResource(R.string.cells_awaiting)
                 }
             },
             icon     = Icons.Filled.Bolt,
@@ -174,7 +175,7 @@ fun VehicleStats(
 
         when (selectedCar?.drivetrain) {
             Drivetrain.FWD -> StatCard(
-                title    = "Front Motor",
+                title    = stringResource(R.string.stat_front_motor),
                 value    = frontMotorRpm?.let { "$it RPM" } ?: "0 RPM",
                 subtitle = "$liveEnginePower kW",
                 iconRes  = R.drawable.ic_motor_axle,
@@ -183,7 +184,7 @@ fun VehicleStats(
                 modifier = cardMod
             )
             Drivetrain.RWD -> StatCard(
-                title    = "Rear Motor",
+                title    = stringResource(R.string.stat_rear_motor),
                 value    = rearMotorRpm?.let { "$it RPM" } ?: "0 RPM",
                 subtitle = "$liveEnginePower kW",
                 iconRes  = R.drawable.ic_motor_axle,
@@ -205,7 +206,7 @@ fun VehicleStats(
                 }
                 val kwLine = "$liveEnginePower kW"
                 StatCard(
-                    title    = "Front / Rear Motors",
+                    title    = stringResource(R.string.stat_front_rear_motors),
                     value    = "${frontMotorRpm ?: "0"} / ${rearMotorRpm ?: "0"} RPM",
                     subtitle = if (drivetrainLabel != null) "$drivetrainLabel · $kwLine" else kwLine,
                     iconRes  = R.drawable.ic_motor_axle,
@@ -217,7 +218,7 @@ fun VehicleStats(
         }
 
         StatCard(
-            title    = "Driving Dynamics",
+            title    = stringResource(R.string.stat_driving_dynamics),
             value    = run {
                 listOfNotNull(
                     telemetry.regenModeName.takeIf { telemetry.regenMode != 0 },
@@ -228,8 +229,8 @@ fun VehicleStats(
                 val slope = vehicleSnapshot?.roadSlopeDeg
                 val needsInit = telemetry.isCarOn && telemetry.driveMode == 0
                 when {
-                    needsInit -> "Change drive mode to initialize display"
-                    slope != null -> "Slope: ${String.format("%.1f", slope)}°"
+                    needsInit -> stringResource(R.string.change_drive_mode_hint)
+                    slope != null -> stringResource(R.string.slope_value, String.format("%.1f", slope))
                     else -> null
                 }
             },
@@ -250,7 +251,7 @@ fun VehicleStats(
         }
 
         StatCard(
-            title    = "Odometer",
+            title    = stringResource(R.string.stat_odometer),
             value    = "${String.format("%.1f", telemetry.odometer)} $distanceUnit",
             icon     = Icons.Filled.Speed,
             color    = MaterialTheme.colorScheme.primary,
@@ -258,7 +259,7 @@ fun VehicleStats(
             modifier = smallCardMod
         )
         StatCard(
-            title    = "Total Discharge",
+            title    = stringResource(R.string.stat_total_discharge),
             value    = "${String.format("%.1f", telemetry.totalDischarge)} kWh",
             subtitle = run {
                 val phm = telemetry.totalElecConPHM ?: return@run null

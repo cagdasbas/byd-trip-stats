@@ -24,10 +24,12 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.sdk.VehicleCompatibilityProbe
 import com.byd.tripstats.ui.theme.BydElectricAzure
@@ -50,11 +52,10 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
     val telegramConfig by telegram.config.collectAsState()
     val telegramState by telegram.state.collectAsState()
 
-    SectionHeader(icon = Icons.Filled.BugReport, title = "Vehicle Compatibility")
+    SectionHeader(icon = Icons.Filled.BugReport, title = stringResource(R.string.vehicle_compat_label))
 
     Text(
-        "Help support for your BYD model by sharing a raw telemetry probe report. " +
-        "Enable probing, drive for a couple of minutes, then export and share the file.",
+        stringResource(R.string.compat_help_desc),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -81,7 +82,7 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        "Privacy notice",
+                        stringResource(R.string.privacy_notice_label),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.secondary
@@ -123,15 +124,16 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Enable compatibility probing",
+                        stringResource(R.string.enable_compat_probe_label),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
+                    val lastCaptureSuffix = lastCapture?.let { " · last: ${it.substringBefore('T')}" } ?: ""
                     Text(
                         if (isEnabled)
-                            "Active — $entryCount fields captured${lastCapture?.let { " · last: ${it.substringBefore('T')}" } ?: ""}"
+                            stringResource(R.string.active_probe_status, entryCount, lastCaptureSuffix)
                         else
-                            "Off — enable, drive briefly, then export.",
+                            stringResource(R.string.probe_off_status),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

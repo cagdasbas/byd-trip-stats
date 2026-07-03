@@ -10,8 +10,10 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.analysis.calculateTripEnergyBreakdown
 import com.byd.tripstats.data.config.CarConfig
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
@@ -91,7 +93,7 @@ fun TripOverviewTab(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             MetricCard(
-                title = "Distance",
+                title = stringResource(R.string.stat_distance),
                 value = String.format("%.1f", unitSystem.convertDistance(trip.distance ?: 0.0)),
                 unit = unitSystem.distanceUnit,
                 icon = Icons.Filled.Route,
@@ -106,7 +108,7 @@ fun TripOverviewTab(
             )
 
             MetricCard(
-                title = "Duration",
+                title = stringResource(R.string.stat_duration),
                 value = formatDuration(trip.duration ?: 0),
                 unit = "",
                 icon = Icons.Filled.Timer,
@@ -126,7 +128,7 @@ fun TripOverviewTab(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             MetricCard(
-                title = "Energy consumed",
+                title = stringResource(R.string.stat_energy_consumed),
                 value = String.format("%.2f", trip.energyConsumed ?: 0.0),
                 unit = "kWh",
                 icon = Icons.Filled.BatteryChargingFull,
@@ -141,7 +143,7 @@ fun TripOverviewTab(
             )
 
             MetricCard(
-                title = "Average consumption",
+                title = stringResource(R.string.stat_avg_consumption),
                 value = String.format("%.2f", unitSystem.convertEfficiency(trip.efficiency ?: 0.0)),
                 unit = "kWh / 100${unitSystem.distanceUnit}",
                 icon = Icons.Filled.Eco,
@@ -172,78 +174,78 @@ fun TripOverviewTab(
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = "Trip Statistics",
+                    text = stringResource(R.string.trip_statistics_section),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                DetailRow("Start Time", formatTimestamp(trip.startTime))
-                DetailRow("End Time", trip.endTime?.let { formatTimestamp(it) } ?: "In Progress")
+                DetailRow(stringResource(R.string.start_time_label), formatTimestamp(trip.startTime))
+                DetailRow(stringResource(R.string.end_time_label), trip.endTime?.let { formatTimestamp(it) } ?: stringResource(R.string.in_progress_label))
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Initial mileage", "${String.format("%.1f", trip.startOdometer)} ${unitSystem.distanceUnit}")
-                DetailRow("Final mileage", trip.endOdometer?.let { "${String.format("%.1f", it)} ${unitSystem.distanceUnit}" } ?: "-")
-                DetailRow("Trip distance", trip.distance?.let { "${String.format("%.1f", unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "-")
+                DetailRow(stringResource(R.string.initial_mileage_label), "${String.format("%.1f", trip.startOdometer)} ${unitSystem.distanceUnit}")
+                DetailRow(stringResource(R.string.final_mileage_label), trip.endOdometer?.let { "${String.format("%.1f", it)} ${unitSystem.distanceUnit}" } ?: "-")
+                DetailRow(stringResource(R.string.trip_distance_label), trip.distance?.let { "${String.format("%.1f", unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
                 if (socSource == SocSource.PANEL) {
-                    DetailRow("Start SoC (Panel)", "${trip.startSocPanel.toInt()}%")
-                    DetailRow("End SoC (Panel)", trip.endSocPanel?.let { "${it.toInt()}%" } ?: "-")
-                    DetailRow("SoC Change (Panel)", trip.socPanelDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                    DetailRow(stringResource(R.string.start_soc_panel), "${trip.startSocPanel.toInt()}%")
+                    DetailRow(stringResource(R.string.end_soc_panel), trip.endSocPanel?.let { "${it.toInt()}%" } ?: "-")
+                    DetailRow(stringResource(R.string.soc_change_panel), trip.socPanelDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
                 } else {
-                    DetailRow("Start SoC (BMS)", "${String.format("%.1f", trip.startSoc)}%")
-                    DetailRow("End SoC (BMS)", trip.endSoc?.let { "${String.format("%.1f", it)}%" } ?: "-")
-                    DetailRow("SoC Change (BMS)", trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                    DetailRow(stringResource(R.string.start_soc_bms), "${String.format("%.1f", trip.startSoc)}%")
+                    DetailRow(stringResource(R.string.end_soc_bms), trip.endSoc?.let { "${String.format("%.1f", it)}%" } ?: "-")
+                    DetailRow(stringResource(R.string.soc_change_bms), trip.socDelta?.let { "${String.format("%.1f", it)}%" } ?: "-")
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Max Speed", "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}")
-                DetailRow("Avg Speed", stats?.avgSpeed?.toInt()?.toString()?.plus(" ${unitSystem.speedUnit}") ?: "-")
+                DetailRow(stringResource(R.string.stat_max_speed), "${trip.maxSpeed.toInt()} ${unitSystem.speedUnit}")
+                DetailRow(stringResource(R.string.avg_speed_detail), stats?.avgSpeed?.toInt()?.toString()?.plus(" ${unitSystem.speedUnit}") ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Max Power", "${trip.maxPower.toInt()} kW")
-                DetailRow("Max Regen", "${abs(trip.maxRegenPower).toInt()} kW")
+                DetailRow(stringResource(R.string.max_power_label), "${trip.maxPower.toInt()} kW")
+                DetailRow(stringResource(R.string.stat_max_regen), "${abs(trip.maxRegenPower).toInt()} kW")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Energy consumed", trip.energyConsumed?.let { String.format("%.2f kWh", it) } ?: "-")
+                DetailRow(stringResource(R.string.stat_energy_consumed), trip.energyConsumed?.let { String.format("%.2f kWh", it) } ?: "-")
                 if (electricityPrice > 0.0) {
                     if (overlappingChargingKwh > 0.01) {
                         DetailRow(
-                            "Trip cost @ fixed tariff",
+                            stringResource(R.string.trip_cost_fixed_label),
                             tariffTripCost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-"
                         )
-                        DetailRow("En-route charging added", String.format("%.2f kWh", overlappingChargingKwh))
-                        DetailRow("Tariff deduction", "-${currencySymbol}${String.format("%.2f", tariffDeductionCost)}")
+                        DetailRow(stringResource(R.string.en_route_charging_label), String.format("%.2f kWh", overlappingChargingKwh))
+                        DetailRow(stringResource(R.string.tariff_deduction_label), "-${currencySymbol}${String.format("%.2f", tariffDeductionCost)}")
                         EditableDetailRow(
-                            label = "Custom DC charging cost",
+                            label = stringResource(R.string.custom_dc_label),
                             value = if (additionalChargingCost > 0.0) {
                                 "${currencySymbol}${String.format("%.2f", additionalChargingCost)}"
                             } else {
-                                "Set cost"
+                                stringResource(R.string.set_cost_action)
                             },
                             onEdit = { showChargingCostDialog = true }
                         )
                         DetailRow(
-                            "Adjusted trip cost",
+                            stringResource(R.string.adjusted_trip_cost_label),
                             if (additionalChargingCost > 0.0 && adjustedTripCost != null) {
                                 "${currencySymbol}${String.format("%.2f", adjustedTripCost)}"
                             } else {
-                                "Set DC cost"
+                                stringResource(R.string.set_dc_cost_action)
                             }
                         )
                     } else {
-                        DetailRow("Trip cost", tariffTripCost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-")
+                        DetailRow(stringResource(R.string.trip_cost_label), tariffTripCost?.let { "${currencySymbol}${String.format("%.2f", it)}" } ?: "-")
                     }
                 }
-                DetailRow("Energy regenerated", stats?.totalRegenEnergy?.let { String.format("%.2f kWh", it) } ?: "-")
-                DetailRow("Gross energy consumed", String.format("%.2f kWh", (trip.energyConsumed ?: 0.0) + (stats?.totalRegenEnergy ?: 0.0)))
-                DetailRow("Regeneration efficiency", regenEfficiencyPct?.let { String.format("%.2f%%", it) } ?: "-")
+                DetailRow(stringResource(R.string.energy_regenerated_label), stats?.totalRegenEnergy?.let { String.format("%.2f kWh", it) } ?: "-")
+                DetailRow(stringResource(R.string.gross_energy_consumed_label), String.format("%.2f kWh", (trip.energyConsumed ?: 0.0) + (stats?.totalRegenEnergy ?: 0.0)))
+                DetailRow(stringResource(R.string.regeneration_efficiency_label), regenEfficiencyPct?.let { String.format("%.2f%%", it) } ?: "-")
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = (MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)))
 
-                DetailRow("Battery Temp Range", tripBatteryTempRangeLabel(trip))
-                DetailRow("Avg Battery Temp", tripBatteryAvgTempLabel(trip))
+                DetailRow(stringResource(R.string.battery_temp_range_label), tripBatteryTempRangeLabel(trip))
+                DetailRow(stringResource(R.string.avg_battery_temp_label), tripBatteryAvgTempLabel(trip))
             }
         }
 
@@ -266,7 +268,7 @@ fun TripOverviewTab(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Energy Breakdown",
+                        text = stringResource(R.string.energy_breakdown_section),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -309,29 +311,29 @@ fun TripOverviewTab(
                         String.format("%.1f", kwh / breakdown.totalConsumedKwh * 100.0) else "0.0"
 
                     DetailRow(
-                        "Rolling resistance",
+                        stringResource(R.string.breakdown_rolling),
                         if (breakdown.hasPhysicsBreakdown) {
                             "${formatKwh(rollingDisplay)} (${pct(rollingDisplay)}%)"
                         } else "n/a"
                     )
 
                     DetailRow(
-                        "Aerodynamic drag",
+                        stringResource(R.string.breakdown_aero),
                         if (breakdown.hasAeroEstimate) {
                             "${formatKwh(aeroDisplay)} (${pct(aeroDisplay)}%)"
                         } else "n/a"
                     )
 
                     DetailRow(
-                        "Climb",
+                        stringResource(R.string.breakdown_climb),
                         if (breakdown.hasGradientEstimate) formatKwh(climbDisplay) else "n/a"
                     )
                     DetailRow(
-                        "Descent (recovery)",
+                        stringResource(R.string.breakdown_descent),
                         if (breakdown.hasGradientEstimate) "−${formatKwh(descentDisplay)}" else "n/a"
                     )
                     DetailRow(
-                        "Net gradient",
+                        stringResource(R.string.breakdown_net_gradient),
                         if (breakdown.hasGradientEstimate) {
                             val signed = if (netGradDisplay >= 0.0) "+${formatKwh(netGradDisplay)}"
                                          else "−${formatKwh(-netGradDisplay)}"
@@ -345,13 +347,13 @@ fun TripOverviewTab(
                     )
 
                     DetailRow(
-                        "Auxiliary losses",
+                        stringResource(R.string.breakdown_auxiliary),
                         if (breakdown.hasPhysicsBreakdown) {
                             "${formatKwh(auxDisplay)} (${pct(auxDisplay)}%)"
                         } else "n/a"
                     )
                     Text(
-                        text = "12 V system, HVAC, and model residual. Shown as remainder after rolling, aero, and gradient. Motor/inverter losses are factored into the figures above",
+                        text = stringResource(R.string.breakdown_aux_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -362,11 +364,11 @@ fun TripOverviewTab(
                     )
 
                     DetailRow(
-                        "Vehicle mass",
+                        stringResource(R.string.vehicle_mass_label),
                         breakdown.estimatedKerbMassKg?.let { "${it.toInt()} kg (estimate)" } ?: "n/a"
                     )
                     DetailRow(
-                        "CdA (drag area)",
+                        stringResource(R.string.cda_drag_area_label),
                         breakdown.cdA?.let { String.format("%.3f m²", it) } ?: "n/a"
                     )
                 }
@@ -378,18 +380,18 @@ fun TripOverviewTab(
         AlertDialog(
             onDismissRequest = { showChargingCostDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Custom DC charging cost", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.custom_dc_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Enter the total amount you paid for DC charging during this trip. The app will deduct the overlapping charging energy from the fixed home-tariff estimate and add this custom cost instead.",
+                        stringResource(R.string.dc_charging_explanation),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = chargingCostInput,
                         onValueChange = { chargingCostInput = it },
-                        label = { Text("Total DC charging cost") },
+                        label = { Text(stringResource(R.string.total_dc_cost_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
@@ -403,7 +405,7 @@ fun TripOverviewTab(
                     val parsed = chargingCostInput.replace(',', '.').toDoubleOrNull()
                     onSaveAdditionalChargingCost(parsed?.takeIf { it > 0.0 })
                     showChargingCostDialog = false
-                }) { Text("Save") }
+                }) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -412,9 +414,9 @@ fun TripOverviewTab(
                             chargingCostInput = ""
                             onSaveAdditionalChargingCost(null)
                             showChargingCostDialog = false
-                        }) { Text("Clear") }
+                        }) { Text(stringResource(R.string.clear)) }
                     }
-                    TextButton(onClick = { showChargingCostDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { showChargingCostDialog = false }) { Text(stringResource(R.string.cancel)) }
                 }
             }
         )

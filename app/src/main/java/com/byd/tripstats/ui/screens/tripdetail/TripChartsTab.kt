@@ -13,8 +13,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import com.byd.tripstats.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -61,72 +63,72 @@ fun TripChartsTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         ClickableChartCard(
-            title = "Speed Profile",
-            subtitle = "${if (useImperial) "mph" else "km/h"} over time",
+            title = stringResource(R.string.chart_speed_profile),
+            subtitle = stringResource(R.string.axis_speed_over_time, if (useImperial) "mph" else "km/h"),
             onClick = { expandedChart = ChartType.SPEED }
         ) {
             CondensedSpeedChart(dataPoints = dataPoints, useImperial = useImperial, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Motor RPM",
-            subtitle = "RPM over time",
+            title = stringResource(R.string.chart_motor_rpm),
+            subtitle = stringResource(R.string.axis_rpm_over_time),
             onClick = { expandedChart = ChartType.MOTOR_RPM }
         ) {
             CondensedMotorRpmChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Power Profile",
-            subtitle = "kW over time",
+            title = stringResource(R.string.chart_power_profile),
+            subtitle = stringResource(R.string.axis_power_over_time),
             onClick = { expandedChart = ChartType.POWER }
         ) {
             CondensedPowerChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Energy Consumption",
-            subtitle = "kWh over time",
+            title = stringResource(R.string.chart_energy_consumption),
+            subtitle = stringResource(R.string.axis_kwh_over_time),
             onClick = { expandedChart = ChartType.ENERGY }
         ) {
             CondensedEnergyChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "State of Charge",
-            subtitle = "SoC% over time",
+            title = stringResource(R.string.chart_state_of_charge),
+            subtitle = stringResource(R.string.axis_soc_over_time),
             onClick = { expandedChart = ChartType.SOC }
         ) {
             CondensedSocChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Elevation Profile",
-            subtitle = "Altitude over time",
+            title = stringResource(R.string.chart_elevation_profile),
+            subtitle = stringResource(R.string.axis_altitude_over_time),
             onClick = { expandedChart = ChartType.ALTITUDE }
         ) {
             CondensedAltitudeChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Battery Voltage",
-            subtitle = "HV bus + cell min/max over time",
+            title = stringResource(R.string.chart_battery_voltage),
+            subtitle = stringResource(R.string.axis_hv_cells),
             onClick = { expandedChart = ChartType.BATTERY_VOLTAGE }
         ) {
             CondensedBatteryVoltageChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Tyre Pressures",
-            subtitle = "All four wheels (pressure) over time",
+            title = stringResource(R.string.chart_tyre_pressures),
+            subtitle = stringResource(R.string.axis_tyre_wheels),
             onClick = { expandedChart = ChartType.TYRE_PRESSURE }
         ) {
             CondensedTyrePressureChart(dataPoints = dataPoints, modifier = Modifier.fillMaxSize())
         }
 
         ClickableChartCard(
-            title = "Instantaneous Consumption",
-            subtitle = "${if (useImperial) "kWh/100mi" else "kWh/100km"} — raw + rolling average",
+            title = stringResource(R.string.chart_instant_consumption),
+            subtitle = stringResource(R.string.axis_consumption_distance, if (useImperial) "kWh/100mi" else "kWh/100km"),
             onClick = { expandedChart = ChartType.INSTANT_CONSUMPTION }
         ) {
             CondensedInstantConsumptionChart(
@@ -137,8 +139,8 @@ fun TripChartsTab(
         }
 
         ClickableChartCard(
-            title = "Drive / Regen Modes",
-            subtitle = "Mode timeline across the trip",
+            title = stringResource(R.string.chart_drive_regen_modes),
+            subtitle = stringResource(R.string.chart_mode_timeline),
             onClick = { expandedChart = ChartType.MODE_TIMELINE },
             cardHeight = 360.dp
         ) {
@@ -223,7 +225,7 @@ internal fun ClickableChartCard(
                 }
                 Icon(
                     imageVector = Icons.Filled.Fullscreen,
-                    contentDescription = "Expand",
+                    contentDescription = stringResource(R.string.expand),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -270,32 +272,32 @@ internal fun FullscreenChartDialog(
                         Column {
                             Text(
                                 text = when (chartType) {
-                                    ChartType.ENERGY             -> "Energy Consumption (Detailed)"
-                                    ChartType.SOC                -> "State of Charge (Detailed)"
-                                    ChartType.SPEED              -> "Speed Profile (Detailed)"
-                                    ChartType.MOTOR_RPM          -> "Motor RPM (Detailed)"
-                                    ChartType.ALTITUDE           -> "Elevation Profile (Detailed)"
-                                    ChartType.POWER              -> "Power Profile (Detailed)"
-                                    ChartType.BATTERY_VOLTAGE    -> "Battery Voltage (Detailed)"
-                                    ChartType.TYRE_PRESSURE      -> "Tyre Pressures (Detailed)"
-                                    ChartType.INSTANT_CONSUMPTION -> "Instantaneous Consumption (Detailed)"
-                                    ChartType.MODE_TIMELINE      -> "Drive / Regen Modes (Detailed)"
+                                    ChartType.ENERGY             -> stringResource(R.string.chart_energy_detailed)
+                                    ChartType.SOC                -> stringResource(R.string.chart_soc_detailed)
+                                    ChartType.SPEED              -> stringResource(R.string.chart_speed_detailed)
+                                    ChartType.MOTOR_RPM          -> stringResource(R.string.chart_rpm_detailed)
+                                    ChartType.ALTITUDE           -> stringResource(R.string.chart_elevation_detailed)
+                                    ChartType.POWER              -> stringResource(R.string.chart_power_detailed)
+                                    ChartType.BATTERY_VOLTAGE    -> stringResource(R.string.chart_voltage_detailed)
+                                    ChartType.TYRE_PRESSURE      -> stringResource(R.string.chart_tyre_detailed)
+                                    ChartType.INSTANT_CONSUMPTION -> stringResource(R.string.chart_instant_detailed)
+                                    ChartType.MODE_TIMELINE      -> stringResource(R.string.chart_modes_detailed)
                                 },
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = when (chartType) {
-                                    ChartType.ENERGY             -> "kWh over time"
-                                    ChartType.SOC                -> "SoC% over time"
-                                    ChartType.SPEED              -> "${if (useImperial) "mph" else "km/h"} over time"
-                                    ChartType.MOTOR_RPM          -> "RPM over time"
-                                    ChartType.ALTITUDE           -> "Altitude over time"
-                                    ChartType.POWER              -> "kW over time"
-                                    ChartType.BATTERY_VOLTAGE    -> "HV bus + cell min/max (V)"
-                                    ChartType.TYRE_PRESSURE      -> "All four wheels (bar)"
-                                    ChartType.INSTANT_CONSUMPTION -> "${if (useImperial) "kWh/100mi" else "kWh/100km"} over distance"
-                                    ChartType.MODE_TIMELINE      -> "Mode timeline over the trip"
+                                    ChartType.ENERGY             -> stringResource(R.string.axis_kwh_over_time)
+                                    ChartType.SOC                -> stringResource(R.string.axis_soc_over_time)
+                                    ChartType.SPEED              -> stringResource(R.string.axis_speed_over_time, if (useImperial) "mph" else "km/h")
+                                    ChartType.MOTOR_RPM          -> stringResource(R.string.axis_rpm_over_time)
+                                    ChartType.ALTITUDE           -> stringResource(R.string.axis_altitude_over_time)
+                                    ChartType.POWER              -> stringResource(R.string.axis_power_over_time)
+                                    ChartType.BATTERY_VOLTAGE    -> stringResource(R.string.axis_hv_cells)
+                                    ChartType.TYRE_PRESSURE      -> stringResource(R.string.axis_tyre_wheels)
+                                    ChartType.INSTANT_CONSUMPTION -> stringResource(R.string.axis_consumption_distance, if (useImperial) "kWh/100mi" else "kWh/100km")
+                                    ChartType.MODE_TIMELINE      -> stringResource(R.string.axis_mode_timeline)
                                 },
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.primary
@@ -304,7 +306,7 @@ internal fun FullscreenChartDialog(
                     },
                     navigationIcon = {
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Filled.Close, "Close")
+                            Icon(Icons.Filled.Close, stringResource(R.string.chart_close))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -389,7 +391,7 @@ internal fun ModeRecordingHint(missingDriveMode: Boolean, missingRegenMode: Bool
                 modifier = Modifier.size(14.dp)
             )
             Text(
-                text = "No $missing mode recorded — on future trips tap each mode on the car display once to enable analytics.",
+                text = stringResource(R.string.heatmap_no_mode, missing),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
@@ -46,14 +48,14 @@ fun TagsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Tags", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Per-tag efficiency & totals",
+                        Text(stringResource(R.string.tags_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.per_tag_efficiency),
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
                             modifier = Modifier.size(28.dp))
                     }
                 },
@@ -71,11 +73,10 @@ fun TagsScreen(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
                     Text("🏷️", fontSize = 52.sp)
-                    Text("No tags yet",
+                    Text(stringResource(R.string.no_tags_yet),
                         style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text(
-                        "Add a tag to a trip from its detail screen, or tag several at once " +
-                            "from History's selection mode. Tagged trips are summarised here.",
+                        stringResource(R.string.tag_usage_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -107,7 +108,7 @@ fun TagsScreen(
         AlertDialog(
             onDismissRequest = { renameTarget = null },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Rename tag") },
+            title = { Text(stringResource(R.string.rename_tag_title)) },
             text = {
                 OutlinedTextField(
                     value = name,
@@ -122,9 +123,9 @@ fun TagsScreen(
                         if (name.isNotBlank()) viewModel.renameTag(target.tag.id, name.trim())
                         renameTarget = null
                     }
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
-            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 
@@ -132,17 +133,16 @@ fun TagsScreen(
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete tag “${target.tag.name}”?") },
+            title = { Text(stringResource(R.string.delete_tag_title, target.tag.name)) },
             text = {
-                Text("This removes the tag from ${target.tripCount} trip${if (target.tripCount == 1) "" else "s"}. " +
-                    "The trips themselves are kept.")
+                Text(stringResource(R.string.delete_tag_msg, target.tripCount))
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.deleteTag(target.tag.id); deleteTarget = null }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } }
+            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.cancel)) } }
         )
     }
 }
@@ -184,21 +184,21 @@ private fun TagStatCard(
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Filled.MoreVert, "Tag options")
+                        Icon(Icons.Filled.MoreVert, stringResource(R.string.tags_label))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("View trips") },
+                            text = { Text(stringResource(R.string.view_trips_action)) },
                             onClick = { menuOpen = false; onOpenInHistory() },
                             leadingIcon = { Icon(Icons.Filled.FilterList, null) }
                         )
                         DropdownMenuItem(
-                            text = { Text("Rename") },
+                            text = { Text(stringResource(R.string.rename)) },
                             onClick = { menuOpen = false; onRename() },
                             leadingIcon = { Icon(Icons.Filled.Edit, null) }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete") },
+                            text = { Text(stringResource(R.string.delete)) },
                             onClick = { menuOpen = false; onDelete() },
                             leadingIcon = { Icon(Icons.Filled.Delete, null) }
                         )

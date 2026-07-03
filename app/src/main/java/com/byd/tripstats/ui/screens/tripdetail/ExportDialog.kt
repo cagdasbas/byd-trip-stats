@@ -17,8 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
@@ -46,7 +48,7 @@ fun ExportDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        title = { Text("Export Trip Data", fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.export_title), fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -63,7 +65,7 @@ fun ExportDialog(
                 ) {
                     Icon(Icons.Filled.ContentCopy, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Copy Summary to Clipboard")
+                    Text(stringResource(R.string.export_copy_summary))
                 }
 
                 HorizontalDivider()
@@ -71,7 +73,7 @@ fun ExportDialog(
                 // ── Downloads (collapsible) ───────────────────────────────────
                 var downloadsExpanded by remember { mutableStateOf(false) }
                 ExpandableSectionHeader(
-                    label = "Save to Download folder",
+                    label = stringResource(R.string.export_save_downloads),
                     expanded = downloadsExpanded,
                     onToggle = { downloadsExpanded = !downloadsExpanded }
                 )
@@ -85,7 +87,7 @@ fun ExportDialog(
                     ) {
                         Icon(Icons.Filled.TableChart, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Save as CSV")
+                        Text(stringResource(R.string.export_save_csv))
                     }
 
                     OutlinedButton(
@@ -97,7 +99,7 @@ fun ExportDialog(
                     ) {
                         Icon(Icons.Filled.DataObject, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Save as JSON")
+                        Text(stringResource(R.string.export_save_json))
                     }
 
                     OutlinedButton(
@@ -109,7 +111,7 @@ fun ExportDialog(
                     ) {
                         Icon(Icons.Filled.Public, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Save as HTML viewer (double-click to open)")
+                        Text(stringResource(R.string.export_save_html))
                     }
                 }
 
@@ -119,16 +121,16 @@ fun ExportDialog(
                 var telegramExpanded by remember { mutableStateOf(false) }
                 ExpandableSectionHeader(
                     label = if (telegramConfig != null)
-                        "Send to Telegram bot (@${telegramConfig!!.botName})"
+                        stringResource(R.string.export_send_telegram) + " (@${telegramConfig!!.botName})"
                     else
-                        "Send to Telegram bot (not configured)",
+                        stringResource(R.string.export_telegram_not_configured),
                     expanded = telegramExpanded,
                     onToggle = { telegramExpanded = !telegramExpanded }
                 )
                 if (telegramExpanded) {
                     if (telegramConfig == null) {
                         Text(
-                            "Set up the bot in Settings → Backup & Restore.",
+                            stringResource(R.string.export_telegram_setup_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -147,7 +149,7 @@ fun ExportDialog(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Send CSV to Telegram")
+                        Text(stringResource(R.string.export_send_csv))
                     }
 
                     OutlinedButton(
@@ -164,7 +166,7 @@ fun ExportDialog(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Send JSON to Telegram")
+                        Text(stringResource(R.string.export_send_json))
                     }
 
                     OutlinedButton(
@@ -181,14 +183,14 @@ fun ExportDialog(
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Send HTML viewer to Telegram")
+                        Text(stringResource(R.string.export_send_html))
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -213,7 +215,7 @@ internal fun ExpandableSectionHeader(
         Icon(
             imageVector = if (expanded) Icons.Filled.KeyboardArrowDown
                           else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = if (expanded) "Collapse" else "Expand",
+            contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )

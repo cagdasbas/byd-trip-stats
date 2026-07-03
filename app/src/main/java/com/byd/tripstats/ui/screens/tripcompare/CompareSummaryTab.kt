@@ -10,9 +10,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
@@ -47,38 +49,38 @@ internal fun CompareSummaryTab(
     data class MetricRow(val label: String, val values: List<String>, val winners: List<Boolean>)
 
     val rows = listOf(
-        MetricRow("Distance",
+        MetricRow(stringResource(R.string.stat_distance),
             trips.map { "%.1f ${unitSystem.distanceUnit}".format(unitSystem.convertDistance(it.distance ?: 0.0)) },
             bestIndices(trips.map { it.distance }, false)),
-        MetricRow("Duration",
+        MetricRow(stringResource(R.string.stat_duration),
             trips.map { formatDurationCompare(it.duration ?: 0L) },
             bestIndices(trips.map { it.duration?.toDouble() }, false)),
-        MetricRow("Consumption",
+        MetricRow(stringResource(R.string.stat_avg_consumption),
             trips.map { "%.1f ${unitSystem.consumptionUnit}".format(unitSystem.convertEfficiency(it.efficiency ?: 0.0)) },
             bestIndices(trips.map { it.efficiency }, true)),
-        MetricRow("Energy used",
+        MetricRow(stringResource(R.string.stat_energy_consumed),
             trips.map { "%.2f kWh".format(it.energyConsumed ?: 0.0) },
             bestIndices(trips.map { it.energyConsumed }, true)),
-        MetricRow("Max speed",
+        MetricRow(stringResource(R.string.stat_max_speed),
             trips.map { "${it.maxSpeed.toInt()} ${unitSystem.speedUnit}" },
             bestIndices(trips.map { it.maxSpeed }, false)),
-        MetricRow("Avg speed",
+        MetricRow(stringResource(R.string.stat_avg_speed),
             trips.map { displayMetrics[it.id]?.avgSpeedKmh?.let { v -> "$v ${unitSystem.speedUnit}" } ?: "—" },
             bestIndices(trips.map { displayMetrics[it.id]?.avgSpeedKmh?.toDouble() }, false)),
         MetricRow(
-            if (socSource == SocSource.PANEL) "SoC start→end (Panel)" else "SoC start→end (BMS)",
+            if (socSource == SocSource.PANEL) stringResource(R.string.soc_start_end_panel) else stringResource(R.string.soc_start_end_bms),
             if (socSource == SocSource.PANEL)
                 trips.map { "${it.startSocPanel.toInt()}% → ${it.endSocPanel?.toInt() ?: "—"}%" }
             else
                 trips.map { "${it.startSoc.toInt()}% → ${it.endSoc?.toInt() ?: "—"}%" },
             trips.map { false }),
-        MetricRow("Regen recovered",
+        MetricRow(stringResource(R.string.regen_recovered_label),
             trips.map { statsById[it.id]?.totalRegenEnergy?.let { v -> "%.2f kWh".format(v) } ?: "—" },
             bestIndices(trips.map { statsById[it.id]?.totalRegenEnergy }, false)),
-        MetricRow("Regen efficiency",
+        MetricRow(stringResource(R.string.stat_regen_eff),
             trips.map { displayMetrics[it.id]?.regenEfficiencyPct?.let { v -> "%.1f%%".format(v) } ?: "—" },
             bestIndices(trips.map { displayMetrics[it.id]?.regenEfficiencyPct }, false)),
-        MetricRow("Trip score",
+        MetricRow(stringResource(R.string.trip_score_label),
             trips.map { displayMetrics[it.id]?.tripScore?.toString() ?: "—" },
             bestIndices(trips.map { displayMetrics[it.id]?.tripScore?.toDouble() }, false))
     )

@@ -7,8 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.RegenGreen
@@ -46,9 +48,9 @@ internal fun ChargingStatsSummary(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            SummaryMetric(label = "Sessions", value = totalSessions.toString(), unit = "")
-            SummaryMetric(label = "Total added", value = "%.1f".format(totalKwh), unit = "kWh")
-            SummaryMetric(label = "Avg SoC gain", value = "%.0f".format(avgSocDelta), unit = "%")
+            SummaryMetric(label = stringResource(R.string.charging_sessions_label), value = totalSessions.toString(), unit = "")
+            SummaryMetric(label = stringResource(R.string.total_added_label), value = "%.1f".format(totalKwh), unit = "kWh")
+            SummaryMetric(label = stringResource(R.string.avg_soc_gain_label), value = "%.0f".format(avgSocDelta), unit = "%")
         }
     }
 }

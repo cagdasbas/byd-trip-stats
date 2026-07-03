@@ -30,6 +30,8 @@ import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.min
@@ -62,22 +64,22 @@ fun TripGoalsScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Goals & Personal Bests", fontSize = 20.sp,
+                        Text(stringResource(R.string.trip_goals_title), fontSize = 20.sp,
                             fontWeight = FontWeight.Bold)
-                        Text("Track your driving milestones",
+                        Text(stringResource(R.string.track_milestones_subtitle),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
                             modifier = Modifier.size(28.dp))
                     }
                 },
                 actions = {
                     IconButton(onClick = { showGoalDialog = true }) {
-                        Icon(Icons.Filled.Edit, "Set goals",
+                        Icon(Icons.Filled.Edit, stringResource(R.string.set_goals_action),
                             tint = MaterialTheme.colorScheme.primary)
                     }
                 },
@@ -97,7 +99,7 @@ fun TripGoalsScreen(
             Spacer(Modifier.height(4.dp))
 
             // ── Personal bests ────────────────────────────────────────────────
-            SectionLabel("🏆  Personal Bests")
+            SectionLabel("🏆  ${stringResource(R.string.personal_bests_section)}")
 
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -107,19 +109,19 @@ fun TripGoalsScreen(
                     modifier = Modifier.weight(1f),
                     icon     = Icons.Filled.Eco,
                     color    = RegenGreen,
-                    label    = "Best efficiency",
+                    label    = stringResource(R.string.best_efficiency_label),
                     value    = personalBests.bestConsumption
                         ?.let { "${"%.2f".format(unitSystem.convertEfficiency(it))} ${unitSystem.consumptionUnit}" } ?: "No data",
-                    sub      = "Lowest ever recorded"
+                    sub      = stringResource(R.string.lowest_ever_label)
                 )
                 BestCard(
                     modifier = Modifier.weight(1f),
                     icon     = Icons.Filled.Route,
                     color    = BatteryBlue,
-                    label    = "Longest trip",
+                    label    = stringResource(R.string.longest_trip_label),
                     value    = personalBests.bestDistance
                         ?.let { "${"%.1f".format(unitSystem.convertDistance(it))} ${unitSystem.distanceUnit}" } ?: "No data",
-                    sub      = "Single trip distance"
+                    sub      = stringResource(R.string.longest_trip_subtitle)
                 )
             }
 
@@ -138,12 +140,11 @@ fun TripGoalsScreen(
                 ) {
                     Text("🔥", fontSize = 28.sp)
                     Column {
-                        Text("Longest active streak",
+                        Text(stringResource(R.string.longest_streak_label),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "${personalBests.longestStreak} consecutive day${
-                                if (personalBests.longestStreak != 1) "s" else ""} with a trip",
+                            stringResource(R.string.consecutive_days, personalBests.longestStreak),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -159,14 +160,14 @@ fun TripGoalsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🎯  Goals", style = MaterialTheme.typography.titleMedium,
+                Text("🎯  ${stringResource(R.string.goals_section_label)}", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold)
                 if (goals.targetConsumptionKwhPer100km == null &&
                     goals.targetDistanceKmPerMonth == null) {
                     TextButton(onClick = { showGoalDialog = true }) {
                         Icon(Icons.Filled.Add, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Set goals")
+                        Text(stringResource(R.string.set_goals_action))
                     }
                 }
             }
@@ -187,10 +188,10 @@ fun TripGoalsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text("🎯", fontSize = 36.sp)
-                        Text("No goals set yet",
+                        Text(stringResource(R.string.no_goals_set),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold)
-                        Text("Tap ✏️ above to set a consumption or distance target.",
+                        Text(stringResource(R.string.set_goals_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center)
@@ -205,8 +206,8 @@ fun TripGoalsScreen(
                 GoalProgressCard(
                     icon        = Icons.Filled.Eco,
                     color       = RegenGreen,
-                    title       = "Efficiency target",
-                    subtitle    = "≤ ${"%.2f".format(displayTarget)} ${unitSystem.consumptionUnit} (last 5 trips avg)",
+                    title       = stringResource(R.string.efficiency_target_label),
+                    subtitle    = stringResource(R.string.efficiency_target_subtitle, "%.2f".format(displayTarget), unitSystem.consumptionUnit),
                     current     = displayCurrent,
                     target      = displayTarget,
                     unit        = unitSystem.consumptionUnit,
@@ -221,8 +222,8 @@ fun TripGoalsScreen(
                 GoalProgressCard(
                     icon        = Icons.Filled.Route,
                     color       = BatteryBlue,
-                    title       = "Monthly distance",
-                    subtitle    = "${"%.0f".format(displayCurrent)} / ${"%.0f".format(displayTarget)} ${unitSystem.distanceUnit} this month",
+                    title       = stringResource(R.string.monthly_distance_goal_label),
+                    subtitle    = stringResource(R.string.monthly_distance_subtitle, "%.0f".format(displayCurrent), "%.0f".format(displayTarget), unitSystem.distanceUnit),
                     current     = displayCurrent,
                     target      = displayTarget,
                     unit        = unitSystem.distanceUnit,
@@ -337,9 +338,9 @@ private fun GoalProgressCard(
 
             if (!achieved && current != null) {
                 val remaining = if (lowerIsBetter)
-                    "Need ${"%.2f".format(current - target)} $unit improvement"
+                    stringResource(R.string.improvement_needed, "%.2f".format(current - target), unit)
                 else
-                    "${"%.0f".format(target - current)} $unit remaining this month"
+                    stringResource(R.string.remaining_this_month, "%.0f".format(target - current), unit)
                 Text(remaining, style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -409,32 +410,32 @@ private fun GoalEditDialog(
         containerColor   = MaterialTheme.colorScheme.surfaceVariant,
         icon = { Icon(Icons.Filled.TrackChanges, null,
             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) },
-        title = { Text("Set Goals", fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.set_goals_dialog_title), fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
-                    "Leave a field blank to disable that goal.",
+                    stringResource(R.string.leave_blank_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedTextField(
                     value = consInput,
                     onValueChange = { consInput = it },
-                    label = { Text("Target consumption") },
-                    placeholder = { Text("e.g. 17.0") },
+                    label = { Text(stringResource(R.string.target_consumption_label)) },
+                    placeholder = { Text(stringResource(R.string.consumption_example_hint)) },
                     suffix = { Text(unitSystem.consumptionUnit) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     supportingText = {
-                        Text("Avg of last 5 trips must be ≤ this value")
+                        Text(stringResource(R.string.consumption_help_text))
                     }
                 )
                 OutlinedTextField(
                     value = distInput,
                     onValueChange = { distInput = it },
-                    label = { Text("Monthly distance target") },
-                    placeholder = { Text("e.g. 500") },
+                    label = { Text(stringResource(R.string.monthly_target_label)) },
+                    placeholder = { Text(stringResource(R.string.distance_example_hint)) },
                     suffix = { Text("${unitSystem.distanceUnit}/month") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
@@ -450,10 +451,10 @@ private fun GoalEditDialog(
                 val dist = distInput.trim().toDoubleOrNull()?.takeIf { it > 0 }
                     ?.let { if (unitSystem == UnitSystem.IMPERIAL) it / 0.621371 else it }
                 onSave(cons, dist)
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

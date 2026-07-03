@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.AccelerationOrange
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 
@@ -50,12 +52,12 @@ internal fun MonthlyCostSummaryCard(
                 ) {
                     Icon(Icons.Filled.AttachMoney, null,
                         tint = AccelerationOrange, modifier = Modifier.size(20.dp))
-                    Text("Monthly Cost", style = MaterialTheme.typography.titleMedium,
+                    Text(stringResource(R.string.monthly_cost_label), style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold)
                 }
                 if (months.size > 1) {
                     TextButton(onClick = { expanded = !expanded }) {
-                        Text(if (expanded) "Show less" else "Show $hiddenCount more")
+                        Text(if (expanded) stringResource(R.string.show_less) else stringResource(R.string.show_more, hiddenCount))
                         Spacer(Modifier.width(4.dp))
                         Icon(
                             if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,

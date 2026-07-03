@@ -15,9 +15,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TagEntity
 import com.byd.tripstats.ui.theme.tagColor
 
@@ -52,7 +54,7 @@ fun TagChip(
         }
         if (onRemove != null) {
             Icon(
-                Icons.Filled.Close, "Remove tag",
+                Icons.Filled.Close, stringResource(R.string.remove_tag_action),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(14.dp).clickable(onClick = onRemove)
             )
@@ -77,11 +79,11 @@ fun ManageTripTagsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        title = { Text("Tags") },
+        title = { Text(stringResource(R.string.tags_label)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (allTags.isEmpty()) {
-                    Text("No tags yet — create one below.",
+                    Text(stringResource(R.string.no_tags_create_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
@@ -106,7 +108,7 @@ fun ManageTripTagsDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } }
     )
 }
 
@@ -126,11 +128,11 @@ fun ApplyTagDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        title = { Text("Apply tag") },
+        title = { Text(stringResource(R.string.apply_tag_action)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (allTags.isNotEmpty()) {
-                    Text("Tap a tag to apply it to the selected trips:",
+                    Text(stringResource(R.string.apply_tag_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -151,7 +153,7 @@ fun ApplyTagDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
@@ -166,13 +168,13 @@ private fun NewTagField(
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        label = { Text("New tag") },
-        placeholder = { Text("e.g. commute") },
+        label = { Text(stringResource(R.string.new_tag_label)) },
+        placeholder = { Text(stringResource(R.string.new_tag_placeholder)) },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onSubmit() }),
         trailingIcon = {
             if (value.isNotBlank()) {
-                TextButton(onClick = onSubmit) { Text("Add") }
+                TextButton(onClick = onSubmit) { Text(stringResource(R.string.add)) }
             }
         }
     )

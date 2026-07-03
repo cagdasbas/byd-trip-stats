@@ -17,8 +17,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.AccelerationOrange
@@ -123,7 +125,7 @@ internal fun ChargingSessionCard(
                             color = RegenGreen.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text     = "● Charging",
+                                text     = stringResource(R.string.charging_legend),
                                 style    = MaterialTheme.typography.labelSmall,
                                 color    = RegenGreen,
                                 fontWeight = FontWeight.Bold,
@@ -144,7 +146,7 @@ internal fun ChargingSessionCard(
                                 imageVector = if (session.isFavourite)
                                     Icons.Filled.Star else Icons.Filled.StarBorder,
                                 contentDescription = if (session.isFavourite)
-                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                    stringResource(R.string.remove_favourite_action) else stringResource(R.string.mark_favourite_action),
                                 modifier = Modifier.size(20.dp),
                                 tint = if (session.isFavourite)
                                     ChargingYellow
@@ -164,7 +166,7 @@ internal fun ChargingSessionCard(
                         ) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Delete",
+                                contentDescription = stringResource(R.string.delete),
                                 modifier = Modifier.size(18.dp),
                                 tint =
                                     if (isActive)
@@ -229,7 +231,7 @@ internal fun ChargingSessionCard(
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
-                            text = "⚡ Reconstructed",
+                            text = stringResource(R.string.reconstructed_badge),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = androidx.compose.ui.Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -244,8 +246,8 @@ internal fun ChargingSessionCard(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete Charging Session?") },
-            text = { Text("This action cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_charging_session_title)) },
+            text = { Text(stringResource(R.string.cannot_be_undone)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -253,11 +255,11 @@ internal fun ChargingSessionCard(
                         showDeleteDialog = false
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDeleteDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

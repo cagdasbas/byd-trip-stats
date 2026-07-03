@@ -43,6 +43,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.byd.tripstats.adb.AdbPermissionManager
+import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.ThemeMode
 import com.byd.tripstats.service.VehicleTelemetryService
@@ -63,6 +64,12 @@ class MainActivity : ComponentActivity() {
     // Shown once per app version update to remind the user to re-enable Autostart
     private val showAutostartReminder = mutableStateOf(false)
     private val showSetupRequired   = mutableStateOf(false)
+
+    // ── Locale override ───────────────────────────────────────────────────────
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.applyLocale(newBase))
+    }
 
     // ── Service binding ───────────────────────────────────────────────────────
 

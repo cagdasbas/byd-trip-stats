@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertEfficiency
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.roundToInt
@@ -46,14 +48,14 @@ fun SeasonalAnalysisScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Seasonal Analysis", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Winter vs summer efficiency breakdown",
+                        Text(stringResource(R.string.seasonal_analysis_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.winter_vs_summer_subtitle),
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
                             modifier = Modifier.size(28.dp))
                     }
                 },
@@ -70,11 +72,11 @@ fun SeasonalAnalysisScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text("🌍", fontSize = 52.sp)
-                    Text("No seasonal data yet",
+                    Text(stringResource(R.string.no_seasonal_data),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold)
                     Text(
-                        "Complete trips across multiple seasons\nto see how temperature affects your range.",
+                        stringResource(R.string.complete_seasons_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -104,12 +106,12 @@ fun SeasonalAnalysisScreen(
                 )
             ) {
                 Column(Modifier.fillMaxSize().padding(12.dp)) {
-                    Text("Avg Consumption by Season",
+                    Text(stringResource(R.string.avg_consumption_by_season),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold)
                     if (reference != null) {
-                        Text("Dashed line = your car's reference (${
-                            "%.1f".format(unitSystem.convertEfficiency(reference))} ${unitSystem.consumptionUnit})",
+                        Text(stringResource(R.string.reference_line_label,
+                            "%.1f".format(unitSystem.convertEfficiency(reference)), unitSystem.consumptionUnit),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -149,15 +151,12 @@ fun SeasonalAnalysisScreen(
                         Icon(Icons.Filled.Lightbulb, null,
                             tint = AccelerationOrange, modifier = Modifier.size(22.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Winter penalty on your Seal",
+                            Text(stringResource(R.string.winter_penalty_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold)
                             Text(
-                                "Your winter consumption is ${"%.1f".format(delta)} ${unitSystem.consumptionUnit} " +
-                                "higher than summer (+${deltaPct}%). " +
-                                "This is primarily battery chemistry — lithium cells deliver less " +
-                                "capacity below 15°C and the BMS draws extra power to maintain " +
-                                "pack temperature. Cabin heating compounds the effect.",
+                                stringResource(R.string.winter_penalty_desc,
+                                    "%.1f".format(delta), unitSystem.consumptionUnit, deltaPct),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

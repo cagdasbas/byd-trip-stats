@@ -29,6 +29,8 @@ import com.byd.tripstats.connections.AbrpConnectionManager
 import com.byd.tripstats.connections.AbrpConnectionStore
 import com.byd.tripstats.connections.MqttConnectionManager
 import com.byd.tripstats.connections.MqttConnectionStore
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.BydElectricAzure
 import com.byd.tripstats.ui.theme.RegenGreen
 import com.byd.tripstats.ui.theme.ToggleUncheckedTrack
@@ -106,11 +108,11 @@ internal fun ConnectionsTab() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        SectionHeader(icon = Icons.Filled.Link, title = "Connections")
+        SectionHeader(icon = Icons.Filled.Link, title = stringResource(R.string.settings_tab_connections))
 
         if (!showConnectionDetails) {
             Text(
-                "Choose a connection to configure. The cards below show live status at a glance.",
+                stringResource(R.string.connections_overview_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -121,16 +123,16 @@ internal fun ConnectionsTab() {
                 ConnectionSummaryCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Filled.Route,
-                    title = "ABRP",
-                    body = "A Better Routeplanner uploads live telemetry.",
-                    statusLine = "Status: ${if (settings.enabled) "Enabled" else "Disabled"} • ${settings.lastStatus}"
+                    title = stringResource(R.string.abrp_title_label),
+                    body = stringResource(R.string.abrp_card_desc),
+                    statusLine = "${if (settings.enabled) stringResource(R.string.status_enabled_label) else stringResource(R.string.status_disabled_label)} • ${settings.lastStatus}"
                 )
                 ConnectionSummaryCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Filled.Cloud,
-                    title = "MQTT",
-                    body = "Publish live telemetry to a broker such as HiveMQ or HomeAssistant.",
-                    statusLine = "Status: ${if (mqttSettings.enabled) "Enabled" else "Disabled"} • ${mqttSettings.lastStatus}"
+                    title = stringResource(R.string.mqtt_title_label),
+                    body = stringResource(R.string.mqtt_card_desc),
+                    statusLine = "${if (mqttSettings.enabled) stringResource(R.string.status_enabled_label) else stringResource(R.string.status_disabled_label)} • ${mqttSettings.lastStatus}"
                 )
             }
             Button(
@@ -141,7 +143,7 @@ internal fun ConnectionsTab() {
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
             ) {
-                Text("Open Connections")
+                Text(stringResource(R.string.open_connections_action))
             }
         } else {
             Row(
@@ -155,7 +157,7 @@ internal fun ConnectionsTab() {
                 }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Back to overview")
+                    Text(stringResource(R.string.back_to_overview_action))
                 }
             }
 
@@ -165,19 +167,17 @@ internal fun ConnectionsTab() {
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "ABRP",
+                        stringResource(R.string.abrp_title_label),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Link Generic token uploads live telemetry to A Better Routeplanner.",
+                        stringResource(R.string.abrp_link_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "Get your ABRP Link Generic token from ABRP web or app. \n" +
-                        "Go to Settings -> Vehicle -> Live data -> Edit connections -> " +
-                        "In-car live data -> Link Generic",
+                        stringResource(R.string.abrp_instructions_text),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -188,13 +188,13 @@ internal fun ConnectionsTab() {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "Enable ABRP",
+                                stringResource(R.string.enable_abrp_label),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                if (enabled) "Uploads every $intervalInput s."
-                                else "Turn on to configure ABRP uploads.",
+                                if (enabled) stringResource(R.string.abrp_uploads_every, intervalInput)
+                                else stringResource(R.string.abrp_disabled_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -237,8 +237,8 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = tokenInput,
                                 onValueChange = { tokenInput = it.trim() },
-                                label = { Text("ABRP user token") },
-                                placeholder = { Text("Paste your Link Generic token") },
+                                label = { Text(stringResource(R.string.abrp_token_label)) },
+                                placeholder = { Text(stringResource(R.string.paste_token_hint)) },
                                 singleLine = true,
                                 visualTransformation = if (showAbrpToken) VisualTransformation.None else PasswordVisualTransformation(),
                                 trailingIcon = {
@@ -254,7 +254,7 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = intervalInput,
                                 onValueChange = { intervalInput = it.filter(Char::isDigit).take(3) },
-                                label = { Text("Upload interval (seconds)") },
+                                label = { Text(stringResource(R.string.upload_interval_label)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth()
@@ -274,16 +274,16 @@ internal fun ConnectionsTab() {
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
                                 ) {
-                                    Text("Save")
+                                    Text(stringResource(R.string.save))
                                 }
                                 Button(
                                     onClick = {
                                         val telemetry = liveTelemetry
                                         if (telemetry == null) {
                                             testResult = if (viewModel.serviceConnected.value) {
-                                                "Telemetry not ready yet - wait a second and try again"
+                                                context.getString(R.string.telemetry_not_ready_msg)
                                             } else {
-                                                "Telemetry service not connected yet"
+                                                context.getString(R.string.service_not_connected_msg)
                                             }
                                             return@Button
                                         }
@@ -297,19 +297,19 @@ internal fun ConnectionsTab() {
                                         screenScope.launch(Dispatchers.IO) {
                                             val (ok, status) = abrpManager.testUpload(telemetry, selectedCarConfig, current)
                                             launch(Dispatchers.Main) {
-                                                testResult = if (ok) "Test upload succeeded" else status
+                                                testResult = if (ok) context.getString(R.string.test_upload_success) else status
                                                 settings = AbrpConnectionStore.load(context)
                                             }
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
                                 ) {
-                                    Text("Test & Save")
+                                    Text(stringResource(R.string.test_and_save_action))
                                 }
                                 OutlinedButton(onClick = {
                                     reloadAbrpDraft()
                                 }) {
-                                    Text("Reload")
+                                    Text(stringResource(R.string.reload_action))
                                 }
                             }
                         }
@@ -347,7 +347,7 @@ internal fun ConnectionsTab() {
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "MQTT",
+                        stringResource(R.string.mqtt_title_label),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -362,10 +362,10 @@ internal fun ConnectionsTab() {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Enable MQTT", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                            Text(stringResource(R.string.enable_mqtt_label), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                             Text(
-                                if (mqttEnabled) "Publishes the live telemetry JSON every $mqttIntervalInput s."
-                                else "Turn on to configure MQTT publishing.",
+                                if (mqttEnabled) stringResource(R.string.publishes_every, mqttIntervalInput)
+                                else stringResource(R.string.mqtt_disabled_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -387,7 +387,7 @@ internal fun ConnectionsTab() {
                                         publishIntervalSeconds = interval
                                     )
                                     MqttConnectionStore.save(context, mqttSettings)
-                                    mqttResult = "MQTT disabled and saved"
+                                    mqttResult = context.getString(R.string.mqtt_disabled_saved_msg)
                                 }
                             },
                             thumbContent = if (!mqttEnabled) {
@@ -412,7 +412,7 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = mqttBrokerInput,
                                 onValueChange = { mqttBrokerInput = it.trim() },
-                                label = { Text("Broker URL") },
+                                label = { Text(stringResource(R.string.broker_url_label)) },
                                 placeholder = { Text("example.hivemq.cloud") },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
@@ -420,7 +420,7 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = mqttPortInput,
                                 onValueChange = { mqttPortInput = it.filter(Char::isDigit).take(5) },
-                                label = { Text("Port") },
+                                label = { Text(stringResource(R.string.port_label)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth()
@@ -432,18 +432,18 @@ internal fun ConnectionsTab() {
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "Use TLS",
+                                        stringResource(R.string.use_tls_label),
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        "Encrypted connection (mqtts / wss). Typically port 8883.",
+                                        stringResource(R.string.tls_desc),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     if (mqttPortInput == "8883" && !mqttUseTls) {
                                         Text(
-                                            "Port 8883 normally requires TLS — without it the connection is unencrypted and will likely fail.",
+                                            stringResource(R.string.port_8883_warning),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.error
                                         )
@@ -469,12 +469,12 @@ internal fun ConnectionsTab() {
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "Use WebSocket",
+                                        stringResource(R.string.use_websocket_label),
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        "MQTT over WebSocket so the broker can sit behind an HTTP reverse proxy.",
+                                        stringResource(R.string.websocket_desc_text),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -496,7 +496,7 @@ internal fun ConnectionsTab() {
                                 OutlinedTextField(
                                     value = mqttWsPathInput,
                                     onValueChange = { mqttWsPathInput = it.trim() },
-                                    label = { Text("WebSocket path") },
+                                    label = { Text(stringResource(R.string.websocket_path_label)) },
                                     placeholder = { Text("/mqtt") },
                                     singleLine = true,
                                     supportingText = {
@@ -512,7 +512,7 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = mqttFriendlyNameInput,
                                 onValueChange = { mqttFriendlyNameInput = it.trim() },
-                                label = { Text("Device friendly name") },
+                                label = { Text(stringResource(R.string.mqtt_device_name_label)) },
                                 placeholder = { Text("my-byd-seal") },
                                 singleLine = true,
                                 supportingText = {
@@ -524,14 +524,14 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = mqttUsernameInput,
                                 onValueChange = { mqttUsernameInput = it },
-                                label = { Text("Username") },
+                                label = { Text(stringResource(R.string.username_label)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             OutlinedTextField(
                                 value = mqttPasswordInput,
                                 onValueChange = { mqttPasswordInput = it },
-                                label = { Text("Password") },
+                                label = { Text(stringResource(R.string.password_label)) },
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 modifier = Modifier.fillMaxWidth()
@@ -539,20 +539,14 @@ internal fun ConnectionsTab() {
                             OutlinedTextField(
                                 value = mqttIntervalInput,
                                 onValueChange = { mqttIntervalInput = it.filter(Char::isDigit).take(3) },
-                                label = { Text("Publish interval (seconds)") },
+                                label = { Text(stringResource(R.string.publish_interval_label)) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                supportingText = { Text("Driving: every ${mqttIntervalInput.ifBlank { "1" }} s  ·  Charging / idle while running: every 30 s", style = MaterialTheme.typography.bodySmall) },
+                                supportingText = { Text(stringResource(R.string.publish_interval_desc, mqttIntervalInput.ifBlank { "1" }), style = MaterialTheme.typography.bodySmall) },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
-                                "While parked, publishing depends on the Background activity mode " +
-                                    "and your broker. In Always On the service keeps running, but most " +
-                                    "BYD units cut WiFi ~15 min after the car is off — so a broker on " +
-                                    "your home network stops receiving until the car powers on, while " +
-                                    "an internet-reachable broker (e.g. HiveMQ Cloud) usually keeps " +
-                                    "getting data over mobile data. Minimal publishes only during the " +
-                                    "~90-min wake blips, and Deep Sleep not at all.",
+                                stringResource(R.string.publish_parked_info),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -574,18 +568,18 @@ internal fun ConnectionsTab() {
                                             webSocketPath = mqttWsPathInput
                                         )
                                         MqttConnectionStore.save(context, mqttSettings)
-                                        mqttResult = "MQTT settings saved"
+                                        mqttResult = context.getString(R.string.mqtt_settings_saved_msg)
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
                                 ) {
-                                    Text("Save")
+                                    Text(stringResource(R.string.save))
                                 }
                                 Button(
                                     enabled = !mqttTesting,
                                     onClick = {
                                         val telemetry = liveTelemetry
                                         if (telemetry == null) {
-                                            mqttResult = "No live telemetry yet"
+                                            mqttResult = context.getString(R.string.no_live_telemetry_yet)
                                             return@Button
                                         }
                                         val interval = mqttIntervalInput.toIntOrNull()?.coerceIn(1, 120) ?: 1
@@ -610,10 +604,10 @@ internal fun ConnectionsTab() {
                                                 val (ok, status) = withContext(Dispatchers.IO) {
                                                     mqttManager.testPublish(telemetry)
                                                 }
-                                                mqttResult = if (ok) "MQTT test publish succeeded" else status
+                                                mqttResult = if (ok) context.getString(R.string.mqtt_test_success) else status
                                                 mqttSettings = MqttConnectionStore.load(context)
                                             } catch (e: Exception) {
-                                                mqttResult = "MQTT test failed: ${e.message}"
+                                                mqttResult = context.getString(R.string.mqtt_test_failed_msg, e.message)
                                             } finally {
                                                 mqttTesting = false
                                             }
@@ -621,12 +615,12 @@ internal fun ConnectionsTab() {
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
                                 ) {
-                                    Text(if (mqttTesting) "Testing…" else "Test & Save")
+                                    Text(if (mqttTesting) stringResource(R.string.running) else stringResource(R.string.test_and_save_action))
                                 }
                                 OutlinedButton(onClick = {
                                     reloadMqttDraft()
                                 }) {
-                                    Text("Reload")
+                                    Text(stringResource(R.string.reload_action))
                                 }
                             }
                         }

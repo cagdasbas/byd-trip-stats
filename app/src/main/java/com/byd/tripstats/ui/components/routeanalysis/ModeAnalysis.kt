@@ -9,9 +9,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.preferences.UnitSystem
@@ -67,19 +69,19 @@ internal fun ModeInsightsCard(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Mode Insights",
+                text = stringResource(R.string.mode_insights_label),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "What your drive and regen modes actually did on this trip",
+                text = stringResource(R.string.mode_insights_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            ModeStackedBar(label = "Drive", summaries = driveSummaries)
+            ModeStackedBar(label = stringResource(R.string.mode_drive_label), summaries = driveSummaries)
             if (regenSummaries.isNotEmpty()) {
-                ModeStackedBar(label = "Regen", summaries = regenSummaries)
+                ModeStackedBar(label = stringResource(R.string.mode_regen_label), summaries = regenSummaries)
             }
 
             if (insights.isNotEmpty()) {
@@ -98,14 +100,14 @@ internal fun ModeInsightsCard(
             }
 
             if (driveSummaries.isNotEmpty()) {
-                Text("Drive mode usage", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.drive_mode_usage_label), fontWeight = FontWeight.SemiBold)
                 driveSummaries.forEach { summary: ModeSummary ->
                     ModeSummaryRow(summary, useImperial)
                 }
             }
 
             if (regenSummaries.isNotEmpty()) {
-                Text("Regen mode usage", fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.regen_mode_usage_label), fontWeight = FontWeight.SemiBold)
                 regenSummaries.forEach { summary: ModeSummary ->
                     ModeSummaryRow(summary, useImperial)
                 }

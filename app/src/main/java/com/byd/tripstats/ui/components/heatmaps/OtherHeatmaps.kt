@@ -5,6 +5,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 
 @Composable
@@ -37,7 +39,7 @@ internal fun GradientVsConsumptionHeatmap(
     if (gradPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "Not enough altitude/distance data for this heatmap.",
+                stringResource(R.string.heatmap_no_altitude),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -81,7 +83,7 @@ internal fun FrontVsRearRpmHeatmap(
     if (rpmPoints.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No dual-motor RPM data recorded on this trip.",
+                stringResource(R.string.heatmap_no_dual_motor),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -136,7 +138,7 @@ internal fun TyrePressureVsConsumptionHeatmap(
     if (points.size < 10) {
         Box(modifier, contentAlignment = Alignment.Center) {
             Text(
-                "No tyre pressure data recorded on this trip.",
+                stringResource(R.string.chart_no_tyre_data),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

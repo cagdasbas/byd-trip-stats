@@ -9,9 +9,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
@@ -57,15 +59,21 @@ fun ChargingDetailScreen(
     // Shared across every charging chart (Power, Voltage, Cell V, Temperature) so the Time/SoC
     // choice carries between tabs instead of resetting per chart.
     var xAxisMode by remember { mutableStateOf(ChargingXAxisMode.TIME) }
-    val tabs = listOf("Overview", "Power", "Voltage", "Cell V", "Temperature")
+    val tabs = listOf(
+        stringResource(R.string.tab_overview),
+        stringResource(R.string.tab_power),
+        stringResource(R.string.tab_voltage),
+        stringResource(R.string.tab_cell_voltage),
+        stringResource(R.string.tab_temperature)
+    )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Charging Detail", fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.charging_detail_title), fontSize = 24.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(28.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(28.dp))
                     }
                 },
                 actions = {
@@ -75,7 +83,7 @@ fun ChargingDetailScreen(
                                 imageVector = if (s.isFavourite)
                                     Icons.Filled.Star else Icons.Filled.StarBorder,
                                 contentDescription = if (s.isFavourite)
-                                    "Remove from favourites" else "Mark as favourite (protects from trimming)",
+                                    stringResource(R.string.remove_favourite_action) else stringResource(R.string.mark_favourite_action),
                                 tint = if (s.isFavourite)
                                     ChargingYellow else LocalContentColor.current,
                                 modifier = Modifier.size(24.dp)

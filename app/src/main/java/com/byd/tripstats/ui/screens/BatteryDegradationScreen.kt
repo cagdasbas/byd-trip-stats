@@ -12,10 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
@@ -47,14 +49,14 @@ fun BatteryDegradationScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Battery Degradation", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("State of Health over time", fontSize = 13.sp,
+                        Text(stringResource(R.string.battery_degradation_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.soh_over_time_subtitle), fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
                             modifier = Modifier.size(28.dp))
                     }
                 },
@@ -81,12 +83,12 @@ fun BatteryDegradationScreen(
                         modifier = Modifier.size(56.dp)
                     )
                     Text(
-                        "Not enough data yet",
+                        stringResource(R.string.not_enough_data_yet),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Complete at least 2 trips with telemetry active\nto see battery degradation tracking.",
+                        stringResource(R.string.complete_trips_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -95,9 +97,7 @@ fun BatteryDegradationScreen(
                     // user a way out so they aren't stranded on an empty screen.
                     if (excludedTripCount > 0) {
                         Text(
-                            "$excludedTripCount earlier trip(s) are hidden because they were recorded " +
-                            "with a legacy method that under-reported SoH. You can include them, though " +
-                            "the chart may show a misleading dip.",
+                            stringResource(R.string.excluded_trips_hidden, excludedTripCount),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -105,7 +105,7 @@ fun BatteryDegradationScreen(
                         OutlinedButton(onClick = { viewModel.setSohExclusionOff() }) {
                             Icon(Icons.Filled.Visibility, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Show all recorded data")
+                            Text(stringResource(R.string.show_all_recorded_data))
                         }
                     }
                 }
@@ -184,14 +184,14 @@ fun BatteryDegradationScreen(
             ) {
                 DegradationStatCard(
                     modifier  = Modifier.weight(1f),
-                    label     = "Current SoH",
+                    label     = stringResource(R.string.current_soh_label),
                     value     = "${"%.1f".format(data.last().avgSoh)}%",
                     icon      = Icons.Filled.BatteryChargingFull,
                     color     = sohColor(data.last().avgSoh)
                 )
                 DegradationStatCard(
                     modifier  = Modifier.weight(1f),
-                    label     = "Trips analysed",
+                    label     = stringResource(R.string.trips_analysed_label),
                     value     = "${data.size}",
                     icon      = Icons.Filled.Route,
                     color     = BatteryBlue
@@ -203,7 +203,7 @@ fun BatteryDegradationScreen(
             ) {
                 DegradationStatCard(
                     modifier  = Modifier.weight(1f),
-                    label     = "Decline rate",
+                    label     = stringResource(R.string.decline_rate_label),
                     value     = if (stats.declinePerYear < 0.01) "< 0.01% / yr"
                                 else "${"%.2f".format(stats.declinePerYear)}% / yr",
                     icon      = Icons.Filled.Timeline,
@@ -211,7 +211,7 @@ fun BatteryDegradationScreen(
                 )
                 DegradationStatCard(
                     modifier  = Modifier.weight(1f),
-                    label     = "Projected @ 80%",
+                    label     = stringResource(R.string.projected_80_label),
                     value     = stats.projectedAt80Label,
                     icon      = Icons.Filled.CalendarMonth,
                     color     = MaterialTheme.colorScheme.primary
@@ -234,16 +234,16 @@ fun BatteryDegradationScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("SoH History", style = MaterialTheme.typography.titleMedium,
+                        Text(stringResource(R.string.soh_history_section), style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
                         // Legend
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            LegendDot(BatteryBlue,      "Recorded")
-                            LegendDot(AccelerationOrange, "Trend")
-                            LegendDot(AccelerationOrange.copy(alpha = 0.5f), "Projected")
+                            LegendDot(BatteryBlue,      stringResource(R.string.legend_recorded))
+                            LegendDot(AccelerationOrange, stringResource(R.string.legend_trend))
+                            LegendDot(AccelerationOrange.copy(alpha = 0.5f), stringResource(R.string.legend_projected))
                         }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -269,29 +269,26 @@ fun BatteryDegradationScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.Info, null,
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Text("How to read this", style = MaterialTheme.typography.titleMedium,
+                        Text(stringResource(R.string.how_to_read_label), style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
                     }
                     Text(
-                        "SoH (State of Health) is shown when the car exposes a direct battery-health value, " +
-                        "or as an estimate derived from vehicle telemetry when a direct value is unavailable. " +
-                        "100% means the pack is at factory capacity. The orange trend line is a " +
-                        "least-squares linear fit across all your recorded trips.",
+                        stringResource(R.string.soh_description),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     HorizontalDivider()
-                    HealthBand(range = "95 - 100%", label = "Excellent — factory new condition",
+                    HealthBand(range = "95 - 100%", label = stringResource(R.string.soh_excellent),
                         color = RegenGreen)
-                    HealthBand(range = "90 - 95%",  label = "Good — normal ageing",
+                    HealthBand(range = "90 - 95%",  label = stringResource(R.string.soh_good),
                         color = BatteryBlue)
-                    HealthBand(range = "80 - 90%",  label = "Fair — noticeable range reduction",
+                    HealthBand(range = "80 - 90%",  label = stringResource(R.string.soh_fair),
                         color = AccelerationOrange)
-                    HealthBand(range = "< 80%",     label = "Poor — heavy range reduction",
+                    HealthBand(range = "< 80%",     label = stringResource(R.string.soh_poor),
                         color = MaterialTheme.colorScheme.error)
                     HorizontalDivider()
                     Text(
-                        "Tip: BYD's warranty covers the battery to 70% SoH for 8 years / 250,000 km.",
+                        stringResource(R.string.soh_warranty_tip),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -313,7 +310,7 @@ fun BatteryDegradationScreen(
                     ) {
                         Icon(Icons.Filled.Description, null,
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Text("Battery health report", style = MaterialTheme.typography.titleMedium,
+                        Text(stringResource(R.string.battery_health_report_title), style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
                         if (!isPro) {
                             Spacer(Modifier.width(4.dp))
@@ -321,10 +318,7 @@ fun BatteryDegradationScreen(
                         }
                     }
                     Text(
-                        "Export a report of your battery's State of Health, decline rate and 80% " +
-                        "projection — useful evidence when selling the car or raising a warranty " +
-                        "claim. Saved to Download/BydTripStats/ as a print-ready PDF or as HTML " +
-                        "(opens in any browser). Generated entirely on-device.",
+                        stringResource(R.string.battery_report_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -336,7 +330,7 @@ fun BatteryDegradationScreen(
                             ) {
                                 Icon(Icons.Filled.PictureAsPdf, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("PDF")
+                                Text(stringResource(R.string.btn_pdf))
                             }
                             OutlinedButton(
                                 onClick = { saveReport(asPdf = false) },
@@ -344,7 +338,7 @@ fun BatteryDegradationScreen(
                             ) {
                                 Icon(Icons.Filled.Description, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("HTML")
+                                Text(stringResource(R.string.btn_html))
                             }
                         }
                     } else {
@@ -354,7 +348,7 @@ fun BatteryDegradationScreen(
                         ) {
                             Icon(Icons.Filled.Lock, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Unlock with Pro")
+                            Text(stringResource(R.string.unlock_pro_action))
                         }
                     }
                 }
@@ -373,8 +367,8 @@ fun BatteryDegradationScreen(
                 change()
                 scope.launch {
                     val res = snackbarHostState.showSnackbar(
-                        message = "Battery data range updated",
-                        actionLabel = "UNDO",
+                        message = context.getString(R.string.data_range_updated_msg),
+                        actionLabel = context.getString(R.string.undo),
                         duration = SnackbarDuration.Short
                     )
                     if (res == SnackbarResult.ActionPerformed) viewModel.restoreSohExclusion(prev)
@@ -396,27 +390,25 @@ fun BatteryDegradationScreen(
                     ) {
                         Icon(Icons.Filled.FilterList, null,
                             tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Text("Battery data range", style = MaterialTheme.typography.titleMedium,
+                        Text(stringResource(R.string.battery_data_range_section), style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
                     }
                     val cutoffLabel = sohExclusion.cutoffMs?.let { dateFmt.format(java.util.Date(it)) }
                     val statusText = when (sohExclusion.mode) {
                         DashboardViewModel.SohExclusionMode.AUTO ->
                             if (excludedTripCount > 0)
-                                "Hiding $excludedTripCount early trip(s) recorded before $cutoffLabel " +
-                                    "with the legacy estimation method (recommended)."
+                                stringResource(R.string.data_range_auto, excludedTripCount, cutoffLabel ?: "")
                             else
-                                "Using every recorded trip — none predate the statistical SoH method."
+                                stringResource(R.string.data_range_none)
                         DashboardViewModel.SohExclusionMode.CUSTOM ->
-                            "Hiding $excludedTripCount trip(s) recorded before $cutoffLabel."
+                            stringResource(R.string.data_range_custom, excludedTripCount, cutoffLabel ?: "")
                         DashboardViewModel.SohExclusionMode.OFF ->
-                            "Including every recorded trip, even early ones whose calculated SoH may read low."
+                            stringResource(R.string.data_range_off)
                     }
                     Text(statusText, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        "This only changes what the chart and reports use — no trips are ever " +
-                        "deleted, and you can change it back anytime.",
+                        stringResource(R.string.data_range_info),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -425,7 +417,7 @@ fun BatteryDegradationScreen(
                         Icon(if (advancedOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
                             null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text(if (advancedOpen) "Hide options" else "Adjust data range")
+                        Text(if (advancedOpen) stringResource(R.string.hide_options_action) else stringResource(R.string.adjust_data_range_action))
                     }
                     if (advancedOpen) {
                         if (sohExclusion.mode != DashboardViewModel.SohExclusionMode.AUTO) {
@@ -435,7 +427,7 @@ fun BatteryDegradationScreen(
                             ) {
                                 Icon(Icons.Filled.Recommend, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Use recommended range")
+                                Text(stringResource(R.string.use_recommended_range))
                             }
                         }
                         OutlinedButton(
@@ -446,7 +438,7 @@ fun BatteryDegradationScreen(
                         ) {
                             Icon(Icons.Filled.RestartAlt, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Start fresh from today")
+                            Text(stringResource(R.string.start_fresh_today))
                         }
                         if (sohExclusion.mode != DashboardViewModel.SohExclusionMode.OFF) {
                             OutlinedButton(
@@ -455,7 +447,7 @@ fun BatteryDegradationScreen(
                             ) {
                                 Icon(Icons.Filled.Visibility, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Show all recorded data")
+                                Text(stringResource(R.string.show_all_recorded_data))
                             }
                         }
                     }
@@ -466,22 +458,18 @@ fun BatteryDegradationScreen(
                 AlertDialog(
                     onDismissRequest = { showShowAllConfirm = false },
                     icon = { Icon(Icons.Filled.Warning, null) },
-                    title = { Text("Show all recorded data?") },
+                    title = { Text(stringResource(R.string.show_all_data_title)) },
                     text = {
-                        Text(
-                            "This re-includes early trips recorded with the legacy method, which " +
-                            "under-estimated SoH — it will add a misleading dip to the chart and to " +
-                            "any report you generate. Nothing is deleted; you can switch back anytime."
-                        )
+                        Text(stringResource(R.string.show_all_data_msg))
                     },
                     confirmButton = {
                         TextButton(onClick = {
                             showShowAllConfirm = false
                             applyExclusion { viewModel.setSohExclusionOff() }
-                        }) { Text("Show all") }
+                        }) { Text(stringResource(R.string.show_all_btn)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showShowAllConfirm = false }) { Text("Cancel") }
+                        TextButton(onClick = { showShowAllConfirm = false }) { Text(stringResource(R.string.cancel)) }
                     }
                 )
             }

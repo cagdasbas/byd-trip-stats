@@ -33,6 +33,8 @@ import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import java.text.SimpleDateFormat
@@ -54,14 +56,14 @@ fun RoutesScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Routes", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Recurring journeys & efficiency",
+                        Text(stringResource(R.string.routes_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.recurring_journeys_subtitle),
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back",
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
                             modifier = Modifier.size(28.dp))
                     }
                 },
@@ -79,12 +81,11 @@ fun RoutesScreen(
                     modifier = Modifier.padding(horizontal = 32.dp)
                 ) {
                     Text("🛣️", fontSize = 52.sp)
-                    Text("No recurring routes yet",
+                    Text(stringResource(R.string.no_recurring_routes),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold)
                     Text(
-                        "Drive the same journey at least 3 times — like a daily commute — " +
-                            "and it'll appear here so you can compare efficiency across each trip.",
+                        stringResource(R.string.recurring_route_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -168,7 +169,7 @@ private fun RouteCard(
                 }
                 Icon(
                     if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    contentDescription = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
                 )
@@ -179,13 +180,13 @@ private fun RouteCard(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                RouteStatChip("🟢", "best",
+                RouteStatChip("🟢", stringResource(R.string.route_best),
                     "%.1f".format(unitSystem.convertEfficiency(route.bestEfficiencyKwhPer100km)),
                     RegenGreen)
-                RouteStatChip("🔴", "worst",
+                RouteStatChip("🔴", stringResource(R.string.route_worst),
                     "%.1f".format(unitSystem.convertEfficiency(route.worstEfficiencyKwhPer100km)),
                     MaterialTheme.colorScheme.error)
-                RouteStatChip("⏱️", "avg",
+                RouteStatChip("⏱️", stringResource(R.string.route_avg),
                     formatDuration(route.avgDurationMs),
                     MaterialTheme.colorScheme.onSurface)
             }
@@ -194,7 +195,7 @@ private fun RouteCard(
             AnimatedVisibility(visible = expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f))
-                    Text("Efficiency per trip (oldest → newest)",
+                    Text(stringResource(R.string.efficiency_trend_label),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     RouteEfficiencyTrend(
