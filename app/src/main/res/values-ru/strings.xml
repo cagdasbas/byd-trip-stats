@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Начните движение, чтобы записать первую поездку!</string>
     <string name="mark_favourite_hint">Нажмите ☆ на поездке, чтобы добавить её в избранное</string>
     <string name="adjust_filters_hint">Попробуйте изменить или сбросить фильтры</string>
-    <string name="trip_history_hint">Нажмите на поездку для аналитики, удерживайте для множественного выбора</string>
+    <string name="session_history_hint">Нажмите на сессию для аналитики, удерживайте для множественного выбора</string>
     <string name="delete_trips_plural">Удалить поездок: %1$s?</string>
     <string name="delete_trip_single">Удалить 1 поездку?</string>
     <string name="delete_trips_msg">Выбранные поездки и все их данные будут удалены навсегда. Это действие нельзя отменить.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Требуется действие — Автозапуск</string>
-    <string name="autostart_dialog_msg">Установлена новая версия. Нужно выключить «disable autostart» для этого приложения — это включает сбор данных в фоне при выключенном автомобиле (например, ночная зарядка).\n\nДля лучшей надёжности перезапустите автомобиль один раз после смены этой настройки, затем снова откройте BYD Trip Stats.\nВНИМАНИЕ: Если во время движения скорость и другие значения не обновляются, нужно перезапустить автомобиль!</string>
+    <string name="autostart_dialog_msg">Установлена новая версия. Нужно выключить «disable autostart» для этого приложения — это позволяет работать службам переднего плана / фоновым службам.\nОднократная перезагрузка автомобиля нужна только при первой установке приложения и после выключения «disable autostart». Если вы обновляетесь с более старой версии, перезагрузка не требуется</string>
     <string name="autostart_got_it">Понятно</string>
     <string name="adb_connecting_title">Подключение…</string>
     <string name="adb_waiting_auth_title">Ожидание авторизации</string>

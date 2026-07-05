@@ -152,7 +152,7 @@
     <string name="start_driving_hint">走行を開始して最初のトリップを記録しましょう！</string>
     <string name="mark_favourite_hint">トリップの☆をタップしてお気に入りに追加</string>
     <string name="adjust_filters_hint">フィルターを調整またはクリアしてみてください</string>
-    <string name="trip_history_hint">トリップをタップで分析、長押しで複数選択</string>
+    <string name="session_history_hint">セッションをタップで分析、長押しで複数選択</string>
     <string name="delete_trips_plural">%1$s件のトリップを削除しますか？</string>
     <string name="delete_trip_single">1件のトリップを削除しますか？</string>
     <string name="delete_trips_msg">選択したトリップとそのすべてのデータが完全に削除されます。この操作は元に戻せません。</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ 操作が必要 — 自動起動</string>
-    <string name="autostart_dialog_msg">新しいバージョンがインストールされました。このアプリの自動起動を無効にする必要があります。これにより、車がオフのとき（例：夜間充電中）のバックグラウンドデータ収集が有効になります。\n\n最良の信頼性のために、この設定を変更した後で車を一度再起動し、BYD Trip Statsを再度開いてください。\n警告：走行中に速度やその他の値が更新されない場合は、車を再起動する必要があります！</string>
+    <string name="autostart_dialog_msg">新しいバージョンがインストールされました。このアプリの自動起動を無効にする必要があります。これにより、フォアグラウンド / バックグラウンドサービスの実行が有効になります。\n車の再起動が一度だけ必要です。アプリを初めてインストールしたときと、自動起動を無効にした後のみです。以前のバージョンから更新する場合は、再起動する必要はありません</string>
     <string name="autostart_got_it">了解</string>
     <string name="adb_connecting_title">接続中…</string>
     <string name="adb_waiting_auth_title">認証を待機中</string>

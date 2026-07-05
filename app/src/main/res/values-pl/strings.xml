@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Zacznij jeździć, aby zarejestrować pierwszą podróż!</string>
     <string name="mark_favourite_hint">Dotknij ☆ przy podróży, aby oznaczyć ją jako ulubioną</string>
     <string name="adjust_filters_hint">Spróbuj zmienić lub wyczyścić filtry</string>
-    <string name="trip_history_hint">Dotknij podróż, aby zobaczyć analizy; przytrzymaj, aby zaznaczyć wiele</string>
+    <string name="session_history_hint">Dotknij sesję, aby zobaczyć analizy; przytrzymaj, aby zaznaczyć wiele</string>
     <string name="delete_trips_plural">Usunąć %1$s podróży?</string>
     <string name="delete_trip_single">Usunąć 1 podróż?</string>
     <string name="delete_trips_msg">Spowoduje to trwałe usunięcie wybranych podróży i wszystkich ich danych. Tej operacji nie można cofnąć.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Wymagane działanie — Autostart</string>
-    <string name="autostart_dialog_msg">Zainstalowano nową wersję. Musisz przełączyć na wyłączone „disable autostart" dla tej aplikacji, co umożliwia zbieranie danych w tle przy wyłączonym samochodzie (np. ładowanie nocne).\n\nDla najlepszej niezawodności zrestartuj raz samochód po zmianie tego ustawienia, potem otwórz BYD Trip Stats ponownie.\nUWAGA: Jeśli podczas jazdy nie widzisz aktualizującej się prędkości i innych wartości, musisz zrestartować samochód!</string>
+    <string name="autostart_dialog_msg">Zainstalowano nową wersję. Musisz przełączyć na wyłączone „disable autostart” dla tej aplikacji, co umożliwia działanie usług pierwszoplanowych / w tle.\nJednorazowy restart samochodu jest potrzebny tylko przy pierwszej instalacji aplikacji i po wyłączeniu „disable autostart”. Jeśli aktualizujesz ze starszej wersji, nie musisz restartować</string>
     <string name="autostart_got_it">Rozumiem</string>
     <string name="adb_connecting_title">Łączenie…</string>
     <string name="adb_waiting_auth_title">Oczekiwanie na autoryzację</string>

@@ -149,7 +149,7 @@
     <string name="start_driving_hint">התחילו לנהוג כדי להקליט את הנסיעה הראשונה!</string>
     <string name="mark_favourite_hint">הקישו על ☆ בנסיעה כדי לסמן אותה כמועדפת</string>
     <string name="adjust_filters_hint">נסו לשנות או לנקות את המסננים</string>
-    <string name="trip_history_hint">הקישו על נסיעה לניתוחים, לחיצה ארוכה לבחירה מרובה</string>
+    <string name="session_history_hint">הקישו על מפגש לניתוחים, לחיצה ארוכה לבחירה מרובה</string>
     <string name="delete_trips_plural">למחוק %1$s נסיעות?</string>
     <string name="delete_trip_single">למחוק נסיעה אחת?</string>
     <string name="delete_trips_msg">פעולה זו תמחק לצמיתות את הנסיעות שנבחרו ואת כל הנתונים שלהן. לא ניתן לבטל אותה.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ נדרשת פעולה — הפעלה אוטומטית</string>
-    <string name="autostart_dialog_msg">הותקנה גרסה חדשה. עליכם לכבות את \"disable autostart\" עבור אפליקציה זו, מה שמאפשר איסוף נתונים ברקע כשהרכב כבוי (למשל טעינה בלילה).\n\nלאמינות מיטבית, הפעילו מחדש את הרכב פעם אחת לאחר שינוי הגדרה זו, ואז פתחו שוב את BYD Trip Stats.\nאזהרה: אם אינכם רואים את המהירות וערכים אחרים מתעדכנים בזמן נהיגה, עליכם להפעיל מחדש את הרכב!</string>
+    <string name="autostart_dialog_msg">הותקנה גרסה חדשה. עליכם לכבות את \"disable autostart\" עבור אפליקציה זו, מה שמאפשר לשירותי חזית / רקע לפעול.\nנדרשת הפעלה מחדש חד-פעמית של הרכב, ורק כשאתם מתקינים את האפליקציה בפעם הראשונה ואחרי שכיביתם את \"disable autostart\". אם אתם מעדכנים מגרסה ישנה יותר, אין צורך להפעיל מחדש</string>
     <string name="autostart_got_it">הבנתי</string>
     <string name="adb_connecting_title">מתחבר…</string>
     <string name="adb_waiting_auth_title">ממתין להרשאה</string>

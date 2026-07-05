@@ -152,7 +152,7 @@
     <string name="start_driving_hint">Inizia a guidare per registrare il tuo primo viaggio!</string>
     <string name="mark_favourite_hint">Tocca ☆ su un viaggio per aggiungerlo ai preferiti</string>
     <string name="adjust_filters_hint">Prova a modificare o cancellare i filtri</string>
-    <string name="trip_history_hint">Tocca il viaggio per l\'analisi, tieni premuto per la selezione multipla</string>
+    <string name="session_history_hint">Tocca la sessione per l\'analisi, tieni premuto per la selezione multipla</string>
     <string name="delete_trips_plural">Eliminare %1$s viaggi?</string>
     <string name="delete_trip_single">Eliminare 1 viaggio?</string>
     <string name="delete_trips_msg">Questo eliminerà definitivamente i viaggi selezionati e tutti i loro dati. Questa azione non può essere annullata.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Azione richiesta — Avvio automatico</string>
-    <string name="autostart_dialog_msg">È stata installata una nuova versione. Devi disabilitare l\'avvio automatico per questa app, che consente la raccolta dati in background quando l\'auto è spenta (ad es. durante la ricarica notturna).\n\nPer la massima affidabilità, riavvia l\'auto una volta dopo aver modificato questa impostazione e poi riapri BYD Trip Stats.\nATTENZIONE: Se non vedi velocità e altri valori aggiornarsi durante la guida, devi riavviare l\'auto!</string>
+    <string name="autostart_dialog_msg">È stata installata una nuova versione. Devi disabilitare l\'avvio automatico per questa app, il che consente l\'esecuzione dei servizi in primo piano / in background.\nÈ necessario un riavvio una tantum dell\'auto, e solo quando installi l\'app per la prima volta e dopo aver disabilitato l\'avvio automatico. Se stai aggiornando da una versione precedente, non devi riavviare</string>
     <string name="autostart_got_it">Capito</string>
     <string name="adb_connecting_title">Connessione…</string>
     <string name="adb_waiting_auth_title">In attesa di autorizzazione</string>

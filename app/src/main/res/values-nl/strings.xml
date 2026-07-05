@@ -152,7 +152,7 @@
     <string name="start_driving_hint">Begin te rijden om je eerste rit op te nemen!</string>
     <string name="mark_favourite_hint">Tik op de ☆ bij een rit om deze als favoriet te markeren</string>
     <string name="adjust_filters_hint">Probeer de filters aan te passen of te wissen</string>
-    <string name="trip_history_hint">Tik op een rit voor analyses, lang indrukken voor meervoudige selectie</string>
+    <string name="session_history_hint">Tik op een sessie voor analyses, lang indrukken voor meervoudige selectie</string>
     <string name="delete_trips_plural">%1$s ritten verwijderen?</string>
     <string name="delete_trip_single">1 rit verwijderen?</string>
     <string name="delete_trips_msg">Dit verwijdert de geselecteerde ritten en al hun gegevens permanent. Deze actie kan niet ongedaan worden gemaakt.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Actie vereist — Autostart</string>
-    <string name="autostart_dialog_msg">Er is een nieuwe versie geïnstalleerd. Je moet autostart uitschakelen voor deze app, wat achtergrondgegevensverzameling mogelijk maakt wanneer de auto uit is (bijv. \'s nachts opladen).\n\nVoor de beste betrouwbaarheid de auto eenmaal opnieuw opstarten nadat je deze instelling hebt gewijzigd, en dan BYD Trip Stats opnieuw openen.\nWAARSCHUWING: Als je geen snelheid en andere waarden ziet updaten tijdens het rijden, moet je de auto opnieuw opstarten!</string>
+    <string name="autostart_dialog_msg">Er is een nieuwe versie geïnstalleerd. Je moet autostart uitschakelen voor deze app, wat voorgrond-/achtergronddiensten laat draaien.\nEen eenmalige herstart van de auto is nodig, en alleen wanneer je de app voor het eerst installeert en nadat je autostart hebt uitgeschakeld. Als je bijwerkt vanaf een oudere versie, hoef je niet te herstarten</string>
     <string name="autostart_got_it">Begrepen</string>
     <string name="adb_connecting_title">Verbinden…</string>
     <string name="adb_waiting_auth_title">Wachten op autorisatie</string>

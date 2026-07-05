@@ -152,7 +152,7 @@
     <string name="start_driving_hint">Begynn å kjøre for å registrere din første tur!</string>
     <string name="mark_favourite_hint">Trykk på ☆ på en tur for å merke den som favoritt</string>
     <string name="adjust_filters_hint">Prøv å justere eller fjerne filtrene</string>
-    <string name="trip_history_hint">Trykk på tur for analyse, hold inne for flervalg</string>
+    <string name="session_history_hint">Trykk på sesjon for analyse, hold inne for flervalg</string>
     <string name="delete_trips_plural">Slette %1$s turer?</string>
     <string name="delete_trip_single">Slette 1 tur?</string>
     <string name="delete_trips_msg">Dette vil permanent slette de valgte turene og alle tilhørende data. Denne handlingen kan ikke angres.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Handling kreves — Autostart</string>
-    <string name="autostart_dialog_msg">En ny versjon er installert. Du må deaktivere autostart for denne appen, noe som muliggjør bakgrunnsdatainnsamling når bilen er av (f.eks. lading om natten).\n\nFor best pålitelighet, start bilen på nytt én gang etter å ha endret denne innstillingen, og åpne deretter BYD Trip Stats igjen.\nADVARSEL: Hvis du ikke ser hastighet og andre verdier oppdatere seg under kjøring, må du starte bilen på nytt!</string>
+    <string name="autostart_dialog_msg">En ny versjon er installert. Du må deaktivere autostart for denne appen, noe som lar forgrunns-/bakgrunnstjenester kjøre.\nEn engangsomstart av bilen er nødvendig, og bare når du installerer appen første gang og etter at du har deaktivert autostart. Hvis du oppdaterer fra en eldre versjon, trenger du ikke starte på nytt</string>
     <string name="autostart_got_it">Forstått</string>
     <string name="adb_connecting_title">Kobler til…</string>
     <string name="adb_waiting_auth_title">Venter på autorisasjon</string>

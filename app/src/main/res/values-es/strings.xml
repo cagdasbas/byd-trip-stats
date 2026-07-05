@@ -152,7 +152,7 @@
     <string name="start_driving_hint">¡Empieza a conducir para registrar tu primer viaje!</string>
     <string name="mark_favourite_hint">Toca ☆ en un viaje para marcarlo como favorito</string>
     <string name="adjust_filters_hint">Prueba a ajustar o limpiar los filtros</string>
-    <string name="trip_history_hint">Toca el viaje para ver análisis, mantén pulsado para selección múltiple</string>
+    <string name="session_history_hint">Toca la sesión para ver análisis, mantén pulsado para selección múltiple</string>
     <string name="delete_trips_plural">¿Eliminar %1$s viajes?</string>
     <string name="delete_trip_single">¿Eliminar 1 viaje?</string>
     <string name="delete_trips_msg">Esto eliminará permanentemente los viajes seleccionados y todos sus datos. Esta acción no se puede deshacer.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Acción requerida — Inicio automático</string>
-    <string name="autostart_dialog_msg">Se instaló una nueva versión. Debes desactivar el inicio automático para esta app, lo que permite la recopilación de datos en segundo plano cuando el coche está apagado (p. ej. cargando por la noche).\n\nPara mayor fiabilidad, reinicia el coche una vez tras cambiar esta configuración y luego abre BYD Trip Stats de nuevo.\nAVISO: Si no ves la velocidad y otros valores actualizándose mientras conduces, ¡necesitas reiniciar el coche!</string>
+    <string name="autostart_dialog_msg">Se instaló una nueva versión. Debes desactivar el inicio automático para esta app, lo que permite ejecutar servicios en primer plano / segundo plano.\nEs necesario un reinicio único del coche, y solo cuando instalas la app por primera vez y después de desactivar el inicio automático. Si actualizas desde una versión anterior, no necesitas reiniciar</string>
     <string name="autostart_got_it">Entendido</string>
     <string name="adb_connecting_title">Conectando…</string>
     <string name="adb_waiting_auth_title">Esperando autorización</string>

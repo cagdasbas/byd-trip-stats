@@ -152,7 +152,7 @@
     <string name="start_driving_hint">Comece a conduzir para registar a sua primeira viagem!</string>
     <string name="mark_favourite_hint">Toque na ☆ de uma viagem para a marcar como favorita</string>
     <string name="adjust_filters_hint">Tente ajustar ou limpar os filtros</string>
-    <string name="trip_history_hint">Toque numa viagem para análise, pressione longamente para seleção múltipla</string>
+    <string name="session_history_hint">Toque numa sessão para análise, pressione longamente para seleção múltipla</string>
     <string name="delete_trips_plural">Eliminar %1$s viagens?</string>
     <string name="delete_trip_single">Eliminar 1 viagem?</string>
     <string name="delete_trips_msg">Isto eliminará permanentemente as viagens selecionadas e todos os seus dados. Esta ação não pode ser desfeita.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Ação necessária — Início automático</string>
-    <string name="autostart_dialog_msg">Uma nova versão foi instalada. Precisas de desativar o início automático desta app, o que permite a recolha de dados em segundo plano quando o carro está desligado (ex.: a carregar durante a noite).\n\nPara maior fiabilidade, reinicia o carro uma vez após alterar esta definição e abre novamente o BYD Trip Stats.\nAVISO: Se não vires a velocidade e outros valores a atualizar durante a condução, precisas de reiniciar o carro!</string>
+    <string name="autostart_dialog_msg">Uma nova versão foi instalada. Precisas de desativar o início automático desta app, o que permite a execução de serviços em primeiro plano / segundo plano.\nÉ necessário um reinício único do carro, e apenas quando instalas a app pela primeira vez e depois de desativares o início automático. Se estás a atualizar a partir de uma versão anterior, não precisas de reiniciar</string>
     <string name="autostart_got_it">Entendido</string>
     <string name="adb_connecting_title">A ligar…</string>
     <string name="adb_waiting_auth_title">À espera de autorização</string>

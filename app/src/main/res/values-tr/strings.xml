@@ -152,7 +152,7 @@
     <string name="start_driving_hint">İlk seyahatinizi kaydetmek için sürüşe başlayın!</string>
     <string name="mark_favourite_hint">Favoriye eklemek için seyahatteki ☆ simgesine dokunun</string>
     <string name="adjust_filters_hint">Filtreleri ayarlamayı veya temizlemeyi deneyin</string>
-    <string name="trip_history_hint">Analitik için seyahate dokunun, çoklu seçim için uzun basın</string>
+    <string name="session_history_hint">Analitik için oturuma dokunun, çoklu seçim için uzun basın</string>
     <string name="delete_trips_plural">%1$s Seyahat Silinsin mi?</string>
     <string name="delete_trip_single">1 Seyahat Silinsin mi?</string>
     <string name="delete_trips_msg">Seçilen seyahatler ve tüm verileri kalıcı olarak silinecek. Bu işlem geri alınamaz.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Eylem Gerekli — Otomatik Başlatma</string>
-    <string name="autostart_dialog_msg">Yeni bir sürüm yüklendi. Bu uygulama için otomatik başlatmayı kapatman gerekiyor; bu, araç kapalıyken (örn. gece şarj ederken) arka plan veri toplamayı etkinleştirir.\n\nEn iyi güvenilirlik için bu ayarı değiştirdikten sonra aracı bir kez yeniden başlat, ardından BYD Trip Stats\'ı tekrar aç.\nUYARI: Sürüş sırasında hız ve diğer değerlerin güncellendiğini görmüyorsan aracı yeniden başlatman gerekiyor!</string>
+    <string name="autostart_dialog_msg">Yeni bir sürüm yüklendi. Bu uygulama için otomatik başlatmayı kapatman gerekiyor; bu, ön plan / arka plan hizmetlerinin çalışmasını sağlar.\nAracın bir kez yeniden başlatılması gerekir; yalnızca uygulamayı ilk kez yüklediğinde ve otomatik başlatmayı kapattıktan sonra. Daha eski bir sürümden güncelliyorsan yeniden başlatmana gerek yok</string>
     <string name="autostart_got_it">Anlaşıldı</string>
     <string name="adb_connecting_title">Bağlanıyor…</string>
     <string name="adb_waiting_auth_title">Yetkilendirme bekleniyor</string>

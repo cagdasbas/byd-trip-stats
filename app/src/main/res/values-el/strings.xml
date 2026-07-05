@@ -118,8 +118,8 @@
     <string name="hv_12v_history_title">Μπαταρίες HV / 12V – τελευταίες 48 ώρες</string>
     <string name="battery_history_subtitle">Δείγματα τηλεμετρίας συν τρέχουσα ζωντανή ανάγνωση</string>
     <string name="stat_latest">Τελευταίο</string>
-    <string name="stat_min">Ελάχ.</string>
-    <string name="stat_max">Μέγ.</string>
+    <string name="stat_min">Ελάχιστη</string>
+    <string name="stat_max">Μέγιστη</string>
     <string name="stat_delta">Δέλτα</string>
     <string name="no_12v_history">Δεν υπάρχει ακόμα καταγεγραμμένο ιστορικό 12V.</string>
     <string name="chart_12v_soc_label">Γράφημα 12V / SoC (Σε λειτουργία εκτός σύνδεσης οι τιμές ανακατασκευάζονται)</string>
@@ -133,7 +133,7 @@
     <string name="start_driving_hint">Ξεκινήστε να οδηγείτε για να καταγράψετε την πρώτη σας διαδρομή!</string>
     <string name="mark_favourite_hint">Πατήστε ☆ σε μια διαδρομή για να την σημειώσετε ως αγαπημένη</string>
     <string name="adjust_filters_hint">Δοκιμάστε να προσαρμόσετε ή να καθαρίσετε τα φίλτρα</string>
-    <string name="trip_history_hint">Αγγίξτε διαδρομή για αναλύσεις, παρατεταμένο πάτημα για πολλαπλή επιλογή</string>
+    <string name="session_history_hint">Αγγίξτε συνεδρία για αναλύσεις, παρατεταμένο πάτημα για πολλαπλή επιλογή</string>
     <string name="delete_trips_plural">Διαγραφή %1$s διαδρομών;</string>
     <string name="delete_trip_single">Διαγραφή 1 διαδρομής;</string>
     <string name="delete_trips_msg">Οι επιλεγμένες διαδρομές και όλα τα δεδομένα τους θα διαγραφούν οριστικά. Αυτή η ενέργεια είναι μη αναστρέψιμη.</string>
@@ -177,8 +177,8 @@
     <string name="filter_consumption">Μέση κατανάλωση (%1$s)</string>
     <string name="filter_regen_eff">Απόδοση ανάκτησης (%)</string>
     <string name="filter_max_speed">Μέγιστη ταχύτητα (%1$s)</string>
-    <string name="filter_min">Ελάχ.</string>
-    <string name="filter_max">Μέγ.</string>
+    <string name="filter_min">Ελάχιστο</string>
+    <string name="filter_max">Μέγιστο</string>
     <string name="filter_score">Βαθμολογία</string>
     <string name="stat_distance">Απόσταση</string>
     <string name="stat_duration">Διάρκεια</string>
@@ -656,7 +656,7 @@
     <string name="web_pin_show_cd">Εμφάνιση PIN</string>
     <string name="web_pin_set">Ορισμός</string>
     <string name="web_pin_regen">Αναγέν.</string>
-    <string name="web_pin_min_digits">Ελάχ. 4 ψηφία. Η αλλαγή PIN ακυρώνει όλες τις ενεργές περιόδους σύνδεσης.</string>
+    <string name="web_pin_min_digits">Ελάχιστα 4 ψηφία. Η αλλαγή PIN ακυρώνει όλες τις ενεργές περιόδους σύνδεσης.</string>
     <string name="web_ip_locked_one">1 διεύθυνση IP κλειδωμένη</string>
     <string name="web_ip_locked_many">%1$d διευθύνσεις IP κλειδωμένες</string>
     <string name="web_too_many_attempts">Πάρα πολλές λανθασμένες προσπάθειες PIN.</string>
@@ -963,7 +963,7 @@
     <string name="qr_failed_msg">Δεν ήταν δυνατή η απόδοση κωδικού QR. Χρησιμοποιήστε \"Αντιγραφή συνδέσμου\" και στείλτε email στο %1$s.</string>
     <string name="compat_telegram_action">Telegram</string>
     <string name="autostart_dialog_title">⚠️ Απαιτείται ενέργεια — Αυτόματη εκκίνηση</string>
-    <string name="autostart_dialog_msg">Εγκαταστάθηκε νέα έκδοση. Πρέπει να απενεργοποιήσετε την αυτόματη εκκίνηση για αυτή την εφαρμογή, κάτι που ενεργοποιεί τη συλλογή δεδομένων παρασκηνίου όταν το αυτοκίνητο είναι σβηστό (π.χ. κατά τη νυχτερινή φόρτιση).\n\nΓια καλύτερη αξιοπιστία, επανεκκινήστε το αυτοκίνητο μία φορά αφού αλλάξετε αυτή τη ρύθμιση και μετά ανοίξτε ξανά το BYD Trip Stats.\nΠΡΟΕΙΔΟΠΟΙΗΣΗ: Αν δεν βλέπετε την ταχύτητα και άλλες τιμές να ενημερώνονται κατά την οδήγηση, πρέπει να επανεκκινήσετε το αυτοκίνητο!</string>
+    <string name="autostart_dialog_msg">Εγκαταστάθηκε νέα έκδοση. Πρέπει να απενεργοποιήσετε την αυτόματη εκκίνηση για αυτή την εφαρμογή, κάτι που επιτρέπει την εκτέλεση υπηρεσιών προσκηνίου / παρασκηνίου.\nΑπαιτείται μία εφάπαξ επανεκκίνηση του αυτοκινήτου, και μόνο όταν εγκαθιστάτε για πρώτη φορά την εφαρμογή και αφού απενεργοποιήσετε την αυτόματη εκκίνηση. Αν κάνετε αναβάθμιση από παλαιότερη έκδοση, δεν χρειάζεται επανεκκίνηση</string>
     <string name="autostart_got_it">Το κατάλαβα</string>
     <string name="adb_connecting_title">Σύνδεση…</string>
     <string name="adb_waiting_auth_title">Αναμονή εξουσιοδότησης</string>

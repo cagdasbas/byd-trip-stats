@@ -152,7 +152,7 @@
     <string name="start_driving_hint">開始駕車以記錄您的第一次行程！</string>
     <string name="mark_favourite_hint">點擊行程上的 ☆ 將其標記為收藏</string>
     <string name="adjust_filters_hint">請嘗試調整或清除篩選條件</string>
-    <string name="trip_history_hint">點擊行程查看分析，長按以多選</string>
+    <string name="session_history_hint">點擊紀錄查看分析，長按以多選</string>
     <string name="delete_trips_plural">刪除 %1$s 次行程？</string>
     <string name="delete_trip_single">刪除 1 次行程？</string>
     <string name="delete_trips_msg">這將永久刪除所選行程及其所有資料，此操作無法復原。</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ 需要操作 — 自動啟動</string>
-    <string name="autostart_dialog_msg">已安裝新版本。您需要關閉此應用程式的自動啟動，這可在汽車關閉時（例如夜間充電）啟用背景資料收集。\n\n為獲得最佳可靠性，更改此設定後請重啟汽車一次，然後重新開啟 BYD Trip Stats。\n警告：如果行駛中速度和其他數值未更新，需要重啟汽車！</string>
+    <string name="autostart_dialog_msg">已安裝新版本。您需要關閉此應用程式的自動啟動，這樣可以讓前景 / 背景服務執行。\n只需在首次安裝應用程式時以及關閉自動啟動後重新啟動一次車輛。如果您是從舊版本升級，則無需重新啟動</string>
     <string name="autostart_got_it">知道了</string>
     <string name="adb_connecting_title">連線中…</string>
     <string name="adb_waiting_auth_title">等待授權</string>

@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Induljon el az első út rögzítéséhez!</string>
     <string name="mark_favourite_hint">Koppintson az út ☆ jelére a kedvencnek jelöléshez</string>
     <string name="adjust_filters_hint">Próbálja módosítani vagy törölni a szűrőket</string>
-    <string name="trip_history_hint">Koppintson az útra az elemzésekhez, tartsa nyomva a többszörös kijelöléshez</string>
+    <string name="session_history_hint">Koppintson a munkamenetre az elemzésekhez, tartsa nyomva a többszörös kijelöléshez</string>
     <string name="delete_trips_plural">Töröl %1$s utat?</string>
     <string name="delete_trip_single">Töröl 1 utat?</string>
     <string name="delete_trips_msg">Ez véglegesen törli a kijelölt utakat és minden adatukat. Ez a művelet nem vonható vissza.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Teendő — Autostart</string>
-    <string name="autostart_dialog_msg">Új verzió lett telepítve. Ki kell kapcsolnia a „disable autostart"-ot ennél az alkalmazásnál, ami lehetővé teszi a háttéradatgyűjtést kikapcsolt autónál (pl. éjszakai töltés).\n\nA legjobb megbízhatóságért a beállítás módosítása után indítsa újra egyszer az autót, majd nyissa meg újra a BYD Trip Stats-ot.\nFIGYELEM: Ha vezetés közben nem látja frissülni a sebességet és más értékeket, újra kell indítania az autót!</string>
+    <string name="autostart_dialog_msg">Új verzió lett telepítve. Ki kell kapcsolnia a „disable autostart”-ot ennél az alkalmazásnál, ami lehetővé teszi az előtér-/háttérszolgáltatások futását.\nAz autó egyszeri újraindítása szükséges, de csak az alkalmazás első telepítésekor és a „disable autostart” kikapcsolása után. Ha egy régebbi verzióról frissít, nem kell újraindítania</string>
     <string name="autostart_got_it">Értem</string>
     <string name="adb_connecting_title">Csatlakozás…</string>
     <string name="adb_waiting_auth_title">Várakozás engedélyezésre</string>

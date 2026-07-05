@@ -152,7 +152,7 @@
     <string name="start_driving_hint">Aloita ajaminen tallentaaksesi ensimmäisen matkasi!</string>
     <string name="mark_favourite_hint">Napauta ☆ matkalla merkitäksesi sen suosikiksi</string>
     <string name="adjust_filters_hint">Kokeile säätää tai tyhjentää suodattimet</string>
-    <string name="trip_history_hint">Napauta matkaa analyysejä varten, paina pitkään usean valinnan tilaan</string>
+    <string name="session_history_hint">Napauta istuntoa analyysejä varten, paina pitkään usean valinnan tilaan</string>
     <string name="delete_trips_plural">Poistetaanko %1$s matkaa?</string>
     <string name="delete_trip_single">Poistetaanko 1 matka?</string>
     <string name="delete_trips_msg">Tämä poistaa pysyvästi valitut matkat ja kaikki niiden tiedot. Tätä toimintoa ei voi kumota.</string>
@@ -1075,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Toiminto vaaditaan — Autostart</string>
-    <string name="autostart_dialog_msg">Uusi versio on asennettu. Sinun täytyy poistaa automaattinen käynnistys käytöstä tässä sovelluksessa, mikä mahdollistaa taustatietojen keräämisen auton ollessa sammutettuna (esim. yölatauksen aikana).\n\nParhaan luotettavuuden varmistamiseksi käynnistä auto uudelleen kerran tämän asetuksen muuttamisen jälkeen ja avaa sitten BYD Trip Stats uudelleen.\nVAROITUS: Jos et näe nopeuden ja muiden arvojen päivittyvän ajon aikana, sinun on käynnistettävä auto uudelleen!</string>
+    <string name="autostart_dialog_msg">Uusi versio on asennettu. Sinun täytyy poistaa automaattinen käynnistys käytöstä tässä sovelluksessa, mikä mahdollistaa etualan / taustan palvelujen suorittamisen.\nAuton kertaluontoinen uudelleenkäynnistys tarvitaan vain, kun asennat sovelluksen ensimmäisen kerran ja kun olet poistanut automaattisen käynnistyksen käytöstä. Jos päivität vanhemmasta versiosta, uudelleenkäynnistystä ei tarvita</string>
     <string name="autostart_got_it">Selvä</string>
     <string name="adb_connecting_title">Yhdistetään…</string>
     <string name="adb_waiting_auth_title">Odotetaan valtuutusta</string>

@@ -133,7 +133,7 @@
     <string name="start_driving_hint">Commencez à conduire pour enregistrer votre premier trajet!</string>
     <string name="mark_favourite_hint">Appuyez sur ☆ sur un trajet pour le marquer comme favori</string>
     <string name="adjust_filters_hint">Essayez d\'ajuster ou d\'effacer les filtres</string>
-    <string name="trip_history_hint">Toucher un trajet pour les analyses, appui long pour la sélection multiple</string>
+    <string name="session_history_hint">Toucher une session pour les analyses, appui long pour la sélection multiple</string>
     <string name="delete_trips_plural">Supprimer %1$s trajets?</string>
     <string name="delete_trip_single">Supprimer 1 trajet?</string>
     <string name="delete_trips_msg">Les trajets sélectionnés et toutes leurs données seront définitivement supprimés. Cette action est irréversible.</string>
@@ -963,7 +963,7 @@
     <string name="qr_failed_msg">Impossible de rendre le code QR. Utiliser \"Copier le lien\" et envoyer par email à %1$s.</string>
     <string name="compat_telegram_action">Telegram</string>
     <string name="autostart_dialog_title">⚠️ Action requise — Démarrage automatique</string>
-    <string name="autostart_dialog_msg">Une nouvelle version a été installée. Vous devez désactiver le démarrage automatique pour cette app, ce qui permet la collecte de données en arrière-plan lorsque la voiture est éteinte (ex. : charge nocturne).\n\nPour une meilleure fiabilité, redémarrez la voiture une fois après avoir modifié ce paramètre, puis rouvrez BYD Trip Stats.\nATTENTION : Si vous ne voyez pas la vitesse et les autres valeurs se mettre à jour pendant la conduite, vous devez redémarrer la voiture !</string>
+    <string name="autostart_dialog_msg">Une nouvelle version a été installée. Vous devez désactiver le démarrage automatique pour cette app, ce qui permet l\'exécution des services de premier plan / d\'arrière-plan.\nUn redémarrage unique de la voiture est nécessaire, uniquement lors de la première installation de l\'app et après avoir désactivé le démarrage automatique. Si vous effectuez une mise à jour depuis une version antérieure, vous n\'avez pas besoin de redémarrer</string>
     <string name="autostart_got_it">Compris</string>
     <string name="adb_connecting_title">Connexion…</string>
     <string name="adb_waiting_auth_title">En attente d\'autorisation</string>

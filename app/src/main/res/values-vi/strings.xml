@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Bắt đầu lái để ghi chuyến đi đầu tiên!</string>
     <string name="mark_favourite_hint">Chạm ☆ trên chuyến đi để đánh dấu yêu thích</string>
     <string name="adjust_filters_hint">Thử điều chỉnh hoặc xóa bộ lọc</string>
-    <string name="trip_history_hint">Chạm chuyến đi để xem phân tích, nhấn giữ để chọn nhiều</string>
+    <string name="session_history_hint">Chạm phiên để xem phân tích, nhấn giữ để chọn nhiều</string>
     <string name="delete_trips_plural">Xóa %1$s Chuyến đi?</string>
     <string name="delete_trip_single">Xóa 1 Chuyến đi?</string>
     <string name="delete_trips_msg">Thao tác này sẽ xóa vĩnh viễn các chuyến đi đã chọn và toàn bộ dữ liệu của chúng. Không thể hoàn tác.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Cần Hành động — Tự khởi động</string>
-    <string name="autostart_dialog_msg">Một phiên bản mới đã được cài đặt. Bạn cần tắt „disable autostart" cho ứng dụng này, việc này bật thu thập dữ liệu nền khi xe tắt (vd. sạc qua đêm).\n\nĐể độ tin cậy tốt nhất, khởi động lại xe một lần sau khi thay đổi cài đặt này, rồi mở lại BYD Trip Stats.\nCẢNH BÁO: Nếu bạn không thấy tốc độ và các giá trị khác cập nhật khi đang lái, bạn cần khởi động lại xe!</string>
+    <string name="autostart_dialog_msg">Một phiên bản mới đã được cài đặt. Bạn cần tắt „disable autostart” cho ứng dụng này, việc này cho phép các dịch vụ tiền cảnh / nền chạy.\nCần khởi động lại xe một lần, và chỉ khi bạn cài đặt ứng dụng lần đầu và sau khi tắt „disable autostart”. Nếu bạn đang cập nhật từ phiên bản cũ hơn, bạn không cần khởi động lại</string>
     <string name="autostart_got_it">Đã hiểu</string>
     <string name="adb_connecting_title">Đang kết nối…</string>
     <string name="adb_waiting_auth_title">Đang chờ ủy quyền</string>

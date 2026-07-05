@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Vyjeďte a zaznamenejte svou první jízdu!</string>
     <string name="mark_favourite_hint">Klepnutím na ☆ u jízdy ji označíte jako oblíbenou</string>
     <string name="adjust_filters_hint">Zkuste upravit nebo vymazat filtry</string>
-    <string name="trip_history_hint">Klepnutím na jízdu zobrazíte analýzy, podržením vyberete více</string>
+    <string name="session_history_hint">Klepnutím na relaci zobrazíte analýzy, podržením vyberete více</string>
     <string name="delete_trips_plural">Smazat %1$s jízd?</string>
     <string name="delete_trip_single">Smazat 1 jízdu?</string>
     <string name="delete_trips_msg">Vybrané jízdy a všechna jejich data budou trvale smazána. Tuto akci nelze vrátit.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Vyžadována akce — Autostart</string>
-    <string name="autostart_dialog_msg">Byla nainstalována nová verze. Musíte pro tuto aplikaci vypnout „disable autostart", což umožní sběr dat na pozadí při vypnutém voze (např. nabíjení přes noc).\n\nPro nejlepší spolehlivost po změně tohoto nastavení jednou restartujte vůz a pak znovu otevřete BYD Trip Stats.\nVAROVÁNÍ: Pokud během jízdy nevidíte aktualizaci rychlosti a dalších hodnot, musíte vůz restartovat!</string>
+    <string name="autostart_dialog_msg">Byla nainstalována nová verze. Musíte pro tuto aplikaci vypnout „disable autostart”, což umožní běh služeb na popředí / na pozadí.\nJednorázový restart vozu je potřeba pouze při první instalaci aplikace a po vypnutí „disable autostart”. Pokud aktualizujete ze starší verze, restart není nutný</string>
     <string name="autostart_got_it">Rozumím</string>
     <string name="adb_connecting_title">Připojování…</string>
     <string name="adb_waiting_auth_title">Čekání na autorizaci</string>

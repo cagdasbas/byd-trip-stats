@@ -133,7 +133,7 @@
     <string name="start_driving_hint">Fahren Sie los, um Ihre erste Fahrt aufzuzeichnen!</string>
     <string name="mark_favourite_hint">Tippen Sie auf ☆ bei einer Fahrt, um sie als Favorit zu markieren</string>
     <string name="adjust_filters_hint">Versuchen Sie, die Filter anzupassen oder zu löschen</string>
-    <string name="trip_history_hint">Tippen für Analysen, lang drücken für Mehrfachauswahl</string>
+    <string name="session_history_hint">Sitzung antippen für Analysen, lang drücken für Mehrfachauswahl</string>
     <string name="delete_trips_plural">%1$s Fahrten löschen?</string>
     <string name="delete_trip_single">1 Fahrt löschen?</string>
     <string name="delete_trips_msg">Die ausgewählten Fahrten und alle ihre Daten werden dauerhaft gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.</string>
@@ -963,7 +963,7 @@
     <string name="qr_failed_msg">QR-Code konnte nicht gerendert werden. \"Link kopieren\" verwenden und an %1$s mailen.</string>
     <string name="compat_telegram_action">Telegram</string>
     <string name="autostart_dialog_title">⚠️ Aktion erforderlich — Autostart</string>
-    <string name="autostart_dialog_msg">Eine neue Version wurde installiert. Du musst den Autostart für diese App deaktivieren — das ermöglicht die Datenerfassung im Hintergrund, wenn das Auto aus ist (z.B. beim nächtlichen Laden).\n\nFür beste Zuverlässigkeit das Auto einmal neu starten, nachdem du diese Einstellung geändert hast, und dann BYD Trip Stats erneut öffnen.\nWARNUNG: Falls Geschwindigkeit und andere Werte beim Fahren nicht aktualisiert werden, das Auto neu starten!</string>
+    <string name="autostart_dialog_msg">Eine neue Version wurde installiert. Du musst den Autostart für diese App deaktivieren — das ermöglicht die Ausführung von Vordergrund-/Hintergrunddiensten.\nEin einmaliger Neustart des Autos ist nötig, und zwar nur bei der ersten Installation der App und nachdem du den Autostart deaktiviert hast. Wenn du von einer älteren Version aktualisierst, musst du nicht neu starten</string>
     <string name="autostart_got_it">Verstanden</string>
     <string name="adb_connecting_title">Verbinden…</string>
     <string name="adb_waiting_auth_title">Warte auf Autorisierung</string>

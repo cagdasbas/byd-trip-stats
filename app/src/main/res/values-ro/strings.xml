@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Porniți la drum pentru a înregistra prima călătorie!</string>
     <string name="mark_favourite_hint">Atingeți ☆ pe o călătorie pentru a o marca favorită</string>
     <string name="adjust_filters_hint">Încercați să ajustați sau să goliți filtrele</string>
-    <string name="trip_history_hint">Atingeți călătoria pentru analize, apăsați lung pentru selecție multiplă</string>
+    <string name="session_history_hint">Atingeți sesiunea pentru analize, apăsați lung pentru selecție multiplă</string>
     <string name="delete_trips_plural">Ștergeți %1$s călătorii?</string>
     <string name="delete_trip_single">Ștergeți 1 călătorie?</string>
     <string name="delete_trips_msg">Aceasta va șterge definitiv călătoriile selectate și toate datele lor. Acțiunea nu poate fi anulată.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Acțiune necesară — Autostart</string>
-    <string name="autostart_dialog_msg">A fost instalată o versiune nouă. Trebuie să dezactivați „disable autostart" pentru această aplicație, ceea ce permite colectarea datelor în fundal cu mașina oprită (de ex. încărcarea peste noapte).\n\nPentru fiabilitate maximă, reporniți mașina o dată după schimbarea acestei setări, apoi deschideți din nou BYD Trip Stats.\nATENȚIE: Dacă nu vedeți viteza și alte valori actualizându-se în timpul condusului, trebuie să reporniți mașina!</string>
+    <string name="autostart_dialog_msg">A fost instalată o versiune nouă. Trebuie să dezactivați „disable autostart” pentru această aplicație, ceea ce permite rularea serviciilor din prim-plan / fundal.\nEste necesară o repornire unică a mașinii, doar la prima instalare a aplicației și după ce dezactivați „disable autostart”. Dacă actualizați de la o versiune mai veche, nu trebuie să reporniți</string>
     <string name="autostart_got_it">Am înțeles</string>
     <string name="adb_connecting_title">Se conectează…</string>
     <string name="adb_waiting_auth_title">Se așteaptă autorizarea</string>

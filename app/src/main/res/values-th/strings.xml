@@ -133,7 +133,7 @@
     <string name="start_driving_hint">เริ่มขับเพื่อบันทึกการเดินทางครั้งแรกของคุณ!</string>
     <string name="mark_favourite_hint">กด ☆ บนการเดินทางเพื่อทำเครื่องหมายเป็นที่ชื่นชอบ</string>
     <string name="adjust_filters_hint">ลองปรับหรือล้างตัวกรอง</string>
-    <string name="trip_history_hint">แตะการเดินทางเพื่อวิเคราะห์ กดค้างเพื่อเลือกหลายรายการ</string>
+    <string name="session_history_hint">แตะเซสชันเพื่อวิเคราะห์ กดค้างเพื่อเลือกหลายรายการ</string>
     <string name="delete_trips_plural">ลบ %1$s การเดินทาง?</string>
     <string name="delete_trip_single">ลบ 1 การเดินทาง?</string>
     <string name="delete_trips_msg">การเดินทางที่เลือกและข้อมูลทั้งหมดจะถูกลบถาวร การดำเนินการนี้ไม่สามารถย้อนกลับได้</string>
@@ -963,7 +963,7 @@
     <string name="qr_failed_msg">ไม่สามารถสร้าง QR Code ได้ ใช้ \"คัดลอกลิงก์\" และส่งอีเมลไปยัง %1$s</string>
     <string name="compat_telegram_action">Telegram</string>
     <string name="autostart_dialog_title">⚠️ ต้องดำเนินการ — การเริ่มต้นอัตโนมัติ</string>
-    <string name="autostart_dialog_msg">มีการติดตั้งเวอร์ชันใหม่แล้ว คุณต้องปิดใช้งานการเริ่มต้นอัตโนมัติสำหรับแอปนี้ ซึ่งจะเปิดใช้งานการเก็บข้อมูลพื้นหลังเมื่อรถดับ (เช่น การชาร์จข้ามคืน)\n\nเพื่อความน่าเชื่อถือสูงสุด ให้รีสตาร์ทรถหนึ่งครั้งหลังจากเปลี่ยนการตั้งค่านี้ แล้วเปิด BYD Trip Stats อีกครั้ง\nคำเตือน: หากคุณไม่เห็นความเร็วและค่าอื่น ๆ อัปเดตขณะขับ ต้องรีสตาร์ทรถ!</string>
+    <string name="autostart_dialog_msg">มีการติดตั้งเวอร์ชันใหม่แล้ว คุณต้องปิดใช้งานการเริ่มต้นอัตโนมัติสำหรับแอปนี้ ซึ่งจะช่วยให้บริการเบื้องหน้า / เบื้องหลังทำงานได้\nต้องรีบูตรถหนึ่งครั้ง และเฉพาะเมื่อคุณติดตั้งแอปครั้งแรกและหลังจากปิดใช้งานการเริ่มต้นอัตโนมัติ หากคุณอัปเดตจากเวอร์ชันเก่า คุณไม่จำเป็นต้องรีบูต</string>
     <string name="autostart_got_it">เข้าใจแล้ว</string>
     <string name="adb_connecting_title">กำลังเชื่อมต่อ…</string>
     <string name="adb_waiting_auth_title">รอการอนุญาต</string>

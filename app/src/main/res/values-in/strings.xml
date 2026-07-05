@@ -149,7 +149,7 @@
     <string name="start_driving_hint">Mulai berkendara untuk merekam perjalanan pertama Anda!</string>
     <string name="mark_favourite_hint">Ketuk ☆ pada perjalanan untuk menandainya favorit</string>
     <string name="adjust_filters_hint">Coba sesuaikan atau bersihkan filter</string>
-    <string name="trip_history_hint">Ketuk perjalanan untuk analitik, tekan lama untuk pilihan ganda</string>
+    <string name="session_history_hint">Ketuk sesi untuk analitik, tekan lama untuk pilihan ganda</string>
     <string name="delete_trips_plural">Hapus %1$s Perjalanan?</string>
     <string name="delete_trip_single">Hapus 1 Perjalanan?</string>
     <string name="delete_trips_msg">Ini akan menghapus permanen perjalanan yang dipilih dan semua datanya. Tindakan ini tidak dapat dibatalkan.</string>
@@ -1071,7 +1071,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Tindakan Diperlukan — Mulai-otomatis</string>
-    <string name="autostart_dialog_msg">Versi baru telah dipasang. Anda perlu mematikan „disable autostart" untuk aplikasi ini, yang mengaktifkan pengumpulan data latar saat mobil mati (mis. mengisi semalaman).\n\nUntuk keandalan terbaik, mulai ulang mobil sekali setelah mengubah pengaturan ini, lalu buka BYD Trip Stats lagi.\nPERINGATAN: Jika Anda tidak melihat kecepatan dan nilai lain diperbarui saat berkendara, Anda perlu memulai ulang mobil!</string>
+    <string name="autostart_dialog_msg">Versi baru telah dipasang. Anda perlu mematikan „disable autostart” untuk aplikasi ini, yang memungkinkan layanan latar depan / latar belakang berjalan.\nDiperlukan mulai ulang mobil satu kali, dan hanya saat Anda pertama kali memasang aplikasi dan setelah mematikan „disable autostart”. Jika Anda memperbarui dari versi lama, Anda tidak perlu mulai ulang</string>
     <string name="autostart_got_it">Mengerti</string>
     <string name="adb_connecting_title">Menghubungkan…</string>
     <string name="adb_waiting_auth_title">Menunggu otorisasi</string>

@@ -133,7 +133,7 @@
     <string name="start_driving_hint">अपनी पहली यात्रा रिकॉर्ड करने के लिए ड्राइव करना शुरू करें!</string>
     <string name="mark_favourite_hint">पसंदीदा के रूप में चिह्नित करने के लिए किसी यात्रा पर ☆ दबाएं</string>
     <string name="adjust_filters_hint">फ़िल्टर समायोजित या साफ़ करने का प्रयास करें</string>
-    <string name="trip_history_hint">विश्लेषण के लिए यात्रा टैप करें, एकाधिक चुनने के लिए लंबे समय तक दबाएं</string>
+    <string name="session_history_hint">विश्लेषण के लिए सत्र टैप करें, एकाधिक चुनने के लिए लंबे समय तक दबाएं</string>
     <string name="delete_trips_plural">%1$s यात्राएं हटाएं?</string>
     <string name="delete_trip_single">1 यात्रा हटाएं?</string>
     <string name="delete_trips_msg">चुनी गई यात्राएं और उनका सारा डेटा स्थायी रूप से हटा दिया जाएगा। इसे पूर्ववत नहीं किया जा सकता।</string>
@@ -963,7 +963,7 @@
     <string name="qr_failed_msg">QR Code जनरेट नहीं हो सका। \"लिंक कॉपी करें\" का उपयोग करें और %1$s को ईमेल करें।</string>
     <string name="compat_telegram_action">Telegram</string>
     <string name="autostart_dialog_title">⚠️ कार्रवाई आवश्यक — ऑटोस्टार्ट</string>
-    <string name="autostart_dialog_msg">एक नया संस्करण इंस्टॉल हुआ है। आपको इस ऐप के लिए ऑटोस्टार्ट बंद करना होगा, जो कार बंद होने पर (जैसे रात भर चार्जिंग के दौरान) पृष्ठभूमि डेटा संग्रह सक्षम करता है।\n\nसर्वोत्तम विश्वसनीयता के लिए, यह सेटिंग बदलने के बाद कार को एक बार पुनः चालू करें, फिर BYD Trip Stats दोबारा खोलें।\nचेतावनी: यदि ड्राइव करते समय गति और अन्य मान अपडेट नहीं हो रहे हैं, तो कार को पुनः चालू करना होगा!</string>
+    <string name="autostart_dialog_msg">एक नया संस्करण इंस्टॉल हुआ है। आपको इस ऐप के लिए ऑटोस्टार्ट बंद करना होगा, जो फोरग्राउंड / बैकग्राउंड सेवाओं को चलने देता है।\nकार का एक-बार रीबूट ज़रूरी है, और केवल तब जब आप पहली बार ऐप इंस्टॉल करते हैं और ऑटोस्टार्ट बंद करने के बाद। अगर आप किसी पुराने संस्करण से अपडेट कर रहे हैं, तो आपको रीबूट करने की ज़रूरत नहीं है</string>
     <string name="autostart_got_it">ठीक है</string>
     <string name="adb_connecting_title">कनेक्ट हो रहा है…</string>
     <string name="adb_waiting_auth_title">अनुमोदन की प्रतीक्षा</string>

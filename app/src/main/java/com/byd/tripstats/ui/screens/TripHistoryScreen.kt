@@ -75,7 +75,7 @@ fun TripHistoryScreen(
                         if (!selectionMode) {
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                stringResource(R.string.trip_history_hint),
+                                stringResource(R.string.session_history_hint),
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
