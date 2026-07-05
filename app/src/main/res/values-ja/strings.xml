@@ -790,7 +790,7 @@
     <string name="soc_source_info">PHEVではBMS SoCが通常報告されません — BMSが0を示す場合はパネルを使用してください。\nBMSはパネル（整数）より正確です（小数）。また、パネルからの大きな乖離は、100%充電または充電キャリブレーションの時期を示す良い指標です</string>
     <string name="pref_cell_imbalance">セル不均衡アラート</string>
     <string name="cell_imbalance_desc">パックのセル電圧ばらつきが上限を超えたときに通知します。</string>
-    <string name="cell_imbalance_info">ばらつき = 最高セル − 最低セル。健全なパックは〜20mV以下に保たれます。持続的に高いばらつきは弱いセルの兆候となり得ます。アラートはSoC 5%%以下および95%%以上では抑制されます（この範囲では広いばらつきが正常です）。</string>
+    <string name="cell_imbalance_info">ばらつき = 最高セル − 最低セル。健全なパックは〜20mV以下に保たれます。持続的に高いばらつきは弱いセルの兆候となり得ます。アラートはSoC 5%以下および95%以上では抑制されます（この範囲では広いばらつきが正常です）。</string>
     <string name="current_limit_value">現在の上限：%1$s mV</string>
     <string name="change_limit_action">上限を変更</string>
     <string name="pro_feature_imbalance_msg">これはBYD Trip Stats Proの機能です。不均衡アラートを受け取るにはProをロック解除してください。</string>

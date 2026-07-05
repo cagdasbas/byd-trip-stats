@@ -790,7 +790,7 @@
     <string name="soc_source_info">PHEV\'lerde BMS SoC genellikle raporlanmaz — BMS 0 gösteriyorsa Panel\'i kullanın.\nBMS, Panel\'den daha doğrudur (kayan nokta vs tam sayı). Ayrıca Panel\'den büyük sapma, %%100 şarj veya şarj kalibrasyonu zamanı geldiğinin iyi bir göstergesidir</string>
     <string name="pref_cell_imbalance">Hücre dengesizlik uyarısı</string>
     <string name="cell_imbalance_desc">Paketteki hücre voltaj farkı sınırın üzerinde kaldığında beni bildir.</string>
-    <string name="cell_imbalance_info">Fark = en yüksek hücre − en düşük hücre. Sağlıklı bir paket ~20 mV\'ın altında kalır; kalıcı olarak yüksek fark zayıf bir hücreye işaret edebilir. Geniş farkın normal olduğu %%5\'in altındaki ve %%95\'in üzerindeki SoC değerlerinde uyarılar bastırılır.</string>
+    <string name="cell_imbalance_info">Fark = en yüksek hücre − en düşük hücre. Sağlıklı bir paket ~20 mV\'ın altında kalır; kalıcı olarak yüksek fark zayıf bir hücreye işaret edebilir. Geniş farkın normal olduğu %5\'in altındaki ve %95\'in üzerindeki SoC değerlerinde uyarılar bastırılır.</string>
     <string name="current_limit_value">Mevcut sınır: %1$s mV</string>
     <string name="change_limit_action">Sınırı değiştir</string>
     <string name="pro_feature_imbalance_msg">Bu bir BYD Trip Stats Pro özelliğidir. Dengesizlik uyarıları almak için Pro\'yu açın.</string>

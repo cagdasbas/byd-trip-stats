@@ -790,7 +790,7 @@
     <string name="soc_source_info">Sui PHEV il SoC del BMS di solito non viene riportato — usa Pannello se BMS mostra 0.\nIl BMS è più preciso (decimale) rispetto al Pannello (intero). Inoltre, una maggiore divergenza dal Pannello è un ottimo segnale che è ora di una carica al 100%% o di una calibrazione della ricarica</string>
     <string name="pref_cell_imbalance">Avviso squilibrio celle</string>
     <string name="cell_imbalance_desc">Avvisami quando la dispersione di tensione delle celle del pacco supera il limite.</string>
-    <string name="cell_imbalance_info">Dispersione = cella più alta − cella più bassa. Un pacco sano rimane sotto ~20 mV; una dispersione persistentemente alta può segnalare una cella debole. Gli avvisi sono soppressi sotto il 5%% e sopra il 95%% di SoC, dove una dispersione ampia è normale.</string>
+    <string name="cell_imbalance_info">Dispersione = cella più alta − cella più bassa. Un pacco sano rimane sotto ~20 mV; una dispersione persistentemente alta può segnalare una cella debole. Gli avvisi sono soppressi sotto il 5% e sopra il 95% di SoC, dove una dispersione ampia è normale.</string>
     <string name="current_limit_value">Limite attuale: %1$s mV</string>
     <string name="change_limit_action">Modifica limite</string>
     <string name="pro_feature_imbalance_msg">Questa è una funzione di BYD Trip Stats Pro. Sblocca Pro per ricevere avvisi di squilibrio.</string>

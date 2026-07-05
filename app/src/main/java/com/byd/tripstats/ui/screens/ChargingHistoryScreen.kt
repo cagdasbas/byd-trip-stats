@@ -52,11 +52,22 @@ fun ChargingHistoryScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     } else {
-                        Text(
-                            stringResource(R.string.charging_history_title),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.charging_history_title),
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                stringResource(R.string.session_history_hint),
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 navigationIcon = {

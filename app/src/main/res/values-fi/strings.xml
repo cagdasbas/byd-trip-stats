@@ -790,7 +790,7 @@
     <string name="soc_source_info">PHEV:ssä BMS:n SoC ei yleensä raportoidu — käytä Paneelia jos BMS näyttää 0.\nBMS on tarkempi (desimaaliluku) kuin Paneeli (kokonaisluku). Myös suurempi ero Paneeliin nähden on hyvä merkki siitä että on aika ladata 100%%:iin tai kalibroida lataus</string>
     <string name="pref_cell_imbalance">Kennon epätasapainohälytys</string>
     <string name="cell_imbalance_desc">Ilmoita minulle kun akun kennojännitteen hajonta pysyy rajan yläpuolella.</string>
-    <string name="cell_imbalance_info">Hajonta = korkein kenno − matalin kenno. Terve akku pysyy alle ~20 mV:ssä; jatkuvasti korkea hajonta voi merkitä heikkoa kennoa. Hälytykset on estetty alle 5%% ja yli 95%% SoC:lla, missä laaja hajonta on normaalia.</string>
+    <string name="cell_imbalance_info">Hajonta = korkein kenno − matalin kenno. Terve akku pysyy alle ~20 mV:ssä; jatkuvasti korkea hajonta voi merkitä heikkoa kennoa. Hälytykset on estetty alle 5% ja yli 95% SoC:lla, missä laaja hajonta on normaalia.</string>
     <string name="current_limit_value">Nykyinen raja: %1$s mV</string>
     <string name="change_limit_action">Muuta rajaa</string>
     <string name="pro_feature_imbalance_msg">Tämä on BYD Trip Stats Pro -ominaisuus. Avaa Pro vastaanottaaksesi epätasapainohälytyksiä.</string>

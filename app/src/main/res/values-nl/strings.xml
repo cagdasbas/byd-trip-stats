@@ -790,7 +790,7 @@
     <string name="soc_source_info">Bij PHEV\'s wordt de BMS SoC gewoonlijk niet gerapporteerd — gebruik Paneel als BMS 0 toont.\nBMS is nauwkeuriger (float) dan Paneel (geheel getal). Ook is een grotere afwijking van Paneel een goede indicatie dat het tijd is voor een 100%-lading of laadkalibratie</string>
     <string name="pref_cell_imbalance">Celonbalanswaarschuwing</string>
     <string name="cell_imbalance_desc">Meld mij wanneer het celspanningsverschil van het pakket boven de limiet blijft.</string>
-    <string name="cell_imbalance_info">Verschil = hoogste cel − laagste cel. Een gezond pakket blijft onder ~20 mV; een aanhoudend hoog verschil kan wijzen op een zwakke cel. Waarschuwingen worden onderdrukt onder 5%% en boven 95%% SoC, waar een groot verschil normaal is.</string>
+    <string name="cell_imbalance_info">Verschil = hoogste cel − laagste cel. Een gezond pakket blijft onder ~20 mV; een aanhoudend hoog verschil kan wijzen op een zwakke cel. Waarschuwingen worden onderdrukt onder 5% en boven 95% SoC, waar een groot verschil normaal is.</string>
     <string name="current_limit_value">Huidige limiet: %1$s mV</string>
     <string name="change_limit_action">Limiet wijzigen</string>
     <string name="pro_feature_imbalance_msg">Dit is een BYD Trip Stats Pro-functie. Ontgrendel Pro om onbalanswaarschuwingen te ontvangen.</string>

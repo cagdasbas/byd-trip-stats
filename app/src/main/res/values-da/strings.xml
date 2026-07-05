@@ -790,7 +790,7 @@
     <string name="soc_source_info">På PHEV\'er rapporteres BMS SoC normalt ikke — brug Panel, hvis BMS viser 0.\nBMS er mere præcis (float) end Panel (heltal). Desuden er større divergens fra Panel en god indikation på, at det er tid til enten 100% opladning eller opladningskalibrering</string>
     <string name="pref_cell_imbalance">Celleimbalancealarm</string>
     <string name="cell_imbalance_desc">Underret mig, når pakkens cellespændingsspredning forbliver over grænsen.</string>
-    <string name="cell_imbalance_info">Spredning = højeste celle − laveste celle. En sund pakke holder sig under ca. 20 mV; en vedvarende høj spredning kan markere en svag celle. Advarsler undertrykkes under 5%% og over 95%% SoC, hvor en bred spredning er normal.</string>
+    <string name="cell_imbalance_info">Spredning = højeste celle − laveste celle. En sund pakke holder sig under ca. 20 mV; en vedvarende høj spredning kan markere en svag celle. Advarsler undertrykkes under 5% og over 95% SoC, hvor en bred spredning er normal.</string>
     <string name="current_limit_value">Nuværende grænse: %1$s mV</string>
     <string name="change_limit_action">Skift grænse</string>
     <string name="pro_feature_imbalance_msg">Dette er en BYD Trip Stats Pro-funktion. Lås op for Pro for at modtage imbalanceadvarsler.</string>

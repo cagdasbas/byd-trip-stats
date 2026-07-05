@@ -787,7 +787,7 @@
     <string name="soc_source_info">ברכבי PHEV, ה-SoC מה-BMS בדרך כלל אינו מדווח — השתמשו בלוח אם ה-BMS מציג 0.\nה-BMS מדויק יותר (עשרוני) מהלוח (שלם). כמו כן, סטייה גדולה יותר מהלוח היא סימן טוב שהגיע הזמן לטעינה מלאה ל-100% או לכיול טעינה</string>
     <string name="pref_cell_imbalance">התראת חוסר איזון תאים</string>
     <string name="cell_imbalance_desc">הודע לי כשפיזור מתח התאים של הסוללה נשאר מעל הגבול.</string>
-    <string name="cell_imbalance_info">פיזור = התא הגבוה ביותר − התא הנמוך ביותר. סוללה בריאה נשארת מתחת ל-~20 mV; פיזור גבוה מתמשך עשוי להצביע על תא חלש. התראות מושתקות מתחת ל-5%% ומעל ל-95%% SoC, שבהם פיזור רחב הוא נורמלי.</string>
+    <string name="cell_imbalance_info">פיזור = התא הגבוה ביותר − התא הנמוך ביותר. סוללה בריאה נשארת מתחת ל-~20 mV; פיזור גבוה מתמשך עשוי להצביע על תא חלש. התראות מושתקות מתחת ל-5% ומעל ל-95% SoC, שבהם פיזור רחב הוא נורמלי.</string>
     <string name="current_limit_value">גבול נוכחי: %1$s mV</string>
     <string name="change_limit_action">שנה גבול</string>
     <string name="pro_feature_imbalance_msg">זוהי תכונת BYD Trip Stats Pro. שחררו את Pro כדי לקבל התראות חוסר איזון.</string>

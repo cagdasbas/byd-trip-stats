@@ -978,19 +978,18 @@ internal fun AppPreferencesTab(
         AlertDialog(
             onDismissRequest = { showCellImbalanceThresholdDialog = false },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Cell imbalance limit", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.imbalance_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Alert when the cell voltage spread stays above this for a few seconds. " +
-                            "Typical limit: 50 mV. Allowed range: 10–500 mV.",
+                        stringResource(R.string.imbalance_input_desc),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     OutlinedTextField(
                         value = thresholdInput,
                         onValueChange = { thresholdInput = it },
-                        label = { Text("Limit (mV)") },
+                        label = { Text(stringResource(R.string.limit_mv_label)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
@@ -1006,10 +1005,10 @@ internal fun AppPreferencesTab(
                         showCellImbalanceThresholdDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                ) { Text("Save") }
+                ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onClick = { showCellImbalanceThresholdDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showCellImbalanceThresholdDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

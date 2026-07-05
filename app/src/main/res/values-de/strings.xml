@@ -719,7 +719,7 @@
     <string name="soc_source_info">Bei PHEVs wird der BMS-SoC üblicherweise nicht gemeldet — verwenden Sie Anzeige, wenn BMS 0 zeigt.\nBMS ist genauer (Dezimalwert) als die Anzeige (Ganzzahl). Außerdem ist eine größere Abweichung von der Anzeige ein guter Hinweis darauf, dass es Zeit für eine 100%-Ladung oder eine Ladekalibrierung ist</string>
     <string name="pref_cell_imbalance">Zellungleichgewicht-Alarm</string>
     <string name="cell_imbalance_desc">Benachrichtigen, wenn die Zellspannungsstreuung über dem Limit bleibt.</string>
-    <string name="cell_imbalance_info">Streuung = höchste Zelle − niedrigste Zelle. Ein gesundes Paket bleibt unter ~20 mV; eine dauerhaft hohe Streuung kann auf eine schwache Zelle hinweisen. Warnungen werden unter 5%% und über 95%% SoC unterdrückt, wo eine große Streuung normal ist.</string>
+    <string name="cell_imbalance_info">Streuung = höchste Zelle − niedrigste Zelle. Ein gesundes Paket bleibt unter ~20 mV; eine dauerhaft hohe Streuung kann auf eine schwache Zelle hinweisen. Warnungen werden unter 5% und über 95% SoC unterdrückt, wo eine große Streuung normal ist.</string>
     <string name="current_limit_value">Aktuelles Limit: %1$s mV</string>
     <string name="change_limit_action">Limit ändern</string>
     <string name="pro_feature_imbalance_msg">Dies ist eine BYD Trip Stats Pro-Funktion. Schalten Sie Pro frei, um Ungleichgewicht-Alarme zu erhalten.</string>

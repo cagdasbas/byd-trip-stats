@@ -790,7 +790,7 @@
     <string name="soc_source_info">On PHEVs the BMS SoC is usually not reported — use Panel if BMS shows 0.\nBMS is more accurate (float) than Panel (integer). Also, larger divergence from Panel is a great indication that it is time for either 100% charge or charging calibration</string>
     <string name="pref_cell_imbalance">Cell imbalance alert</string>
     <string name="cell_imbalance_desc">Notify me when the pack\'s cell voltage spread stays above the limit.</string>
-    <string name="cell_imbalance_info">Spread = highest cell − lowest cell. A healthy pack stays under ~20 mV; a persistently high spread can flag a weak cell. Alerts are suppressed below 5%% and above 95%% SoC, where a wide spread is normal.</string>
+    <string name="cell_imbalance_info">Spread = highest cell − lowest cell. A healthy pack stays under ~20 mV; a persistently high spread can flag a weak cell. Alerts are suppressed below 5% and above 95% SoC, where a wide spread is normal.</string>
     <string name="current_limit_value">Current limit: %1$s mV</string>
     <string name="change_limit_action">Change limit</string>
     <string name="pro_feature_imbalance_msg">This is a BYD Trip Stats Pro feature. Unlock Pro to receive imbalance alerts.</string>

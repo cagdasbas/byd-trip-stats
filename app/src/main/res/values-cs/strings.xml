@@ -787,7 +787,7 @@
     <string name="soc_source_info">U PHEV se SoC z BMS obvykle nehlásí — použijte Panel, pokud BMS ukazuje 0.\nBMS je přesnější (desetinné číslo) než panel (celé číslo). Větší odchylka od panelu je navíc dobrým znamením, že je čas na 100% nabití nebo kalibraci nabíjení</string>
     <string name="pref_cell_imbalance">Upozornění na nerovnováhu článků</string>
     <string name="cell_imbalance_desc">Upozornit, když rozptyl napětí článků paketu zůstává nad limitem.</string>
-    <string name="cell_imbalance_info">Rozptyl = nejvyšší článek − nejnižší článek. Zdravý paket zůstává pod ~20 mV; trvale vysoký rozptyl může signalizovat slabý článek. Upozornění jsou potlačena pod 5%% a nad 95%% SoC, kde je velký rozptyl normální.</string>
+    <string name="cell_imbalance_info">Rozptyl = nejvyšší článek − nejnižší článek. Zdravý paket zůstává pod ~20 mV; trvale vysoký rozptyl může signalizovat slabý článek. Upozornění jsou potlačena pod 5% a nad 95% SoC, kde je velký rozptyl normální.</string>
     <string name="current_limit_value">Aktuální limit: %1$s mV</string>
     <string name="change_limit_action">Změnit limit</string>
     <string name="pro_feature_imbalance_msg">Toto je funkce BYD Trip Stats Pro. Odemkněte Pro pro upozornění na nerovnováhu.</string>

@@ -787,7 +787,7 @@
     <string name="soc_source_info">W PHEV SoC z BMS zwykle nie jest raportowany — użyj Panelu, jeśli BMS pokazuje 0.\nBMS jest dokładniejszy (ułamkowy) niż Panel (całkowity). Ponadto większa rozbieżność względem Panelu to dobry znak, że czas na ładowanie do 100% lub kalibrację ładowania</string>
     <string name="pref_cell_imbalance">Alert nierównowagi ogniw</string>
     <string name="cell_imbalance_desc">Powiadom mnie, gdy rozrzut napięć ogniw pakietu utrzymuje się powyżej limitu.</string>
-    <string name="cell_imbalance_info">Rozrzut = najwyższe ogniwo − najniższe ogniwo. Zdrowy pakiet pozostaje poniżej ~20 mV; utrzymujący się wysoki rozrzut może wskazywać słabe ogniwo. Alerty są wyciszane poniżej 5%% i powyżej 95%% SoC, gdzie duży rozrzut jest normalny.</string>
+    <string name="cell_imbalance_info">Rozrzut = najwyższe ogniwo − najniższe ogniwo. Zdrowy pakiet pozostaje poniżej ~20 mV; utrzymujący się wysoki rozrzut może wskazywać słabe ogniwo. Alerty są wyciszane poniżej 5% i powyżej 95% SoC, gdzie duży rozrzut jest normalny.</string>
     <string name="current_limit_value">Bieżący limit: %1$s mV</string>
     <string name="change_limit_action">Zmień limit</string>
     <string name="pro_feature_imbalance_msg">To funkcja BYD Trip Stats Pro. Odblokuj Pro, aby otrzymywać alerty nierównowagi.</string>

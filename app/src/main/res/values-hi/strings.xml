@@ -719,7 +719,7 @@
     <string name="soc_source_info">PHEV में BMS SoC अक्सर रिपोर्ट नहीं होता — अगर BMS 0 दिखाए तो पैनल उपयोग करें।\nBMS पैनल (पूर्णांक) से अधिक सटीक (दशमलव) है। साथ ही, पैनल से बड़ा अंतर एक अच्छा संकेत है कि 100% चार्ज या चार्जिंग कैलिब्रेशन का समय आ गया है</string>
     <string name="pref_cell_imbalance">सेल असंतुलन अलर्ट</string>
     <string name="cell_imbalance_desc">सेल वोल्टेज स्प्रेड सीमा से ऊपर होने पर अलर्ट करें।</string>
-    <string name="cell_imbalance_info">स्प्रेड = अधिकतम सेल − न्यूनतम सेल। स्वस्थ पैक ~20 mV से नीचे रहते हैं; लगातार उच्च स्प्रेड कमज़ोर सेल का संकेत हो सकता है। 5%% से नीचे और 95%% SoC से ऊपर अलर्ट दबा दिए जाते हैं, जहाँ अधिक स्प्रेड सामान्य है।</string>
+    <string name="cell_imbalance_info">स्प्रेड = अधिकतम सेल − न्यूनतम सेल। स्वस्थ पैक ~20 mV से नीचे रहते हैं; लगातार उच्च स्प्रेड कमज़ोर सेल का संकेत हो सकता है। 5% से नीचे और 95% SoC से ऊपर अलर्ट दबा दिए जाते हैं, जहाँ अधिक स्प्रेड सामान्य है।</string>
     <string name="current_limit_value">वर्तमान सीमा: %1$s mV</string>
     <string name="change_limit_action">सीमा बदलें</string>
     <string name="pro_feature_imbalance_msg">यह एक BYD Trip Stats Pro फीचर है। असंतुलन अलर्ट पाने के लिए Pro अनलॉक करें।</string>

@@ -787,7 +787,7 @@
     <string name="soc_source_info">PHEV-eken a BMS SoC általában nem érkezik — használja a Panelt, ha a BMS 0-t mutat.\nA BMS pontosabb (tört érték), mint a panel (egész szám). Emellett a paneltől való nagyobb eltérés jó jele annak, hogy ideje 100%-os töltésnek vagy töltéskalibrációnak</string>
     <string name="pref_cell_imbalance">Cella-kiegyensúlyozatlansági riasztás</string>
     <string name="cell_imbalance_desc">Értesítsen, ha a pakk cellafeszültség-szórása a határérték felett marad.</string>
-    <string name="cell_imbalance_info">Szórás = legmagasabb cella − legalacsonyabb cella. Egészséges pakk ~20 mV alatt marad; a tartósan magas szórás gyenge cellát jelezhet. A riasztások 5%% alatt és 95%% SoC felett elnémulnak, ahol a nagy szórás normális.</string>
+    <string name="cell_imbalance_info">Szórás = legmagasabb cella − legalacsonyabb cella. Egészséges pakk ~20 mV alatt marad; a tartósan magas szórás gyenge cellát jelezhet. A riasztások 5% alatt és 95% SoC felett elnémulnak, ahol a nagy szórás normális.</string>
     <string name="current_limit_value">Jelenlegi határ: %1$s mV</string>
     <string name="change_limit_action">Határ módosítása</string>
     <string name="pro_feature_imbalance_msg">Ez BYD Trip Stats Pro funkció. Oldja fel a Pro-t a kiegyensúlyozatlansági riasztásokhoz.</string>

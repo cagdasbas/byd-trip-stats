@@ -787,7 +787,7 @@
     <string name="soc_source_info">La PHEV-uri, SoC din BMS de obicei nu este raportat — folosiți Panou dacă BMS arată 0.\nBMS este mai precis (zecimal) decât Panoul (întreg). De asemenea, o divergență mai mare față de Panou e un bun indiciu că e timpul fie pentru o încărcare la 100%, fie pentru o calibrare a încărcării</string>
     <string name="pref_cell_imbalance">Alertă dezechilibru celule</string>
     <string name="cell_imbalance_desc">Notifică-mă când dispersia tensiunii celulelor pachetului rămâne peste limită.</string>
-    <string name="cell_imbalance_info">Dispersie = celula cea mai mare − celula cea mai mică. Un pachet sănătos rămâne sub ~20 mV; o dispersie persistent mare poate semnala o celulă slabă. Alertele sunt suprimate sub 5%% și peste 95%% SoC, unde o dispersie mare este normală.</string>
+    <string name="cell_imbalance_info">Dispersie = celula cea mai mare − celula cea mai mică. Un pachet sănătos rămâne sub ~20 mV; o dispersie persistent mare poate semnala o celulă slabă. Alertele sunt suprimate sub 5% și peste 95% SoC, unde o dispersie mare este normală.</string>
     <string name="current_limit_value">Limita curentă: %1$s mV</string>
     <string name="change_limit_action">Schimbă limita</string>
     <string name="pro_feature_imbalance_msg">Aceasta este o funcție BYD Trip Stats Pro. Deblocați Pro pentru a primi alerte de dezechilibru.</string>

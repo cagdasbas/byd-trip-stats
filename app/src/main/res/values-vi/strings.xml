@@ -787,7 +787,7 @@
     <string name="soc_source_info">Trên PHEV, SoC của BMS thường không được báo cáo — dùng Bảng nếu BMS hiển thị 0.\nBMS chính xác hơn (số thập phân) so với Bảng (số nguyên). Ngoài ra, chênh lệch lớn hơn so với Bảng là dấu hiệu tốt cho thấy đã đến lúc sạc 100% hoặc hiệu chuẩn sạc</string>
     <string name="pref_cell_imbalance">Cảnh báo mất cân bằng cell</string>
     <string name="cell_imbalance_desc">Thông báo cho tôi khi chênh lệch điện áp cell của pin ở trên giới hạn.</string>
-    <string name="cell_imbalance_info">Chênh lệch = cell cao nhất − cell thấp nhất. Pin khỏe giữ dưới ~20 mV; chênh lệch cao kéo dài có thể báo hiệu cell yếu. Cảnh báo bị chặn dưới 5%% và trên 95%% SoC, nơi chênh lệch lớn là bình thường.</string>
+    <string name="cell_imbalance_info">Chênh lệch = cell cao nhất − cell thấp nhất. Pin khỏe giữ dưới ~20 mV; chênh lệch cao kéo dài có thể báo hiệu cell yếu. Cảnh báo bị chặn dưới 5% và trên 95% SoC, nơi chênh lệch lớn là bình thường.</string>
     <string name="current_limit_value">Giới hạn hiện tại: %1$s mV</string>
     <string name="change_limit_action">Đổi giới hạn</string>
     <string name="pro_feature_imbalance_msg">Đây là tính năng BYD Trip Stats Pro. Mở khóa Pro để nhận cảnh báo mất cân bằng.</string>

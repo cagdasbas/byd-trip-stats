@@ -790,7 +790,7 @@
     <string name="soc_source_info">PHEV 车型通常不上报 BMS SoC — 若 BMS 显示为 0，请使用面板值。\nBMS 比面板更准确（浮点数 vs 整数）。此外，与面板值差异较大时，通常提示需要进行 100% 充电或充电校准。</string>
     <string name="pref_cell_imbalance">电芯不平衡提醒</string>
     <string name="cell_imbalance_desc">当电池组电芯电压差持续超过限制时通知我。</string>
-    <string name="cell_imbalance_info">电压差 = 最高电芯 − 最低电芯。健康电池组应低于约 20 mV；持续偏高的电压差可能表明存在弱电芯。SoC 低于 5%% 或高于 95%% 时，较大的电压差属正常现象，提醒将被抑制。</string>
+    <string name="cell_imbalance_info">电压差 = 最高电芯 − 最低电芯。健康电池组应低于约 20 mV；持续偏高的电压差可能表明存在弱电芯。SoC 低于 5% 或高于 95% 时，较大的电压差属正常现象，提醒将被抑制。</string>
     <string name="current_limit_value">当前限制：%1$s mV</string>
     <string name="change_limit_action">更改限制</string>
     <string name="pro_feature_imbalance_msg">这是 BYD Trip Stats Pro 功能。请解锁 Pro 以接收不平衡提醒。</string>

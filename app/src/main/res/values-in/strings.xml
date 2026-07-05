@@ -787,7 +787,7 @@
     <string name="soc_source_info">Pada PHEV, SoC BMS biasanya tidak dilaporkan — gunakan Panel jika BMS menunjukkan 0.\nBMS lebih akurat (desimal) daripada Panel (bilangan bulat). Selain itu, perbedaan lebih besar dari Panel adalah indikasi bagus bahwa saatnya mengisi 100% atau kalibrasi pengisian</string>
     <string name="pref_cell_imbalance">Peringatan ketidakseimbangan sel</string>
     <string name="cell_imbalance_desc">Beri tahu saya saat sebaran tegangan sel pak tetap di atas batas.</string>
-    <string name="cell_imbalance_info">Sebaran = sel tertinggi − sel terendah. Pak yang sehat tetap di bawah ~20 mV; sebaran tinggi yang bertahan bisa menandai sel lemah. Peringatan ditekan di bawah 5%% dan di atas 95%% SoC, di mana sebaran lebar adalah normal.</string>
+    <string name="cell_imbalance_info">Sebaran = sel tertinggi − sel terendah. Pak yang sehat tetap di bawah ~20 mV; sebaran tinggi yang bertahan bisa menandai sel lemah. Peringatan ditekan di bawah 5% dan di atas 95% SoC, di mana sebaran lebar adalah normal.</string>
     <string name="current_limit_value">Batas saat ini: %1$s mV</string>
     <string name="change_limit_action">Ubah batas</string>
     <string name="pro_feature_imbalance_msg">Ini adalah fitur BYD Trip Stats Pro. Buka Pro untuk menerima peringatan ketidakseimbangan.</string>

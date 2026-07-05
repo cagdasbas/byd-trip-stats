@@ -719,7 +719,7 @@
     <string name="soc_source_info">Sur les PHEV, le SoC BMS n\'est généralement pas rapporté — utilisez Tableau de bord si BMS affiche 0.\nLe BMS est plus précis (décimal) que le Tableau de bord (entier). De plus, un écart important avec le Tableau de bord est un bon indicateur qu\'il est temps de faire une charge à 100 % ou une calibration de charge</string>
     <string name="pref_cell_imbalance">Alerte déséquilibre cellulaire</string>
     <string name="cell_imbalance_desc">Me notifier quand la dispersion de tension des cellules reste au-dessus de la limite.</string>
-    <string name="cell_imbalance_info">Dispersion = cellule la plus haute − cellule la plus basse. Un pack sain reste sous ~20 mV ; une dispersion durablement élevée peut signaler une cellule faible. Les alertes sont supprimées sous 5%% et au-dessus de 95%% de SoC, où une large dispersion est normale.</string>
+    <string name="cell_imbalance_info">Dispersion = cellule la plus haute − cellule la plus basse. Un pack sain reste sous ~20 mV ; une dispersion durablement élevée peut signaler une cellule faible. Les alertes sont supprimées sous 5% et au-dessus de 95% de SoC, où une large dispersion est normale.</string>
     <string name="current_limit_value">Limite actuelle: %1$s mV</string>
     <string name="change_limit_action">Modifier la limite</string>
     <string name="pro_feature_imbalance_msg">Ceci est une fonctionnalité BYD Trip Stats Pro. Déverrouillez Pro pour recevoir des alertes de déséquilibre.</string>
