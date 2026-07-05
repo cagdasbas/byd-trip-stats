@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -34,6 +35,7 @@ import com.byd.tripstats.R
 import com.byd.tripstats.data.backup.LocalBackupManager
 import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.data.entitlement.EntitlementManager
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.worker.DatabaseTrimmer
@@ -148,12 +150,15 @@ fun LocalBackupScreen(
             TopAppBar(
                 title = {
                     Text(stringResource(R.string.backup_restore_title),
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onNavigateBack() })
                 },
                 navigationIcon = {
+                  BrandNavigationBar {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(28.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(32.dp))
                     }
+                  }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer

@@ -1,5 +1,6 @@
 package com.byd.tripstats.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlinx.coroutines.Dispatchers
@@ -70,10 +72,17 @@ fun ChargingDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.charging_detail_title), fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        stringResource(R.string.charging_detail_title), fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onNavigateBack() }
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(28.dp))
+                    BrandNavigationBar {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(32.dp))
+                        }
                     }
                 },
                 actions = {

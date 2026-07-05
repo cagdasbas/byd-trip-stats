@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">Regenerointitilan käyttö</string>
     <string name="mode_of_mode_attributed_trip">tilarekisteröidystä matkasta</string>
     <string name="mode_recovered_via_regen">talteen otettu regeneraatiolla</string>
-    <string name="mode_eco_normal_same">Eco ja Normaali tuottivat käytännössä saman tuloksen tällä matkalla, joten reitti ja liikenne vaikuttivat enemmän kuin valittu ajotila.</string>
-    <string name="mode_sport_more_than_normal">Sport kulutti %1$s %2$s enemmän kuin Normal vastaavilla osuuksilla tällä matkalla.</string>
-    <string name="mode_high_regen_no_improvement">High regen ei parantanut merkittävästi talteen otettua energiaa tällä matkalla — jarrutusmahdollisuudet vaikuttivat todennäköisesti enemmän kuin regen-asetus.</string>
+    <string name="mode_drive_modes_same">%1$s ja %2$s kuluttivat tällä matkalla suunnilleen saman verran energiaa, joten reitti ja liikenne vaikuttivat enemmän kuin ajotila.</string>
+    <string name="mode_drive_more_efficient">%1$s kulutti tällä matkalla %2$s %% vähemmän energiaa kuin %3$s — tehokkaampi valinta tässä.</string>
+    <string name="mode_regen_modes_same">%1$s ja %2$s ottivat tällä matkalla talteen suunnilleen saman verran energiaa, joten jarrutusmahdollisuudet vaikuttivat enemmän kuin regenerointiasetus.</string>
+    <string name="mode_regen_more">%1$s otti tällä matkalla talteen noin %2$s %% enemmän energiaa kuin %3$s.</string>
     <string name="route_segments_label">Reitinsegmentit</string>
     <string name="segment_number_label">Segmentti %1$s</string>
     <string name="waypoints_label">Reitinpisteet</string>

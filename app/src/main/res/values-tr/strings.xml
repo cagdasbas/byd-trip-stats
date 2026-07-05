@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">Rejenerasyon modu kullanımı</string>
     <string name="mode_of_mode_attributed_trip">mod izlenen sürüşten</string>
     <string name="mode_recovered_via_regen">rejenerasyon yoluyla kurtarıldı</string>
-    <string name="mode_eco_normal_same">Bu yolculukta Eco ve Normal pratik olarak aynı performansı gösterdi, bu nedenle rota ve trafik seçilen sürüş modundan daha belirleyici oldu.</string>
-    <string name="mode_sport_more_than_normal">Bu yolculuktaki karşılaştırılabilir bölümlerde Sport, Normal\'den %1$s %2$s daha fazla tüketti.</string>
-    <string name="mode_high_regen_no_improvement">Bu yolculukta High regen, geri kazanılan enerjiyi önemli ölçüde artırmadı — fren fırsatları büyük olasılıkla regen ayarından daha belirleyici oldu.</string>
+    <string name="mode_drive_modes_same">%1$s ve %2$s bu seyahatte yaklaşık aynı enerjiyi kullandı, bu yüzden güzergah ve trafik sürüş modundan daha çok etkili oldu.</string>
+    <string name="mode_drive_more_efficient">%1$s bu seyahatte %3$s\'den %2$s%% daha az enerji kullandı — burada daha verimli seçim.</string>
+    <string name="mode_regen_modes_same">%1$s ve %2$s bu seyahatte yaklaşık aynı enerjiyi geri kazandı, bu yüzden frenleme fırsatları rejenerasyon ayarından daha çok etkili oldu.</string>
+    <string name="mode_regen_more">%1$s bu seyahatte %3$s\'den yaklaşık %2$s%% daha fazla enerji geri kazandı.</string>
     <string name="route_segments_label">Rota Segmentleri</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Ara noktalar</string>

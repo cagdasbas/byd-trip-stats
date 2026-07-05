@@ -1,15 +1,9 @@
 package com.byd.tripstats.ui.screens
 
 import android.content.SharedPreferences
-import android.widget.Toast
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +31,7 @@ import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.convertDistance
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.components.CompactBattery
 import com.byd.tripstats.ui.components.RangeDataPoint
 import com.byd.tripstats.ui.screens.dashboard.*
@@ -45,8 +39,6 @@ import com.byd.tripstats.ui.theme.AccelerationOrange
 import com.byd.tripstats.ui.theme.BatteryBlue
 import com.byd.tripstats.ui.theme.RegenGreen
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
-import com.byd.tripstats.data.entitlement.EntitlementManager
-import com.byd.tripstats.util.ScreenshotUtil
 import kotlinx.coroutines.launch
 
 private const val SHOW_MOCK_BUTTON = false  // Set to true for testing, false for production
@@ -62,7 +54,6 @@ fun DashboardScreen(
 ) {
     val telemetry by viewModel.displayTelemetry.collectAsState()
     val vehicleSnapshot by viewModel.displayVehicleSnapshot.collectAsState()
-    val isPro by EntitlementManager.isPro.collectAsState()
     val batteryVoltageHistory24h by viewModel.batteryVoltageHistory24h.collectAsState()
     val isMockModeActive by viewModel.isMockModeActive.collectAsState()
     val isInTrip by viewModel.isInTrip.collectAsState()
@@ -94,7 +85,6 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
     var showBattery12vDialog by remember { mutableStateOf(false) }
-    var showScreenshotFlash by remember { mutableStateOf(false) }
     var consumptionExpanded by remember { mutableStateOf(false) }
     var showTyreUnitDialog by remember { mutableStateOf(false) }
     val tyrePrefs: SharedPreferences = remember { context.getSharedPreferences("tyre_unit_prefs", 0) }
@@ -118,67 +108,18 @@ fun DashboardScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val logoInteractionSource = remember { MutableInteractionSource() }
-                        Image(
-                            painter = painterResource(id = R.drawable.byd_logo),
-                            contentDescription = "BYD — tap to save a screenshot",
-                            modifier = Modifier
-                                .height(28.dp)
-                                .clickable(
-                                    interactionSource = logoInteractionSource,
-                                    indication = null
-                                ) {
-                                    if (!isPro) {
-                                        Toast.makeText(
-                                            context,
-                                            context.getString(R.string.screenshots_pro_only),
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                        return@clickable
-                                    }
-                                    scope.launch {
-                                        try {
-                                            ScreenshotUtil.captureAndSave(
-                                                activity,
-                                                onCaptured = { showScreenshotFlash = true }
-                                            )
-                                        } catch (e: Exception) {
-                                            Toast.makeText(
-                                                context,
-                                                context.getString(R.string.screenshot_failed, e.message),
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    }
-                                }
-                        )
-                        Spacer(Modifier.width(8.dp))
+                    selectedCar?.let { car ->
                         Text(
-                            text = "trip stats",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
+                            text = car.displayName.uppercase(),
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier = Modifier.clickable { showCarSelectionDialog = true }
                         )
-
-                        selectedCar?.let { car ->
-                            VerticalDivider(
-                                modifier = Modifier
-                                    .padding(horizontal = 12.dp)
-                                    .height(24.dp),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f)
-                            )
-                            Text(
-                                text = car.displayName.uppercase(),
-                                color = MaterialTheme.colorScheme.secondary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                modifier = Modifier.clickable { showCarSelectionDialog = true }
-                            )
-                        }
                     }
                 },
+                navigationIcon = { BrandNavigationBar(showTrailingDivider = selectedCar != null) },
                 actions = {
                     if (SHOW_MOCK_BUTTON) {
                         IconButton(onClick = { viewModel.startMockDrive() }) {
@@ -309,11 +250,6 @@ fun DashboardScreen(
           }
         }
     }
-
-        ScreenshotFlash(
-            visible = showScreenshotFlash,
-            onFinished = { showScreenshotFlash = false }
-        )
     }
 
     telemetry?.let { currentTelemetry ->
@@ -427,21 +363,6 @@ fun DashboardScreen(
             }
         )
     }
-}
-
-@Composable
-private fun ScreenshotFlash(visible: Boolean, onFinished: () -> Unit) {
-    if (!visible) return
-    val alpha = remember { Animatable(0.9f) }
-    LaunchedEffect(Unit) {
-        alpha.animateTo(0f, animationSpec = tween(durationMillis = 320, easing = LinearEasing))
-        onFinished()
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White.copy(alpha = alpha.value))
-    )
 }
 
 @Composable

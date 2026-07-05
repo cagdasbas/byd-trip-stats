@@ -445,9 +445,10 @@
     <string name="regen_mode_usage_label">Utilisation du mode de récupération</string>
     <string name="mode_of_mode_attributed_trip">du trajet avec mode enregistré</string>
     <string name="mode_recovered_via_regen">récupéré par regen</string>
-    <string name="mode_eco_normal_same">Eco et Normal ont été pratiquement identiques sur ce trajet, donc l\'itinéraire et le trafic ont davantage compté que le mode de conduite sélectionné.</string>
-    <string name="mode_sport_more_than_normal">Sport a consommé %1$s %2$s de plus que Normal sur les segments comparables de ce trajet.</string>
-    <string name="mode_high_regen_no_improvement">High regen n\'a pas amélioré de manière significative l\'énergie récupérée sur ce trajet — les opportunités de freinage ont probablement joué un rôle plus important que le réglage regen.</string>
+    <string name="mode_drive_modes_same">%1$s et %2$s ont utilisé à peu près la même énergie sur ce trajet, donc l\'itinéraire et le trafic ont compté plus que le mode de conduite.</string>
+    <string name="mode_drive_more_efficient">%1$s a utilisé %2$s %% moins d\'énergie que %3$s sur ce trajet — le choix le plus efficace ici.</string>
+    <string name="mode_regen_modes_same">%1$s et %2$s ont récupéré à peu près la même énergie sur ce trajet, donc les occasions de freinage ont compté plus que le réglage de récupération.</string>
+    <string name="mode_regen_more">%1$s a récupéré environ %2$s %% plus d\'énergie que %3$s sur ce trajet.</string>
     <string name="route_segments_label">Segments d\'itinéraire</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Points de passage</string>

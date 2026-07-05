@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">Penggunaan mode regen</string>
     <string name="mode_of_mode_attributed_trip">dari perjalanan yang diatribusikan ke mode</string>
     <string name="mode_recovered_via_regen">dipulihkan via regen</string>
-    <string name="mode_eco_normal_same">Eco dan Normal praktis sama pada perjalanan ini, jadi rute dan lalu lintas lebih berpengaruh daripada mode berkendara yang dipilih.</string>
-    <string name="mode_sport_more_than_normal">Sport menggunakan %1$s %2$s lebih banyak daripada Normal pada segmen yang sebanding di perjalanan ini.</string>
-    <string name="mode_high_regen_no_improvement">High regen tidak secara berarti meningkatkan energi yang dipulihkan pada perjalanan ini, jadi peluang pengereman kemungkinan lebih berpengaruh daripada pengaturan regen.</string>
+    <string name="mode_drive_modes_same">%1$s dan %2$s menggunakan energi yang kurang lebih sama pada perjalanan ini, jadi rute dan lalu lintas lebih berpengaruh daripada mode berkendara.</string>
+    <string name="mode_drive_more_efficient">%1$s menggunakan energi %2$s%% lebih sedikit daripada %3$s pada perjalanan ini — pilihan yang lebih efisien di sini.</string>
+    <string name="mode_regen_modes_same">%1$s dan %2$s memulihkan energi yang kurang lebih sama pada perjalanan ini, jadi peluang pengereman lebih berpengaruh daripada pengaturan regen.</string>
+    <string name="mode_regen_more">%1$s memulihkan energi sekitar %2$s%% lebih banyak daripada %3$s pada perjalanan ini.</string>
     <string name="route_segments_label">Segmen Rute</string>
     <string name="segment_number_label">Segmen %1$s</string>
     <string name="waypoints_label">Titik jalan</string>

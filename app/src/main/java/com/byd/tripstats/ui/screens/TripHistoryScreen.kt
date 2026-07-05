@@ -1,5 +1,6 @@
 package com.byd.tripstats.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +24,7 @@ import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.repository.MergeEligibility
 import com.byd.tripstats.data.repository.MergeResult
 import com.byd.tripstats.ui.components.ApplyTagDialog
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel.TripSortOrder
@@ -62,40 +64,47 @@ fun TripHistoryScreen(
     var showApplyTagDialog      by remember { mutableStateOf(false) }
 
     val activeFilters = filterState.activeFilterCount
+    val onBackOrCancelSelection: () -> Unit = {
+        if (selectionMode) {
+            selectionMode = false
+            selectedTrips = setOf()
+        } else {
+            onNavigateBack()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(stringResource(R.string.nav_trip_history), fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.nav_trip_history), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable(onClick = onBackOrCancelSelection)
+                        )
                         if (!selectionMode) {
-                            Spacer(modifier = Modifier.width(4.dp))
+                            VerticalDivider(
+                                modifier = Modifier.height(14.dp),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Text(
                                 stringResource(R.string.session_history_hint),
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (selectionMode) {
-                            selectionMode = false
-                            selectedTrips = setOf()
-                        } else {
-                            onNavigateBack()
+                    BrandNavigationBar {
+                        IconButton(onClick = onBackOrCancelSelection) {
+                            Icon(
+                                imageVector = if (selectionMode) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (selectionMode) stringResource(R.string.cancel) else stringResource(R.string.back),
+                                modifier = Modifier.size(32.dp)
+                            )
                         }
-                    }) {
-                        Icon(
-                            imageVector = if (selectionMode) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = if (selectionMode) stringResource(R.string.cancel) else stringResource(R.string.back),
-                            modifier = Modifier.size(28.dp)
-                        )
                     }
                 },
                 actions = {

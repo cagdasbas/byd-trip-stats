@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">回收模式使用情况</string>
     <string name="mode_of_mode_attributed_trip">的行程（按模式统计）</string>
     <string name="mode_recovered_via_regen">通过制动回收</string>
-    <string name="mode_eco_normal_same">在这次行程中，Eco 和 Normal 模式效果几乎相同，说明路线和交通状况比所选驾驶模式更重要。</string>
-    <string name="mode_sport_more_than_normal">在这次行程的可比路段上，Sport 比 Normal 多消耗了 %1$s %2$s。</string>
-    <string name="mode_high_regen_no_improvement">在这次行程中，High regen 没有明显提高制动回收能量，制动机会很可能比 regen 设置更重要。</string>
+    <string name="mode_drive_modes_same">%1$s和%2$s在本次行程中消耗的能量大致相同，因此路线和路况的影响比驾驶模式更大。</string>
+    <string name="mode_drive_more_efficient">%1$s在本次行程中比%3$s少消耗了%2$s%%的能量——这里更高效的选择。</string>
+    <string name="mode_regen_modes_same">%1$s和%2$s在本次行程中回收的能量大致相同，因此制动机会的影响比回收设置更大。</string>
+    <string name="mode_regen_more">%1$s在本次行程中比%3$s多回收了约%2$s%%的能量。</string>
     <string name="route_segments_label">路线段</string>
     <string name="segment_number_label">第 %1$s 段</string>
     <string name="waypoints_label">途经点</string>

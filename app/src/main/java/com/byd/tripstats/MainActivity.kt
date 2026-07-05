@@ -49,6 +49,7 @@ import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.ThemeMode
 import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.ui.components.ScreenshotFlashOverlay
 import com.byd.tripstats.ui.navigation.AppNavigation
 import com.byd.tripstats.ui.screens.InitializationScreen
 import com.byd.tripstats.ui.theme.BydTripStatsTheme
@@ -239,6 +240,8 @@ class MainActivity : ComponentActivity() {
                             viewModel = viewModel
                         )
                     }
+
+                    ScreenshotFlashOverlay()
                 }
             }
         }

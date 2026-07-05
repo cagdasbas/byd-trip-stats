@@ -3,6 +3,7 @@ package com.byd.tripstats.ui.screens
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,7 @@ import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
 import androidx.compose.ui.res.stringResource
 import com.byd.tripstats.R
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.min
@@ -63,18 +65,26 @@ fun TripGoalsScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(stringResource(R.string.trip_goals_title), fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.trip_goals_title), fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onNavigateBack() })
+                        VerticalDivider(
+                            modifier = Modifier.height(14.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text(stringResource(R.string.track_milestones_subtitle),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
+                    BrandNavigationBar {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
-                            modifier = Modifier.size(28.dp))
+                            modifier = Modifier.size(32.dp))
+                    }
                     }
                 },
                 actions = {

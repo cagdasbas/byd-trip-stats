@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import com.byd.tripstats.R
 import com.byd.tripstats.data.config.CarCatalog
 import com.byd.tripstats.data.config.CarConfig
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +69,7 @@ fun InitializationScreen(
                         fontWeight = FontWeight.Bold
                     )
                 },
+                navigationIcon = { BrandNavigationBar() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )

@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">Sử dụng chế độ tái tạo</string>
     <string name="mode_of_mode_attributed_trip">của chuyến đi được gán theo chế độ</string>
     <string name="mode_recovered_via_regen">thu hồi qua tái tạo</string>
-    <string name="mode_eco_normal_same">Eco và Normal thực chất giống nhau trong chuyến đi này, nên lộ trình và giao thông quan trọng hơn chế độ lái đã chọn.</string>
-    <string name="mode_sport_more_than_normal">Sport dùng nhiều hơn Normal %1$s %2$s trên các đoạn tương đương trong chuyến đi này.</string>
-    <string name="mode_high_regen_no_improvement">High regen không cải thiện đáng kể năng lượng thu hồi trong chuyến đi này, nên cơ hội phanh có lẽ quan trọng hơn cài đặt tái tạo.</string>
+    <string name="mode_drive_modes_same">%1$s và %2$s đã dùng năng lượng gần bằng nhau trong chuyến đi này, nên tuyến đường và giao thông ảnh hưởng nhiều hơn chế độ lái.</string>
+    <string name="mode_drive_more_efficient">%1$s đã dùng ít hơn %2$s%% năng lượng so với %3$s trong chuyến đi này — lựa chọn hiệu quả hơn ở đây.</string>
+    <string name="mode_regen_modes_same">%1$s và %2$s đã thu hồi năng lượng gần bằng nhau trong chuyến đi này, nên cơ hội phanh ảnh hưởng nhiều hơn cài đặt tái tạo.</string>
+    <string name="mode_regen_more">%1$s đã thu hồi nhiều hơn khoảng %2$s%% năng lượng so với %3$s trong chuyến đi này.</string>
     <string name="route_segments_label">Đoạn Lộ trình</string>
     <string name="segment_number_label">Đoạn %1$s</string>
     <string name="waypoints_label">Điểm mốc</string>

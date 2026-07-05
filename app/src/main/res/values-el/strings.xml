@@ -443,11 +443,12 @@
     <string name="mode_regen_label">Ανάκτηση</string>
     <string name="drive_mode_usage_label">Χρήση λειτουργίας οδήγησης</string>
     <string name="regen_mode_usage_label">Χρήση λειτουργίας ανάκτησης</string>
-    <string name="mode_of_mode_attributed_trip">της διαδρομής με καταγεγραμμένο τρόπο</string>
+    <string name="mode_of_mode_attributed_trip">της διαδρομής με την συγκεκριμένη λειτουργία</string>
     <string name="mode_recovered_via_regen">ανακτήθηκε μέσω αναγέννησης</string>
-    <string name="mode_eco_normal_same">Στη διαδρομή αυτή, Eco και Normal ήταν ουσιαστικά ίδια, οπότε η διαδρομή και η κίνηση μέτρησαν περισσότερο από τον επιλεγμένο τρόπο οδήγησης.</string>
-    <string name="mode_sport_more_than_normal">Sport χρησιμοποίησε %1$s %2$s περισσότερο από Normal σε συγκρίσιμα τμήματα αυτής της διαδρομής.</string>
-    <string name="mode_high_regen_no_improvement">High regen δεν βελτίωσε ουσιαστικά την ανακτημένη ενέργεια στη διαδρομή αυτή — οι ευκαιρίες πέδησης πιθανότατα επηρέασαν περισσότερο από τη ρύθμιση regen.</string>
+    <string name="mode_drive_modes_same">%1$s και %2$s χρησιμοποίησαν περίπου την ίδια ενέργεια στη διαδρομή αυτή, οπότε η διαδρομή και η κίνηση μέτρησαν περισσότερο από τον τρόπο οδήγησης.</string>
+    <string name="mode_drive_more_efficient">%1$s χρησιμοποίησε %2$s%% λιγότερη ενέργεια από %3$s στη διαδρομή αυτή — η πιο αποδοτική επιλογή εδώ.</string>
+    <string name="mode_regen_modes_same">%1$s και %2$s ανέκτησαν περίπου την ίδια ενέργεια στη διαδρομή αυτή, οπότε οι ευκαιρίες πέδησης μέτρησαν περισσότερο από τη ρύθμιση regen.</string>
+    <string name="mode_regen_more">%1$s ανέκτησε περίπου %2$s%% περισσότερη ενέργεια από %3$s στη διαδρομή αυτή.</string>
     <string name="route_segments_label">Τμήματα διαδρομής</string>
     <string name="segment_number_label">Τμήμα %1$s</string>
     <string name="waypoints_label">Σημεία διαδρομής</string>

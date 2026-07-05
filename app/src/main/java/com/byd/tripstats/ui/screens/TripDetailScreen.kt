@@ -1,5 +1,6 @@
 package com.byd.tripstats.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +19,7 @@ import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.isImperial
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.components.ManageTripTagsDialog
 import com.byd.tripstats.ui.components.RouteAnalysisTab
 import com.byd.tripstats.ui.components.TagChip
@@ -67,10 +69,17 @@ fun TripDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.nav_trip_details), fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        stringResource(R.string.nav_trip_details), fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onNavigateBack() }
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(28.dp))
+                    BrandNavigationBar {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(32.dp))
+                        }
                     }
                 },
                 actions = {

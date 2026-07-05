@@ -445,9 +445,10 @@
     <string name="regen_mode_usage_label">การใช้โหมดชาร์จคืน</string>
     <string name="mode_of_mode_attributed_trip">ของการเดินทางที่บันทึกโหมด</string>
     <string name="mode_recovered_via_regen">ที่ดึงคืนผ่าน regen</string>
-    <string name="mode_eco_normal_same">Eco และ Normal ให้ผลเหมือนกันในทางปฏิบัติในการเดินทางนี้ ดังนั้นเส้นทางและการจราจรมีความสำคัญมากกว่าโหมดขับขี่ที่เลือก</string>
-    <string name="mode_sport_more_than_normal">Sport ใช้พลังงาน %1$s %2$s มากกว่า Normal ในส่วนที่เทียบเคียงได้ของการเดินทางนี้</string>
-    <string name="mode_high_regen_no_improvement">High regen ไม่ได้ปรับปรุงพลังงานที่ดึงคืนได้อย่างมีนัยสำคัญในการเดินทางนี้ โอกาสในการเบรกน่าจะสำคัญกว่าการตั้งค่า regen</string>
+    <string name="mode_drive_modes_same">%1$s และ %2$s ใช้พลังงานใกล้เคียงกันในการเดินทางนี้ เส้นทางและการจราจรจึงมีผลมากกว่าโหมดการขับ</string>
+    <string name="mode_drive_more_efficient">%1$s ใช้พลังงานน้อยกว่า %3$s อยู่ %2$s%% ในการเดินทางนี้ — ตัวเลือกที่มีประสิทธิภาพมากกว่าที่นี่</string>
+    <string name="mode_regen_modes_same">%1$s และ %2$s ดึงพลังงานคืนใกล้เคียงกันในการเดินทางนี้ โอกาสในการเบรกจึงมีผลมากกว่าการตั้งค่า regen</string>
+    <string name="mode_regen_more">%1$s ดึงพลังงานคืนมากกว่า %3$s ประมาณ %2$s%% ในการเดินทางนี้</string>
     <string name="route_segments_label">ส่วนของเส้นทาง</string>
     <string name="segment_number_label">ส่วน %1$s</string>
     <string name="waypoints_label">จุดแวะพัก</string>

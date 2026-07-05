@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">Regentilstandsbrug</string>
     <string name="mode_of_mode_attributed_trip">af turen med modussporing</string>
     <string name="mode_recovered_via_regen">genvundet via regen</string>
-    <string name="mode_eco_normal_same">Eco og Normal ydede praktisk talt det samme på denne tur, så rute og trafik betød mere end den valgte køremodus.</string>
-    <string name="mode_sport_more_than_normal">Sport brugte %1$s %2$s mere end Normal over sammenlignelige strækninger på denne tur.</string>
-    <string name="mode_high_regen_no_improvement">High regen forbedrede ikke væsentligt den genvundne energi på denne tur — bremsmuligheder var sandsynligvis vigtigere end regen-indstillingen.</string>
+    <string name="mode_drive_modes_same">%1$s og %2$s brugte cirka samme mængde energi på denne tur, så rute og trafik betød mere end køretilstanden.</string>
+    <string name="mode_drive_more_efficient">%1$s brugte %2$s %% mindre energi end %3$s på denne tur — det mest effektive valg her.</string>
+    <string name="mode_regen_modes_same">%1$s og %2$s genvandt cirka samme mængde energi på denne tur, så bremsemuligheder betød mere end regenindstillingen.</string>
+    <string name="mode_regen_more">%1$s genvandt cirka %2$s %% mere energi end %3$s på denne tur.</string>
     <string name="route_segments_label">Rutesegmenter</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Vejpunkter</string>

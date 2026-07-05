@@ -1,6 +1,7 @@
 package com.byd.tripstats.ui.screens.dashboard
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -18,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
@@ -26,6 +28,7 @@ import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.sdk.VehicleTelemetrySnapshot
 import androidx.compose.ui.res.stringResource
 import com.byd.tripstats.R
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.theme.BatteryBlue
 import com.byd.tripstats.ui.theme.MotorViolet
@@ -94,18 +97,28 @@ internal fun Battery12vHistoryDialog(
             Column(modifier = Modifier.fillMaxSize()) {
                 TopAppBar(
                     title = {
-                        Column {
-                            Text(stringResource(R.string.hv_12v_history_title))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                stringResource(R.string.hv_12v_history_title), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable(onClick = onDismiss)
+                            )
+                            VerticalDivider(
+                                modifier = Modifier.height(14.dp),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Text(
                                 stringResource(R.string.battery_history_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
+                                fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Filled.Close, contentDescription = "Close")
+                        BrandNavigationBar {
+                            IconButton(onClick = onDismiss) {
+                                Icon(Icons.Filled.Close, contentDescription = "Close", modifier = Modifier.size(32.dp))
+                            }
                         }
                     }
                 )

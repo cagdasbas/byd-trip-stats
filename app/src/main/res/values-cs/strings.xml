@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">Využití rekuperačních režimů</string>
     <string name="mode_of_mode_attributed_trip">jízdy přiřazené režimům</string>
     <string name="mode_recovered_via_regen">získáno rekuperací</string>
-    <string name="mode_eco_normal_same">Eco a Normal byly na této jízdě prakticky stejné, takže trasa a provoz hrály větší roli než zvolený jízdní režim.</string>
-    <string name="mode_sport_more_than_normal">Sport spotřeboval o %1$s %2$s více než Normal na srovnatelných úsecích této jízdy.</string>
-    <string name="mode_high_regen_no_improvement">High regen na této jízdě výrazně nezlepšil získanou energii, takže příležitosti k brzdění hrály zřejmě větší roli než nastavení rekuperace.</string>
+    <string name="mode_drive_modes_same">%1$s a %2$s spotřebovaly na této jízdě přibližně stejné množství energie, takže trasa a provoz měly větší vliv než jízdní režim.</string>
+    <string name="mode_drive_more_efficient">%1$s spotřeboval o %2$s %% méně energie než %3$s na této jízdě — zde efektivnější volba.</string>
+    <string name="mode_regen_modes_same">%1$s a %2$s získaly na této jízdě přibližně stejné množství energie rekuperací, takže příležitosti k brzdění měly větší vliv než nastavení rekuperace.</string>
+    <string name="mode_regen_more">%1$s získal na této jízdě přibližně o %2$s %% více energie rekuperací než %3$s.</string>
     <string name="route_segments_label">Úseky trasy</string>
     <string name="segment_number_label">Úsek %1$s</string>
     <string name="waypoints_label">Body trasy</string>

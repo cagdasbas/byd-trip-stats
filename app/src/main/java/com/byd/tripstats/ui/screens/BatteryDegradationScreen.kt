@@ -1,6 +1,7 @@
 package com.byd.tripstats.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.R
 import com.byd.tripstats.data.entitlement.EntitlementManager
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.util.BatteryHealthReport
@@ -48,17 +50,27 @@ fun BatteryDegradationScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(stringResource(R.string.battery_degradation_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.battery_degradation_title), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onNavigateBack() }
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(14.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text(stringResource(R.string.soh_over_time_subtitle), fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
+                  BrandNavigationBar {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
-                            modifier = Modifier.size(28.dp))
+                            modifier = Modifier.size(32.dp))
                     }
+                  }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer

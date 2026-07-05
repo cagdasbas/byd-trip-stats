@@ -445,9 +445,10 @@
     <string name="regen_mode_usage_label">회생 모드 사용</string>
     <string name="mode_of_mode_attributed_trip">모드 기록 주행의</string>
     <string name="mode_recovered_via_regen">회생을 통해 회수됨</string>
-    <string name="mode_eco_normal_same">이번 주행에서 Eco와 Normal은 사실상 동일한 결과를 보였으며, 선택한 주행 모드보다 경로와 교통 상황이 더 중요하게 작용했습니다.</string>
-    <string name="mode_sport_more_than_normal">이번 주행의 비교 가능한 구간에서 Sport는 Normal보다 %1$s %2$s 더 소비했습니다.</string>
-    <string name="mode_high_regen_no_improvement">이번 주행에서 High regen은 회수 에너지를 크게 향상시키지 못했으며, 제동 기회가 regen 설정보다 더 중요하게 작용했을 가능성이 높습니다.</string>
+    <string name="mode_drive_modes_same">이 주행에서 %1$s와(과) %2$s는 비슷한 에너지를 사용했으므로, 경로와 교통 상황이 주행 모드보다 더 큰 영향을 미쳤습니다.</string>
+    <string name="mode_drive_more_efficient">이 주행에서 %1$s는(은) %3$s보다 에너지를 %2$s%% 적게 사용했습니다 — 여기서는 더 효율적인 선택입니다.</string>
+    <string name="mode_regen_modes_same">이 주행에서 %1$s와(과) %2$s는 비슷한 에너지를 회수했으므로, 제동 기회가 회생 설정보다 더 큰 영향을 미쳤습니다.</string>
+    <string name="mode_regen_more">이 주행에서 %1$s는(은) %3$s보다 약 %2$s%% 더 많은 에너지를 회수했습니다.</string>
     <string name="route_segments_label">경로 구간</string>
     <string name="segment_number_label">구간 %1$s</string>
     <string name="waypoints_label">경유지</string>

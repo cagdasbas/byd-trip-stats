@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">Regeneratiemodusgebruik</string>
     <string name="mode_of_mode_attributed_trip">van de rit met modusregistratie</string>
     <string name="mode_recovered_via_regen">teruggewonnen via regen</string>
-    <string name="mode_eco_normal_same">Eco en Normal presteerden op deze rit vrijwel hetzelfde, dus route en verkeer waren bepalender dan de gekozen rijmodus.</string>
-    <string name="mode_sport_more_than_normal">Sport verbruikte %1$s %2$s meer dan Normal over vergelijkbare segmenten op deze rit.</string>
-    <string name="mode_high_regen_no_improvement">High regen heeft de teruggewonnen energie op deze rit niet merkbaar verbeterd — rijomstandigheden met remkansen waren waarschijnlijk bepalender dan de regen-instelling.</string>
+    <string name="mode_drive_modes_same">%1$s en %2$s gebruikten ongeveer evenveel energie tijdens deze rit, dus route en verkeer telden zwaarder dan de rijmodus.</string>
+    <string name="mode_drive_more_efficient">%1$s gebruikte %2$s %% minder energie dan %3$s tijdens deze rit — hier de efficiëntere keuze.</string>
+    <string name="mode_regen_modes_same">%1$s en %2$s wonnen ongeveer evenveel energie terug tijdens deze rit, dus remkansen telden zwaarder dan de regeneratie-instelling.</string>
+    <string name="mode_regen_more">%1$s won ongeveer %2$s %% meer energie terug dan %3$s tijdens deze rit.</string>
     <string name="route_segments_label">Routesegmenten</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Waypoints</string>

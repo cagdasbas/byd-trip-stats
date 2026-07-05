@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">回生モード使用状況</string>
     <string name="mode_of_mode_attributed_trip">のモード記録走行</string>
     <string name="mode_recovered_via_regen">回生ブレーキで回収</string>
-    <string name="mode_eco_normal_same">このトリップではEcoとNormalは実質的に同じでした。選択したドライブモードよりも、ルートと交通状況の方が消費量に影響しました。</string>
-    <string name="mode_sport_more_than_normal">このトリップの比較可能な区間で、SportはNormalより%1$s %2$s多く消費しました。</string>
-    <string name="mode_high_regen_no_improvement">このトリップでは、High regen は回収エネルギーを大幅に改善しませんでした — regen 設定よりも制動機会の方が影響が大きかった可能性があります。</string>
+    <string name="mode_drive_modes_same">このトリップでは%1$sと%2$sの消費エネルギーはほぼ同じだったため、ルートや交通状況の方がドライブモードより影響しました。</string>
+    <string name="mode_drive_more_efficient">このトリップでは%1$sは%3$sより%2$s%%少ないエネルギーで走行しました — こちらがより効率的な選択です。</string>
+    <string name="mode_regen_modes_same">このトリップでは%1$sと%2$sの回収エネルギーはほぼ同じだったため、ブレーキの機会の方が回生設定より影響しました。</string>
+    <string name="mode_regen_more">このトリップでは%1$sは%3$sより約%2$s%%多くのエネルギーを回収しました。</string>
     <string name="route_segments_label">ルートセグメント</string>
     <string name="segment_number_label">セグメント %1$s</string>
     <string name="waypoints_label">ウェイポイント</string>

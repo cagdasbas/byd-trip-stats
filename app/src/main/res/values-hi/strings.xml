@@ -445,9 +445,10 @@
     <string name="regen_mode_usage_label">रीजेन मोड उपयोग</string>
     <string name="mode_of_mode_attributed_trip">मोड-रिकॉर्ड की गई यात्रा का</string>
     <string name="mode_recovered_via_regen">रेजेन के माध्यम से पुनः प्राप्त</string>
-    <string name="mode_eco_normal_same">इस यात्रा में Eco और Normal प्रभावी रूप से समान थे, इसलिए मार्ग और यातायात ने चुने गए ड्राइव मोड से अधिक मायने रखा।</string>
-    <string name="mode_sport_more_than_normal">इस यात्रा के तुलनीय खंडों में Sport ने Normal की तुलना में %1$s %2$s अधिक उपयोग किया।</string>
-    <string name="mode_high_regen_no_improvement">इस यात्रा में High regen ने पुनः प्राप्त ऊर्जा में कोई उल्लेखनीय सुधार नहीं किया — ब्रेकिंग के अवसर regen सेटिंग से अधिक महत्वपूर्ण थे।</string>
+    <string name="mode_drive_modes_same">%1$s और %2$s ने इस यात्रा में लगभग समान ऊर्जा का उपयोग किया, इसलिए रूट और ट्रैफ़िक का असर ड्राइव मोड से ज़्यादा रहा।</string>
+    <string name="mode_drive_more_efficient">%1$s ने इस यात्रा में %3$s की तुलना में %2$s%% कम ऊर्जा का उपयोग किया — यहाँ यह अधिक कुशल विकल्प रहा।</string>
+    <string name="mode_regen_modes_same">%1$s और %2$s ने इस यात्रा में लगभग समान ऊर्जा पुनः प्राप्त की, इसलिए ब्रेकिंग के अवसरों का असर रीजेन सेटिंग से ज़्यादा रहा।</string>
+    <string name="mode_regen_more">%1$s ने इस यात्रा में %3$s की तुलना में लगभग %2$s%% अधिक ऊर्जा पुनः प्राप्त की।</string>
     <string name="route_segments_label">मार्ग खंड</string>
     <string name="segment_number_label">खंड %1$s</string>
     <string name="waypoints_label">वेपॉइंट</string>

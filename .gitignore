@@ -15,3 +15,9 @@ private-telemetry-*.aar
 MD
 # Auto-generated from root CHANGELOG.md by the syncChangelog Gradle task
 app/src/main/assets/changelog.md
+# Cloud and local LLMs
+.claude
+.opencode
+.vscode
+graphify-out
+AGENTS.md

@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">Использование режимов рекуперации</string>
     <string name="mode_of_mode_attributed_trip">поездки с атрибуцией режимов</string>
     <string name="mode_recovered_via_regen">возвращено рекуперацией</string>
-    <string name="mode_eco_normal_same">Eco и Normal в этой поездке были практически одинаковы, поэтому маршрут и трафик значили больше, чем выбранный режим вождения.</string>
-    <string name="mode_sport_more_than_normal">Sport израсходовал на %1$s %2$s больше, чем Normal, на сопоставимых участках этой поездки.</string>
-    <string name="mode_high_regen_no_improvement">High regen существенно не улучшил возврат энергии в этой поездке, поэтому возможности для торможения, вероятно, значили больше, чем настройка рекуперации.</string>
+    <string name="mode_drive_modes_same">%1$s и %2$s израсходовали примерно одинаковое количество энергии в этой поездке, поэтому маршрут и трафик повлияли больше, чем режим вождения.</string>
+    <string name="mode_drive_more_efficient">%1$s израсходовал на %2$s%% меньше энергии, чем %3$s, в этой поездке — более эффективный выбор здесь.</string>
+    <string name="mode_regen_modes_same">%1$s и %2$s вернули примерно одинаковое количество энергии в этой поездке, поэтому возможности торможения повлияли больше, чем настройка рекуперации.</string>
+    <string name="mode_regen_more">%1$s вернул примерно на %2$s%% больше энергии, чем %3$s, в этой поездке.</string>
     <string name="route_segments_label">Участки маршрута</string>
     <string name="segment_number_label">Участок %1$s</string>
     <string name="waypoints_label">Точки маршрута</string>

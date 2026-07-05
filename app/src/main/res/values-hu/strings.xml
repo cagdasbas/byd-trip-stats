@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">Rekuperációs módok használata</string>
     <string name="mode_of_mode_attributed_trip">a módokhoz rendelt útból</string>
     <string name="mode_recovered_via_regen">rekuperációval visszanyerve</string>
-    <string name="mode_eco_normal_same">Az Eco és a Normal gyakorlatilag ugyanolyan volt ezen az úton, így az útvonal és a forgalom többet számított, mint a választott vezetési mód.</string>
-    <string name="mode_sport_more_than_normal">A Sport %1$s %2$s-tal többet fogyasztott a Normalnál az út összehasonlítható szakaszain.</string>
-    <string name="mode_high_regen_no_improvement">A High regen nem javította érdemben a visszanyert energiát ezen az úton, így a fékezési lehetőségek valószínűleg többet számítottak, mint a rekuperációs beállítás.</string>
+    <string name="mode_drive_modes_same">%1$s és %2$s ezen az úton nagyjából ugyanannyi energiát használt, így az útvonal és a forgalom többet számított, mint a vezetési mód.</string>
+    <string name="mode_drive_more_efficient">%1$s ezen az úton %2$s%%-kal kevesebb energiát használt, mint %3$s — itt ez a hatékonyabb választás.</string>
+    <string name="mode_regen_modes_same">%1$s és %2$s ezen az úton nagyjából ugyanannyi energiát nyert vissza, így a fékezési lehetőségek többet számítottak, mint a rekuperációs beállítás.</string>
+    <string name="mode_regen_more">%1$s ezen az úton nagyjából %2$s%%-kal több energiát nyert vissza, mint %3$s.</string>
     <string name="route_segments_label">Útszakaszok</string>
     <string name="segment_number_label">%1$s. szakasz</string>
     <string name="waypoints_label">Útpontok</string>

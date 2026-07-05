@@ -445,9 +445,10 @@
     <string name="regen_mode_usage_label">Rekuperationsmodusnutzung</string>
     <string name="mode_of_mode_attributed_trip">der modusbehafteten Fahrt</string>
     <string name="mode_recovered_via_regen">durch Rekuperation gewonnen</string>
-    <string name="mode_eco_normal_same">Eco und Normal haben auf dieser Fahrt praktisch dasselbe geleistet, sodass Strecke und Verkehr mehr beeinflussten als der gewählte Fahrmodus.</string>
-    <string name="mode_sport_more_than_normal">Sport verbrauchte %1$s %2$s mehr als Normal über vergleichbare Abschnitte auf dieser Fahrt.</string>
-    <string name="mode_high_regen_no_improvement">High regen hat die zurückgewonnene Energie auf dieser Fahrt nicht wesentlich verbessert — Bremsmöglichkeiten waren wahrscheinlich entscheidender als die Rekuperationseinstellung.</string>
+    <string name="mode_drive_modes_same">%1$s und %2$s haben auf dieser Fahrt etwa gleich viel Energie verbraucht — Strecke und Verkehr waren also entscheidender als der Fahrmodus.</string>
+    <string name="mode_drive_more_efficient">%1$s hat auf dieser Fahrt %2$s %% weniger Energie verbraucht als %3$s — hier die effizientere Wahl.</string>
+    <string name="mode_regen_modes_same">%1$s und %2$s haben auf dieser Fahrt etwa gleich viel Energie zurückgewonnen — Bremsgelegenheiten waren also entscheidender als die Rekuperationseinstellung.</string>
+    <string name="mode_regen_more">%1$s hat auf dieser Fahrt etwa %2$s %% mehr Energie zurückgewonnen als %3$s.</string>
     <string name="route_segments_label">Routensegmente</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Wegpunkte</string>

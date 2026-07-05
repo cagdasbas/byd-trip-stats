@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">Utilizarea modurilor de regenerare</string>
     <string name="mode_of_mode_attributed_trip">din călătoria atribuită modurilor</string>
     <string name="mode_recovered_via_regen">recuperat prin regenerare</string>
-    <string name="mode_eco_normal_same">Eco și Normal au fost practic identice în această călătorie, deci traseul și traficul au contat mai mult decât modul de condus ales.</string>
-    <string name="mode_sport_more_than_normal">Sport a consumat cu %1$s %2$s mai mult decât Normal pe segmente comparabile în această călătorie.</string>
-    <string name="mode_high_regen_no_improvement">High regen nu a îmbunătățit semnificativ energia recuperată în această călătorie, deci ocaziile de frânare au contat probabil mai mult decât setarea de regenerare.</string>
+    <string name="mode_drive_modes_same">%1$s și %2$s au consumat aproximativ aceeași energie în această călătorie, deci traseul și traficul au contat mai mult decât modul de condus.</string>
+    <string name="mode_drive_more_efficient">%1$s a consumat cu %2$s%% mai puțină energie decât %3$s în această călătorie — alegerea mai eficientă aici.</string>
+    <string name="mode_regen_modes_same">%1$s și %2$s au recuperat aproximativ aceeași energie în această călătorie, deci ocaziile de frânare au contat mai mult decât setarea de regenerare.</string>
+    <string name="mode_regen_more">%1$s a recuperat cu aproximativ %2$s%% mai multă energie decât %3$s în această călătorie.</string>
     <string name="route_segments_label">Segmente de traseu</string>
     <string name="segment_number_label">Segmentul %1$s</string>
     <string name="waypoints_label">Puncte de traseu</string>

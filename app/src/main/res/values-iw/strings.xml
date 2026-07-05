@@ -493,9 +493,10 @@
     <string name="regen_mode_usage_label">שימוש במצבי ריקופרציה</string>
     <string name="mode_of_mode_attributed_trip">מהנסיעה המשויכת למצבים</string>
     <string name="mode_recovered_via_regen">הוחזר בריקופרציה</string>
-    <string name="mode_eco_normal_same">Eco ו-Normal היו למעשה זהים בנסיעה זו, כך שהמסלול והתנועה השפיעו יותר ממצב הנהיגה שנבחר.</string>
-    <string name="mode_sport_more_than_normal">Sport צרך %1$s %2$s יותר מ-Normal בקטעים דומים בנסיעה זו.</string>
-    <string name="mode_high_regen_no_improvement">High regen לא שיפר משמעותית את האנרגיה שהוחזרה בנסיעה זו, כך שהזדמנויות הבלימה כנראה השפיעו יותר מהגדרת הריקופרציה.</string>
+    <string name="mode_drive_modes_same">%1$s ו-%2$s צרכו כמות אנרגיה דומה בנסיעה זו, כך שהמסלול והתנועה השפיעו יותר ממצב הנהיגה.</string>
+    <string name="mode_drive_more_efficient">%1$s צרך %2$s%% פחות אנרגיה מ-%3$s בנסיעה זו — הבחירה היעילה יותר כאן.</string>
+    <string name="mode_regen_modes_same">%1$s ו-%2$s החזירו כמות אנרגיה דומה בנסיעה זו, כך שהזדמנויות הבלימה השפיעו יותר מהגדרת הריקופרציה.</string>
+    <string name="mode_regen_more">%1$s החזיר כ-%2$s%% יותר אנרגיה מ-%3$s בנסיעה זו.</string>
     <string name="route_segments_label">קטעי מסלול</string>
     <string name="segment_number_label">קטע %1$s</string>
     <string name="waypoints_label">נקודות ציון</string>

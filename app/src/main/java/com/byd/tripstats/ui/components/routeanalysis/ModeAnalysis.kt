@@ -28,6 +28,7 @@ import com.byd.tripstats.ui.components.hasTripModeData
 import com.byd.tripstats.ui.components.regenModeColor
 import com.byd.tripstats.ui.components.regenModeLabel
 import kotlin.math.abs
+import kotlin.math.max
 
 internal data class ModeSummary(
     val label: String,
@@ -53,14 +54,15 @@ internal fun ModeInsightsCard(
     val regenSummaries = remember(dataPoints, trip) {
         buildRegenModeSummaries(dataPoints = dataPoints, trip = trip)
     }
-    val strEcoNormalSame        = stringResource(R.string.mode_eco_normal_same)
-    val strSportMoreFmt         = stringResource(R.string.mode_sport_more_than_normal)
-    val strHighRegenNoImprove   = stringResource(R.string.mode_high_regen_no_improvement)
-    val insights: List<String> = remember(driveSummaries, regenSummaries, useImperial,
-        strEcoNormalSame, strSportMoreFmt, strHighRegenNoImprove) {
+    val strDriveSameFmt         = stringResource(R.string.mode_drive_modes_same)
+    val strDriveMoreEfficient   = stringResource(R.string.mode_drive_more_efficient)
+    val strRegenSameFmt         = stringResource(R.string.mode_regen_modes_same)
+    val strRegenMoreFmt         = stringResource(R.string.mode_regen_more)
+    val insights: List<String> = remember(driveSummaries, regenSummaries,
+        strDriveSameFmt, strDriveMoreEfficient, strRegenSameFmt, strRegenMoreFmt) {
         buildList {
-            compareDriveModes(driveSummaries, useImperial, strEcoNormalSame, strSportMoreFmt)?.let(::add)
-            compareRegenModes(regenSummaries, strHighRegenNoImprove)?.let(::add)
+            compareDriveModes(driveSummaries, strDriveSameFmt, strDriveMoreEfficient)?.let(::add)
+            compareRegenModes(regenSummaries, strRegenSameFmt, strRegenMoreFmt)?.let(::add)
         }
     }
 
@@ -323,49 +325,63 @@ private fun buildModeSummaries(
         .sortedByDescending { it.distanceKm }
 }
 
+/**
+ * Compares whichever two drive modes were actually driven the most on this trip, purely from
+ * measured consumption — no assumption about which mode "should" be more efficient (you can drive
+ * Eco hard or Sport gently, so the data leads). Whenever two modes each cover a meaningful distance
+ * there is always an insight; a single mode yields none.
+ */
 private fun compareDriveModes(
     summaries: List<ModeSummary>,
-    useImperial: Boolean = false,
-    ecoNormalSameStr: String,
-    sportMoreFmt: String
+    driveSameFmt: String,
+    driveMoreEfficientFmt: String
 ): String? {
-    val eco    = summaries.firstOrNull { it.label == "Eco"    && it.distanceKm >= 1.0 }
-    val normal = summaries.firstOrNull { it.label == "Normal" && it.distanceKm >= 1.0 }
-    val sport  = summaries.firstOrNull { it.label == "Sport"  && it.distanceKm >= 1.0 }
+    val ranked = summaries
+        .filter { it.distanceKm >= 1.0 && it.consumptionKwhPer100Km != null }
+        .sortedByDescending { it.distanceKm }
+    if (ranked.size < 2) return null
 
-    if (eco != null && normal != null &&
-        eco.consumptionKwhPer100Km != null && normal.consumptionKwhPer100Km != null
-    ) {
-        val diffPct = ((eco.consumptionKwhPer100Km - normal.consumptionKwhPer100Km) / normal.consumptionKwhPer100Km) * 100.0
-        if (abs(diffPct) < 5.0) {
-            return ecoNormalSameStr
-        }
-    }
+    val a = ranked[0]
+    val b = ranked[1]
+    val ca = a.consumptionKwhPer100Km!!
+    val cb = b.consumptionKwhPer100Km!!
+    val higher = max(ca, cb)
+    if (higher <= 0.0) return null
 
-    if (sport != null && normal != null &&
-        sport.consumptionKwhPer100Km != null && normal.consumptionKwhPer100Km != null
-    ) {
-        val delta = sport.consumptionKwhPer100Km - normal.consumptionKwhPer100Km
-        if (delta > 1.0) {
-            val deltaDisplay = if (useImperial) delta / 0.621371 else delta
-            val unit = if (useImperial) "kWh/100mi" else "kWh/100km"
-            return sportMoreFmt.format(String.format("%.1f", deltaDisplay), unit)
-        }
+    val diffPct = (abs(ca - cb) / higher) * 100.0
+    if (diffPct < 5.0) {
+        return driveSameFmt.format(a.label, b.label)
     }
-    return null
+    val lower = if (ca < cb) a else b
+    val higherMode = if (ca < cb) b else a
+    return driveMoreEfficientFmt.format(lower.label, String.format("%.0f", diffPct), higherMode.label)
 }
 
-private fun compareRegenModes(summaries: List<ModeSummary>, highRegenNoImprovementStr: String): String? {
-    val standard = summaries.firstOrNull { it.label == "Standard" && it.distanceKm >= 1.0 }
-    val high     = summaries.firstOrNull { it.label == "High"     && it.distanceKm >= 1.0 }
+/**
+ * Compares the two most-driven regen modes on this trip by measured regen share — again data-led,
+ * so "High" is only reported as better when it actually recovered more here. Any two modes with a
+ * meaningful distance always produce an insight.
+ */
+private fun compareRegenModes(
+    summaries: List<ModeSummary>,
+    regenSameFmt: String,
+    regenMoreFmt: String
+): String? {
+    val ranked = summaries
+        .filter { it.distanceKm >= 1.0 && it.regenSharePct != null }
+        .sortedByDescending { it.distanceKm }
+    if (ranked.size < 2) return null
 
-    if (high != null && standard != null &&
-        high.regenSharePct != null && standard.regenSharePct != null
-    ) {
-        val delta = high.regenSharePct - standard.regenSharePct
-        if (delta < 2.0) {
-            return highRegenNoImprovementStr
-        }
+    val a = ranked[0]
+    val b = ranked[1]
+    val ra = a.regenSharePct!!
+    val rb = b.regenSharePct!!
+
+    val delta = abs(ra - rb)
+    if (delta < 2.0) {
+        return regenSameFmt.format(a.label, b.label)
     }
-    return null
+    val more = if (ra > rb) a else b
+    val less = if (ra > rb) b else a
+    return regenMoreFmt.format(more.label, String.format("%.0f", delta), less.label)
 }

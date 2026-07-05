@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">Uso do modo de regeneração</string>
     <string name="mode_of_mode_attributed_trip">da viagem com modo registrado</string>
     <string name="mode_recovered_via_regen">recuperado por regen</string>
-    <string name="mode_eco_normal_same">Eco e Normal foram praticamente iguais nesta viagem, então a rota e o tráfego importaram mais do que o modo de condução selecionado.</string>
-    <string name="mode_sport_more_than_normal">Sport usou %1$s %2$s a mais do que Normal em segmentos comparáveis nesta viagem.</string>
-    <string name="mode_high_regen_no_improvement">High regen não melhorou materialmente a energia recuperada nesta viagem, então as oportunidades de frenagem provavelmente importaram mais do que a configuração de regen.</string>
+    <string name="mode_drive_modes_same">%1$s e %2$s consumiram cerca da mesma energia nesta viagem, então a rota e o trânsito importaram mais do que o modo de condução.</string>
+    <string name="mode_drive_more_efficient">%1$s consumiu %2$s%% menos energia do que %3$s nesta viagem — a escolha mais eficiente aqui.</string>
+    <string name="mode_regen_modes_same">%1$s e %2$s recuperaram cerca da mesma energia nesta viagem, então as oportunidades de frenagem importaram mais do que a configuração de regeneração.</string>
+    <string name="mode_regen_more">%1$s recuperou cerca de %2$s%% mais energia do que %3$s nesta viagem.</string>
     <string name="route_segments_label">Segmentos da rota</string>
     <string name="segment_number_label">Segmento %1$s</string>
     <string name="waypoints_label">Pontos de passagem</string>

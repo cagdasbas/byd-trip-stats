@@ -35,6 +35,7 @@ import com.byd.tripstats.data.preferences.convertEfficiency
 import com.byd.tripstats.data.preferences.distanceUnit
 import androidx.compose.ui.res.stringResource
 import com.byd.tripstats.R
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import java.text.SimpleDateFormat
@@ -55,17 +56,27 @@ fun RoutesScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(stringResource(R.string.routes_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.routes_title), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onNavigateBack() }
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(14.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text(stringResource(R.string.recurring_journeys_subtitle),
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
+                  BrandNavigationBar {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
-                            modifier = Modifier.size(28.dp))
+                            modifier = Modifier.size(32.dp))
                     }
+                  }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer

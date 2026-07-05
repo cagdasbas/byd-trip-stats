@@ -1,5 +1,6 @@
 package com.byd.tripstats.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.byd.tripstats.R
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.ChargingYellow
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.ui.screens.charginghistory.*
@@ -40,6 +42,14 @@ fun ChargingHistoryScreen(
     var selectedSessions by remember { mutableStateOf(setOf<Long>()) }
     var selectionMode by remember { mutableStateOf(false) }
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
+    val onBackOrCancelSelection: () -> Unit = {
+        if (selectionMode) {
+            selectionMode = false
+            selectedSessions = setOf()
+        } else {
+            onNavigateBack()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -52,43 +62,38 @@ fun ChargingHistoryScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
                                 stringResource(R.string.charging_history_title),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable(onClick = onBackOrCancelSelection)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            VerticalDivider(
+                                modifier = Modifier.height(14.dp),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Text(
                                 stringResource(R.string.session_history_hint),
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (selectionMode) {
-                                selectionMode = false
-                                selectedSessions = setOf()
-                            } else {
-                                onNavigateBack()
-                            }
-                        }
-                    ) {
+                    BrandNavigationBar {
+                    IconButton(onClick = onBackOrCancelSelection) {
                     Icon(
                         imageVector =
                             if (selectionMode) Icons.Filled.Close
                             else Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription =
                             if (selectionMode) stringResource(R.string.cancel) else stringResource(R.string.back),
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(32.dp)
                     )
+                    }
                     }
                 },
                 actions = {

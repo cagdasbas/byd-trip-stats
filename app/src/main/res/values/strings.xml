@@ -496,9 +496,10 @@
     <string name="regen_mode_usage_label">Regen mode usage</string>
     <string name="mode_of_mode_attributed_trip">of mode-attributed trip</string>
     <string name="mode_recovered_via_regen">recovered via regen</string>
-    <string name="mode_eco_normal_same">Eco and Normal were effectively the same on this trip, so route and traffic mattered more than the selected drive mode.</string>
-    <string name="mode_sport_more_than_normal">Sport used %1$s %2$s more than Normal over comparable segments in this trip.</string>
-    <string name="mode_high_regen_no_improvement">High regen did not materially improve recovered energy on this trip, so braking opportunities likely mattered more than the regen setting.</string>
+    <string name="mode_drive_modes_same">%1$s and %2$s used about the same energy on this trip, so route and traffic mattered more than the drive mode.</string>
+    <string name="mode_drive_more_efficient">%1$s used %2$s%% less energy than %3$s on this trip — the more efficient choice here.</string>
+    <string name="mode_regen_modes_same">%1$s and %2$s recovered about the same energy on this trip, so braking opportunities mattered more than the regen setting.</string>
+    <string name="mode_regen_more">%1$s recovered about %2$s%% more energy than %3$s on this trip.</string>
     <string name="route_segments_label">Route Segments</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Waypoints</string>
