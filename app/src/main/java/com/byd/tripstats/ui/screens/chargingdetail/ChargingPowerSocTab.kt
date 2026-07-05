@@ -23,7 +23,7 @@ internal fun ChargingPowerSocTab(
         dataPoints  = dataPoints,
         isSynthetic = isSynthetic,
         title       = chargePowerLabel,
-        yAxisLabel  = "Power (kW)",
+        yAxisLabel  = "kW",
         socSource   = socSource,
         xAxisMode   = xAxisMode,
         onXAxisModeChange = onXAxisModeChange,

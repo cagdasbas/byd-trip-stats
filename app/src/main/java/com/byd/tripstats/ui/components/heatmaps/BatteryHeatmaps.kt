@@ -47,8 +47,8 @@ internal fun BatteryTempVsPowerHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Battery Temp (°C)",
-        yAxisLabel = "Power (kW)",
+        xAxisLabel = stringResource(R.string.heatmap_axis_battery_temp),
+        yAxisLabel = stringResource(R.string.heatmap_axis_power),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -139,7 +139,7 @@ internal fun SocVsRegenHeatmap(
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
         xAxisLabel = "SOC (%)",
-        yAxisLabel = "Regen Power (kW)",
+        yAxisLabel = stringResource(R.string.heatmap_axis_regen_power),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -184,7 +184,7 @@ internal fun CellVoltageSpreadVsSocHeatmap(
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins, "%.3f"),
         xAxisLabel = "SOC (%)",
-        yAxisLabel = "Cell Spread (V)",
+        yAxisLabel = stringResource(R.string.heatmap_axis_cell_spread),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         yValueFmt  = { "%.3f".format(it) },
         yTickWidth = 70f,

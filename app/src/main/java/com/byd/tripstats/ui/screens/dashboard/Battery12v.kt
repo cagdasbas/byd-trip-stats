@@ -195,6 +195,7 @@ private fun Battery12vHistoryChart(
     var touchPos by remember { mutableStateOf<Offset?>(null) }
     val strChargingSample = stringResource(R.string.legend_charging_sample)
     val strDriveSample = stringResource(R.string.legend_drive_sample)
+    val strNow = stringResource(R.string.label_now)
 
     Card(
         modifier = modifier,
@@ -293,7 +294,7 @@ private fun Battery12vHistoryChart(
                     val label = if (tick == nowMs) {
                         timeFormatter.format(Date(tick))
                     } else {
-                        "now - ${((nowMs - tick) / 3_600_000L)}h"
+                        "$strNow - ${((nowMs - tick) / 3_600_000L)}h"
                     }
                     nc.drawText(label, x, size.height - 10f, labelPaint)
                 }

@@ -115,6 +115,11 @@ private enum class InstrumentTyrePressureEncoding {
 data class VehicleTelemetrySnapshot(
     val isChargingActive: Boolean = false,
     val chargingPower: Double = 0.0,
+    /** True when [chargingPower] came from the capacity-rate tier (NET energy into the cells, which
+     *  under-reports the charger's gross output). False when it came from a gross getter
+     *  (instrument getChargePower / m33) — those are decimal-accurate and match the BYD app, so the
+     *  whole-kW enginePower fallback must NOT override them. */
+    val chargingPowerIsNet: Boolean = false,
     val chargingPowerRaw: Double = 0.0,
     val chargingCapacity: Double = 0.0,
     val chargingCapState: Int = 0,
@@ -380,6 +385,10 @@ data class VehicleTelemetrySnapshot(
         // charge), so a value can't latch a phantom after the car powers off.
         // chargingPower is taken straight from the pack reading so DC sessions get a real power
         // curve instead of the 0 kW the listener path records when it can't see the magnitude.
+        // Pack power for the charging magnitude. On the Seal this is only available as a whole-kW
+        // integer (getEnginePower / m23); the decimal-precise sources — getChargingPower (m33),
+        // the Power device V/I (m50) and total voltage (m37) — all read 0/null on this firmware,
+        // so the charge power is quantized to whole kW here (a ~6.1 kW charge reports 6).
         val packPowerKw = enginePower ?: 0
         val parkedBev = gear == "P" && carConfig?.isPhev != true
         val dcChargeInferred = parkedBev &&
@@ -391,21 +400,25 @@ data class VehicleTelemetrySnapshot(
             chargingPower > 0.0 ||
             dcChargeInferred
 
-        // Charging-power magnitude. While parked and charging (BEV), enginePower is the pack's own
-        // V×I reading — the true rate energy enters the battery. The dedicated charging-power getters
-        // under-report badly on several firmwares: the Seal's capacity-derived value read ~3.3 kW for
-        // a charge whose pack power was −5 kW, and an Atto 3 reported a flat ~2 kW for a ~4 kW charge
-        // (independently confirmed by its wall socket at 4.6 kW). enginePower tracks the real rate and
-        // even follows aux draw — it correctly drops when the AC compressor runs. So whenever power is
-        // flowing into the pack while parked-charging, prefer the pack reading over the dedicated
-        // getter; fall back to the getter only when enginePower isn't showing a charge (e.g. car fully
-        // off → the pack getter reads idle, and off-state charging is reconstructed from SoC anyway).
-        // This subsumes the DC case above; kwhAdded still comes from the SoC delta, so the energy
-        // total is unaffected — only the live/recorded power curve and the MQTT charging_power sensor.
+        // Charging-power magnitude. Source priority:
+        //   1. chargingPower from a GROSS getter (instrument getChargePower / m33) — decimal-accurate
+        //      and matches the BYD app (e.g. the Seal reads 6.14 kW). chargingPowerIsNet is false here,
+        //      so it wins outright; never override an accurate decimal with the whole-kW enginePower.
+        //   2. enginePower (pack V×I, whole-kW) — used when chargingPower is either absent (the
+        //      DC-charge-while-on wedge: listener silent, isChargingActive false, chargingPower 0 —
+        //      enginePower is the only surviving signal) OR is the capacity-rate NET value, which
+        //      under-reports the charger's gross output badly on some firmware (an Atto 3 reported a
+        //      flat ~2 kW for a ~4 kW charge, wall socket confirmed 4.6 kW). enginePower tracks the
+        //      real gross rate and even follows aux draw (it dips when the AC compressor runs).
+        //   3. chargingPower (net) as a last resort when enginePower shows no charge (e.g. car fully
+        //      off → pack getter idle; off-state charging is reconstructed from SoC anyway).
+        // kwhAdded still comes from the SoC delta, so energy totals are unaffected regardless — only
+        // the live/recorded power curve and the MQTT charging_power sensor.
         val packChargeKw = if (chargingActive && parkedBev && packPowerKw < 0) -packPowerKw.toDouble() else 0.0
         val inferredChargingPower = when {
-            packChargeKw > 0.0 -> packChargeKw
-            chargingPower > 0.0 -> chargingPower
+            chargingPower > 0.0 && !chargingPowerIsNet -> chargingPower  // gross getter — accurate, keep decimals
+            packChargeKw > 0.0 -> packChargeKw                           // enginePower gross fallback
+            chargingPower > 0.0 -> chargingPower                         // capacity-net, only if enginePower absent
             else -> 0.0
         }
 
@@ -5081,10 +5094,15 @@ class BydVehicleDataSource(context: Context) {
             recentCapacityActivity -> _chargingPowerKw.value  // capacity-rate = NET into battery (see note above)
             else -> 0.0
         }
+        // Only the capacity-rate tier is NET (under-reports); the pack/direct getters are gross and
+        // decimal-accurate. toTelemetry uses this to know when the whole-kW enginePower fallback is
+        // allowed to override chargingPower (net) vs. must defer to it (gross getter).
+        val chargingPowerFromNet = !recentPackPower && !recentDirectPower && recentCapacityActivity
         _vehicleSnapshot.value = VehicleTelemetrySnapshot(
             wifiSsid = currentWifiSsid(),
             isChargingActive = computeChargingActive(),
             chargingPower = effectiveChargingPowerKw,
+            chargingPowerIsNet = chargingPowerFromNet,
             chargingPowerRaw = _chargingPowerRaw.value,
             chargingCapacity = _chargingCapacity.value,
             chargingCapState = _chargingCapState.value,

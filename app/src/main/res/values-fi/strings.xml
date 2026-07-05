@@ -54,7 +54,7 @@
     <string name="tab_analysis">Analyysi</string>
     <string name="tab_power">Teho</string>
     <string name="tab_voltage">Jännite</string>
-    <string name="tab_cell_voltage">Kenno V</string>
+    <string name="tab_cell_voltage">Kennot</string>
     <string name="tab_temperature">Lämpötila</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">Kuvakaappaus epäonnistui: %1$s</string>
     <string name="ev_range_label">EV-kantama</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">Nopeus</string>
+    <string name="stat_range">Toimintamatka</string>
+    <string name="label_time">Aika</string>
+    <string name="label_now">nyt</string>
+    <string name="chart_hv_battery_voltage">HV-akkujännite</string>
+    <string name="cell_low_label">Matalin</string>
+    <string name="cell_high_label">Korkein</string>
+    <string name="crosshair_cell_high">Korkein %.3f V</string>
+    <string name="crosshair_cell_low">Matalin %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">AIKA</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">Ajodynamiikka</string>
     <string name="stat_odometer">Matkamittari</string>
     <string name="stat_total_discharge">Kokonaislataus</string>
+    <string name="stat_total_consumed">Yhteensä kulutettu</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">Lopeta</string>
@@ -197,8 +207,8 @@
     <string name="stat_duration">Kesto</string>
     <string name="stat_avg_consumption">Keskikulutus</string>
     <string name="stat_energy_consumed">Kulutettu energia</string>
-    <string name="stat_max_regen">Maksimiregen.</string>
-    <string name="stat_regen_eff">Regen. teho.</string>
+    <string name="stat_max_regen">Maksimiregen</string>
+    <string name="stat_regen_eff">Regen tehokkuus</string>
     <string name="stat_avg_speed">Keskinopeus</string>
     <string name="stat_max_speed">Huippunopeus</string>
     <string name="stat_soc_panel">SoC (Paneeli)</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">Vie matkatiedot</string>
     <string name="export_copy_summary">Kopioi yhteenveto leikepöydälle</string>
-    <string name="export_save_downloads">Tallenna Lataukset-kansioon</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">Tallenna CSV:nä</string>
     <string name="export_save_json">Tallenna JSON:na</string>
     <string name="export_save_html">Tallenna HTML-katselimena (avaa kaksoisnapsauttamalla)</string>
@@ -283,7 +293,7 @@
     <string name="soc_end_label">SoC lopussa</string>
     <string name="soc_added_label">SoC lisätty</string>
     <string name="kwh_added_label">kWh lisätty</string>
-    <string name="battery_car_label">Akku (auto)</string>
+    <string name="battery_car_label">Akku (HV)</string>
     <string name="peak_power_label">Huipputeho</string>
     <string name="average_power_label">Keskiteho</string>
     <string name="charge_rate_label">Lataustahti</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">Analysoituja matkoja</string>
     <string name="decline_rate_label">Rappeutumisnopeus</string>
     <string name="projected_80_label">Ennustettu 80%%:iin</string>
+    <string name="soh_not_declining">Ei laskua</string>
+    <string name="soh_far_future">Kaukainen tulevaisuus</string>
     <string name="soh_history_section">SoH-historia</string>
     <string name="legend_recorded">Tallennettu</string>
     <string name="legend_trend">Trendi</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">Vinkki: BYD:n takuu kattaa akun 70%%:n SoH:iin asti 8 vuodeksi / 250 000 km.</string>
     <string name="battery_health_report_title">Akun terveysraportti</string>
     <string name="battery_report_desc">Vie raportti akun terveyden tilasta, rappeutumisnopeudesta ja 80%%-ennusteesta — hyödyllinen todiste myytäessä autoa tai esitettäessä takuuvaatimus. Tallennetaan Lataukset/BydTripStats/:iin tulostusvalmiina PDF:nä tai HTML:nä (avautuu missä tahansa selaimessa). Luotu kokonaan laitteella.</string>
+    <string name="battery_report_warranty_note">BYD:n akkutakuu kattaa akun yleensä 70% State of Health -tasoon asti 8 vuoden / 250 000 km ajan. Tarkat ehdot löytyvät ajoneuvosi takuukirjasta.</string>
+    <string name="battery_report_exclusion_note">Jättää pois %1$d aiempaa matkaa, jotka on tallennettu ennen %2$s vanhalla arviointimenetelmällä, joka aliarvioi State of Healthin.</string>
+    <string name="report_saved_msg">Raportti tallennettu: %1$s</string>
+    <string name="report_failed_msg">Raportti epäonnistui: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">Akkudatan aikaväli</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">Kausianalyysi</string>
-    <string name="winter_vs_summer_subtitle">Talven ja kesän tehokkuusvertailu</string>
+    <string name="winter_vs_summer_subtitle">Talven ja kesän kulutusvertailu</string>
     <string name="no_seasonal_data">Ei kausikohtaista dataa vielä</string>
     <string name="complete_seasons_hint">Suorita matkoja useilla vuodenajoilla nähdäksesi kuinka lämpötila vaikuttaa kantamaasi.</string>
     <string name="avg_consumption_by_season">Keskikulutus kausittain</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">Reitit</string>
-    <string name="recurring_journeys_subtitle">Toistuvat matkat &amp; tehokkuus</string>
+    <string name="recurring_journeys_subtitle">Toistuvat matkat &amp; kulutus</string>
     <string name="no_recurring_routes">Ei toistuvia reittejä vielä</string>
-    <string name="recurring_route_hint">Aja sama matka vähintään 3 kertaa — kuten päivittäinen työmatkasi — ja se ilmestyy tänne jotta voit vertailla tehokkuutta eri matkoilla.</string>
+    <string name="recurring_route_hint">Aja sama matka vähintään 3 kertaa — kuten päivittäinen työmatkasi — ja se ilmestyy tänne jotta voit vertailla kulutusta eri matkoilla.</string>
     <string name="route_best">paras</string>
     <string name="route_worst">heikoin</string>
     <string name="route_avg">ka.</string>
-    <string name="efficiency_trend_label">Tehokkuus per matka (vanhin → uusin)</string>
+    <string name="efficiency_trend_label">Kulutus per matka (vanhin → uusin)</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">Tavoitteet &amp; henkilökohtaiset ennätykset</string>
     <string name="track_milestones_subtitle">Seuraa ajomilestoonejasi</string>
     <string name="set_goals_action">Aseta tavoitteet</string>
     <string name="personal_bests_section">Henkilökohtaiset ennätykset</string>
-    <string name="best_efficiency_label">Paras tehokkuus</string>
+    <string name="best_efficiency_label">Paras kulutus</string>
     <string name="lowest_ever_label">Kaikkien aikojen alin tallennettu</string>
     <string name="longest_trip_label">Pisin matka</string>
     <string name="longest_trip_subtitle">Yhden matkan pituus</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">Tavoitteet</string>
     <string name="no_goals_set">Ei tavoitteita asetettu vielä</string>
     <string name="set_goals_hint">Napauta ✏️ yllä asettaaksesi kulutus- tai matkatavoitteen.</string>
-    <string name="efficiency_target_label">Tehokkuustavoite</string>
+    <string name="efficiency_target_label">Kulutustavoite</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s (viim. 5 matkan ka.)</string>
     <string name="monthly_distance_goal_label">Kuukausittainen matka</string>
     <string name="monthly_distance_subtitle">%1$s / %2$s %3$s tässä kuussa</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">Tunnisteet</string>
-    <string name="per_tag_efficiency">Tehokkuus &amp; kokonaismäärät tunnisteittain</string>
+    <string name="per_tag_efficiency">Kulutus &amp; kokonaismäärät tunnisteittain</string>
     <string name="no_tags_yet">Ei tunnisteita vielä</string>
     <string name="tag_usage_hint">Lisää tunniste matkalle sen tietonäytöltä tai merkitse useita kerralla historian valintatilastausta. Merkityt matkat on tiivistetty tänne.</string>
     <string name="rename_tag_title">Nimeä tunniste uudelleen</string>
@@ -410,8 +426,8 @@
 
     <!-- Local Backup screen -->
     <string name="backup_restore_title">Tietokannan varmuuskopio &amp; palautus</string>
-    <string name="backup_to_download_label">Varmuuskopio Latauksiin</string>
-    <string name="backup_download_desc">Tallentaa koko matkatietokannan kohteeseen: Lataukset/BydTripStats/byd_stats_backup_PÄIVÄ.db</string>
+    <string name="backup_to_download_label">Varmuuskopio Download-kansioon</string>
+    <string name="backup_download_desc">Tallentaa koko matkatietokannan kohteeseen: Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">Tee varmuuskopio nyt</string>
     <string name="backup_to_sd_label">Varmuuskopio SD-kortille</string>
     <string name="sd_backup_desc">Tallentaa kopion tietokannasta BydTripStats-kansioon SD-kortille. Toisin kuin Lataukset-varmuuskopio, nämä selviävät sovelluksen asennuksen poistamisesta — laitteen ulkopuolinen redundanssi jonka voit ottaa ulos ja lukea tietokoneella.</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">Regenerointi</string>
     <string name="drive_mode_usage_label">Ajotilan käyttö</string>
     <string name="regen_mode_usage_label">Regenerointitilan käyttö</string>
+    <string name="mode_of_mode_attributed_trip">tilarekisteröidystä matkasta</string>
+    <string name="mode_recovered_via_regen">talteen otettu regeneraatiolla</string>
+    <string name="mode_eco_normal_same">Eco ja Normaali tuottivat käytännössä saman tuloksen tällä matkalla, joten reitti ja liikenne vaikuttivat enemmän kuin valittu ajotila.</string>
+    <string name="mode_sport_more_than_normal">Sport kulutti %1$s %2$s enemmän kuin Normal vastaavilla osuuksilla tällä matkalla.</string>
+    <string name="mode_high_regen_no_improvement">High regen ei parantanut merkittävästi talteen otettua energiaa tällä matkalla — jarrutusmahdollisuudet vaikuttivat todennäköisesti enemmän kuin regen-asetus.</string>
     <string name="route_segments_label">Reitinsegmentit</string>
     <string name="segment_number_label">Segmentti %1$s</string>
     <string name="waypoints_label">Reitinpisteet</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">Hetkellinen kulutus</string>
     <string name="chart_drive_regen_modes">Ajo- / regenerointitilat</string>
     <string name="chart_mode_timeline">Tilojen aikajana matkan aikana</string>
+    <string name="heatmap_mode_filters">Tilasuodattimet</string>
+    <string name="heatmap_legend_few">Vähän</string>
+    <string name="heatmap_legend_many">Paljon</string>
+    <string name="heatmap_legend_density">Värin intensiteetti = näytetiheys (log-asteikko)</string>
+    <string name="heatmap_axis_speed">Nopeus (%1$s)</string>
+    <string name="heatmap_axis_power">Teho (kW)</string>
+    <string name="heatmap_axis_regen_power">Regen. teho (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">Etumoottori RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">Takamoottori RPM</string>
+    <string name="heatmap_axis_motor_rpm">Moottori RPM</string>
+    <string name="heatmap_axis_accel">Kiihtyvyys (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">Vuorokaudenaika</string>
+    <string name="heatmap_axis_battery_temp">Akun lämpötila (°C)</string>
+    <string name="heatmap_axis_cell_spread">Kennojen hajonta (V)</string>
+    <string name="heatmap_axis_gradient">Kaltevuus (%)</string>
+    <string name="heatmap_axis_front_rpm">Etu-RPM</string>
+    <string name="heatmap_axis_rear_rpm">Taka-RPM</string>
+    <string name="heatmap_axis_avg_tyre_pressure">Keski. rengaspaine (PSI)</string>
+    <string name="mode_no_data">Tälle matkalle ei ole tallennettu ajo- tai regenerointitilaa.</string>
+    <string name="mode_enable_hint">Ota käyttöön ajotila tai regenerointitila nähdäksesi aikajanan.</string>
+    <string name="mode_drive_lane_title">Ajotila</string>
+    <string name="mode_regen_lane_title">Regenerointitila</string>
+    <string name="mode_drive_modes_label">Ajotilat</string>
+    <string name="mode_regen_modes_label">Regenerointitilat</string>
     <string name="chart_speed_detailed">Nopeusprofiili (yksityiskohtainen)</string>
     <string name="chart_rpm_detailed">Moottorin RPM (yksityiskohtainen)</string>
     <string name="chart_power_detailed">Tehoprofiili (yksityiskohtainen)</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">Ei dataa saatavilla</string>
     <string name="chart_insufficient_data">Riittämätön data</string>
     <string name="chart_not_enough_driving">Ei tarpeeksi ajodataa hetkelliselle kulutukselle</string>
-    <string name="chart_weekly_consumption">Viikkokulutus</string>
-    <string name="chart_monthly_consumption">Kuukausikulutus</string>
-    <string name="chart_yearly_consumption">Vuosikulutus</string>
+    <string name="chart_weekly_consumption">Tällä viikolla</string>
+    <string name="chart_monthly_consumption">Tässä kuussa</string>
+    <string name="chart_yearly_consumption">Tänä vuonna</string>
     <string name="chart_your_duration_avg">Oma keston ka. (%1$s %2$s)</string>
     <string name="chart_selected_car_avg">Valitun auton ka. (%1$s %2$s)</string>
     <string name="chart_close">Sulje kaavio</string>
     <string name="chart_no_data_yet">Ei dataa vielä</string>
     <string name="chart_instant_label">Hetkellinen</string>
     <string name="chart_avg_5pt">5 pisteen keskiarvo</string>
+    <string name="chart_into_trip">matkalla</string>
     <string name="chart_no_motor_data">Ei moottoritietoja saatavilla</string>
     <string name="chart_motor_smoothed_note">Hyvin lyhyet akselipurskeet saattavat näkyä tasoitettuina — katso yksityiskohdat koko näytöltä</string>
     <string name="legend_rear_motor">Takamoottori</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh ajan kuluessa</string>
-    <string name="axis_soc_over_time">SoC%% ajan kuluessa</string>
+    <string name="axis_soc_over_time">SoC% ajan kuluessa</string>
     <string name="axis_speed_over_time">%1$s ajan kuluessa</string>
     <string name="axis_rpm_over_time">RPM ajan kuluessa</string>
     <string name="axis_altitude_over_time">Korkeus ajan kuluessa</string>
     <string name="axis_power_over_time">kW ajan kuluessa</string>
     <string name="axis_hv_cells">HV-väylä + kennon min/max (V)</string>
-    <string name="axis_tyre_wheels">Kaikki neljä pyörää (bar)</string>
-    <string name="axis_consumption_distance">%1$s matkan kuluessa</string>
+    <string name="axis_tyre_wheels">Kaikki neljä pyörää</string>
+    <string name="axis_consumption_distance">%1$s ajan kuluessa</string>
     <string name="axis_mode_timeline">Tilojen aikajana matkan aikana</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">Latausteho</string>
     <string name="charging_chart_cell_voltage">Kennon jännite</string>
     <string name="charging_chart_avg_temp">Ka.</string>
-    <string name="charging_chart_cell_min_temp">Kennon min</string>
-    <string name="charging_chart_cell_max_temp">Kennon max</string>
+    <string name="charging_chart_cell_min_temp">Matalin</string>
+    <string name="chart_cells_voltage_axis">Kennot (V)</string>
+    <string name="charging_chart_cell_max_temp">Korkein</string>
     <string name="charging_chart_hv_bus">HV-väylä (V)</string>
-    <string name="charging_chart_cell_min">Kennon min (V)</string>
-    <string name="charging_chart_cell_max">Kennon max (V)</string>
+    <string name="charging_chart_cell_min">Kennon min. jännite (V)</string>
+    <string name="charging_chart_cell_max">Kennon maks. jännite (V)</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
     <string name="charging_chart_panel_soc">Paneeli SoC</string>
     <string name="wheel_lf">VE</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">Teho vs nopeus</string>
     <string name="heatmap_power_vs_speed_desc">Moottorin teho eri nopeuksilla — näyttää missä auto todella toimii</string>
     <string name="heatmap_consumption_vs_speed">Kulutus vs nopeus</string>
-    <string name="heatmap_consumption_vs_speed_desc">Hetkellinen tehokkuus (%1$s) koko nopeusalueella</string>
+    <string name="heatmap_consumption_vs_speed_desc">Hetkellinen kulutus (%1$s) koko nopeusalueella</string>
     <string name="heatmap_regen_vs_speed">Regenerointiteho vs nopeus</string>
     <string name="heatmap_regen_vs_speed_desc">Regeneratiivisen jarrutuksen voimakkuus nopeuskaistalla</string>
     <string name="heatmap_front_rpm_vs_speed">Etumoottorin RPM vs nopeus</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">Kiihtyvyys vs nopeus</string>
     <string name="heatmap_accel_desc">Missä kuljettaja kiihdyttää voimakkaasti tai liukuu — pienempi on tehokkaampaa</string>
     <string name="heatmap_soc_vs_consumption">SoC vs kulutus</string>
-    <string name="heatmap_soc_consumption_desc">Muuttuuko tehokkuus matalilla tai korkeilla lataustiloilla</string>
+    <string name="heatmap_soc_consumption_desc">Muuttuuko kulutus matalilla tai korkeilla lataustiloilla</string>
     <string name="heatmap_time_vs_speed">Vuorokaudenaika vs nopeus</string>
     <string name="heatmap_time_speed_desc">Milloin ja kuinka nopeasti ajat — paljastaa ruuhkahuippujen kuviot</string>
     <string name="heatmap_gradient_vs_consumption">Kaltevuus vs kulutus</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">Etu- vs takamoottorin RPM</string>
     <string name="heatmap_awd_desc">AWD-vääntömomentin jakautuminen — diagonaali = tasainen osuus, diagonaalin ulkopuolella = yksi moottori hallitsee</string>
     <string name="heatmap_tyre_vs_consumption">Rengaspaine vs kulutus</string>
-    <string name="heatmap_tyre_desc">Parantaako korkeampi paine mitattavasti tehokkuutta autossasi</string>
+    <string name="heatmap_tyre_desc">Vähentääkö korkeampi paine mitattavasti kulutusta autossasi</string>
     <string name="heatmap_soc_vs_regen">SoC vs regenerointitehokkuus</string>
     <string name="heatmap_soc_regen_desc">Missä BMS rajoittaa regeneratiivista jarrutusta — odotettavissa lähellä 100%% SoC:ia</string>
     <string name="heatmap_speed_vs_temp">Nopeus vs akun lämpötila</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">Ei akun lämpötiladataa tallennettu tällä matkalla.</string>
     <string name="heatmap_no_mode">Ei %1$s-tilaa tallennettu — tulevilla matkoilla napauta jokaista tilaa auton näytöllä kerran ottaaksesi analytiikan käyttöön.</string>
     <string name="chart_no_route_data">Ei reittitietoja saatavilla</string>
+    <string name="map_no_gps_recorded">GPS-koordinaatit näkyvät tässä kun ne on tallennettu</string>
+    <string name="map_no_valid_gps">Ei kelvollisia GPS-tietoja tällä matkalla</string>
+    <string name="map_traffic_label">Liikenne</string>
+    <string name="map_traffic_free_flow">Sujuva liikenne  (≥ %1$s)</string>
+    <string name="map_traffic_light">Vähän liikennettä  (%1$s)</string>
+    <string name="map_traffic_heavy">Ruuhkaa  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">Energiapisteet</string>
+    <string name="route_energy_hotspots_desc">Segmentit joilla on korkein energiankulutus</string>
+    <string name="route_trip_timeline">Matkan aikajana</string>
+    <string name="route_trip_started">Matka aloitettu</string>
+    <string name="route_hard_acceleration">Kova kiihdytys</string>
+    <string name="route_hard_braking">Kova jarrutus</string>
+    <string name="route_trip_ended">Matka päättynyt</string>
+    <string name="stat_one_trip">1 matka</string>
+    <string name="stat_n_trips">%1$d matkaa</string>
+    <string name="season_vs_ref">%1$s vs. ref.</string>
+    <string name="season_stat_km_total">%1$s km yhteensä</string>
+    <string name="season_stat_kwh_used">%1$s kWh käytetty</string>
+    <string name="season_stat_avg_temp">keskim. %1$s°C</string>
+    <string name="route_distance_label">%1$s %2$s reitti</string>
+    <string name="route_instance_trips">%1$d matkaa · %2$s</string>
+    <string name="route_avg_unit">keskim. %1$s</string>
+    <string name="schedule_daily">Päivittäin</string>
+    <string name="schedule_weekly">Viikoittain</string>
+    <string name="schedule_monthly">Kuukausittain</string>
+    <string name="danger_zone_title">VAARAVYÖHYKE</string>
+    <string name="danger_zone_desc">Poistaa pysyvästi kaikki matkat, datapisteet ja tilastot. Paikallinen varmuuskopio luodaan automaattisesti ennen nollauksen suorittamista.</string>
+    <string name="send_diag_log_desc">Lähettää koko diagnoosilokin (speed-stall ja \'telemetrian päivitys jumissa\'-tapahtumat) suoraan yhdistettyyn Telegram-bottiisi — mitään ei tallenneta tai jaeta paikallisesti. Yhdistä ensin botti kohdassa Backup &amp; Restore → Telegram Backup.</string>
+    <string name="compat_privacy_notice_body">Raportti tallentaa raakaarvoja jokaisesta auton head unitin tietolähteestä — numeeriset arvot, merkkijonot ja taulukot.\n\nGPS-leveyttä ja -pituutta EI sisällytetä.\n\nKaikki muu sisällytetään: akun tila, moottorin tiedot, vaihde, nopeus, ajotilat, ilmastointitila, latausastatus, PHEV-kohtaiset arvot jne.\n\nMitään ei lähetetä automaattisesti. "Sähköposti QR-koodin kautta" lataa raportin väliaikaiselle julkiselle palvelimelle (litterbox) ja näyttää linkin, joka poistetaan automaattisesti 12 tunnin jälkeen; kuka tahansa linkin saaneista voi lukea sen siihen asti. Muut vaihtoehdot pitävät raportin laitteellasi.</string>
+    <string name="compat_sending_label">Lähetetään…</string>
+    <string name="compat_email_qr_label">Sähköposti QR-koodilla</string>
+    <string name="compat_uploading_label">Ladataan…</string>
+    <string name="compat_telegram_not_configured">Telegram ei ole määritetty — määritä se ensin kohdassa Backup &amp; Restore.</string>
+    <string name="compat_sent_telegram">Lähetetty Telegramilla ✓</string>
+    <string name="compat_telegram_failed">Telegram-lähetys epäonnistui: %1$s</string>
+    <string name="compat_save_failed">Tallennus epäonnistui: %1$s</string>
+    <string name="compat_probe_cleared">Probe-tiedot tyhjennetty.</string>
+    <string name="compat_upload_failed">Lataus epäonnistui: %1$s</string>
+    <string name="compat_qr_copy_link">Kopioi linkki</string>
+    <string name="compat_qr_dialog_title">Skannaa lähettääksesi raportti sähköpostilla</string>
+    <string name="compat_qr_dialog_desc">Skannaa puhelimellasi — avaa esitäytetyn sähköpostin osoitteeseen %1$s. Valitse tilisi ja paina Lähetä. Linkki vanhenee 12 tunnin kuluttua.</string>
+    <string name="compat_qr_no_render">QR-koodia ei voitu renderöidä. Käytä "Kopioi linkki" ja lähetä se sähköpostilla osoitteeseen %1$s.</string>
+    <string name="compat_qr_content_desc">QR-koodi, joka avaa esitäytetyn sähköpostin probe-latauslinkillä</string>
+    <string name="web_access_pin_label">Käyttö-PIN</string>
+    <string name="web_pin_browser_hint">Näytetään selaimen kirjautumissivulla, kun joku avaa palvelimen URL-osoitteen.</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">Piilota PIN</string>
+    <string name="web_pin_show_cd">Näytä PIN</string>
+    <string name="web_pin_set">Aseta</string>
+    <string name="web_pin_regen">Luo uusi</string>
+    <string name="web_pin_min_digits">Väh. 4 numeroa. PIN:n vaihtaminen mitätöi kaikki aktiiviset selainistunnot.</string>
+    <string name="web_ip_locked_one">1 IP-osoite estetty</string>
+    <string name="web_ip_locked_many">%1$d IP-osoitetta estetty</string>
+    <string name="web_too_many_attempts">Liian monta väärää PIN-yritystä havaittu.</string>
+    <string name="web_server_failed">Käynnistys epäonnistui: %1$s</string>
+    <string name="web_server_waiting">Odotetaan IP-osoitetta…</string>
+    <string name="web_server_open_hint">Avaa tämä osoite millä tahansa laitteella, joka on yhdistettynä samaan WiFi-verkkoon.</string>
+    <string name="web_copy_url_cd">Kopioi URL</string>
     <string name="chart_no_tyre_data">Ei rengaspainetietoja tallennettu tällä matkalla</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTT-testijulkaisu onnistui</string>
     <string name="mqtt_test_failed_msg">MQTT-testi epäonnistui: %1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT-asetukset tallennettu</string>
+    <string name="connection_group_label">Yhteys</string>
+    <string name="hide_token_cd">Piilota tunnus</string>
+    <string name="show_token_cd">Näytä tunnus</string>
+    <string name="abrp_status_label">ABRP-tila</string>
+    <string name="mqtt_status_label">MQTT-tila</string>
+    <string name="label_configured">Määritetty</string>
+    <string name="label_enabled">Käytössä</string>
+    <string name="label_last_upload">Viimeisin lataus</string>
+    <string name="label_last_publish">Viimeisin julkaisu</string>
+    <string name="label_last_status">Viimeisin tila</string>
+    <string name="value_yes">Kyllä</string>
+    <string name="value_no">Ei</string>
+    <string name="value_na">ei sov.</string>
 
     <!-- About screen -->
     <string name="about_version_label">Versio</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">Muistinkäyttö</string>
     <string name="last_60s_label">viim. 60s</string>
     <string name="adb_shell_label">ADB-komentotulkki</string>
-    <string name="adb_shell_desc_text">Suoritetaan valtuutetun paikallisen ADB-demonin kautta. Syötä komento täsmälleen kuten tekisit `adb shell` -komennon jälkeen.</string>
+    <string name="adb_shell_desc_text">Suoritetaan valtuutetun paikallisen ADB daemonin kautta. Syötä komento täsmälleen kuten tekisit `adb shell` -komennon jälkeen.</string>
     <string name="shell_command_label">Komentotulkin komento</string>
     <string name="run_shell_cmd_action">Suorita komentotulkin komento</string>
     <string name="samples_refresh_note">Näytteet päivittyvät 2 sekunnin välein tämän näytön ollessa auki.</string>
@@ -956,8 +1074,8 @@
     <string name="compat_telegram_action">Telegram</string>
 
     <!-- MainActivity dialogs -->
-    <string name="autostart_dialog_title">⚠️ Toimenpide vaaditaan — Autostart</string>
-    <string name="autostart_dialog_msg">Uusi versio asennettiin. Sinun täytyy kytkeä pois päältä autostart-esto tälle sovellukselle, mikä mahdollistaa taustatiedonkeruun auton ollessa sammutettuna (esim. ladatessa yön yli).\n\nParhaan luotettavuuden varmistamiseksi käynnistä auto kerran uudelleen tämän asetuksen muuttamisen jälkeen, sitten avaa BYD Trip Stats uudelleen.\nVAROITUS: Jos et näe nopeuden ja muiden arvojen päivittyvän ajon aikana, sinun täytyy käynnistää auto uudelleen!</string>
+    <string name="autostart_dialog_title">⚠️ Toiminto vaaditaan — Autostart</string>
+    <string name="autostart_dialog_msg">Uusi versio on asennettu. Sinun täytyy poistaa automaattinen käynnistys käytöstä tässä sovelluksessa, mikä mahdollistaa taustatietojen keräämisen auton ollessa sammutettuna (esim. yölatauksen aikana).\n\nParhaan luotettavuuden varmistamiseksi käynnistä auto uudelleen kerran tämän asetuksen muuttamisen jälkeen ja avaa sitten BYD Trip Stats uudelleen.\nVAROITUS: Jos et näe nopeuden ja muiden arvojen päivittyvän ajon aikana, sinun on käynnistettävä auto uudelleen!</string>
     <string name="autostart_got_it">Selvä</string>
     <string name="adb_connecting_title">Yhdistetään…</string>
     <string name="adb_waiting_auth_title">Odotetaan valtuutusta</string>

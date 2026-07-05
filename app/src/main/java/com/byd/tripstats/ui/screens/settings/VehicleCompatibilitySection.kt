@@ -96,14 +96,7 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
             }
             AnimatedVisibility(visible = privacyExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                 Text(
-                    "The report captures raw values from every data source on " +
-                    "your car's head unit — numeric values, strings, and arrays.\n\n" +
-                    "GPS latitude and longitude are NOT included.\n\n" +
-                    "Everything else is included: battery state, motor data, gear, speed, " +
-                    "drive modes, climate state, charging state, PHEV-specific values, etc.\n\n" +
-                    "Nothing is sent automatically. \"Email via QR code\" uploads the report to a " +
-                    "temporary public host (litterbox) and shows a link that auto-deletes after 12 hours; " +
-                    "anyone with the link can read it until then. The other options keep the report on your device.",
+                    stringResource(R.string.compat_privacy_notice_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
@@ -128,7 +121,7 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
-                    val lastCaptureSuffix = lastCapture?.let { " · last: ${it.substringBefore('T')}" } ?: ""
+                    val lastCaptureSuffix = lastCapture?.let { stringResource(R.string.last_capture_suffix, it.substringBefore('T')) } ?: ""
                     Text(
                         if (isEnabled)
                             stringResource(R.string.active_probe_status, entryCount, lastCaptureSuffix)
@@ -166,7 +159,7 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                 Button(
                     onClick = {
                         if (telegramConfig == null) {
-                            statusMessage = "Telegram not configured — set it up under Backup & Restore first."
+                            statusMessage = context.getString(R.string.compat_telegram_not_configured)
                             return@Button
                         }
                         scope.launch(Dispatchers.IO) {
@@ -178,11 +171,11 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                                         "Entries: $entryCount · ${lastCapture?.substringBefore('T') ?: "no date"}"
                                 )
                                 launch(Dispatchers.Main) {
-                                    statusMessage = "Sent via Telegram ✓"
+                                    statusMessage = context.getString(R.string.compat_sent_telegram)
                                 }
                             } catch (e: Exception) {
                                 launch(Dispatchers.Main) {
-                                    statusMessage = "Telegram send failed: ${e.message}"
+                                    statusMessage = context.getString(R.string.compat_telegram_failed, e.message ?: "")
                                 }
                             }
                         }
@@ -201,7 +194,7 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                         Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
                     }
                     Spacer(Modifier.width(6.dp))
-                    Text(if (isSending) "Sending…" else "Telegram")
+                    Text(if (isSending) stringResource(R.string.compat_sending_label) else "Telegram")
                 }
 
                 Button(
@@ -210,11 +203,11 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                             try {
                                 VehicleCompatibilityProbe.exportReportFile(saveToDownloads = true)
                                 launch(Dispatchers.Main) {
-                                    statusMessage = "Saved to Download/BydTripStats/compat_probe.json"
+                                    statusMessage = context.getString(R.string.saved_download_msg)
                                 }
                             } catch (e: Exception) {
                                 launch(Dispatchers.Main) {
-                                    statusMessage = "Save failed: ${e.message}"
+                                    statusMessage = context.getString(R.string.compat_save_failed, e.message ?: "")
                                 }
                             }
                         }
@@ -225,13 +218,13 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                 ) {
                     Icon(Icons.Filled.Download, null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Save")
+                    Text(stringResource(R.string.save_local_action))
                 }
 
                 Button(
                     onClick = {
                         VehicleCompatibilityProbe.clear()
-                        statusMessage = "Probe data cleared."
+                        statusMessage = context.getString(R.string.compat_probe_cleared)
                     },
                     enabled = entryCount > 0 && !isSending,
                     modifier = Modifier.weight(1f),
@@ -256,7 +249,7 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                         } catch (e: Exception) {
                             launch(Dispatchers.Main) {
                                 uploadInProgress = false
-                                statusMessage = "Upload failed: ${e.message}"
+                                statusMessage = context.getString(R.string.compat_upload_failed, e.message ?: "")
                             }
                         }
                     }
@@ -275,12 +268,12 @@ internal fun VehicleCompatibilitySection(context: Context, scope: CoroutineScope
                     Icon(Icons.Filled.QrCode2, null, modifier = Modifier.size(16.dp))
                 }
                 Spacer(Modifier.width(6.dp))
-                Text(if (uploadInProgress) "Uploading…" else "Email via QR code")
+                Text(if (uploadInProgress) stringResource(R.string.compat_uploading_label) else stringResource(R.string.compat_email_qr_label))
             }
 
             if (telegramConfig == null) {
                 Text(
-                    "Telegram not configured — set it up under Backup & Restore first.",
+                    stringResource(R.string.compat_telegram_not_configured),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -326,17 +319,23 @@ private fun ProbeEmailQrDialog(downloadUrl: String, onDismiss: () -> Unit) {
         QrCodeGenerator.generate(mailto, sizePx)?.asImageBitmap()
     }
 
+    val strDone        = stringResource(R.string.done)
+    val strCopyLink    = stringResource(R.string.compat_qr_copy_link)
+    val strTitle       = stringResource(R.string.compat_qr_dialog_title)
+    val strDesc        = stringResource(R.string.compat_qr_dialog_desc, supportEmail)
+    val strNoRender    = stringResource(R.string.compat_qr_no_render, supportEmail)
+    val strContentDesc = stringResource(R.string.compat_qr_content_desc)
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done") }
+            TextButton(onClick = onDismiss) { Text(strDone) }
         },
         dismissButton = {
             TextButton(onClick = { clipboard.setText(AnnotatedString(downloadUrl)) }) {
-                Text("Copy link")
+                Text(strCopyLink)
             }
         },
-        title = { Text("Scan to email the report") },
+        title = { Text(strTitle) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -344,15 +343,14 @@ private fun ProbeEmailQrDialog(downloadUrl: String, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "Scan with your phone — it opens a pre-filled email to $supportEmail. " +
-                        "Just choose your account and press Send. The link expires in 12 hours.",
+                    strDesc,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (qr != null) {
                     Image(
                         bitmap = qr,
-                        contentDescription = "QR code that opens a pre-filled email with the probe download link",
+                        contentDescription = strContentDesc,
                         filterQuality = FilterQuality.None,
                         modifier = Modifier
                             .background(Color.White, RoundedCornerShape(8.dp))
@@ -361,7 +359,7 @@ private fun ProbeEmailQrDialog(downloadUrl: String, onDismiss: () -> Unit) {
                     )
                 } else {
                     Text(
-                        "Couldn't render the QR code. Use \"Copy link\" and email it to $supportEmail.",
+                        strNoRender,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error
                     )

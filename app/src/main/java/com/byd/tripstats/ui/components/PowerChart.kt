@@ -26,6 +26,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.byd.tripstats.ui.theme.*
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Size
 
@@ -51,6 +53,7 @@ fun PowerChart(
     val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     val zeroColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val intoTrip = stringResource(R.string.chart_into_trip)
 
     // Pre-extract modes once — avoids JSON parsing inside the draw loop
     val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
@@ -216,7 +219,7 @@ fun PowerChart(
                 val v = values[idx]
                 val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
                 val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
-                val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
+                val durationStr = "+%d:%02d $intoTrip".format((secs / 60).toInt(), (secs % 60).toInt())
                 val powerState = when { v > 5f -> "Accel"; v < -5f -> "Regen"; else -> "Cruise" }
                 val dotColor = when { v < -5f -> regenColor; else -> accelColor }
                 val mode = modes[idx]

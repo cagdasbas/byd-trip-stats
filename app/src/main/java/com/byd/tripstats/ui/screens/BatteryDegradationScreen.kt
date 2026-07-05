@@ -116,6 +116,13 @@ fun BatteryDegradationScreen(
         // ── Compute regression + projection ───────────────────────────────────
         val regression  = computeLinearRegression(data)
         val stats       = buildDegradationScreenStats(regression)
+        val strNotDeclining = stringResource(R.string.soh_not_declining)
+        val strFarFuture    = stringResource(R.string.soh_far_future)
+        val localizedProjLabel = when (stats.projectedAt80Label) {
+            "Not declining" -> strNotDeclining
+            "Far future"    -> strFarFuture
+            else            -> stats.projectedAt80Label
+        }
 
         // Assemble the report payload from the same data/stats shown on screen.
         fun buildReportData(): BatteryHealthReport.Data {
@@ -132,13 +139,13 @@ fun BatteryDegradationScreen(
                 firstDate = df.format(Date(data.first().timestamp)),
                 lastDate = df.format(Date(data.last().timestamp)),
                 tripsAnalyzed = data.size,
-                warrantyNote = "BYD's battery warranty typically covers the pack to 70% State of " +
-                    "Health for 8 years / 250,000 km. Check your vehicle's warranty booklet for " +
-                    "the exact terms.",
+                warrantyNote = context.getString(R.string.battery_report_warranty_note),
                 exclusionNote = if (excludedTripCount > 0)
-                    "Excludes $excludedTripCount earlier trip(s) recorded before " +
-                        "${df.format(Date(sohExclusion.cutoffMs ?: 0L))} using a legacy estimation " +
-                        "method that under-reported State of Health."
+                    context.getString(
+                        R.string.battery_report_exclusion_note,
+                        excludedTripCount,
+                        df.format(Date(sohExclusion.cutoffMs ?: 0L))
+                    )
                     else null,
                 entries = data.map {
                     BatteryHealthReport.Entry(
@@ -159,11 +166,15 @@ fun BatteryDegradationScreen(
                                else BatteryHealthReport.generateAndSave(context, d)
                     Toast.makeText(
                         context,
-                        "Report saved: Download/BydTripStats/$name",
+                        context.getString(R.string.report_saved_msg, "Download/BydTripStats/$name"),
                         Toast.LENGTH_LONG
                     ).show()
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Report failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.report_failed_msg, e.message ?: ""),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -212,7 +223,7 @@ fun BatteryDegradationScreen(
                 DegradationStatCard(
                     modifier  = Modifier.weight(1f),
                     label     = stringResource(R.string.projected_80_label),
-                    value     = stats.projectedAt80Label,
+                    value     = localizedProjLabel,
                     icon      = Icons.Filled.CalendarMonth,
                     color     = MaterialTheme.colorScheme.primary
                 )

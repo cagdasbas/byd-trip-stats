@@ -159,15 +159,17 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
 
             // ── PIN ──────────────────────────────────────────────────────────
             Text(
-                "Access PIN",
+                stringResource(R.string.web_access_pin_label),
                 style      = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium
             )
             Text(
-                "Shown on the browser login page when someone opens the server URL.",
+                stringResource(R.string.web_pin_browser_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            val strHidePin = stringResource(R.string.web_pin_hide_cd)
+            val strShowPin = stringResource(R.string.web_pin_show_cd)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -176,7 +178,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                 OutlinedTextField(
                     value = pinInput,
                     onValueChange = { pinInput = it.filter(Char::isDigit).take(10) },
-                    label = { Text("PIN") },
+                    label = { Text(stringResource(R.string.web_pin_field_label)) },
                     singleLine = true,
                     visualTransformation = if (pinVisible)
                         VisualTransformation.None
@@ -187,7 +189,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                         IconButton(onClick = { pinVisible = !pinVisible }) {
                             Icon(
                                 if (pinVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (pinVisible) "Hide PIN" else "Show PIN"
+                                contentDescription = if (pinVisible) strHidePin else strShowPin
                             )
                         }
                     },
@@ -201,7 +203,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                         }
                     },
                     enabled = pinInput.length >= 4 && pinInput != pin
-                ) { Text("Set") }
+                ) { Text(stringResource(R.string.web_pin_set)) }
                 // Generate a new random PIN
                 OutlinedButton(
                     onClick = {
@@ -211,10 +213,10 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                             preferencesManager.saveWebServerPin(newPin)
                         }
                     }
-                ) { Text("Regen") }
+                ) { Text(stringResource(R.string.web_pin_regen)) }
             }
             Text(
-                "Min 4 digits. Changing the PIN invalidates all active browser sessions.",
+                stringResource(R.string.web_pin_min_digits),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -223,7 +225,10 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
 
             // ── Lockout banner ───────────────────────────────────────────────
             if (lockedCount > 0) {
-                val plural = if (lockedCount > 1) "addresses" else "address"
+                val strLocked = if (lockedCount == 1)
+                    stringResource(R.string.web_ip_locked_one)
+                else
+                    stringResource(R.string.web_ip_locked_many, lockedCount)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -243,13 +248,13 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "$lockedCount IP $plural locked out",
+                            strLocked,
                             style      = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color      = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            "Too many incorrect PIN attempts detected.",
+                            stringResource(R.string.web_too_many_attempts),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                         )
@@ -259,7 +264,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                         colors  = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
                         )
-                    ) { Text("Clear") }
+                    ) { Text(stringResource(R.string.clear_lockout_action)) }
                 }
             }
 
@@ -283,14 +288,15 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            "Failed to start: $serverError",
+                            stringResource(R.string.web_server_failed, serverError ?: ""),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.weight(1f)
                         )
                     }
                 } else {
-                    val url = serverUrl ?: "Waiting for IP…"
+                    val strWaiting = stringResource(R.string.web_server_waiting)
+                    val url = serverUrl ?: strWaiting
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -315,7 +321,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                             ) {
                                 Icon(
                                     Icons.Filled.ContentCopy,
-                                    contentDescription = "Copy URL",
+                                    contentDescription = stringResource(R.string.web_copy_url_cd),
                                     modifier = Modifier.size(18.dp),
                                     tint     = MaterialTheme.colorScheme.primary
                                 )
@@ -323,7 +329,7 @@ internal fun WebCompanionSection(context: Context, scope: CoroutineScope) {
                         }
                     }
                     Text(
-                        "Open this address on any device connected to the same WiFi.",
+                        stringResource(R.string.web_server_open_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

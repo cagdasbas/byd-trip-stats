@@ -22,6 +22,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
 import com.byd.tripstats.ui.components.drawCrosshair
 import com.byd.tripstats.ui.theme.BatteryBlue
@@ -323,7 +325,7 @@ internal fun ChargingSeriesChart(
 @Composable
 internal fun ChargingXAxisToggle(mode: ChargingXAxisMode, onChange: (ChargingXAxisMode) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(ChargingXAxisMode.TIME to "Time", ChargingXAxisMode.SOC to "SoC").forEach { (m, label) ->
+        listOf(ChargingXAxisMode.TIME to stringResource(R.string.label_time), ChargingXAxisMode.SOC to "SoC").forEach { (m, label) ->
             val selected = mode == m
             Box(
                 modifier = Modifier

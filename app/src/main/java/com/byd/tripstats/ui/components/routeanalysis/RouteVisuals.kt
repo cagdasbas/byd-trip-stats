@@ -9,6 +9,8 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,12 +45,12 @@ internal fun EnergyHeatmapCard(dataPoints: List<TripDataPointEntity>) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Energy Hotspots",
+                text = stringResource(R.string.route_energy_hotspots),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Segments with highest energy usage",
+                text = stringResource(R.string.route_energy_hotspots_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -87,9 +89,14 @@ internal fun EnergyHeatmapCard(dataPoints: List<TripDataPointEntity>) {
 
 @Composable
 internal fun TripTimelineCard(dataPoints: List<TripDataPointEntity>) {
+    val strTripStarted     = stringResource(R.string.route_trip_started)
+    val strHardAcceleration = stringResource(R.string.route_hard_acceleration)
+    val strHardBraking     = stringResource(R.string.route_hard_braking)
+    val strTripEnded       = stringResource(R.string.route_trip_ended)
+
     val events = mutableListOf<TimelineEvent>()
 
-    events.add(TimelineEvent(fmt(dataPoints.first().timestamp), "Trip Started", Icons.Filled.FlagCircle, RegenGreen))
+    events.add(TimelineEvent(fmt(dataPoints.first().timestamp), strTripStarted, Icons.Filled.FlagCircle, RegenGreen))
 
     val window = 5
     var lastEventTs = dataPoints.first().timestamp
@@ -106,7 +113,7 @@ internal fun TripTimelineCard(dataPoints: List<TripDataPointEntity>) {
         if (abs(delta) > 30) {
             events.add(TimelineEvent(
                 time  = fmt(curr.timestamp),
-                title = if (delta > 0) "Hard Acceleration" else "Hard Braking",
+                title = if (delta > 0) strHardAcceleration else strHardBraking,
                 icon  = if (delta > 0) Icons.AutoMirrored.Filled.TrendingUp else Icons.AutoMirrored.Filled.TrendingDown,
                 color = if (delta > 0) AccelerationOrange else RegenGreen
             ))
@@ -114,7 +121,7 @@ internal fun TripTimelineCard(dataPoints: List<TripDataPointEntity>) {
         }
     }
 
-    events.add(TimelineEvent(fmt(dataPoints.last().timestamp), "Trip Ended", Icons.Filled.LocationOn, BydErrorRed))
+    events.add(TimelineEvent(fmt(dataPoints.last().timestamp), strTripEnded, Icons.Filled.LocationOn, BydErrorRed))
     val visibleEvents = sampleTimelineEvents(events, maxVisible = 15)
 
     Card(
@@ -123,7 +130,7 @@ internal fun TripTimelineCard(dataPoints: List<TripDataPointEntity>) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Trip Timeline",
+                text = stringResource(R.string.route_trip_timeline),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )

@@ -147,7 +147,7 @@ fun ChargingDetailScreen(
                 2 -> ChargingChartTab(
                     dataPoints    = chartPoints,
                     isSynthetic   = isSynthetic,
-                    title         = "HV Battery Voltage",
+                    title         = stringResource(R.string.chart_hv_battery_voltage),
                     yAxisLabel    = "V",
                     lineColor     = BydEcoTealDim,
                     socSource     = socSource,

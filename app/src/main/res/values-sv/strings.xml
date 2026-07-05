@@ -54,7 +54,7 @@
     <string name="tab_analysis">Analys</string>
     <string name="tab_power">Effekt</string>
     <string name="tab_voltage">Spänning</string>
-    <string name="tab_cell_voltage">Cell V</string>
+    <string name="tab_cell_voltage">Celler</string>
     <string name="tab_temperature">Temperatur</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">Skärmdump misslyckades: %1$s</string>
     <string name="ev_range_label">EV-räckvidd</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">Hastighet</string>
+    <string name="stat_range">Räckvidd</string>
+    <string name="label_time">Tid</string>
+    <string name="label_now">nu</string>
+    <string name="chart_hv_battery_voltage">HV-batterispänning</string>
+    <string name="cell_low_label">Lägsta</string>
+    <string name="cell_high_label">Högsta</string>
+    <string name="crosshair_cell_high">Högsta %.3f V</string>
+    <string name="crosshair_cell_low">Lägsta %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">TID</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">Kördynamik</string>
     <string name="stat_odometer">Mätarställning</string>
     <string name="stat_total_discharge">Total urladdning</string>
+    <string name="stat_total_consumed">Totalt förbrukat</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">Stopp</string>
@@ -198,7 +208,7 @@
     <string name="stat_avg_consumption">Medelförbrukning</string>
     <string name="stat_energy_consumed">Energiförbrukning</string>
     <string name="stat_max_regen">Max regen</string>
-    <string name="stat_regen_eff">Regen-eff.</string>
+    <string name="stat_regen_eff">Regen effektivitet</string>
     <string name="stat_avg_speed">Medelhastighet</string>
     <string name="stat_max_speed">Maxhastighet</string>
     <string name="stat_soc_panel">SoC (Panel)</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">Exportera resedata</string>
     <string name="export_copy_summary">Kopiera sammanfattning till urklipp</string>
-    <string name="export_save_downloads">Spara till nedladdningsmapp</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">Spara som CSV</string>
     <string name="export_save_json">Spara som JSON</string>
     <string name="export_save_html">Spara som HTML-visare (dubbelklicka för att öppna)</string>
@@ -283,7 +293,7 @@
     <string name="soc_end_label">SoC slut</string>
     <string name="soc_added_label">SoC tillagd</string>
     <string name="kwh_added_label">kWh tillagd</string>
-    <string name="battery_car_label">Batteri (bil)</string>
+    <string name="battery_car_label">Batteri (HV)</string>
     <string name="peak_power_label">Toppeffekt</string>
     <string name="average_power_label">Medeleffekt</string>
     <string name="charge_rate_label">Laddningshastighet</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">Analyserade resor</string>
     <string name="decline_rate_label">Försämringstakt</string>
     <string name="projected_80_label">Beräknad @ 80%</string>
+    <string name="soh_not_declining">Ingen nedgång</string>
+    <string name="soh_far_future">Avlägsen framtid</string>
     <string name="soh_history_section">SoH-historik</string>
     <string name="legend_recorded">Inspelad</string>
     <string name="legend_trend">Trend</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">Tips: BYD\'s garanti täcker batteriet till 70% SoH i 8 år / 250 000 km.</string>
     <string name="battery_health_report_title">Batterihälsorapport</string>
     <string name="battery_report_desc">Exportera en rapport om batteriets State of Health, försämringstakt och 80%-projektion — användbart bevis vid försäljning av bilen eller vid garantianspråk. Sparad i Download/BydTripStats/ som en utskriftsklar PDF eller HTML (öppnas i valfri webbläsare). Genereras helt på enheten.</string>
+    <string name="battery_report_warranty_note">BYD:s batterigaranti täcker vanligtvis batteriet till 70% State of Health i 8 år / 250 000 km. Se fordonets garantihäfte för exakta villkor.</string>
+    <string name="battery_report_exclusion_note">Utesluter %1$d tidigare resa/resor som registrerats före %2$s med en äldre uppskattningsmetod som underrapporterade State of Health.</string>
+    <string name="report_saved_msg">Rapport sparad: %1$s</string>
+    <string name="report_failed_msg">Rapporten misslyckades: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">Batteridataperiod</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">Säsongsanalys</string>
-    <string name="winter_vs_summer_subtitle">Vinter vs. sommar effektivitetsanalys</string>
+    <string name="winter_vs_summer_subtitle">Vinter vs. sommar förbrukningsanalys</string>
     <string name="no_seasonal_data">Inga säsongsdata ännu</string>
     <string name="complete_seasons_hint">Genomför resor över flera säsonger för att se hur temperaturen påverkar din räckvidd.</string>
     <string name="avg_consumption_by_season">Medelförbrukning per säsong</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">Rutter</string>
-    <string name="recurring_journeys_subtitle">Återkommande resor &amp; effektivitet</string>
+    <string name="recurring_journeys_subtitle">Återkommande resor &amp; förbrukning</string>
     <string name="no_recurring_routes">Inga återkommande rutter ännu</string>
-    <string name="recurring_route_hint">Kör samma sträcka minst 3 gånger — som en daglig pendling — och den visas här så att du kan jämföra effektiviteten för varje resa.</string>
+    <string name="recurring_route_hint">Kör samma sträcka minst 3 gånger — som en daglig pendling — och den visas här så att du kan jämföra förbrukningen för varje resa.</string>
     <string name="route_best">bäst</string>
     <string name="route_worst">sämst</string>
     <string name="route_avg">medel</string>
-    <string name="efficiency_trend_label">Effektivitet per resa (äldst → nyast)</string>
+    <string name="efficiency_trend_label">Förbrukning per resa (äldst → nyast)</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">Mål &amp; personliga rekord</string>
     <string name="track_milestones_subtitle">Spåra dina körmilstolpar</string>
     <string name="set_goals_action">Sätt mål</string>
     <string name="personal_bests_section">Personliga rekord</string>
-    <string name="best_efficiency_label">Bästa effektivitet</string>
+    <string name="best_efficiency_label">Bästa förbrukning</string>
     <string name="lowest_ever_label">Lägsta någonsin inspelad</string>
     <string name="longest_trip_label">Längsta resa</string>
     <string name="longest_trip_subtitle">Avstånd för enstaka resa</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">Mål</string>
     <string name="no_goals_set">Inga mål satta ännu</string>
     <string name="set_goals_hint">Tryck på ✏️ ovan för att ange ett förbruknings- eller avståndsmål.</string>
-    <string name="efficiency_target_label">Effektivitetsmål</string>
+    <string name="efficiency_target_label">Förbrukningsmål</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s (medel av senaste 5 resor)</string>
     <string name="monthly_distance_goal_label">Månadsavstånd</string>
     <string name="monthly_distance_subtitle">%1$s / %2$s %3$s den här månaden</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">Taggar</string>
-    <string name="per_tag_efficiency">Effektivitet &amp; totaler per tagg</string>
+    <string name="per_tag_efficiency">Förbrukning &amp; totaler per tagg</string>
     <string name="no_tags_yet">Inga taggar ännu</string>
     <string name="tag_usage_hint">Lägg till en tagg till en resa från dess detaljskärm, eller tagga flera på en gång från Historikens urvalsläge. Taggade resor sammanfattas här.</string>
     <string name="rename_tag_title">Byt namn på tagg</string>
@@ -410,7 +426,7 @@
 
     <!-- Local Backup screen -->
     <string name="backup_restore_title">Databassäkerhets­kopiering &amp; Återställning</string>
-    <string name="backup_to_download_label">Säkerhetskopiera till Nedladdning</string>
+    <string name="backup_to_download_label">Säkerhetskopiera till Download</string>
     <string name="backup_download_desc">Sparar hela resedatabasen till: Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">Säkerhetskopiera nu</string>
     <string name="backup_to_sd_label">Säkerhetskopiera till SD-kort</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">Regen</string>
     <string name="drive_mode_usage_label">Körlägesanvändning</string>
     <string name="regen_mode_usage_label">Regenlägesanvändning</string>
+    <string name="mode_of_mode_attributed_trip">av lägesregistrerad del av resan</string>
+    <string name="mode_recovered_via_regen">återvunnet via regen</string>
+    <string name="mode_eco_normal_same">Eco och Normal presterade i praktiken likadant på denna resa, så rutten och trafiken spelade större roll än det valda körläget.</string>
+    <string name="mode_sport_more_than_normal">Sport använde %1$s %2$s mer än Normal över jämförbara sträckor på denna resa.</string>
+    <string name="mode_high_regen_no_improvement">High regen förbättrade inte märkbart den återvunna energin på denna resa — bromsmöjligheterna spelade troligen större roll än regen-inställningen.</string>
     <string name="route_segments_label">Ruttssegment</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Vägpunkter</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">Ögonblicksförbrukning</string>
     <string name="chart_drive_regen_modes">Körnings- / Regenlägen</string>
     <string name="chart_mode_timeline">Lägeslinje över resan</string>
+    <string name="heatmap_mode_filters">Lägesfilter</string>
+    <string name="heatmap_legend_few">Få</string>
+    <string name="heatmap_legend_many">Många</string>
+    <string name="heatmap_legend_density">Färgintensitet = stickprovsdensitet (log-skala)</string>
+    <string name="heatmap_axis_speed">Hastighet (%1$s)</string>
+    <string name="heatmap_axis_power">Effekt (kW)</string>
+    <string name="heatmap_axis_regen_power">Regen. effekt (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">Frammotor RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">Bakmotor RPM</string>
+    <string name="heatmap_axis_motor_rpm">Motor RPM</string>
+    <string name="heatmap_axis_accel">Accel. (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">Tid på dygnet</string>
+    <string name="heatmap_axis_battery_temp">Batteri-temp. (°C)</string>
+    <string name="heatmap_axis_cell_spread">Cellspridning (V)</string>
+    <string name="heatmap_axis_gradient">Lutning (%)</string>
+    <string name="heatmap_axis_front_rpm">Fram RPM</string>
+    <string name="heatmap_axis_rear_rpm">Bak RPM</string>
+    <string name="heatmap_axis_avg_tyre_pressure">Medelddäcktryck (PSI)</string>
+    <string name="mode_no_data">Inga körläges-/regenlägesdata registrerade för denna resa.</string>
+    <string name="mode_enable_hint">Aktivera körläge eller regenläge för att visa tidslinjen.</string>
+    <string name="mode_drive_lane_title">Körläge</string>
+    <string name="mode_regen_lane_title">Regenläge</string>
+    <string name="mode_drive_modes_label">Körlägen</string>
+    <string name="mode_regen_modes_label">Regenlägen</string>
     <string name="chart_speed_detailed">Hastighetsprofil (Detaljerad)</string>
     <string name="chart_rpm_detailed">Motor-RPM (Detaljerad)</string>
     <string name="chart_power_detailed">Effektprofil (Detaljerad)</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">Inga data tillgängliga</string>
     <string name="chart_insufficient_data">Otillräckliga data</string>
     <string name="chart_not_enough_driving">Inte tillräckligt med kördata för ögonblicksförbrukning</string>
-    <string name="chart_weekly_consumption">Veckoförbrukning</string>
-    <string name="chart_monthly_consumption">Månadsförbrukning</string>
-    <string name="chart_yearly_consumption">Årsförbrukning</string>
+    <string name="chart_weekly_consumption">Denna vecka</string>
+    <string name="chart_monthly_consumption">Denna månad</string>
+    <string name="chart_yearly_consumption">Detta år</string>
     <string name="chart_your_duration_avg">Ditt varaktighetsmedel (%1$s %2$s)</string>
     <string name="chart_selected_car_avg">Vald bilmedel (%1$s %2$s)</string>
     <string name="chart_close">Stäng diagram</string>
     <string name="chart_no_data_yet">Inga data ännu</string>
     <string name="chart_instant_label">Ögonblick</string>
     <string name="chart_avg_5pt">5-punktsmedel</string>
+    <string name="chart_into_trip">in i resan</string>
     <string name="chart_no_motor_data">Inga motordata tillgängliga</string>
     <string name="chart_motor_smoothed_note">Mycket korta axelburstar kan verka utjämnade — helskärm för detaljer</string>
     <string name="legend_rear_motor">Bakmotor</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh över tid</string>
-    <string name="axis_soc_over_time">SoC%% över tid</string>
+    <string name="axis_soc_over_time">SoC% över tid</string>
     <string name="axis_speed_over_time">%1$s över tid</string>
     <string name="axis_rpm_over_time">RPM över tid</string>
     <string name="axis_altitude_over_time">Höjd över tid</string>
     <string name="axis_power_over_time">kW över tid</string>
     <string name="axis_hv_cells">HV-buss + cell min/max (V)</string>
-    <string name="axis_tyre_wheels">Alla fyra hjul (bar)</string>
-    <string name="axis_consumption_distance">%1$s över avstånd</string>
+    <string name="axis_tyre_wheels">Alla fyra hjul</string>
+    <string name="axis_consumption_distance">%1$s över tid</string>
     <string name="axis_mode_timeline">Lägeslinje över resan</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">Laddningseffekt</string>
     <string name="charging_chart_cell_voltage">Cellspänning</string>
     <string name="charging_chart_avg_temp">Medel</string>
-    <string name="charging_chart_cell_min_temp">Cell min</string>
-    <string name="charging_chart_cell_max_temp">Cell max</string>
+    <string name="charging_chart_cell_min_temp">Lägsta</string>
+    <string name="chart_cells_voltage_axis">Celler (V)</string>
+    <string name="charging_chart_cell_max_temp">Högsta</string>
     <string name="charging_chart_hv_bus">HV-buss (V)</string>
-    <string name="charging_chart_cell_min">Cell min (V)</string>
-    <string name="charging_chart_cell_max">Cell max (V)</string>
+    <string name="charging_chart_cell_min">Min. cellspänning (V)</string>
+    <string name="charging_chart_cell_max">Max. cellspänning (V)</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
     <string name="charging_chart_panel_soc">Panel SoC</string>
     <string name="wheel_lf">VF</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">Effekt vs. Hastighet</string>
     <string name="heatmap_power_vs_speed_desc">Motorutmatning vid varje hastighet — visar var bilen faktiskt opererar</string>
     <string name="heatmap_consumption_vs_speed">Förbrukning vs. Hastighet</string>
-    <string name="heatmap_consumption_vs_speed_desc">Ögonblickseffektivitet (%1$s) över hastighetsintervallet</string>
+    <string name="heatmap_consumption_vs_speed_desc">Ögonblicklig förbrukning (%1$s) över hastighetsintervallet</string>
     <string name="heatmap_regen_vs_speed">Regeneffekt vs. Hastighet</string>
     <string name="heatmap_regen_vs_speed_desc">Regenerativ bromsningsstyrka per hastighetsband</string>
     <string name="heatmap_front_rpm_vs_speed">Frammotor-RPM vs. Hastighet</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">Acceleration vs. Hastighet</string>
     <string name="heatmap_accel_desc">Var föraren accelererar hårt eller glider — lägre är effektivare</string>
     <string name="heatmap_soc_vs_consumption">SOC vs. Förbrukning</string>
-    <string name="heatmap_soc_consumption_desc">Om effektiviteten förändras vid lågt eller högt laddningstillstånd</string>
+    <string name="heatmap_soc_consumption_desc">Om förbrukningen förändras vid lågt eller högt laddningstillstånd</string>
     <string name="heatmap_time_vs_speed">Tid på dygnet vs. Hastighet</string>
     <string name="heatmap_time_speed_desc">När och hur fort du kör — avslöjar rusningstidstrafikmönster</string>
     <string name="heatmap_gradient_vs_consumption">Gradient vs. Förbrukning</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">Frammotor vs. Bakmotor-RPM</string>
     <string name="heatmap_awd_desc">AWD-momentfördelning — diagonal = lika fördelning, utanför diagonal = en motor dominant</string>
     <string name="heatmap_tyre_vs_consumption">Däcktryck vs. Förbrukning</string>
-    <string name="heatmap_tyre_desc">Om högre tryck mätbart förbättrar effektiviteten i din bil</string>
+    <string name="heatmap_tyre_desc">Om högre tryck mätbart minskar förbrukningen i din bil</string>
     <string name="heatmap_soc_vs_regen">SOC vs. Regeneffektivitet</string>
     <string name="heatmap_soc_regen_desc">Var BMS stryper regenerativ bromsning — förväntat nära 100% SoC</string>
     <string name="heatmap_speed_vs_temp">Hastighet vs. Batteritp.</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">Inga batteritemperaturdata inspelade på den här resan.</string>
     <string name="heatmap_no_mode">Inget %1$s-läge inspelat — tryck på varje läge på bilens display en gång under framtida resor för att aktivera analys.</string>
     <string name="chart_no_route_data">Inga ruttdata tillgängliga</string>
+    <string name="map_no_gps_recorded">GPS-koordinater visas här när de är inspelade</string>
+    <string name="map_no_valid_gps">Inga giltiga GPS-data i denna resa</string>
+    <string name="map_traffic_label">Trafik</string>
+    <string name="map_traffic_free_flow">Fri körning  (≥ %1$s)</string>
+    <string name="map_traffic_light">Lätt trafik  (%1$s)</string>
+    <string name="map_traffic_heavy">Tung trafik  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">Energi-hotspots</string>
+    <string name="route_energy_hotspots_desc">Segment med högst energiförbrukning</string>
+    <string name="route_trip_timeline">Resans tidslinje</string>
+    <string name="route_trip_started">Resa startad</string>
+    <string name="route_hard_acceleration">Kraftig acceleration</string>
+    <string name="route_hard_braking">Kraftig inbromsning</string>
+    <string name="route_trip_ended">Resa avslutad</string>
+    <string name="stat_one_trip">1 resa</string>
+    <string name="stat_n_trips">%1$d resor</string>
+    <string name="season_vs_ref">%1$s vs. ref.</string>
+    <string name="season_stat_km_total">%1$s km totalt</string>
+    <string name="season_stat_kwh_used">%1$s kWh förbrukade</string>
+    <string name="season_stat_avg_temp">medeltemp. %1$s°C</string>
+    <string name="route_distance_label">%1$s %2$s rutt</string>
+    <string name="route_instance_trips">%1$d resor · %2$s</string>
+    <string name="route_avg_unit">medel %1$s</string>
+    <string name="schedule_daily">Dagligen</string>
+    <string name="schedule_weekly">Veckovis</string>
+    <string name="schedule_monthly">Månadsvis</string>
+    <string name="danger_zone_title">FARLIG ZON</string>
+    <string name="danger_zone_desc">Raderar permanent alla resor, datapunkter och statistik. En lokal säkerhetskopia skapas automatiskt innan återställningen.</string>
+    <string name="send_diag_log_desc">Skickar hela diagnoseloggen (speed-stall och \'telemetri refresh fastnat\'-händelser) direkt till din anslutna Telegram-bot — inget sparas eller delas lokalt. Anslut en bot under Backup &amp; Restore → Telegram Backup först.</string>
+    <string name="compat_privacy_notice_body">Rapporten fångar råvärden från varje datakälla på bilens head unit — numeriska värden, strängar och arrayer.\n\nGPS-latitud och -longitud ingår INTE.\n\nAllt annat ingår: batteritillstånd, motordata, växel, hastighet, körlägen, klimattillstånd, laddningstillstånd, PHEV-specifika värden osv.\n\nInget skickas automatiskt. "E-post via QR-kod" laddar upp rapporten till en tillfällig offentlig värd (litterbox) och visar en länk som raderas automatiskt efter 12 timmar; vem som helst med länken kan läsa den tills dess. De andra alternativen behåller rapporten på din enhet.</string>
+    <string name="compat_sending_label">Skickar…</string>
+    <string name="compat_email_qr_label">E-post via QR-kod</string>
+    <string name="compat_uploading_label">Laddar upp…</string>
+    <string name="compat_telegram_not_configured">Telegram inte konfigurerat — konfigurera det under Backup &amp; Restore först.</string>
+    <string name="compat_sent_telegram">Skickat via Telegram ✓</string>
+    <string name="compat_telegram_failed">Telegram-sändning misslyckades: %1$s</string>
+    <string name="compat_save_failed">Sparning misslyckades: %1$s</string>
+    <string name="compat_probe_cleared">Probe-data raderade.</string>
+    <string name="compat_upload_failed">Uppladdning misslyckades: %1$s</string>
+    <string name="compat_qr_copy_link">Kopiera länk</string>
+    <string name="compat_qr_dialog_title">Skanna för att e-posta rapporten</string>
+    <string name="compat_qr_dialog_desc">Skanna med din telefon — det öppnar ett förifyllt e-postmeddelande till %1$s. Välj ditt konto och tryck på Skicka. Länken går ut om 12 timmar.</string>
+    <string name="compat_qr_no_render">Kunde inte rendera QR-koden. Använd "Kopiera länk" och e-posta den till %1$s.</string>
+    <string name="compat_qr_content_desc">QR-kod som öppnar ett förifyllt e-postmeddelande med probe-nedladdningslänken</string>
+    <string name="web_access_pin_label">Åtkomst-PIN</string>
+    <string name="web_pin_browser_hint">Visas på webbläsarens inloggningssida när någon öppnar server-URL:en.</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">Dölj PIN</string>
+    <string name="web_pin_show_cd">Visa PIN</string>
+    <string name="web_pin_set">Ange</string>
+    <string name="web_pin_regen">Generera om</string>
+    <string name="web_pin_min_digits">Min. 4 siffror. Att ändra PIN ogiltigförklarar alla aktiva webbläsarsessioner.</string>
+    <string name="web_ip_locked_one">1 IP-adress blockerad</string>
+    <string name="web_ip_locked_many">%1$d IP-adresser blockerade</string>
+    <string name="web_too_many_attempts">För många felaktiga PIN-försök upptäcktes.</string>
+    <string name="web_server_failed">Start misslyckades: %1$s</string>
+    <string name="web_server_waiting">Väntar på IP-adress…</string>
+    <string name="web_server_open_hint">Öppna den här adressen på valfri enhet ansluten till samma WiFi.</string>
+    <string name="web_copy_url_cd">Kopiera URL</string>
     <string name="chart_no_tyre_data">Inga däcktrycksdata inspelade på den här resan</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTT-testpublicering lyckades</string>
     <string name="mqtt_test_failed_msg">MQTT-test misslyckades: %1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT-inställningar sparade</string>
+    <string name="connection_group_label">Anslutning</string>
+    <string name="hide_token_cd">Dölj token</string>
+    <string name="show_token_cd">Visa token</string>
+    <string name="abrp_status_label">ABRP-status</string>
+    <string name="mqtt_status_label">MQTT-status</string>
+    <string name="label_configured">Konfigurerad</string>
+    <string name="label_enabled">Aktiverad</string>
+    <string name="label_last_upload">Senaste uppladdning</string>
+    <string name="label_last_publish">Senaste publicering</string>
+    <string name="label_last_status">Senaste status</string>
+    <string name="value_yes">Ja</string>
+    <string name="value_no">Nej</string>
+    <string name="value_na">i/t</string>
 
     <!-- About screen -->
     <string name="about_version_label">Version</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">Minnesanvändning</string>
     <string name="last_60s_label">senaste 60 s</string>
     <string name="adb_shell_label">ADB-skal</string>
-    <string name="adb_shell_desc_text">Körs genom den auktoriserade lokala ADB-demonen. Ange kommandot exakt som du skulle göra efter `adb shell`.</string>
+    <string name="adb_shell_desc_text">Körs genom den auktoriserade lokala ADB daemon. Ange kommandot exakt som du skulle göra efter `adb shell`.</string>
     <string name="shell_command_label">Skalkommando</string>
     <string name="run_shell_cmd_action">Kör skalkommando</string>
     <string name="samples_refresh_note">Prover uppdateras var 2:a sekund medan den här skärmen är öppen.</string>
@@ -957,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Åtgärd krävs — Autostart</string>
-    <string name="autostart_dialog_msg">En ny version installerades. Du behöver stänga av inaktivera autostart för den här appen, vilket aktiverar bakgrundsdatainsamling när bilen är av (t.ex. laddning över natten).\n\nFör bästa tillförlitlighet, starta om bilen en gång efter att ha ändrat den här inställningen och öppna sedan BYD Trip Stats igen.\nVARNING: Om du inte ser hastighet och andra värden uppdateras under körning måste du starta om bilen!</string>
+    <string name="autostart_dialog_msg">En ny version har installerats. Du måste inaktivera autostart för den här appen, vilket möjliggör bakgrundsdatainsamling när bilen är av (t.ex. laddning över natten).\n\nFör bästa tillförlitlighet, starta om bilen en gång efter att ha ändrat den här inställningen och öppna sedan BYD Trip Stats igen.\nVARNING: Om du inte ser hastighet och andra värden uppdateras under körning måste du starta om bilen!</string>
     <string name="autostart_got_it">Förstått</string>
     <string name="adb_connecting_title">Ansluter…</string>
     <string name="adb_waiting_auth_title">Väntar på auktorisering</string>

@@ -52,7 +52,7 @@ fun TripHeatmapsTab(dataPoints: List<TripDataPointEntity>) {
     ) {
         if (hasTripModeData(dataPoints)) {
             Text(
-                text = "Mode filters",
+                text = stringResource(R.string.heatmap_mode_filters),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )

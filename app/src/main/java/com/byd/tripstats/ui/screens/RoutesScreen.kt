@@ -146,12 +146,13 @@ private fun RouteCard(
                         tint = BydElectricAzure, modifier = Modifier.size(26.dp))
                     Column {
                         Text(
-                            "${"%.1f".format(unitSystem.convertDistance(route.avgDistanceKm))} " +
-                                "${unitSystem.distanceUnit} route",
+                            stringResource(R.string.route_distance_label,
+                                "%.1f".format(unitSystem.convertDistance(route.avgDistanceKm)),
+                                unitSystem.distanceUnit),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        Text("${route.instanceCount} trips · $dateRange",
+                        Text(stringResource(R.string.route_instance_trips, route.instanceCount, dateRange),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -163,7 +164,7 @@ private fun RouteCard(
                         fontWeight = FontWeight.Bold,
                         color = BydElectricAzure
                     )
-                    Text("avg ${unitSystem.consumptionUnit}",
+                    Text(stringResource(R.string.route_avg_unit, unitSystem.consumptionUnit),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -299,6 +300,7 @@ private fun RouteEfficiencyTrend(
     val best  = route.bestEfficiencyKwhPer100km
     val worst = route.worstEfficiencyKwhPer100km
     val avg   = route.avgEfficiencyKwhPer100km
+    val strAvgLabel = stringResource(R.string.route_avg_unit, "%.1f".format(unitSystem.convertEfficiency(avg)))
 
     Canvas(modifier = modifier) {
         val w = size.width; val h = size.height
@@ -343,7 +345,7 @@ private fun RouteEfficiencyTrend(
 
         // "avg" label at the dashed line.
         drawContext.canvas.nativeCanvas.drawText(
-            "avg ${"%.1f".format(unitSystem.convertEfficiency(avg))}",
+            strAvgLabel,
             padL + 2f, (avgY - 4f).coerceAtLeast(12f),
             android.graphics.Paint().apply {
                 color = textColor.copy(alpha = 0.7f).toArgb()

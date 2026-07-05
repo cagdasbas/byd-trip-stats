@@ -24,6 +24,8 @@ import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import kotlin.math.roundToInt
 
 private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -46,6 +48,7 @@ fun SpeedChart(
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val intoTrip = stringResource(R.string.chart_into_trip)
 
     // Pre-extract modes once — avoids JSON parsing inside the draw loop
     val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
@@ -194,7 +197,7 @@ fun SpeedChart(
                 val idx = ((tp.x - padL) / chartW * (dataPoints.size - 1)).roundToInt().coerceIn(0, dataPoints.size - 1)
                 val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
                 val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
-                val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
+                val durationStr = "+%d:%02d $intoTrip".format((secs / 60).toInt(), (secs % 60).toInt())
                 val mode = modes[idx]
                 val modeStr = buildString {
                     if (mode.driveMode != 0) append(driveModeLabel(mode.driveMode))

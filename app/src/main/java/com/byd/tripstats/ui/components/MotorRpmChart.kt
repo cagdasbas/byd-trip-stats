@@ -26,6 +26,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.config.Drivetrain
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.preferences.PreferencesManager
@@ -65,6 +67,7 @@ fun MotorRpmChart(
     val gridColor  = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor  = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val intoTrip = stringResource(R.string.chart_into_trip)
 
     val modes = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
     val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
@@ -95,7 +98,7 @@ fun MotorRpmChart(
         }
 
         Text(
-            text = "Very short axle bursts may appear smoothed - fullscreen for details",
+            text = stringResource(R.string.chart_motor_smoothed_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -311,7 +314,7 @@ fun MotorRpmChart(
 
                     val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
                     val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
-                    val durationStr = "+%d:%02d into trip".format(
+                    val durationStr = "+%d:%02d $intoTrip".format(
                         (secs / 60).toInt(),
                         (secs % 60).toInt()
                     )

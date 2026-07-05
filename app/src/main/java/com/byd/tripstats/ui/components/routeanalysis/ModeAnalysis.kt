@@ -53,10 +53,14 @@ internal fun ModeInsightsCard(
     val regenSummaries = remember(dataPoints, trip) {
         buildRegenModeSummaries(dataPoints = dataPoints, trip = trip)
     }
-    val insights: List<String> = remember(driveSummaries, regenSummaries, useImperial) {
+    val strEcoNormalSame        = stringResource(R.string.mode_eco_normal_same)
+    val strSportMoreFmt         = stringResource(R.string.mode_sport_more_than_normal)
+    val strHighRegenNoImprove   = stringResource(R.string.mode_high_regen_no_improvement)
+    val insights: List<String> = remember(driveSummaries, regenSummaries, useImperial,
+        strEcoNormalSame, strSportMoreFmt, strHighRegenNoImprove) {
         buildList {
-            compareDriveModes(driveSummaries, useImperial)?.let(::add)
-            compareRegenModes(regenSummaries)?.let(::add)
+            compareDriveModes(driveSummaries, useImperial, strEcoNormalSame, strSportMoreFmt)?.let(::add)
+            compareRegenModes(regenSummaries, strHighRegenNoImprove)?.let(::add)
         }
     }
 
@@ -177,6 +181,8 @@ private fun ModeStackedBar(
 @Composable
 private fun ModeSummaryRow(summary: ModeSummary, useImperial: Boolean = false) {
     val unitSystem = if (useImperial) UnitSystem.IMPERIAL else UnitSystem.METRIC
+    val strOfModeAttributedTrip = stringResource(R.string.mode_of_mode_attributed_trip)
+    val strRecoveredViaRegen    = stringResource(R.string.mode_recovered_via_regen)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -201,7 +207,7 @@ private fun ModeSummaryRow(summary: ModeSummary, useImperial: Boolean = false) {
             Column {
                 Text(summary.label, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "${String.format("%.1f", unitSystem.convertDistance(summary.distanceKm))} ${unitSystem.distanceUnit} • ${String.format("%.0f", summary.distanceSharePct)}% of mode-attributed trip",
+                    text = "${String.format("%.1f", unitSystem.convertDistance(summary.distanceKm))} ${unitSystem.distanceUnit} • ${String.format("%.0f", summary.distanceSharePct)}% $strOfModeAttributedTrip",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -213,7 +219,7 @@ private fun ModeSummaryRow(summary: ModeSummary, useImperial: Boolean = false) {
                 style = MaterialTheme.typography.bodySmall
             )
             Text(
-                text = summary.regenSharePct?.let { "${String.format("%.1f", it)}% recovered via regen" } ?: "—",
+                text = summary.regenSharePct?.let { "${String.format("%.1f", it)}% $strRecoveredViaRegen" } ?: "—",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -317,7 +323,12 @@ private fun buildModeSummaries(
         .sortedByDescending { it.distanceKm }
 }
 
-private fun compareDriveModes(summaries: List<ModeSummary>, useImperial: Boolean = false): String? {
+private fun compareDriveModes(
+    summaries: List<ModeSummary>,
+    useImperial: Boolean = false,
+    ecoNormalSameStr: String,
+    sportMoreFmt: String
+): String? {
     val eco    = summaries.firstOrNull { it.label == "Eco"    && it.distanceKm >= 1.0 }
     val normal = summaries.firstOrNull { it.label == "Normal" && it.distanceKm >= 1.0 }
     val sport  = summaries.firstOrNull { it.label == "Sport"  && it.distanceKm >= 1.0 }
@@ -327,7 +338,7 @@ private fun compareDriveModes(summaries: List<ModeSummary>, useImperial: Boolean
     ) {
         val diffPct = ((eco.consumptionKwhPer100Km - normal.consumptionKwhPer100Km) / normal.consumptionKwhPer100Km) * 100.0
         if (abs(diffPct) < 5.0) {
-            return "Eco and Normal were effectively the same on this trip, so route and traffic mattered more than the selected drive mode."
+            return ecoNormalSameStr
         }
     }
 
@@ -338,13 +349,13 @@ private fun compareDriveModes(summaries: List<ModeSummary>, useImperial: Boolean
         if (delta > 1.0) {
             val deltaDisplay = if (useImperial) delta / 0.621371 else delta
             val unit = if (useImperial) "kWh/100mi" else "kWh/100km"
-            return "Sport used ${String.format("%.1f", deltaDisplay)} $unit more than Normal over comparable segments in this trip."
+            return sportMoreFmt.format(String.format("%.1f", deltaDisplay), unit)
         }
     }
     return null
 }
 
-private fun compareRegenModes(summaries: List<ModeSummary>): String? {
+private fun compareRegenModes(summaries: List<ModeSummary>, highRegenNoImprovementStr: String): String? {
     val standard = summaries.firstOrNull { it.label == "Standard" && it.distanceKm >= 1.0 }
     val high     = summaries.firstOrNull { it.label == "High"     && it.distanceKm >= 1.0 }
 
@@ -353,7 +364,7 @@ private fun compareRegenModes(summaries: List<ModeSummary>): String? {
     ) {
         val delta = high.regenSharePct - standard.regenSharePct
         if (delta < 2.0) {
-            return "High regen did not materially improve recovered energy on this trip, so braking opportunities likely mattered more than the regen setting."
+            return highRegenNoImprovementStr
         }
     }
     return null

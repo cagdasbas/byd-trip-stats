@@ -54,7 +54,7 @@
     <string name="tab_analysis">Analiz</string>
     <string name="tab_power">Güç</string>
     <string name="tab_voltage">Voltaj</string>
-    <string name="tab_cell_voltage">Hücre V</string>
+    <string name="tab_cell_voltage">Hücreler</string>
     <string name="tab_temperature">Sıcaklık</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">Ekran görüntüsü başarısız: %1$s</string>
     <string name="ev_range_label">EV menzili</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">Hız</string>
+    <string name="stat_range">Menzil</string>
+    <string name="label_time">Zaman</string>
+    <string name="label_now">şimdi</string>
+    <string name="chart_hv_battery_voltage">HV Pil Voltajı</string>
+    <string name="cell_low_label">En düşük</string>
+    <string name="cell_high_label">En yüksek</string>
+    <string name="crosshair_cell_high">En yüksek %.3f V</string>
+    <string name="crosshair_cell_low">En düşük %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">SÜRE</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">Sürüş Dinamiği</string>
     <string name="stat_odometer">Kilometre Sayacı</string>
     <string name="stat_total_discharge">Toplam Deşarj</string>
+    <string name="stat_total_consumed">Toplam tüketim</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">Durdur</string>
@@ -198,7 +208,7 @@
     <string name="stat_avg_consumption">Ort. Tüketim</string>
     <string name="stat_energy_consumed">Tüketilen enerji</string>
     <string name="stat_max_regen">Maks. Rejenerasyon</string>
-    <string name="stat_regen_eff">Rejenerasyon Ver.</string>
+    <string name="stat_regen_eff">Rejenerasyon Verimi</string>
     <string name="stat_avg_speed">Ort. Hız</string>
     <string name="stat_max_speed">Maks. Hız</string>
     <string name="stat_soc_panel">SoC (Panel)</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">Seyahat Verilerini Dışa Aktar</string>
     <string name="export_copy_summary">Özeti Panoya Kopyala</string>
-    <string name="export_save_downloads">İndirilenler klasörüne kaydet</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">CSV olarak kaydet</string>
     <string name="export_save_json">JSON olarak kaydet</string>
     <string name="export_save_html">HTML görüntüleyici olarak kaydet (açmak için çift tıklayın)</string>
@@ -283,7 +293,7 @@
     <string name="soc_end_label">Bitiş SoC</string>
     <string name="soc_added_label">Eklenen SoC</string>
     <string name="kwh_added_label">Eklenen kWh</string>
-    <string name="battery_car_label">Pil (araç)</string>
+    <string name="battery_car_label">Pil (HV)</string>
     <string name="peak_power_label">Tepe güç</string>
     <string name="average_power_label">Ortalama güç</string>
     <string name="charge_rate_label">Şarj hızı</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">Analiz edilen seyahatler</string>
     <string name="decline_rate_label">Bozunma hızı</string>
     <string name="projected_80_label">Tahmini %%80</string>
+    <string name="soh_not_declining">Düşüş yok</string>
+    <string name="soh_far_future">Uzak gelecek</string>
     <string name="soh_history_section">SoH Geçmişi</string>
     <string name="legend_recorded">Kaydedilen</string>
     <string name="legend_trend">Eğilim</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">İpucu: BYD\'nin garantisi pili 8 yıl / 250.000 km için %%70 SoH\'e kadar kapsar.</string>
     <string name="battery_health_report_title">Pil sağlığı raporu</string>
     <string name="battery_report_desc">Pilinizin Sağlık Durumu, bozunma hızı ve %%80 projeksiyonunu içeren bir rapor dışa aktarın — aracı satarken veya garanti talebi oluştururken yararlı bir kanıt. Download/BydTripStats/ klasörüne yazdırmaya hazır PDF veya HTML olarak kaydedilir. Tamamen cihazda oluşturulur.</string>
+    <string name="battery_report_warranty_note">BYD\'nin batarya garantisi bataryayı genellikle 8 yıl / 250.000 km boyunca 70% State of Health\'e kadar kapsar. Kesin koşullar için aracınızın garanti kitapçığına bakın.</string>
+    <string name="battery_report_exclusion_note">%2$s tarihinden önce State of Health\'i olduğundan düşük raporlayan eski bir tahmin yöntemiyle kaydedilen %1$d önceki yolculuğu hariç tutar.</string>
+    <string name="report_saved_msg">Rapor kaydedildi: %1$s</string>
+    <string name="report_failed_msg">Rapor başarısız: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">Pil veri aralığı</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">Mevsimsel Analiz</string>
-    <string name="winter_vs_summer_subtitle">Kış-yaz verimlilik karşılaştırması</string>
+    <string name="winter_vs_summer_subtitle">Kış-yaz tüketim karşılaştırması</string>
     <string name="no_seasonal_data">Henüz mevsimsel veri yok</string>
     <string name="complete_seasons_hint">Sıcaklığın menzilinizi nasıl etkilediğini görmek için birden fazla mevsim boyunca seyahat tamamlayın.</string>
     <string name="avg_consumption_by_season">Mevsime Göre Ort. Tüketim</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">Rotalar</string>
-    <string name="recurring_journeys_subtitle">Tekrarlayan yolculuklar &amp; verimlilik</string>
+    <string name="recurring_journeys_subtitle">Tekrarlayan yolculuklar &amp; tüketim</string>
     <string name="no_recurring_routes">Henüz tekrarlayan rota yok</string>
-    <string name="recurring_route_hint">Günlük işe gidiş gibi aynı güzergahı en az 3 kez gidin — burada görünür ve her seyahat arasındaki verimliliği karşılaştırabilirsiniz.</string>
+    <string name="recurring_route_hint">Günlük işe gidiş gibi aynı güzergahı en az 3 kez gidin — burada görünür ve her seyahat arasındaki tüketimi karşılaştırabilirsiniz.</string>
     <string name="route_best">en iyi</string>
     <string name="route_worst">en kötü</string>
     <string name="route_avg">ort.</string>
-    <string name="efficiency_trend_label">Seyahat başına verimlilik (eskiden yeniye)</string>
+    <string name="efficiency_trend_label">Seyahat başına tüketim (eskiden yeniye)</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">Hedefler &amp; Kişisel Rekorlar</string>
     <string name="track_milestones_subtitle">Sürüş dönüm noktalarınızı takip edin</string>
     <string name="set_goals_action">Hedef belirle</string>
     <string name="personal_bests_section">Kişisel Rekorlar</string>
-    <string name="best_efficiency_label">En iyi verimlilik</string>
+    <string name="best_efficiency_label">En iyi tüketim</string>
     <string name="lowest_ever_label">Kaydedilen en düşük</string>
     <string name="longest_trip_label">En uzun seyahat</string>
     <string name="longest_trip_subtitle">Tek seyahat mesafesi</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">Hedefler</string>
     <string name="no_goals_set">Henüz hedef belirlenmedi</string>
     <string name="set_goals_hint">Bir tüketim veya mesafe hedefi belirlemek için yukarıdaki ✏️ simgesine dokunun.</string>
-    <string name="efficiency_target_label">Verimlilik hedefi</string>
+    <string name="efficiency_target_label">Tüketim hedefi</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s (son 5 seyahat ort.)</string>
     <string name="monthly_distance_goal_label">Aylık mesafe</string>
     <string name="monthly_distance_subtitle">Bu ay %1$s / %2$s %3$s</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">Etiketler</string>
-    <string name="per_tag_efficiency">Etikete göre verimlilik &amp; toplamlar</string>
+    <string name="per_tag_efficiency">Etikete göre tüketim &amp; toplamlar</string>
     <string name="no_tags_yet">Henüz etiket yok</string>
     <string name="tag_usage_hint">Seyahatin detay ekranından etiket ekleyin veya Geçmiş\'in seçim modundan aynı anda birkaçını etiketleyin. Etiketli seyahatler burada özetlenir.</string>
     <string name="rename_tag_title">Etiketi yeniden adlandır</string>
@@ -410,8 +426,8 @@
 
     <!-- Local Backup screen -->
     <string name="backup_restore_title">Veritabanı Yedekleme &amp; Geri Yükleme</string>
-    <string name="backup_to_download_label">İndirilenler\'e Yedekle</string>
-    <string name="backup_download_desc">Tam seyahat veritabanını şuraya kaydeder: Download/BydTripStats/byd_stats_backup_TARİH.db</string>
+    <string name="backup_to_download_label">Download\'a Yedekle</string>
+    <string name="backup_download_desc">Tam seyahat veritabanını şuraya kaydeder: Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">Şimdi Yedekle</string>
     <string name="backup_to_sd_label">SD karta yedekle</string>
     <string name="sd_backup_desc">Veritabanının bir kopyasını SD karttaki BydTripStats klasörüne kaydeder. İndirilenler yedeğinin aksine, bunlar uygulama kaldırmadan sonra da hayatta kalır — bilgisayarda okuyabileceğiniz cihaz dışı yedeklilik.</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">Rejenerasyon</string>
     <string name="drive_mode_usage_label">Sürüş modu kullanımı</string>
     <string name="regen_mode_usage_label">Rejenerasyon modu kullanımı</string>
+    <string name="mode_of_mode_attributed_trip">mod izlenen sürüşten</string>
+    <string name="mode_recovered_via_regen">rejenerasyon yoluyla kurtarıldı</string>
+    <string name="mode_eco_normal_same">Bu yolculukta Eco ve Normal pratik olarak aynı performansı gösterdi, bu nedenle rota ve trafik seçilen sürüş modundan daha belirleyici oldu.</string>
+    <string name="mode_sport_more_than_normal">Bu yolculuktaki karşılaştırılabilir bölümlerde Sport, Normal\'den %1$s %2$s daha fazla tüketti.</string>
+    <string name="mode_high_regen_no_improvement">Bu yolculukta High regen, geri kazanılan enerjiyi önemli ölçüde artırmadı — fren fırsatları büyük olasılıkla regen ayarından daha belirleyici oldu.</string>
     <string name="route_segments_label">Rota Segmentleri</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Ara noktalar</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">Anlık Tüketim</string>
     <string name="chart_drive_regen_modes">Sürüş / Rejenerasyon Modları</string>
     <string name="chart_mode_timeline">Seyahat boyunca mod zaman çizelgesi</string>
+    <string name="heatmap_mode_filters">Mod filtreleri</string>
+    <string name="heatmap_legend_few">Az</string>
+    <string name="heatmap_legend_many">Çok</string>
+    <string name="heatmap_legend_density">Renk yoğunluğu = örnek yoğunluğu (log ölçek)</string>
+    <string name="heatmap_axis_speed">Hız (%1$s)</string>
+    <string name="heatmap_axis_power">Güç (kW)</string>
+    <string name="heatmap_axis_regen_power">Rejenerasyon gücü (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">Ön motor RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">Arka motor RPM</string>
+    <string name="heatmap_axis_motor_rpm">Motor RPM</string>
+    <string name="heatmap_axis_accel">İvme (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">Günün saati</string>
+    <string name="heatmap_axis_battery_temp">Batarya sıcaklığı (°C)</string>
+    <string name="heatmap_axis_cell_spread">Hücre farkı (V)</string>
+    <string name="heatmap_axis_gradient">Eğim (%)</string>
+    <string name="heatmap_axis_front_rpm">Ön RPM</string>
+    <string name="heatmap_axis_rear_rpm">Arka RPM</string>
+    <string name="heatmap_axis_avg_tyre_pressure">Ort. lastik basıncı (PSI)</string>
+    <string name="mode_no_data">Bu yolculuk için sürüş/rejenerasyon modu verisi kaydedilmedi.</string>
+    <string name="mode_enable_hint">Zaman çizelgesini görmek için sürüş modunu veya rejenerasyon modunu etkinleştirin.</string>
+    <string name="mode_drive_lane_title">Sürüş modu</string>
+    <string name="mode_regen_lane_title">Rejenerasyon modu</string>
+    <string name="mode_drive_modes_label">Sürüş modları</string>
+    <string name="mode_regen_modes_label">Rejenerasyon modları</string>
     <string name="chart_speed_detailed">Hız Profili (Ayrıntılı)</string>
     <string name="chart_rpm_detailed">Motor Devri (Ayrıntılı)</string>
     <string name="chart_power_detailed">Güç Profili (Ayrıntılı)</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">Veri mevcut değil</string>
     <string name="chart_insufficient_data">Yetersiz veri</string>
     <string name="chart_not_enough_driving">Anlık tüketim için yeterli sürüş verisi yok</string>
-    <string name="chart_weekly_consumption">Haftalık tüketim</string>
-    <string name="chart_monthly_consumption">Aylık tüketim</string>
-    <string name="chart_yearly_consumption">Yıllık tüketim</string>
+    <string name="chart_weekly_consumption">Bu hafta</string>
+    <string name="chart_monthly_consumption">Bu ay</string>
+    <string name="chart_yearly_consumption">Bu yıl</string>
     <string name="chart_your_duration_avg">Süre ortalamanız (%1$s %2$s)</string>
     <string name="chart_selected_car_avg">Seçilen araç ort. (%1$s %2$s)</string>
     <string name="chart_close">Grafiği kapat</string>
     <string name="chart_no_data_yet">Henüz veri yok</string>
     <string name="chart_instant_label">Anlık</string>
     <string name="chart_avg_5pt">5 noktalı ortalama</string>
+    <string name="chart_into_trip">yolculukta</string>
     <string name="chart_no_motor_data">Motor verisi mevcut değil</string>
     <string name="chart_motor_smoothed_note">Çok kısa aks patlamaları düzeltilmiş görünebilir - ayrıntılar için tam ekrana geçin</string>
     <string name="legend_rear_motor">Arka motor</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">Zamana göre kWh</string>
-    <string name="axis_soc_over_time">Zamana göre SoC%%</string>
+    <string name="axis_soc_over_time">Zamana göre SoC%</string>
     <string name="axis_speed_over_time">Zamana göre %1$s</string>
     <string name="axis_rpm_over_time">Zamana göre RPM</string>
     <string name="axis_altitude_over_time">Zamana göre rakım</string>
     <string name="axis_power_over_time">Zamana göre kW</string>
     <string name="axis_hv_cells">YV barası + hücre min/maks (V)</string>
-    <string name="axis_tyre_wheels">Dört tekerlek de (bar)</string>
-    <string name="axis_consumption_distance">Mesafeye göre %1$s</string>
+    <string name="axis_tyre_wheels">Dört tekerlek de</string>
+    <string name="axis_consumption_distance">Zamana göre %1$s</string>
     <string name="axis_mode_timeline">Seyahat boyunca mod zaman çizelgesi</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">Şarj Gücü</string>
     <string name="charging_chart_cell_voltage">Hücre Voltajı</string>
     <string name="charging_chart_avg_temp">Ort.</string>
-    <string name="charging_chart_cell_min_temp">Hücre min</string>
-    <string name="charging_chart_cell_max_temp">Hücre maks</string>
+    <string name="charging_chart_cell_min_temp">En düşük</string>
+    <string name="chart_cells_voltage_axis">Hücreler (V)</string>
+    <string name="charging_chart_cell_max_temp">En yüksek</string>
     <string name="charging_chart_hv_bus">YV Barası (V)</string>
-    <string name="charging_chart_cell_min">Hücre min (V)</string>
-    <string name="charging_chart_cell_max">Hücre maks (V)</string>
+    <string name="charging_chart_cell_min">Min. hücre gerilimi (V)</string>
+    <string name="charging_chart_cell_max">Maks. hücre gerilimi (V)</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
     <string name="charging_chart_panel_soc">Panel SoC</string>
     <string name="wheel_lf">ÖS</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">Güç - Hız</string>
     <string name="heatmap_power_vs_speed_desc">Her hızda motor çıkışı — aracın gerçekte nerede çalıştığını gösterir</string>
     <string name="heatmap_consumption_vs_speed">Tüketim - Hız</string>
-    <string name="heatmap_consumption_vs_speed_desc">Hız aralığı boyunca anlık verimlilik (%1$s)</string>
+    <string name="heatmap_consumption_vs_speed_desc">Hız aralığı boyunca anlık tüketim (%1$s)</string>
     <string name="heatmap_regen_vs_speed">Rejenerasyon Gücü - Hız</string>
     <string name="heatmap_regen_vs_speed_desc">Hız bandına göre rejeneratif frenleme gücü</string>
     <string name="heatmap_front_rpm_vs_speed">Ön Motor Devri - Hız</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">İvme - Hız</string>
     <string name="heatmap_accel_desc">Sürücünün sert ivme yaptığı veya serbest bıraktığı yer — düşükse daha verimli</string>
     <string name="heatmap_soc_vs_consumption">SoC - Tüketim</string>
-    <string name="heatmap_soc_consumption_desc">Düşük veya yüksek şarj durumlarında verimliliğin değişip değişmediği</string>
+    <string name="heatmap_soc_consumption_desc">Düşük veya yüksek şarj durumlarında tüketimin değişip değişmediği</string>
     <string name="heatmap_time_vs_speed">Günün Saati - Hız</string>
     <string name="heatmap_time_speed_desc">Ne zaman ve ne kadar hızlı sürdüğünüz — trafik yoğunluk saati sıkışıklık örüntülerini ortaya koyar</string>
     <string name="heatmap_gradient_vs_consumption">Eğim - Tüketim</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">Ön - Arka Motor Devri</string>
     <string name="heatmap_awd_desc">AWD tork dağılımı — köşegen = eşit pay, köşegen dışı = bir motor baskın</string>
     <string name="heatmap_tyre_vs_consumption">Lastik Basıncı - Tüketim</string>
-    <string name="heatmap_tyre_desc">Daha yüksek basıncın aracınızda verimliliği ölçülebilir şekilde artırıp artırmadığı</string>
+    <string name="heatmap_tyre_desc">Daha yüksek basıncın aracınızda tüketimi ölçülebilir şekilde azaltıp azaltmadığı</string>
     <string name="heatmap_soc_vs_regen">SoC - Rejenerasyon Verimi</string>
     <string name="heatmap_soc_regen_desc">BMS\'nin rejeneratif frenlemeyi kısıtladığı yer — %%100 SoC yakınında beklenir</string>
     <string name="heatmap_speed_vs_temp">Hız - Pil Sıcaklığı</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">Bu seyahatte pil sıcaklığı verisi kaydedilmedi.</string>
     <string name="heatmap_no_mode">%1$s modu kaydedilmedi — gelecekteki seyahatlerde analizleri etkinleştirmek için araç ekranındaki her moda bir kez dokunun.</string>
     <string name="chart_no_route_data">Rota verisi mevcut değil</string>
+    <string name="map_no_gps_recorded">GPS koordinatları kaydedildiğinde burada görünecek</string>
+    <string name="map_no_valid_gps">Bu gezi için geçerli GPS verisi yok</string>
+    <string name="map_traffic_label">Trafik</string>
+    <string name="map_traffic_free_flow">Akışkan trafik  (≥ %1$s)</string>
+    <string name="map_traffic_light">Hafif trafik  (%1$s)</string>
+    <string name="map_traffic_heavy">Yoğun trafik  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">Enerji yoğunluk noktaları</string>
+    <string name="route_energy_hotspots_desc">En yüksek enerji tüketimli segmentler</string>
+    <string name="route_trip_timeline">Yolculuk zaman çizelgesi</string>
+    <string name="route_trip_started">Yolculuk başladı</string>
+    <string name="route_hard_acceleration">Sert ivmelenme</string>
+    <string name="route_hard_braking">Sert frenleme</string>
+    <string name="route_trip_ended">Yolculuk bitti</string>
+    <string name="stat_one_trip">1 yolculuk</string>
+    <string name="stat_n_trips">%1$d yolculuk</string>
+    <string name="season_vs_ref">%1$s ref. karşı</string>
+    <string name="season_stat_km_total">%1$s km toplam</string>
+    <string name="season_stat_kwh_used">%1$s kWh kullanıldı</string>
+    <string name="season_stat_avg_temp">ort. %1$s°C</string>
+    <string name="route_distance_label">%1$s %2$s güzergah</string>
+    <string name="route_instance_trips">%1$d yolculuk · %2$s</string>
+    <string name="route_avg_unit">ort. %1$s</string>
+    <string name="schedule_daily">Günlük</string>
+    <string name="schedule_weekly">Haftalık</string>
+    <string name="schedule_monthly">Aylık</string>
+    <string name="danger_zone_title">TEHLİKE BÖLGESİ</string>
+    <string name="danger_zone_desc">Tüm gezileri, veri noktalarını ve istatistikleri kalıcı olarak siler. Sıfırlama öncesinde otomatik olarak yerel bir yedek oluşturulur.</string>
+    <string name="send_diag_log_desc">Tam tanılama günlüğünü (speed-stall ve \'telemetri yenileme takıldı\' olayları) doğrudan bağlı Telegram botunuza gönderir — yerel olarak hiçbir şey kaydedilmez veya paylaşılmaz. Önce Backup &amp; Restore → Telegram Backup altında bir bot bağlayın.</string>
+    <string name="compat_privacy_notice_body">Rapor, aracınızın kafa ünitesindeki her veri kaynağından ham değerleri yakalar — sayısal değerler, dizeler ve diziler.\n\nGPS enlem ve boylamı DAHİL DEĞİLDİR.\n\nDiğer her şey dahildir: akü durumu, motor verileri, vites, hız, sürüş modları, klima durumu, şarj durumu, PHEV\'e özgü değerler vb.\n\nHiçbir şey otomatik olarak gönderilmez. "QR koduyla e-posta" raporu geçici bir genel sunucuya (litterbox) yükler ve 12 saat sonra otomatik olarak silinen bir bağlantı gösterir; o zamana kadar bağlantıya sahip olan herkes okuyabilir. Diğer seçenekler raporu cihazınızda tutar.</string>
+    <string name="compat_sending_label">Gönderiliyor…</string>
+    <string name="compat_email_qr_label">QR koduyla e-posta</string>
+    <string name="compat_uploading_label">Yükleniyor…</string>
+    <string name="compat_telegram_not_configured">Telegram yapılandırılmamış — önce Backup &amp; Restore altında kurun.</string>
+    <string name="compat_sent_telegram">Telegram ile gönderildi ✓</string>
+    <string name="compat_telegram_failed">Telegram gönderimi başarısız: %1$s</string>
+    <string name="compat_save_failed">Kaydetme başarısız: %1$s</string>
+    <string name="compat_probe_cleared">Probe verileri temizlendi.</string>
+    <string name="compat_upload_failed">Yükleme başarısız: %1$s</string>
+    <string name="compat_qr_copy_link">Bağlantıyı kopyala</string>
+    <string name="compat_qr_dialog_title">Raporu e-postayla göndermek için QR\'ı tarayın</string>
+    <string name="compat_qr_dialog_desc">Telefonunuzla tarayın — %1$s adresine önceden doldurulmuş bir e-posta açar. Hesabınızı seçin ve Gönder\'e basın. Bağlantı 12 saat sonra sona erer.</string>
+    <string name="compat_qr_no_render">QR kodu oluşturulamadı. "Bağlantıyı kopyala"yı kullanın ve %1$s adresine e-posta ile gönderin.</string>
+    <string name="compat_qr_content_desc">Probe indirme bağlantısıyla önceden doldurulmuş e-posta açan QR kodu</string>
+    <string name="web_access_pin_label">Erişim PIN</string>
+    <string name="web_pin_browser_hint">Birisi sunucu URL\'sini açtığında tarayıcı giriş sayfasında gösterilir.</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">PIN\'i gizle</string>
+    <string name="web_pin_show_cd">PIN\'i göster</string>
+    <string name="web_pin_set">Ayarla</string>
+    <string name="web_pin_regen">Yenile</string>
+    <string name="web_pin_min_digits">Min. 4 rakam. PIN\'in değiştirilmesi tüm aktif tarayıcı oturumlarını geçersiz kılar.</string>
+    <string name="web_ip_locked_one">1 IP adresi kilitlendi</string>
+    <string name="web_ip_locked_many">%1$d IP adresi kilitlendi</string>
+    <string name="web_too_many_attempts">Çok fazla yanlış PIN denemesi tespit edildi.</string>
+    <string name="web_server_failed">Başlatma başarısız: %1$s</string>
+    <string name="web_server_waiting">IP adresi bekleniyor…</string>
+    <string name="web_server_open_hint">Bu adresi aynı WiFi\'ye bağlı herhangi bir cihazda açın.</string>
+    <string name="web_copy_url_cd">URL\'yi kopyala</string>
     <string name="chart_no_tyre_data">Bu seyahatte lastik basıncı verisi kaydedilmedi</string>
 
     <!-- Initialization screen -->
@@ -685,7 +790,7 @@
     <string name="soc_source_info">PHEV\'lerde BMS SoC genellikle raporlanmaz — BMS 0 gösteriyorsa Panel\'i kullanın.\nBMS, Panel\'den daha doğrudur (kayan nokta vs tam sayı). Ayrıca Panel\'den büyük sapma, %%100 şarj veya şarj kalibrasyonu zamanı geldiğinin iyi bir göstergesidir</string>
     <string name="pref_cell_imbalance">Hücre dengesizlik uyarısı</string>
     <string name="cell_imbalance_desc">Paketteki hücre voltaj farkı sınırın üzerinde kaldığında beni bildir.</string>
-    <string name="cell_imbalance_info">Fark = en yüksek hücre − en düşük hücre. Sağlıklı bir paket ~20 mV\'ın altında kalır; kalıcı olarak yüksek fark zayıf bir hücreye işaret edebilir. Uyarılar, geniş farkın normal olduğu %%5\'in altında ve %%95\'in üzerinde SoC\'de bastırılır.</string>
+    <string name="cell_imbalance_info">Fark = en yüksek hücre − en düşük hücre. Sağlıklı bir paket ~20 mV\'ın altında kalır; kalıcı olarak yüksek fark zayıf bir hücreye işaret edebilir. Geniş farkın normal olduğu %%5\'in altındaki ve %%95\'in üzerindeki SoC değerlerinde uyarılar bastırılır.</string>
     <string name="current_limit_value">Mevcut sınır: %1$s mV</string>
     <string name="change_limit_action">Sınırı değiştir</string>
     <string name="pro_feature_imbalance_msg">Bu bir BYD Trip Stats Pro özelliğidir. Dengesizlik uyarıları almak için Pro\'yu açın.</string>
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTT test yayını başarılı</string>
     <string name="mqtt_test_failed_msg">MQTT testi başarısız: %1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT ayarları kaydedildi</string>
+    <string name="connection_group_label">Bağlantı</string>
+    <string name="hide_token_cd">Jetonu gizle</string>
+    <string name="show_token_cd">Jetonu göster</string>
+    <string name="abrp_status_label">ABRP durumu</string>
+    <string name="mqtt_status_label">MQTT durumu</string>
+    <string name="label_configured">Yapılandırıldı</string>
+    <string name="label_enabled">Etkinleştirildi</string>
+    <string name="label_last_upload">Son yükleme</string>
+    <string name="label_last_publish">Son yayın</string>
+    <string name="label_last_status">Son durum</string>
+    <string name="value_yes">Evet</string>
+    <string name="value_no">Hayır</string>
+    <string name="value_na">yok</string>
 
     <!-- About screen -->
     <string name="about_version_label">Sürüm</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">Bellek kullanımı</string>
     <string name="last_60s_label">son 60 sn</string>
     <string name="adb_shell_label">ADB kabuğu</string>
-    <string name="adb_shell_desc_text">Yetkili yerel ADB arka plan programı üzerinden çalışır. Komutu `adb shell`\'den sonra yazacağınız gibi tam olarak girin.</string>
+    <string name="adb_shell_desc_text">Yetkili yerel ADB daemon üzerinden çalışır. Komutu `adb shell`\'den sonra yazacağınız gibi tam olarak girin.</string>
     <string name="shell_command_label">Kabuk komutu</string>
     <string name="run_shell_cmd_action">Kabuk komutunu çalıştır</string>
     <string name="samples_refresh_note">Örnekler bu ekran açıkken her 2 saniyede bir yenilenir.</string>
@@ -956,8 +1074,8 @@
     <string name="compat_telegram_action">Telegram</string>
 
     <!-- MainActivity dialogs -->
-    <string name="autostart_dialog_title">⚠️ İşlem Gerekli — Otomatik Başlatma</string>
-    <string name="autostart_dialog_msg">Yeni bir sürüm yüklendi. Bu uygulama için otomatik başlatmayı devre dışı bırakma seçeneğini kapatmanız gerekiyor; bu, araç kapalıyken (örn. gecelik şarj) arka plan veri toplamasını etkinleştirir.\n\nEn iyi güvenilirlik için bu ayarı değiştirdikten sonra aracı bir kez yeniden başlatın, ardından BYD Trip Stats\'ı yeniden açın.\nUYARI: Sürüş sırasında hız ve diğer değerlerin güncellenmediğini görürseniz aracı yeniden başlatmanız gerekir!</string>
+    <string name="autostart_dialog_title">⚠️ Eylem Gerekli — Otomatik Başlatma</string>
+    <string name="autostart_dialog_msg">Yeni bir sürüm yüklendi. Bu uygulama için otomatik başlatmayı kapatman gerekiyor; bu, araç kapalıyken (örn. gece şarj ederken) arka plan veri toplamayı etkinleştirir.\n\nEn iyi güvenilirlik için bu ayarı değiştirdikten sonra aracı bir kez yeniden başlat, ardından BYD Trip Stats\'ı tekrar aç.\nUYARI: Sürüş sırasında hız ve diğer değerlerin güncellendiğini görmüyorsan aracı yeniden başlatman gerekiyor!</string>
     <string name="autostart_got_it">Anlaşıldı</string>
     <string name="adb_connecting_title">Bağlanıyor…</string>
     <string name="adb_waiting_auth_title">Yetkilendirme bekleniyor</string>

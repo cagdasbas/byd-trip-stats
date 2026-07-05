@@ -54,7 +54,7 @@
     <string name="tab_analysis">Analisi</string>
     <string name="tab_power">Potenza</string>
     <string name="tab_voltage">Tensione</string>
-    <string name="tab_cell_voltage">V cella</string>
+    <string name="tab_cell_voltage">Celle</string>
     <string name="tab_temperature">Temperatura</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">Screenshot fallito: %1$s</string>
     <string name="ev_range_label">Autonomia EV</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">Velocità</string>
+    <string name="stat_range">Autonomia</string>
+    <string name="label_time">Tempo</string>
+    <string name="label_now">ora</string>
+    <string name="chart_hv_battery_voltage">Tensione batteria HV</string>
+    <string name="cell_low_label">La più bassa</string>
+    <string name="cell_high_label">La più alta</string>
+    <string name="crosshair_cell_high">La più alta %.3f V</string>
+    <string name="crosshair_cell_low">La più bassa %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">TEMPO</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">Dinamica di guida</string>
     <string name="stat_odometer">Contachilometri</string>
     <string name="stat_total_discharge">Scarica totale</string>
+    <string name="stat_total_consumed">Totale consumato</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">Ferma</string>
@@ -198,7 +208,7 @@
     <string name="stat_avg_consumption">Consumo medio</string>
     <string name="stat_energy_consumed">Energia consumata</string>
     <string name="stat_max_regen">Regen. massima</string>
-    <string name="stat_regen_eff">Ef. regen.</string>
+    <string name="stat_regen_eff">Efficienza regen.</string>
     <string name="stat_avg_speed">Velocità media</string>
     <string name="stat_max_speed">Velocità massima</string>
     <string name="stat_soc_panel">SoC (Pannello)</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">Esporta dati viaggio</string>
     <string name="export_copy_summary">Copia riepilogo negli appunti</string>
-    <string name="export_save_downloads">Salva nella cartella Download</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">Salva come CSV</string>
     <string name="export_save_json">Salva come JSON</string>
     <string name="export_save_html">Salva come visualizzatore HTML (doppio clic per aprire)</string>
@@ -283,7 +293,7 @@
     <string name="soc_end_label">SoC fine</string>
     <string name="soc_added_label">SoC aggiunto</string>
     <string name="kwh_added_label">kWh aggiunti</string>
-    <string name="battery_car_label">Batteria (auto)</string>
+    <string name="battery_car_label">Batteria (HV)</string>
     <string name="peak_power_label">Potenza di picco</string>
     <string name="average_power_label">Potenza media</string>
     <string name="charge_rate_label">Velocità di ricarica</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">Viaggi analizzati</string>
     <string name="decline_rate_label">Tasso di declino</string>
     <string name="projected_80_label">Proiettato all\'80%%</string>
+    <string name="soh_not_declining">Senza declino</string>
+    <string name="soh_far_future">Futuro lontano</string>
     <string name="soh_history_section">Storico SoH</string>
     <string name="legend_recorded">Registrato</string>
     <string name="legend_trend">Tendenza</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">Suggerimento: la garanzia BYD copre la batteria al 70%% di SoH per 8 anni / 250.000 km.</string>
     <string name="battery_health_report_title">Report salute batteria</string>
     <string name="battery_report_desc">Esporta un report dello Stato di salute della tua batteria, tasso di declino e proiezione all\'80%% — prova utile per vendere l\'auto o avanzare un reclamo in garanzia. Salvato in Download/BydTripStats/ come PDF pronto per la stampa o come HTML (si apre in qualsiasi browser). Generato interamente sul dispositivo.</string>
+    <string name="battery_report_warranty_note">La garanzia della batteria BYD copre di solito il pacco fino al 70% di State of Health per 8 anni / 250.000 km. Consulta il libretto di garanzia del veicolo per i termini esatti.</string>
+    <string name="battery_report_exclusion_note">Esclude %1$d viaggio/i precedente/i registrato/i prima del %2$s con un vecchio metodo di stima che sottostimava lo State of Health.</string>
+    <string name="report_saved_msg">Report salvato: %1$s</string>
+    <string name="report_failed_msg">Report non riuscito: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">Intervallo dati batteria</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">Analisi stagionale</string>
-    <string name="winter_vs_summer_subtitle">Analisi efficienza inverno vs estate</string>
+    <string name="winter_vs_summer_subtitle">Analisi consumo inverno vs estate</string>
     <string name="no_seasonal_data">Nessun dato stagionale ancora</string>
     <string name="complete_seasons_hint">Completa viaggi in più stagioni per vedere come la temperatura influisce sulla tua autonomia.</string>
     <string name="avg_consumption_by_season">Consumo medio per stagione</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">Percorsi</string>
-    <string name="recurring_journeys_subtitle">Tragitti ricorrenti &amp; efficienza</string>
+    <string name="recurring_journeys_subtitle">Tragitti ricorrenti &amp; consumo</string>
     <string name="no_recurring_routes">Nessun percorso ricorrente ancora</string>
-    <string name="recurring_route_hint">Percorri lo stesso tragitto almeno 3 volte — come il pendolarismo quotidiano — e apparirà qui così puoi confrontare l\'efficienza di ogni viaggio.</string>
+    <string name="recurring_route_hint">Percorri lo stesso tragitto almeno 3 volte — come il pendolarismo quotidiano — e apparirà qui così puoi confrontare il consumo di ogni viaggio.</string>
     <string name="route_best">migliore</string>
     <string name="route_worst">peggiore</string>
     <string name="route_avg">media</string>
-    <string name="efficiency_trend_label">Efficienza per viaggio (dal più vecchio al più recente)</string>
+    <string name="efficiency_trend_label">Consumo per viaggio (dal più vecchio al più recente)</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">Obiettivi &amp; record personali</string>
     <string name="track_milestones_subtitle">Monitora i tuoi traguardi di guida</string>
     <string name="set_goals_action">Imposta obiettivi</string>
     <string name="personal_bests_section">Record personali</string>
-    <string name="best_efficiency_label">Migliore efficienza</string>
+    <string name="best_efficiency_label">Migliore consumo</string>
     <string name="lowest_ever_label">Minimo storico registrato</string>
     <string name="longest_trip_label">Viaggio più lungo</string>
     <string name="longest_trip_subtitle">Distanza viaggio singolo</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">Obiettivi</string>
     <string name="no_goals_set">Nessun obiettivo impostato ancora</string>
     <string name="set_goals_hint">Tocca ✏️ in alto per impostare un obiettivo di consumo o distanza.</string>
-    <string name="efficiency_target_label">Obiettivo efficienza</string>
+    <string name="efficiency_target_label">Obiettivo consumo</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s (media ultimi 5 viaggi)</string>
     <string name="monthly_distance_goal_label">Distanza mensile</string>
     <string name="monthly_distance_subtitle">%1$s / %2$s %3$s questo mese</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">Etichette</string>
-    <string name="per_tag_efficiency">Efficienza &amp; totali per etichetta</string>
+    <string name="per_tag_efficiency">Consumo &amp; totali per etichetta</string>
     <string name="no_tags_yet">Nessuna etichetta ancora</string>
     <string name="tag_usage_hint">Aggiungi un\'etichetta a un viaggio dalla sua schermata di dettaglio, oppure etichetta più viaggi contemporaneamente dalla modalità selezione dello storico. I viaggi etichettati sono riepilogati qui.</string>
     <string name="rename_tag_title">Rinomina etichetta</string>
@@ -411,7 +427,7 @@
     <!-- Local Backup screen -->
     <string name="backup_restore_title">Backup &amp; Ripristino database</string>
     <string name="backup_to_download_label">Backup in Download</string>
-    <string name="backup_download_desc">Salva il database completo in: Download/BydTripStats/byd_stats_backup_DATA.db</string>
+    <string name="backup_download_desc">Salva il database completo in: Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">Esegui backup ora</string>
     <string name="backup_to_sd_label">Backup su scheda SD</string>
     <string name="sd_backup_desc">Salva una copia del database in una cartella BydTripStats sulla scheda SD. A differenza del backup in Download, questi sopravvivono alla disinstallazione dell\'app — ridondanza esterna che puoi estrarre e leggere su un computer.</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">Rigenerazione</string>
     <string name="drive_mode_usage_label">Utilizzo modalità di guida</string>
     <string name="regen_mode_usage_label">Utilizzo modalità rigenerazione</string>
+    <string name="mode_of_mode_attributed_trip">del viaggio monitorato per modo</string>
+    <string name="mode_recovered_via_regen">recuperato tramite regen</string>
+    <string name="mode_eco_normal_same">Eco e Normal sono stati praticamente uguali in questo viaggio, quindi il percorso e il traffico hanno contato più della modalità di guida selezionata.</string>
+    <string name="mode_sport_more_than_normal">Sport ha consumato %1$s %2$s in più rispetto a Normal sui segmenti comparabili di questo viaggio.</string>
+    <string name="mode_high_regen_no_improvement">High regen non ha migliorato materialmente l\'energia recuperata in questo viaggio, quindi le opportunità di frenata hanno probabilmente contato più dell\'impostazione regen.</string>
     <string name="route_segments_label">Segmenti percorso</string>
     <string name="segment_number_label">Segmento %1$s</string>
     <string name="waypoints_label">Waypoint</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">Consumo istantaneo</string>
     <string name="chart_drive_regen_modes">Modalità guida / regen.</string>
     <string name="chart_mode_timeline">Sequenza temporale modalità durante il viaggio</string>
+    <string name="heatmap_mode_filters">Filtri modalità</string>
+    <string name="heatmap_legend_few">Pochi</string>
+    <string name="heatmap_legend_many">Molti</string>
+    <string name="heatmap_legend_density">Intensità colore = densità campioni (scala log)</string>
+    <string name="heatmap_axis_speed">Velocità (%1$s)</string>
+    <string name="heatmap_axis_power">Potenza (kW)</string>
+    <string name="heatmap_axis_regen_power">Potenza regen. (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">RPM motore anteriore</string>
+    <string name="heatmap_axis_rear_motor_rpm">RPM motore posteriore</string>
+    <string name="heatmap_axis_motor_rpm">RPM motore</string>
+    <string name="heatmap_axis_accel">Accel. (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">Ora del giorno</string>
+    <string name="heatmap_axis_battery_temp">Temp. batteria (°C)</string>
+    <string name="heatmap_axis_cell_spread">Dispersione celle (V)</string>
+    <string name="heatmap_axis_gradient">Pendenza (%)</string>
+    <string name="heatmap_axis_front_rpm">RPM anteriore</string>
+    <string name="heatmap_axis_rear_rpm">RPM posteriore</string>
+    <string name="heatmap_axis_avg_tyre_pressure">Pressione media gomma (PSI)</string>
+    <string name="mode_no_data">Nessun dato di modalità guida/rigenerazione registrato per questo viaggio.</string>
+    <string name="mode_enable_hint">Abilita la modalità guida o rigenerazione per visualizzare la timeline.</string>
+    <string name="mode_drive_lane_title">Modalità guida</string>
+    <string name="mode_regen_lane_title">Modalità rigenerazione</string>
+    <string name="mode_drive_modes_label">Modalità di guida</string>
+    <string name="mode_regen_modes_label">Modalità di rigenerazione</string>
     <string name="chart_speed_detailed">Profilo velocità (dettagliato)</string>
     <string name="chart_rpm_detailed">RPM motore (dettagliato)</string>
     <string name="chart_power_detailed">Profilo potenza (dettagliato)</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">Nessun dato disponibile</string>
     <string name="chart_insufficient_data">Dati insufficienti</string>
     <string name="chart_not_enough_driving">Dati di guida insufficienti per il consumo istantaneo</string>
-    <string name="chart_weekly_consumption">Consumo settimanale</string>
-    <string name="chart_monthly_consumption">Consumo mensile</string>
-    <string name="chart_yearly_consumption">Consumo annuale</string>
+    <string name="chart_weekly_consumption">Questa settimana</string>
+    <string name="chart_monthly_consumption">Questo mese</string>
+    <string name="chart_yearly_consumption">Quest\'anno</string>
     <string name="chart_your_duration_avg">La tua media di durata (%1$s %2$s)</string>
     <string name="chart_selected_car_avg">Media auto selezionata (%1$s %2$s)</string>
     <string name="chart_close">Chiudi grafico</string>
     <string name="chart_no_data_yet">Nessun dato ancora</string>
     <string name="chart_instant_label">Istantaneo</string>
     <string name="chart_avg_5pt">Media 5 punti</string>
+    <string name="chart_into_trip">nel viaggio</string>
     <string name="chart_no_motor_data">Nessun dato motore disponibile</string>
     <string name="chart_motor_smoothed_note">Burst assale molto brevi potrebbero apparire levigati - schermo intero per i dettagli</string>
     <string name="legend_rear_motor">Motore posteriore</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh nel tempo</string>
-    <string name="axis_soc_over_time">SoC%% nel tempo</string>
+    <string name="axis_soc_over_time">SoC% nel tempo</string>
     <string name="axis_speed_over_time">%1$s nel tempo</string>
     <string name="axis_rpm_over_time">RPM nel tempo</string>
     <string name="axis_altitude_over_time">Altitudine nel tempo</string>
     <string name="axis_power_over_time">kW nel tempo</string>
     <string name="axis_hv_cells">Bus HV + min/max cella (V)</string>
-    <string name="axis_tyre_wheels">Tutte e quattro le ruote (bar)</string>
-    <string name="axis_consumption_distance">%1$s sulla distanza</string>
+    <string name="axis_tyre_wheels">Tutte e quattro le ruote</string>
+    <string name="axis_consumption_distance">%1$s nel tempo</string>
     <string name="axis_mode_timeline">Sequenza temporale modalità durante il viaggio</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">Potenza di ricarica</string>
     <string name="charging_chart_cell_voltage">Tensione cella</string>
     <string name="charging_chart_avg_temp">Media</string>
-    <string name="charging_chart_cell_min_temp">Min cella</string>
-    <string name="charging_chart_cell_max_temp">Max cella</string>
+    <string name="charging_chart_cell_min_temp">La più bassa</string>
+    <string name="chart_cells_voltage_axis">Celle (V)</string>
+    <string name="charging_chart_cell_max_temp">La più alta</string>
     <string name="charging_chart_hv_bus">Bus HV (V)</string>
-    <string name="charging_chart_cell_min">Min cella (V)</string>
-    <string name="charging_chart_cell_max">Max cella (V)</string>
+    <string name="charging_chart_cell_min">Tensione cella min. (V)</string>
+    <string name="charging_chart_cell_max">Tensione cella max. (V)</string>
     <string name="charging_chart_bms_soc">SoC BMS</string>
     <string name="charging_chart_panel_soc">SoC Pannello</string>
     <string name="wheel_lf">AS</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">Potenza vs Velocità</string>
     <string name="heatmap_power_vs_speed_desc">Uscita motore ad ogni velocità — mostra dove opera effettivamente l\'auto</string>
     <string name="heatmap_consumption_vs_speed">Consumo vs Velocità</string>
-    <string name="heatmap_consumption_vs_speed_desc">Efficienza istantanea (%1$s) nell\'intero intervallo di velocità</string>
+    <string name="heatmap_consumption_vs_speed_desc">Consumo istantaneo (%1$s) nell\'intero intervallo di velocità</string>
     <string name="heatmap_regen_vs_speed">Potenza regen. vs Velocità</string>
     <string name="heatmap_regen_vs_speed_desc">Intensità frenata rigenerativa per fascia di velocità</string>
     <string name="heatmap_front_rpm_vs_speed">RPM motore anteriore vs Velocità</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">Accelerazione vs Velocità</string>
     <string name="heatmap_accel_desc">Dove il guidatore accelera forte o lascia andare — minore è più efficiente</string>
     <string name="heatmap_soc_vs_consumption">SoC vs Consumo</string>
-    <string name="heatmap_soc_consumption_desc">Se l\'efficienza cambia a stati di carica bassi o alti</string>
+    <string name="heatmap_soc_consumption_desc">Se il consumo cambia a stati di carica bassi o alti</string>
     <string name="heatmap_time_vs_speed">Ora del giorno vs Velocità</string>
     <string name="heatmap_time_speed_desc">Quando e a che velocità guidi — rivela i pattern di congestione nelle ore di punta</string>
     <string name="heatmap_gradient_vs_consumption">Gradiente vs Consumo</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">RPM motore ant. vs post.</string>
     <string name="heatmap_awd_desc">Ripartizione coppia AWD — diagonale = quota uguale, fuori diagonale = un motore dominante</string>
     <string name="heatmap_tyre_vs_consumption">Pressione pneumatici vs Consumo</string>
-    <string name="heatmap_tyre_desc">Se una pressione maggiore migliora misurabilmente l\'efficienza sulla tua auto</string>
+    <string name="heatmap_tyre_desc">Se una pressione maggiore riduce misurabilmente il consumo sulla tua auto</string>
     <string name="heatmap_soc_vs_regen">SoC vs Efficienza regen.</string>
     <string name="heatmap_soc_regen_desc">Dove il BMS riduce la frenata rigenerativa — atteso vicino al 100%% di SoC</string>
     <string name="heatmap_speed_vs_temp">Velocità vs Temp. batteria</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">Nessun dato di temperatura batteria registrato in questo viaggio.</string>
     <string name="heatmap_no_mode">Nessuna modalità %1$s registrata — nei viaggi futuri tocca ogni modalità sul display dell\'auto una volta per abilitare l\'analisi.</string>
     <string name="chart_no_route_data">Nessun dato percorso disponibile</string>
+    <string name="map_no_gps_recorded">Le coordinate GPS appariranno qui quando vengono registrate</string>
+    <string name="map_no_valid_gps">Nessun dato GPS valido in questo viaggio</string>
+    <string name="map_traffic_label">Traffico</string>
+    <string name="map_traffic_free_flow">Traffico scorrevole  (≥ %1$s)</string>
+    <string name="map_traffic_light">Traffico leggero  (%1$s)</string>
+    <string name="map_traffic_heavy">Traffico intenso  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">Punti ad alto consumo</string>
+    <string name="route_energy_hotspots_desc">Segmenti con il maggiore consumo di energia</string>
+    <string name="route_trip_timeline">Cronologia del viaggio</string>
+    <string name="route_trip_started">Viaggio iniziato</string>
+    <string name="route_hard_acceleration">Accelerazione brusca</string>
+    <string name="route_hard_braking">Frenata brusca</string>
+    <string name="route_trip_ended">Viaggio terminato</string>
+    <string name="stat_one_trip">1 viaggio</string>
+    <string name="stat_n_trips">%1$d viaggi</string>
+    <string name="season_vs_ref">%1$s vs rif.</string>
+    <string name="season_stat_km_total">%1$s km totali</string>
+    <string name="season_stat_kwh_used">%1$s kWh consumati</string>
+    <string name="season_stat_avg_temp">%1$s°C media</string>
+    <string name="route_distance_label">Percorso %1$s %2$s</string>
+    <string name="route_instance_trips">%1$d viaggi · %2$s</string>
+    <string name="route_avg_unit">media %1$s</string>
+    <string name="schedule_daily">Giornaliero</string>
+    <string name="schedule_weekly">Settimanale</string>
+    <string name="schedule_monthly">Mensile</string>
+    <string name="danger_zone_title">ZONA PERICOLOSA</string>
+    <string name="danger_zone_desc">Elimina definitivamente tutti i viaggi, i punti dati e le statistiche. Prima del ripristino viene creato automaticamente un backup locale.</string>
+    <string name="send_diag_log_desc">Invia il registro diagnostico completo (eventi speed-stall e \'telemetria refresh bloccata\') direttamente al tuo bot Telegram collegato — nulla viene salvato o condiviso localmente. Collega prima un bot in Backup &amp; Restore → Backup Telegram.</string>
+    <string name="compat_privacy_notice_body">Il report cattura valori grezzi da ogni sorgente dati dell\'head unit della tua auto — valori numerici, stringhe e array.\n\nLatitudine e longitudine GPS NON sono incluse.\n\nTutto il resto è incluso: stato della batteria, dati del motore, marcia, velocità, modalità di guida, stato del clima, stato di ricarica, valori specifici PHEV, ecc.\n\nNulla viene inviato automaticamente. "Email via codice QR" carica il report su un host pubblico temporaneo (litterbox) e mostra un link che si cancella automaticamente dopo 12 ore; chiunque abbia il link può leggerlo fino ad allora. Le altre opzioni mantengono il report sul tuo dispositivo.</string>
+    <string name="compat_sending_label">Invio…</string>
+    <string name="compat_email_qr_label">Email via codice QR</string>
+    <string name="compat_uploading_label">Caricamento…</string>
+    <string name="compat_telegram_not_configured">Telegram non configurato — configuralo prima in Backup &amp; Restore.</string>
+    <string name="compat_sent_telegram">Inviato via Telegram ✓</string>
+    <string name="compat_telegram_failed">Invio Telegram fallito: %1$s</string>
+    <string name="compat_save_failed">Salvataggio fallito: %1$s</string>
+    <string name="compat_probe_cleared">Dati probe cancellati.</string>
+    <string name="compat_upload_failed">Caricamento fallito: %1$s</string>
+    <string name="compat_qr_copy_link">Copia link</string>
+    <string name="compat_qr_dialog_title">Scansiona per inviare il report via email</string>
+    <string name="compat_qr_dialog_desc">Scansiona con il tuo telefono — apre un\'email precompilata a %1$s. Scegli il tuo account e premi Invia. Il link scade in 12 ore.</string>
+    <string name="compat_qr_no_render">Impossibile rendere il codice QR. Usa "Copia link" e invialo via email a %1$s.</string>
+    <string name="compat_qr_content_desc">Codice QR che apre un\'email precompilata con il link di download del probe</string>
+    <string name="web_access_pin_label">PIN di accesso</string>
+    <string name="web_pin_browser_hint">Visualizzato nella pagina di login del browser quando qualcuno apre l\'URL del server.</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">Nascondi PIN</string>
+    <string name="web_pin_show_cd">Mostra PIN</string>
+    <string name="web_pin_set">Imposta</string>
+    <string name="web_pin_regen">Rigenera</string>
+    <string name="web_pin_min_digits">Min. 4 cifre. La modifica del PIN invalida tutte le sessioni browser attive.</string>
+    <string name="web_ip_locked_one">1 indirizzo IP bloccato</string>
+    <string name="web_ip_locked_many">%1$d indirizzi IP bloccati</string>
+    <string name="web_too_many_attempts">Rilevati troppi tentativi PIN errati.</string>
+    <string name="web_server_failed">Avvio fallito: %1$s</string>
+    <string name="web_server_waiting">In attesa di IP…</string>
+    <string name="web_server_open_hint">Apri questo indirizzo su qualsiasi dispositivo connesso allo stesso WiFi.</string>
+    <string name="web_copy_url_cd">Copia URL</string>
     <string name="chart_no_tyre_data">Nessun dato di pressione pneumatici registrato in questo viaggio</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">Test pubblicazione MQTT riuscito</string>
     <string name="mqtt_test_failed_msg">Test MQTT fallito: %1$s</string>
     <string name="mqtt_settings_saved_msg">Impostazioni MQTT salvate</string>
+    <string name="connection_group_label">Connessione</string>
+    <string name="hide_token_cd">Nascondi token</string>
+    <string name="show_token_cd">Mostra token</string>
+    <string name="abrp_status_label">Stato ABRP</string>
+    <string name="mqtt_status_label">Stato MQTT</string>
+    <string name="label_configured">Configurato</string>
+    <string name="label_enabled">Abilitato</string>
+    <string name="label_last_upload">Ultimo caricamento</string>
+    <string name="label_last_publish">Ultima pubblicazione</string>
+    <string name="label_last_status">Ultimo stato</string>
+    <string name="value_yes">Sì</string>
+    <string name="value_no">No</string>
+    <string name="value_na">n/d</string>
 
     <!-- About screen -->
     <string name="about_version_label">Versione</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">Utilizzo memoria</string>
     <string name="last_60s_label">ultimi 60s</string>
     <string name="adb_shell_label">Shell ADB</string>
-    <string name="adb_shell_desc_text">Eseguito tramite il demone ADB locale autorizzato. Inserisci il comando esattamente come faresti dopo `adb shell`.</string>
+    <string name="adb_shell_desc_text">Eseguito tramite l\'ADB daemon locale autorizzato. Inserisci il comando esattamente come faresti dopo `adb shell`.</string>
     <string name="shell_command_label">Comando shell</string>
     <string name="run_shell_cmd_action">Esegui comando shell</string>
     <string name="samples_refresh_note">I campioni si aggiornano ogni 2 secondi mentre questa schermata è aperta.</string>
@@ -957,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Azione richiesta — Avvio automatico</string>
-    <string name="autostart_dialog_msg">È stata installata una nuova versione. Devi disattivare l\'avvio automatico per questa app, il che consente la raccolta dati in background quando l\'auto è spenta (es. in ricarica notturna).\n\nPer maggiore affidabilità, riavvia l\'auto una volta dopo aver modificato questa impostazione, poi riapri BYD Trip Stats.\nATTENZIONE: Se non vedi velocità e altri valori aggiornarsi durante la guida, devi riavviare l\'auto!</string>
+    <string name="autostart_dialog_msg">È stata installata una nuova versione. Devi disabilitare l\'avvio automatico per questa app, che consente la raccolta dati in background quando l\'auto è spenta (ad es. durante la ricarica notturna).\n\nPer la massima affidabilità, riavvia l\'auto una volta dopo aver modificato questa impostazione e poi riapri BYD Trip Stats.\nATTENZIONE: Se non vedi velocità e altri valori aggiornarsi durante la guida, devi riavviare l\'auto!</string>
     <string name="autostart_got_it">Capito</string>
     <string name="adb_connecting_title">Connessione…</string>
     <string name="adb_waiting_auth_title">In attesa di autorizzazione</string>

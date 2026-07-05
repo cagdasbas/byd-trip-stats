@@ -298,7 +298,7 @@ fun EnergyFlowDiagram(
                         }
                     )
                     PowerMetric(
-                        label = "Speed",
+                        label = stringResource(R.string.stat_speed),
                         value = "${unitSystem.convertSpeed(displaySpeedKmh.toDouble()).toInt()}",
                         unit = speedUnit,
                         color = BydEcoTealDim
@@ -310,7 +310,7 @@ fun EnergyFlowDiagram(
                         color = BatteryBlue
                     )
                     PowerMetric(
-                        label = "Range",
+                        label = stringResource(R.string.stat_range),
                         value = run {
                             val km = tripDataPoints.lastOrNull()?.projectedRangeKm?.takeIf { it > 0 }
                                 ?: telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }

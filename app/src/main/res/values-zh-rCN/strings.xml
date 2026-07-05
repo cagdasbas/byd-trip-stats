@@ -54,7 +54,7 @@
     <string name="tab_analysis">分析</string>
     <string name="tab_power">功率</string>
     <string name="tab_voltage">电压</string>
-    <string name="tab_cell_voltage">电芯电压</string>
+    <string name="tab_cell_voltage">电芯</string>
     <string name="tab_temperature">温度</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">截图失败：%1$s</string>
     <string name="ev_range_label">纯电续航</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">速度</string>
+    <string name="stat_range">续航里程</string>
+    <string name="label_time">时间</string>
+    <string name="label_now">当前</string>
+    <string name="chart_hv_battery_voltage">HV电池电压</string>
+    <string name="cell_low_label">最低</string>
+    <string name="cell_high_label">最高</string>
+    <string name="crosshair_cell_high">最高 %.3f V</string>
+    <string name="crosshair_cell_low">最低 %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">时间</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">驾驶动态</string>
     <string name="stat_odometer">里程表</string>
     <string name="stat_total_discharge">总放电量</string>
+    <string name="stat_total_consumed">总消耗</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">停止</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">导出行程数据</string>
     <string name="export_copy_summary">复制摘要到剪贴板</string>
-    <string name="export_save_downloads">保存到下载文件夹</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">保存为 CSV</string>
     <string name="export_save_json">保存为 JSON</string>
     <string name="export_save_html">保存为 HTML 查看器（双击打开）</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">已分析行程数</string>
     <string name="decline_rate_label">衰减速率</string>
     <string name="projected_80_label">预计达到 80%</string>
+    <string name="soh_not_declining">无下降</string>
+    <string name="soh_far_future">遥远未来</string>
     <string name="soh_history_section">SoH 历史</string>
     <string name="legend_recorded">实测值</string>
     <string name="legend_trend">趋势线</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">提示：比亚迪的质保承诺覆盖电池 SoH 至 70%，有效期 8 年或 25 万公里。</string>
     <string name="battery_health_report_title">电池健康报告</string>
     <string name="battery_report_desc">导出包含电池健康状态、衰减速率和 80% 预测的报告 — 在出售车辆或提出质保索赔时非常有用。保存至 Download/BydTripStats/ 目录，格式为 PDF 或 HTML（可在任何浏览器中打开）。完全在本地设备上生成。</string>
+    <string name="battery_report_warranty_note">比亚迪的电池保修通常在 8 年 / 250,000 公里内将电池覆盖至 70% State of Health。确切条款请查阅您车辆的保修手册。</string>
+    <string name="battery_report_exclusion_note">排除 %1$d 次在 %2$s 之前使用低估 State of Health 的旧估算方法记录的早期行程。</string>
+    <string name="report_saved_msg">报告已保存: %1$s</string>
+    <string name="report_failed_msg">报告失败: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">电池数据范围</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">季节分析</string>
-    <string name="winter_vs_summer_subtitle">冬季与夏季效率对比</string>
+    <string name="winter_vs_summer_subtitle">冬季与夏季能耗对比</string>
     <string name="no_seasonal_data">暂无季节数据</string>
     <string name="complete_seasons_hint">跨多个季节完成行程，查看温度如何影响您的续航。</string>
     <string name="avg_consumption_by_season">各季节平均能耗</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">路线</string>
-    <string name="recurring_journeys_subtitle">常用路线 &amp; 效率</string>
+    <string name="recurring_journeys_subtitle">常用路线 &amp; 能耗</string>
     <string name="no_recurring_routes">暂无常用路线</string>
-    <string name="recurring_route_hint">同一路线至少行驶 3 次（例如每天上班通勤），就会显示在这里，方便您比较每次行程的效率。</string>
+    <string name="recurring_route_hint">同一路线至少行驶 3 次（例如每天上班通勤），就会显示在这里，方便您比较每次行程的能耗。</string>
     <string name="route_best">最佳</string>
     <string name="route_worst">最差</string>
     <string name="route_avg">平均</string>
-    <string name="efficiency_trend_label">每次行程效率趋势（从旧到新）</string>
+    <string name="efficiency_trend_label">每次行程能耗趋势（从旧到新）</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">目标 &amp; 个人最佳</string>
     <string name="track_milestones_subtitle">追踪您的驾驶里程碑</string>
     <string name="set_goals_action">设置目标</string>
     <string name="personal_bests_section">个人最佳</string>
-    <string name="best_efficiency_label">最佳效率</string>
+    <string name="best_efficiency_label">最低能耗</string>
     <string name="lowest_ever_label">历史最低记录</string>
     <string name="longest_trip_label">最长行程</string>
     <string name="longest_trip_subtitle">单次行程距离</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">目标</string>
     <string name="no_goals_set">暂未设置目标</string>
     <string name="set_goals_hint">点击上方 ✏️ 设置能耗或距离目标。</string>
-    <string name="efficiency_target_label">效率目标</string>
+    <string name="efficiency_target_label">能耗目标</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s（最近 5 次行程均值）</string>
     <string name="monthly_distance_goal_label">每月行驶距离</string>
     <string name="monthly_distance_subtitle">本月 %1$s / %2$s %3$s</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">标签</string>
-    <string name="per_tag_efficiency">各标签效率 &amp; 统计</string>
+    <string name="per_tag_efficiency">各标签能耗 &amp; 统计</string>
     <string name="no_tags_yet">暂无标签</string>
     <string name="tag_usage_hint">在行程详情页面添加标签，或在历史记录的多选模式下批量添加。带标签的行程汇总显示于此。</string>
     <string name="rename_tag_title">重命名标签</string>
@@ -410,7 +426,7 @@
 
     <!-- Local Backup screen -->
     <string name="backup_restore_title">数据库备份 &amp; 恢复</string>
-    <string name="backup_to_download_label">备份到下载目录</string>
+    <string name="backup_to_download_label">备份到 Download</string>
     <string name="backup_download_desc">将完整行程数据库保存至：Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">立即备份</string>
     <string name="backup_to_sd_label">备份到 SD 卡</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">回收</string>
     <string name="drive_mode_usage_label">驾驶模式使用情况</string>
     <string name="regen_mode_usage_label">回收模式使用情况</string>
+    <string name="mode_of_mode_attributed_trip">的行程（按模式统计）</string>
+    <string name="mode_recovered_via_regen">通过制动回收</string>
+    <string name="mode_eco_normal_same">在这次行程中，Eco 和 Normal 模式效果几乎相同，说明路线和交通状况比所选驾驶模式更重要。</string>
+    <string name="mode_sport_more_than_normal">在这次行程的可比路段上，Sport 比 Normal 多消耗了 %1$s %2$s。</string>
+    <string name="mode_high_regen_no_improvement">在这次行程中，High regen 没有明显提高制动回收能量，制动机会很可能比 regen 设置更重要。</string>
     <string name="route_segments_label">路线段</string>
     <string name="segment_number_label">第 %1$s 段</string>
     <string name="waypoints_label">途经点</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">瞬时能耗</string>
     <string name="chart_drive_regen_modes">驾驶 / 回收模式</string>
     <string name="chart_mode_timeline">行程中的模式时间线</string>
+    <string name="heatmap_mode_filters">模式筛选</string>
+    <string name="heatmap_legend_few">少</string>
+    <string name="heatmap_legend_many">多</string>
+    <string name="heatmap_legend_density">颜色强度 = 样本密度（对数刻度）</string>
+    <string name="heatmap_axis_speed">速度 (%1$s)</string>
+    <string name="heatmap_axis_power">功率 (kW)</string>
+    <string name="heatmap_axis_regen_power">回收功率 (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">前驱电机 RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">后驱电机 RPM</string>
+    <string name="heatmap_axis_motor_rpm">电机 RPM</string>
+    <string name="heatmap_axis_accel">加速度 (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">一天中的时刻</string>
+    <string name="heatmap_axis_battery_temp">电池温度 (°C)</string>
+    <string name="heatmap_axis_cell_spread">单体差异 (V)</string>
+    <string name="heatmap_axis_gradient">坡度 (%)</string>
+    <string name="heatmap_axis_front_rpm">前 RPM</string>
+    <string name="heatmap_axis_rear_rpm">后 RPM</string>
+    <string name="heatmap_axis_avg_tyre_pressure">平均胎压 (PSI)</string>
+    <string name="mode_no_data">本次行程未记录驾驶/回收模式数据。</string>
+    <string name="mode_enable_hint">启用驾驶模式或回收模式以查看时间轴。</string>
+    <string name="mode_drive_lane_title">驾驶模式</string>
+    <string name="mode_regen_lane_title">回收模式</string>
+    <string name="mode_drive_modes_label">驾驶模式</string>
+    <string name="mode_regen_modes_label">回收模式</string>
     <string name="chart_speed_detailed">速度曲线（详细）</string>
     <string name="chart_rpm_detailed">电机转速（详细）</string>
     <string name="chart_power_detailed">功率曲线（详细）</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">暂无数据</string>
     <string name="chart_insufficient_data">数据不足</string>
     <string name="chart_not_enough_driving">行驶数据不足以计算瞬时能耗</string>
-    <string name="chart_weekly_consumption">每周能耗</string>
-    <string name="chart_monthly_consumption">每月能耗</string>
-    <string name="chart_yearly_consumption">每年能耗</string>
+    <string name="chart_weekly_consumption">本周</string>
+    <string name="chart_monthly_consumption">本月</string>
+    <string name="chart_yearly_consumption">本年</string>
     <string name="chart_your_duration_avg">您的时长均值（%1$s %2$s）</string>
     <string name="chart_selected_car_avg">所选车型均值（%1$s %2$s）</string>
     <string name="chart_close">关闭图表</string>
     <string name="chart_no_data_yet">暂无数据</string>
     <string name="chart_instant_label">瞬时值</string>
     <string name="chart_avg_5pt">5 点均值</string>
+    <string name="chart_into_trip">行程中</string>
     <string name="chart_no_motor_data">暂无电机数据</string>
     <string name="chart_motor_smoothed_note">极短的轴向脉冲可能显示为平滑 — 全屏查看详情</string>
     <string name="legend_rear_motor">后电机</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh 随时间变化</string>
-    <string name="axis_soc_over_time">SoC%% 随时间变化</string>
+    <string name="axis_soc_over_time">SoC% 随时间变化</string>
     <string name="axis_speed_over_time">%1$s 随时间变化</string>
     <string name="axis_rpm_over_time">RPM 随时间变化</string>
     <string name="axis_altitude_over_time">海拔随时间变化</string>
     <string name="axis_power_over_time">kW 随时间变化</string>
     <string name="axis_hv_cells">高压母线 + 电芯最小/最大值（V）</string>
-    <string name="axis_tyre_wheels">四轮气压（bar）</string>
-    <string name="axis_consumption_distance">%1$s 随距离变化</string>
+    <string name="axis_tyre_wheels">四轮气压</string>
+    <string name="axis_consumption_distance">%1$s 随时间变化</string>
     <string name="axis_mode_timeline">行程中的模式时间线</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">充电功率</string>
     <string name="charging_chart_cell_voltage">电芯电压</string>
     <string name="charging_chart_avg_temp">平均值</string>
-    <string name="charging_chart_cell_min_temp">电芯最低温</string>
-    <string name="charging_chart_cell_max_temp">电芯最高温</string>
+    <string name="charging_chart_cell_min_temp">最低</string>
+    <string name="chart_cells_voltage_axis">单体 (V)</string>
+    <string name="charging_chart_cell_max_temp">最高</string>
     <string name="charging_chart_hv_bus">高压母线（V）</string>
-    <string name="charging_chart_cell_min">电芯最小（V）</string>
-    <string name="charging_chart_cell_max">电芯最大（V）</string>
+    <string name="charging_chart_cell_min">最小单体电压 (V)</string>
+    <string name="charging_chart_cell_max">最大单体电压 (V)</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
     <string name="charging_chart_panel_soc">面板 SoC</string>
     <string name="wheel_lf">左前</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">功率 vs 速度</string>
     <string name="heatmap_power_vs_speed_desc">各速度下的电机输出 — 显示车辆的实际运行状态</string>
     <string name="heatmap_consumption_vs_speed">能耗 vs 速度</string>
-    <string name="heatmap_consumption_vs_speed_desc">各速度范围内的瞬时效率（%1$s）</string>
+    <string name="heatmap_consumption_vs_speed_desc">各速度范围内的瞬时能耗（%1$s）</string>
     <string name="heatmap_regen_vs_speed">回收功率 vs 速度</string>
     <string name="heatmap_regen_vs_speed_desc">各速度段的制动能量回收强度</string>
     <string name="heatmap_front_rpm_vs_speed">前电机转速 vs 速度</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">加速度 vs 速度</string>
     <string name="heatmap_accel_desc">驾驶员急加速或滑行的位置 — 数值越低越节能</string>
     <string name="heatmap_soc_vs_consumption">SoC vs 能耗</string>
-    <string name="heatmap_soc_consumption_desc">高电量和低电量状态下效率是否有变化</string>
+    <string name="heatmap_soc_consumption_desc">高电量和低电量状态下能耗是否有变化</string>
     <string name="heatmap_time_vs_speed">一天中的时间 vs 速度</string>
     <string name="heatmap_time_speed_desc">您何时以何种速度行驶 — 揭示早晚高峰拥堵规律</string>
     <string name="heatmap_gradient_vs_consumption">坡度 vs 能耗</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">前电机 vs 后电机转速</string>
     <string name="heatmap_awd_desc">四驱扭矩分配 — 对角线 = 均等分配，偏离对角线 = 单侧电机主导</string>
     <string name="heatmap_tyre_vs_consumption">轮胎气压 vs 能耗</string>
-    <string name="heatmap_tyre_desc">较高气压是否能明显提高您车辆的效率</string>
+    <string name="heatmap_tyre_desc">较高气压是否能明显降低您车辆的能耗</string>
     <string name="heatmap_soc_vs_regen">SoC vs 回收效率</string>
     <string name="heatmap_soc_regen_desc">BMS 限制制动回收的位置 — 预期在 SoC 接近 100% 时出现</string>
     <string name="heatmap_speed_vs_temp">速度 vs 电池温度</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">本次行程未记录电池温度数据。</string>
     <string name="heatmap_no_mode">未记录 %1$s 模式 — 在未来的行程中，请在车载屏幕上点击一次每种模式以启用分析。</string>
     <string name="chart_no_route_data">暂无路线数据</string>
+    <string name="map_no_gps_recorded">GPS坐标记录后将显示在此处</string>
+    <string name="map_no_valid_gps">此行程中没有有效的GPS数据</string>
+    <string name="map_traffic_label">交通状况</string>
+    <string name="map_traffic_free_flow">畅通  (≥ %1$s)</string>
+    <string name="map_traffic_light">较畅通  (%1$s)</string>
+    <string name="map_traffic_heavy">拥堵  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">高耗能路段</string>
+    <string name="route_energy_hotspots_desc">能耗最高的路段</string>
+    <string name="route_trip_timeline">行程时间线</string>
+    <string name="route_trip_started">行程开始</string>
+    <string name="route_hard_acceleration">急加速</string>
+    <string name="route_hard_braking">急制动</string>
+    <string name="route_trip_ended">行程结束</string>
+    <string name="stat_one_trip">1次行程</string>
+    <string name="stat_n_trips">%1$d次行程</string>
+    <string name="season_vs_ref">%1$s 对比参考</string>
+    <string name="season_stat_km_total">%1$s km 总计</string>
+    <string name="season_stat_kwh_used">%1$s kWh 已用</string>
+    <string name="season_stat_avg_temp">均温 %1$s°C</string>
+    <string name="route_distance_label">%1$s %2$s 路线</string>
+    <string name="route_instance_trips">%1$d次 · %2$s</string>
+    <string name="route_avg_unit">平均 %1$s</string>
+    <string name="schedule_daily">每天</string>
+    <string name="schedule_weekly">每周</string>
+    <string name="schedule_monthly">每月</string>
+    <string name="danger_zone_title">危险区域</string>
+    <string name="danger_zone_desc">永久删除所有行程、数据点和统计信息。重置前会自动创建本地备份。</string>
+    <string name="send_diag_log_desc">将完整诊断日志（速度停滞和\'遥测刷新卡死\'事件）直接发送到已连接的 Telegram 机器人——不会在本地保存或共享任何内容。请先在备份 &amp; 恢复 → Telegram 备份中连接一个机器人。</string>
+    <string name="compat_privacy_notice_body">报告捕获汽车主机每个数据源的原始值——数值、字符串和数组。\n\n不包含 GPS 经纬度。\n\n包含其他所有内容：电池状态、电机数据、档位、速度、驾驶模式、空调状态、充电状态、PHEV 专用值等。\n\n不会自动发送任何内容。"通过二维码发送邮件"将报告上传到临时公共主机（litterbox）并显示一个 12 小时后自动删除的链接；在此之前任何有链接的人都可以读取。其他选项将报告保存在您的设备上。</string>
+    <string name="compat_sending_label">发送中…</string>
+    <string name="compat_email_qr_label">通过二维码发送邮件</string>
+    <string name="compat_uploading_label">上传中…</string>
+    <string name="compat_telegram_not_configured">Telegram 未配置 — 请先在备份 &amp; 恢复中设置。</string>
+    <string name="compat_sent_telegram">已通过 Telegram 发送 ✓</string>
+    <string name="compat_telegram_failed">Telegram 发送失败：%1$s</string>
+    <string name="compat_save_failed">保存失败：%1$s</string>
+    <string name="compat_probe_cleared">探测数据已清除。</string>
+    <string name="compat_upload_failed">上传失败：%1$s</string>
+    <string name="compat_qr_copy_link">复制链接</string>
+    <string name="compat_qr_dialog_title">扫描以通过邮件发送报告</string>
+    <string name="compat_qr_dialog_desc">用手机扫描 — 将打开发送至 %1$s 的预填邮件。选择您的账户并点击发送。链接 12 小时后过期。</string>
+    <string name="compat_qr_no_render">无法生成二维码。请使用"复制链接"并发送邮件至 %1$s。</string>
+    <string name="compat_qr_content_desc">打开含探测下载链接的预填邮件的二维码</string>
+    <string name="web_access_pin_label">访问PIN</string>
+    <string name="web_pin_browser_hint">当有人打开服务器URL时，显示在浏览器登录页面上。</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">隐藏PIN</string>
+    <string name="web_pin_show_cd">显示PIN</string>
+    <string name="web_pin_set">设置</string>
+    <string name="web_pin_regen">重新生成</string>
+    <string name="web_pin_min_digits">最少4位数。更改PIN将使所有活跃的浏览器会话失效。</string>
+    <string name="web_ip_locked_one">1个IP地址已锁定</string>
+    <string name="web_ip_locked_many">%1$d个IP地址已锁定</string>
+    <string name="web_too_many_attempts">检测到过多错误的PIN尝试。</string>
+    <string name="web_server_failed">启动失败：%1$s</string>
+    <string name="web_server_waiting">等待IP地址…</string>
+    <string name="web_server_open_hint">在连接到同一WiFi的任何设备上打开此地址。</string>
+    <string name="web_copy_url_cd">复制URL</string>
     <string name="chart_no_tyre_data">本次行程未记录轮胎气压数据</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTT 测试发布成功</string>
     <string name="mqtt_test_failed_msg">MQTT 测试失败：%1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT 设置已保存</string>
+    <string name="connection_group_label">连接</string>
+    <string name="hide_token_cd">隐藏令牌</string>
+    <string name="show_token_cd">显示令牌</string>
+    <string name="abrp_status_label">ABRP 状态</string>
+    <string name="mqtt_status_label">MQTT 状态</string>
+    <string name="label_configured">已配置</string>
+    <string name="label_enabled">已启用</string>
+    <string name="label_last_upload">上次上传</string>
+    <string name="label_last_publish">上次发布</string>
+    <string name="label_last_status">上次状态</string>
+    <string name="value_yes">是</string>
+    <string name="value_no">否</string>
+    <string name="value_na">无</string>
 
     <!-- About screen -->
     <string name="about_version_label">版本</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">内存使用率</string>
     <string name="last_60s_label">最近 60 秒</string>
     <string name="adb_shell_label">ADB Shell</string>
-    <string name="adb_shell_desc_text">通过授权的本地 ADB 守护进程运行。请按 `adb shell` 后的格式输入命令。</string>
+    <string name="adb_shell_desc_text">通过授权的本地 ADB daemon 运行。请按 `adb shell` 后的格式输入命令。</string>
     <string name="shell_command_label">Shell 命令</string>
     <string name="run_shell_cmd_action">运行 Shell 命令</string>
     <string name="samples_refresh_note">此页面打开时，样本每 2 秒刷新一次。</string>
@@ -957,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ 需要操作 — 自动启动</string>
-    <string name="autostart_dialog_msg">已安装新版本。您需要在本应用的禁用自动启动中切换为关闭，这将启用车辆关闭时的后台数据采集（例如隔夜充电）。\n\n为了最佳可靠性，更改此设置后请重启一次车辆，然后再次打开 BYD Trip Stats。\n警告：如果驾驶时速度和其他值不更新，需要重启车辆！</string>
+    <string name="autostart_dialog_msg">已安装新版本。您需要关闭此应用的自动启动，这可在汽车关闭时（例如夜间充电）启用后台数据收集。\n\n为获得最佳可靠性，更改此设置后请重启汽车一次，然后重新打开 BYD Trip Stats。\n警告：如果行驶中速度和其他数值未更新，需要重启汽车！</string>
     <string name="autostart_got_it">知道了</string>
     <string name="adb_connecting_title">连接中…</string>
     <string name="adb_waiting_auth_title">等待授权</string>

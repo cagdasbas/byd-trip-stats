@@ -482,12 +482,12 @@ fun LocalBackupScreen(
                                     onClick  = {
                                         if (s != telegramSchedule) {
                                             telegramManager.setSchedule(s)
-                                            scheduleChanged = s.label
+                                            scheduleChanged = context.getString(s.labelRes)
                                         }
                                     }
                                 )
                                 Text(
-                                    text  = s.label,
+                                    text  = stringResource(s.labelRes),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
@@ -677,10 +677,9 @@ fun LocalBackupScreen(
             item {
                 var showResetConfirm by remember { mutableStateOf(false) }
                 val resetBusy = backupState is LocalBackupManager.BackupState.InProgress
-                SectionCard(title = "DANGER ZONE", icon = Icons.Filled.DeleteForever) {
+                SectionCard(title = stringResource(R.string.danger_zone_title), icon = Icons.Filled.DeleteForever) {
                     Text(
-                        text = "Permanently delete all trips, data points and statistics. " +
-                               "A local backup is created automatically before the reset.",
+                        text = stringResource(R.string.danger_zone_desc),
                         style = MaterialTheme.typography.bodyLarge,
                         color = BydErrorRed
                     )

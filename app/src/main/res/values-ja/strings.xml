@@ -54,7 +54,7 @@
     <string name="tab_analysis">分析</string>
     <string name="tab_power">電力</string>
     <string name="tab_voltage">電圧</string>
-    <string name="tab_cell_voltage">セルV</string>
+    <string name="tab_cell_voltage">セル</string>
     <string name="tab_temperature">温度</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">スクリーンショットに失敗しました：%1$s</string>
     <string name="ev_range_label">EV航続距離</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">速度</string>
+    <string name="stat_range">航続距離</string>
+    <string name="label_time">時間</string>
+    <string name="label_now">現在</string>
+    <string name="chart_hv_battery_voltage">HVバッテリー電圧</string>
+    <string name="cell_low_label">セル最低</string>
+    <string name="cell_high_label">セル最高</string>
+    <string name="crosshair_cell_high">最高 %.3f V</string>
+    <string name="crosshair_cell_low">最低 %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">時間</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">走行ダイナミクス</string>
     <string name="stat_odometer">オドメーター</string>
     <string name="stat_total_discharge">総放電量</string>
+    <string name="stat_total_consumed">総消費量</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">停止</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">走行データのエクスポート</string>
     <string name="export_copy_summary">サマリーをクリップボードにコピー</string>
-    <string name="export_save_downloads">ダウンロードフォルダに保存</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">CSVとして保存</string>
     <string name="export_save_json">JSONとして保存</string>
     <string name="export_save_html">HTMLビューアーとして保存（ダブルクリックで開く）</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">分析されたトリップ数</string>
     <string name="decline_rate_label">低下率</string>
     <string name="projected_80_label">80%での予測</string>
+    <string name="soh_not_declining">低下していません</string>
+    <string name="soh_far_future">遠い将来</string>
     <string name="soh_history_section">SoH履歴</string>
     <string name="legend_recorded">記録済み</string>
     <string name="legend_trend">トレンド</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">ヒント：BYDの保証はバッテリーSoH 70%まで8年/25万kmをカバーしています。</string>
     <string name="battery_health_report_title">バッテリー健康レポート</string>
     <string name="battery_report_desc">バッテリーの健康状態、低下率、80%予測のレポートをエクスポートします。車の売却時や保証請求時の有用な証拠になります。Download/BydTripStats/に印刷対応PDFまたはHTML（どのブラウザでも開けます）として保存されます。すべてデバイス上で生成されます。</string>
+    <string name="battery_report_warranty_note">BYDのバッテリー保証は通常、8年 / 250,000 kmの間、バッテリーを70% State of Healthまで保証します。正確な条件については車両の保証書をご確認ください。</string>
+    <string name="battery_report_exclusion_note">State of Healthを低く報告していた旧式の推定方法で%2$sより前に記録された過去の%1$d回のトリップを除外します。</string>
+    <string name="report_saved_msg">レポートを保存しました: %1$s</string>
+    <string name="report_failed_msg">レポートに失敗しました: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">バッテリーデータ範囲</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">季節分析</string>
-    <string name="winter_vs_summer_subtitle">冬と夏の効率比較</string>
+    <string name="winter_vs_summer_subtitle">冬と夏の消費量比較</string>
     <string name="no_seasonal_data">季節データがまだありません</string>
     <string name="complete_seasons_hint">複数の季節にわたってトリップを完了すると、気温が航続距離に与える影響を確認できます。</string>
     <string name="avg_consumption_by_season">季節別平均消費量</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">ルート</string>
-    <string name="recurring_journeys_subtitle">繰り返し移動 &amp; 効率</string>
+    <string name="recurring_journeys_subtitle">繰り返し移動 &amp; 消費量</string>
     <string name="no_recurring_routes">繰り返しルートがまだありません</string>
-    <string name="recurring_route_hint">毎日の通勤のような同じ経路を3回以上走行すると、ここに表示され、各トリップの効率を比較できます。</string>
+    <string name="recurring_route_hint">毎日の通勤のような同じ経路を3回以上走行すると、ここに表示され、各トリップの消費量を比較できます。</string>
     <string name="route_best">最良</string>
     <string name="route_worst">最悪</string>
     <string name="route_avg">平均</string>
-    <string name="efficiency_trend_label">トリップごとの効率（古い順→新しい順）</string>
+    <string name="efficiency_trend_label">トリップごとの消費量（古い順→新しい順）</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">目標 &amp; 自己ベスト</string>
     <string name="track_milestones_subtitle">走行マイルストーンを追跡</string>
     <string name="set_goals_action">目標を設定</string>
     <string name="personal_bests_section">自己ベスト</string>
-    <string name="best_efficiency_label">最高効率</string>
+    <string name="best_efficiency_label">最低消費量</string>
     <string name="lowest_ever_label">過去最低記録</string>
     <string name="longest_trip_label">最長トリップ</string>
     <string name="longest_trip_subtitle">単一トリップ距離</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">目標</string>
     <string name="no_goals_set">目標がまだ設定されていません</string>
     <string name="set_goals_hint">上の✏️をタップして消費量または距離の目標を設定してください。</string>
-    <string name="efficiency_target_label">効率目標</string>
+    <string name="efficiency_target_label">消費量目標</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s（直近5トリップ平均）</string>
     <string name="monthly_distance_goal_label">月間走行距離</string>
     <string name="monthly_distance_subtitle">今月 %1$s / %2$s %3$s</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">タグ</string>
-    <string name="per_tag_efficiency">タグ別効率 &amp; 合計</string>
+    <string name="per_tag_efficiency">タグ別消費量 &amp; 合計</string>
     <string name="no_tags_yet">タグがまだありません</string>
     <string name="tag_usage_hint">トリップの詳細画面からタグを追加するか、履歴の選択モードから複数のトリップにまとめてタグ付けできます。タグが付いたトリップはここにまとめられます。</string>
     <string name="rename_tag_title">タグ名を変更</string>
@@ -410,7 +426,7 @@
 
     <!-- Local Backup screen -->
     <string name="backup_restore_title">データベースバックアップ &amp; 復元</string>
-    <string name="backup_to_download_label">ダウンロードにバックアップ</string>
+    <string name="backup_to_download_label">Download にバックアップ</string>
     <string name="backup_download_desc">走行データベース全体を次の場所に保存：Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">今すぐバックアップ</string>
     <string name="backup_to_sd_label">SDカードにバックアップ</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">回生</string>
     <string name="drive_mode_usage_label">ドライブモード使用状況</string>
     <string name="regen_mode_usage_label">回生モード使用状況</string>
+    <string name="mode_of_mode_attributed_trip">のモード記録走行</string>
+    <string name="mode_recovered_via_regen">回生ブレーキで回収</string>
+    <string name="mode_eco_normal_same">このトリップではEcoとNormalは実質的に同じでした。選択したドライブモードよりも、ルートと交通状況の方が消費量に影響しました。</string>
+    <string name="mode_sport_more_than_normal">このトリップの比較可能な区間で、SportはNormalより%1$s %2$s多く消費しました。</string>
+    <string name="mode_high_regen_no_improvement">このトリップでは、High regen は回収エネルギーを大幅に改善しませんでした — regen 設定よりも制動機会の方が影響が大きかった可能性があります。</string>
     <string name="route_segments_label">ルートセグメント</string>
     <string name="segment_number_label">セグメント %1$s</string>
     <string name="waypoints_label">ウェイポイント</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">瞬時消費量</string>
     <string name="chart_drive_regen_modes">ドライブ / 回生モード</string>
     <string name="chart_mode_timeline">トリップ全体のモードタイムライン</string>
+    <string name="heatmap_mode_filters">モードフィルター</string>
+    <string name="heatmap_legend_few">少ない</string>
+    <string name="heatmap_legend_many">多い</string>
+    <string name="heatmap_legend_density">色の濃さ = サンプル密度（対数スケール）</string>
+    <string name="heatmap_axis_speed">速度 (%1$s)</string>
+    <string name="heatmap_axis_power">出力 (kW)</string>
+    <string name="heatmap_axis_regen_power">回生出力 (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">フロントモーター RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">リアモーター RPM</string>
+    <string name="heatmap_axis_motor_rpm">モーター RPM</string>
+    <string name="heatmap_axis_accel">加速度 (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">時間帯</string>
+    <string name="heatmap_axis_battery_temp">バッテリー温度 (°C)</string>
+    <string name="heatmap_axis_cell_spread">セル電圧差 (V)</string>
+    <string name="heatmap_axis_gradient">勾配 (%)</string>
+    <string name="heatmap_axis_front_rpm">フロント RPM</string>
+    <string name="heatmap_axis_rear_rpm">リア RPM</string>
+    <string name="heatmap_axis_avg_tyre_pressure">平均タイヤ空気圧 (PSI)</string>
+    <string name="mode_no_data">この走行のドライブ/回生モードデータは記録されていません。</string>
+    <string name="mode_enable_hint">タイムラインを表示するには、ドライブモードまたは回生モードを有効にしてください。</string>
+    <string name="mode_drive_lane_title">ドライブモード</string>
+    <string name="mode_regen_lane_title">回生モード</string>
+    <string name="mode_drive_modes_label">ドライブモード</string>
+    <string name="mode_regen_modes_label">回生モード</string>
     <string name="chart_speed_detailed">速度プロファイル（詳細）</string>
     <string name="chart_rpm_detailed">モーターRPM（詳細）</string>
     <string name="chart_power_detailed">電力プロファイル（詳細）</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">データがありません</string>
     <string name="chart_insufficient_data">データ不足</string>
     <string name="chart_not_enough_driving">瞬時消費量のための走行データが不足しています</string>
-    <string name="chart_weekly_consumption">週間消費量</string>
-    <string name="chart_monthly_consumption">月間消費量</string>
-    <string name="chart_yearly_consumption">年間消費量</string>
+    <string name="chart_weekly_consumption">1週間で</string>
+    <string name="chart_monthly_consumption">1ヶ月で</string>
+    <string name="chart_yearly_consumption">1年で</string>
     <string name="chart_your_duration_avg">あなたの期間平均（%1$s %2$s）</string>
     <string name="chart_selected_car_avg">選択した車の平均（%1$s %2$s）</string>
     <string name="chart_close">チャートを閉じる</string>
     <string name="chart_no_data_yet">まだデータがありません</string>
     <string name="chart_instant_label">瞬時</string>
     <string name="chart_avg_5pt">5点移動平均</string>
+    <string name="chart_into_trip">行程経過</string>
     <string name="chart_no_motor_data">モーターデータがありません</string>
     <string name="chart_motor_smoothed_note">非常に短いアクセル操作は平滑化されて見える場合があります。詳細はフルスクリーンで確認してください</string>
     <string name="legend_rear_motor">リアモーター</string>
@@ -544,14 +590,14 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh（時間）</string>
-    <string name="axis_soc_over_time">SoC%%（時間）</string>
+    <string name="axis_soc_over_time">SoC%（時間）</string>
     <string name="axis_speed_over_time">%1$s（時間）</string>
     <string name="axis_rpm_over_time">RPM（時間）</string>
     <string name="axis_altitude_over_time">高度（時間）</string>
     <string name="axis_power_over_time">kW（時間）</string>
     <string name="axis_hv_cells">HVバス + セル最小/最大（V）</string>
-    <string name="axis_tyre_wheels">全4輪（bar）</string>
-    <string name="axis_consumption_distance">%1$s（距離）</string>
+    <string name="axis_tyre_wheels">全4輪</string>
+    <string name="axis_consumption_distance">%1$s（時間）</string>
     <string name="axis_mode_timeline">トリップ全体のモードタイムライン</string>
 
     <!-- Charging chart labels -->
@@ -561,6 +607,7 @@
     <string name="charging_chart_cell_min_temp">セル最小</string>
     <string name="charging_chart_cell_max_temp">セル最大</string>
     <string name="charging_chart_hv_bus">HVバス（V）</string>
+    <string name="chart_cells_voltage_axis">セル (V)</string>
     <string name="charging_chart_cell_min">セル最小（V）</string>
     <string name="charging_chart_cell_max">セル最大（V）</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">電力対速度</string>
     <string name="heatmap_power_vs_speed_desc">各速度でのモーター出力 — 車が実際にどこで動作しているかを示す</string>
     <string name="heatmap_consumption_vs_speed">消費量対速度</string>
-    <string name="heatmap_consumption_vs_speed_desc">速度範囲全体での瞬時効率（%1$s）</string>
+    <string name="heatmap_consumption_vs_speed_desc">速度範囲全体での瞬時消費量（%1$s）</string>
     <string name="heatmap_regen_vs_speed">回生電力対速度</string>
     <string name="heatmap_regen_vs_speed_desc">速度帯ごとの回生ブレーキ強度</string>
     <string name="heatmap_front_rpm_vs_speed">フロントモーターRPM対速度</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">加速度対速度</string>
     <string name="heatmap_accel_desc">ドライバーが強く加速またはコーストする場所 — 低いほど効率的</string>
     <string name="heatmap_soc_vs_consumption">SoC対消費量</string>
-    <string name="heatmap_soc_consumption_desc">低充電または高充電状態で効率が変化するかどうか</string>
+    <string name="heatmap_soc_consumption_desc">低充電または高充電状態で消費量が変化するかどうか</string>
     <string name="heatmap_time_vs_speed">時刻対速度</string>
     <string name="heatmap_time_speed_desc">いつどのくらいの速度で走行するか — ラッシュアワーの渋滞パターンを明示</string>
     <string name="heatmap_gradient_vs_consumption">勾配対消費量</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">前後モーターRPM</string>
     <string name="heatmap_awd_desc">AWDトルク配分 — 対角線 = 均等配分、対角外 = 一方のモーターが支配的</string>
     <string name="heatmap_tyre_vs_consumption">タイヤ空気圧対消費量</string>
-    <string name="heatmap_tyre_desc">高い空気圧がお使いの車の効率を測定可能に改善するかどうか</string>
+    <string name="heatmap_tyre_desc">高い空気圧がお使いの車の消費量を測定可能に低下させるかどうか</string>
     <string name="heatmap_soc_vs_regen">SoC対回生効率</string>
     <string name="heatmap_soc_regen_desc">BMSが回生ブレーキを制限する場所 — SoC 100%付近で予想される</string>
     <string name="heatmap_speed_vs_temp">速度対バッテリー温度</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">このトリップにバッテリー温度データが記録されていません。</string>
     <string name="heatmap_no_mode">%1$s モードが記録されていません — 今後のトリップで、分析を有効にするために車のディスプレイで各モードを一度タップしてください。</string>
     <string name="chart_no_route_data">ルートデータがありません</string>
+    <string name="map_no_gps_recorded">GPS座標は記録されるとここに表示されます</string>
+    <string name="map_no_valid_gps">この旅行に有効なGPSデータがありません</string>
+    <string name="map_traffic_label">交通状況</string>
+    <string name="map_traffic_free_flow">流れている  (≥ %1$s)</string>
+    <string name="map_traffic_light">やや混雑  (%1$s)</string>
+    <string name="map_traffic_heavy">渋滞  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">エネルギー集中区間</string>
+    <string name="route_energy_hotspots_desc">エネルギー消費量が最も高い区間</string>
+    <string name="route_trip_timeline">旅行タイムライン</string>
+    <string name="route_trip_started">旅行開始</string>
+    <string name="route_hard_acceleration">急加速</string>
+    <string name="route_hard_braking">急ブレーキ</string>
+    <string name="route_trip_ended">旅行終了</string>
+    <string name="stat_one_trip">1旅行</string>
+    <string name="stat_n_trips">%1$d旅行</string>
+    <string name="season_vs_ref">%1$s 対基準</string>
+    <string name="season_stat_km_total">%1$s km 合計</string>
+    <string name="season_stat_kwh_used">%1$s kWh 使用</string>
+    <string name="season_stat_avg_temp">平均 %1$s°C</string>
+    <string name="route_distance_label">%1$s %2$s ルート</string>
+    <string name="route_instance_trips">%1$d回 · %2$s</string>
+    <string name="route_avg_unit">平均 %1$s</string>
+    <string name="schedule_daily">毎日</string>
+    <string name="schedule_weekly">毎週</string>
+    <string name="schedule_monthly">毎月</string>
+    <string name="danger_zone_title">危険ゾーン</string>
+    <string name="danger_zone_desc">すべての旅行、データポイント、統計を完全に削除します。リセット前にローカルバックアップが自動的に作成されます。</string>
+    <string name="send_diag_log_desc">診断ログ全体（speed-stallおよび\'テレメトリ更新停止\'イベント）を接続されたTelegramボットに直接送信します—ローカルに保存または共有されるものはありません。まずBackup &amp; Restore → Telegramバックアップでボットを接続してください。</string>
+    <string name="compat_privacy_notice_body">レポートは車のヘッドユニットのすべてのデータソースから生の値を取得します—数値、文字列、配列。\n\nGPSの緯度と経度は含まれません。\n\nその他すべてが含まれます：バッテリー状態、モーターデータ、ギア、速度、ドライブモード、空調状態、充電状態、PHEV固有の値など。\n\n自動送信されるものはありません。"QRコードでメール"はレポートを一時的な公開ホスト（litterbox）にアップロードし、12時間後に自動削除されるリンクを表示します；それまでリンクを持つ誰でも読めます。他のオプションはレポートをデバイスに保存します。</string>
+    <string name="compat_sending_label">送信中…</string>
+    <string name="compat_email_qr_label">QRコードでメール</string>
+    <string name="compat_uploading_label">アップロード中…</string>
+    <string name="compat_telegram_not_configured">Telegramが設定されていません — 先にBackup &amp; Restoreで設定してください。</string>
+    <string name="compat_sent_telegram">Telegramで送信しました ✓</string>
+    <string name="compat_telegram_failed">Telegram送信失敗：%1$s</string>
+    <string name="compat_save_failed">保存失敗：%1$s</string>
+    <string name="compat_probe_cleared">プローブデータを消去しました。</string>
+    <string name="compat_upload_failed">アップロード失敗：%1$s</string>
+    <string name="compat_qr_copy_link">リンクをコピー</string>
+    <string name="compat_qr_dialog_title">スキャンしてレポートをメールで送信</string>
+    <string name="compat_qr_dialog_desc">スマートフォンでスキャン — %1$s宛の事前入力済みメールが開きます。アカウントを選択して送信を押してください。リンクは12時間後に失効します。</string>
+    <string name="compat_qr_no_render">"リンクをコピー"を使用して%1$sにメールしてください。</string>
+    <string name="compat_qr_content_desc">プローブダウンロードリンク付きの事前入力済みメールを開くQRコード</string>
+    <string name="web_access_pin_label">アクセスPIN</string>
+    <string name="web_pin_browser_hint">誰かがサーバーURLを開いたときにブラウザのログインページに表示されます。</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">PINを隠す</string>
+    <string name="web_pin_show_cd">PINを表示</string>
+    <string name="web_pin_set">設定</string>
+    <string name="web_pin_regen">再生成</string>
+    <string name="web_pin_min_digits">最低4桁。PINを変更するとすべてのアクティブなブラウザセッションが無効になります。</string>
+    <string name="web_ip_locked_one">1つのIPアドレスがロックされました</string>
+    <string name="web_ip_locked_many">%1$d個のIPアドレスがロックされました</string>
+    <string name="web_too_many_attempts">不正なPIN試行が多すぎます。</string>
+    <string name="web_server_failed">起動失敗：%1$s</string>
+    <string name="web_server_waiting">IPアドレスを待っています…</string>
+    <string name="web_server_open_hint">同じWiFiに接続された任意のデバイスでこのアドレスを開いてください。</string>
+    <string name="web_copy_url_cd">URLをコピー</string>
     <string name="chart_no_tyre_data">このトリップにタイヤ空気圧データが記録されていません</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTTテスト公開成功</string>
     <string name="mqtt_test_failed_msg">MQTTテストに失敗しました：%1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT設定が保存されました</string>
+    <string name="connection_group_label">接続</string>
+    <string name="hide_token_cd">トークンを隠す</string>
+    <string name="show_token_cd">トークンを表示</string>
+    <string name="abrp_status_label">ABRPステータス</string>
+    <string name="mqtt_status_label">MQTTステータス</string>
+    <string name="label_configured">設定済み</string>
+    <string name="label_enabled">有効</string>
+    <string name="label_last_upload">最終アップロード</string>
+    <string name="label_last_publish">最終公開</string>
+    <string name="label_last_status">最終ステータス</string>
+    <string name="value_yes">はい</string>
+    <string name="value_no">いいえ</string>
+    <string name="value_na">なし</string>
 
     <!-- About screen -->
     <string name="about_version_label">バージョン</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">メモリ使用率</string>
     <string name="last_60s_label">直近60秒</string>
     <string name="adb_shell_label">ADBシェル</string>
-    <string name="adb_shell_desc_text">認証済みローカルADBデーモンを通じて実行します。`adb shell`の後に入力するのと同じようにコマンドを入力してください。</string>
+    <string name="adb_shell_desc_text">認証済みローカルADB daemonを通じて実行します。`adb shell`の後に入力するのと同じようにコマンドを入力してください。</string>
     <string name="shell_command_label">シェルコマンド</string>
     <string name="run_shell_cmd_action">シェルコマンドを実行</string>
     <string name="samples_refresh_note">この画面が開いている間、サンプルは2秒ごとに更新されます。</string>
@@ -957,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ 操作が必要 — 自動起動</string>
-    <string name="autostart_dialog_msg">新しいバージョンがインストールされました。このアプリの自動起動を無効化をオフに切り替える必要があります。これにより、車がオフのとき（例：夜間充電）のバックグラウンドデータ収集が有効になります。\n\nこの設定を変更した後、信頼性向上のため車を一度再起動してから、BYD Trip Statsを再度開いてください。\n警告：走行中に速度やその他の値が更新されない場合は、車を再起動してください！</string>
+    <string name="autostart_dialog_msg">新しいバージョンがインストールされました。このアプリの自動起動を無効にする必要があります。これにより、車がオフのとき（例：夜間充電中）のバックグラウンドデータ収集が有効になります。\n\n最良の信頼性のために、この設定を変更した後で車を一度再起動し、BYD Trip Statsを再度開いてください。\n警告：走行中に速度やその他の値が更新されない場合は、車を再起動する必要があります！</string>
     <string name="autostart_got_it">了解</string>
     <string name="adb_connecting_title">接続中…</string>
     <string name="adb_waiting_auth_title">認証を待機中</string>

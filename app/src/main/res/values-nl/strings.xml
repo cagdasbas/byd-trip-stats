@@ -54,7 +54,7 @@
     <string name="tab_analysis">Analyse</string>
     <string name="tab_power">Vermogen</string>
     <string name="tab_voltage">Spanning</string>
-    <string name="tab_cell_voltage">Cel V</string>
+    <string name="tab_cell_voltage">Cellen</string>
     <string name="tab_temperature">Temperatuur</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">Screenshot mislukt: %1$s</string>
     <string name="ev_range_label">EV-bereik</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">Snelheid</string>
+    <string name="stat_range">Bereik</string>
+    <string name="label_time">Tijd</string>
+    <string name="label_now">nu</string>
+    <string name="chart_hv_battery_voltage">HV-batterijspanning</string>
+    <string name="cell_low_label">Laagste</string>
+    <string name="cell_high_label">Hoogste</string>
+    <string name="crosshair_cell_high">Hoogste %.3f V</string>
+    <string name="crosshair_cell_low">Laagste %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">TIJD</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">Rijdynamiek</string>
     <string name="stat_odometer">Kilometerstand</string>
     <string name="stat_total_discharge">Totale ontlading</string>
+    <string name="stat_total_consumed">Totaal verbruikt</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">Stoppen</string>
@@ -198,7 +208,7 @@
     <string name="stat_avg_consumption">Gemiddeld verbruik</string>
     <string name="stat_energy_consumed">Verbruikte energie</string>
     <string name="stat_max_regen">Max. regeneratie</string>
-    <string name="stat_regen_eff">Regen. rend.</string>
+    <string name="stat_regen_eff">Regen. rendement</string>
     <string name="stat_avg_speed">Gemiddelde snelheid</string>
     <string name="stat_max_speed">Maximumsnelheid</string>
     <string name="stat_soc_panel">SoC (paneel)</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">Ritgegevens exporteren</string>
     <string name="export_copy_summary">Samenvatting naar klembord kopiëren</string>
-    <string name="export_save_downloads">Opslaan in map Downloads</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">Opslaan als CSV</string>
     <string name="export_save_json">Opslaan als JSON</string>
     <string name="export_save_html">Opslaan als HTML-viewer (dubbelklik om te openen)</string>
@@ -283,7 +293,7 @@
     <string name="soc_end_label">SoC einde</string>
     <string name="soc_added_label">SoC toegevoegd</string>
     <string name="kwh_added_label">kWh toegevoegd</string>
-    <string name="battery_car_label">Batterij (auto)</string>
+    <string name="battery_car_label">Batterij (HV)</string>
     <string name="peak_power_label">Piekvermogen</string>
     <string name="average_power_label">Gemiddeld vermogen</string>
     <string name="charge_rate_label">Laadsnelheid</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">Geanalyseerde ritten</string>
     <string name="decline_rate_label">Achteruitgangssnelheid</string>
     <string name="projected_80_label">Geprojekteerd @ 80%</string>
+    <string name="soh_not_declining">Geen afname</string>
+    <string name="soh_far_future">Verre toekomst</string>
     <string name="soh_history_section">SoH-geschiedenis</string>
     <string name="legend_recorded">Opgenomen</string>
     <string name="legend_trend">Trend</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">Tip: BYD\'s garantie dekt de batterij tot 70% SoH gedurende 8 jaar / 250.000 km.</string>
     <string name="battery_health_report_title">Batterijgezondheidsrapport</string>
     <string name="battery_report_desc">Exporteer een rapport van de State of Health, achteruitgangssnelheid en 80%-projectie van je batterij — nuttig bewijs bij verkoop van de auto of het indienen van een garantieverzoek. Opgeslagen in Download/BydTripStats/ als drukklare PDF of als HTML (opent in elke browser). Volledig op het apparaat gegenereerd.</string>
+    <string name="battery_report_warranty_note">De accugarantie van BYD dekt het pakket doorgaans tot 70% State of Health gedurende 8 jaar / 250.000 km. Raadpleeg het garantieboekje van uw voertuig voor de exacte voorwaarden.</string>
+    <string name="battery_report_exclusion_note">Sluit %1$d eerdere rit(ten) uit die vóór %2$s zijn vastgelegd met een oude schattingsmethode die de State of Health te laag rapporteerde.</string>
+    <string name="report_saved_msg">Rapport opgeslagen: %1$s</string>
+    <string name="report_failed_msg">Rapport mislukt: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">Batterijgegevensbereik</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">Seizoensanalyse</string>
-    <string name="winter_vs_summer_subtitle">Efficiëntieanalyse winter versus zomer</string>
+    <string name="winter_vs_summer_subtitle">Verbruiksanalyse winter versus zomer</string>
     <string name="no_seasonal_data">Nog geen seizoensgegevens</string>
     <string name="complete_seasons_hint">Maak ritten in meerdere seizoenen om te zien hoe temperatuur je bereik beïnvloedt.</string>
     <string name="avg_consumption_by_season">Gemiddeld verbruik per seizoen</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">Routes</string>
-    <string name="recurring_journeys_subtitle">Terugkerende ritten &amp; efficiëntie</string>
+    <string name="recurring_journeys_subtitle">Terugkerende ritten &amp; verbruik</string>
     <string name="no_recurring_routes">Nog geen terugkerende routes</string>
-    <string name="recurring_route_hint">Maak dezelfde rit minimaal 3 keer — zoals een dagelijkse woon-werkrit — en hij verschijnt hier zodat je de efficiëntie per rit kunt vergelijken.</string>
+    <string name="recurring_route_hint">Maak dezelfde rit minimaal 3 keer — zoals een dagelijkse woon-werkrit — en hij verschijnt hier zodat je het verbruik per rit kunt vergelijken.</string>
     <string name="route_best">beste</string>
     <string name="route_worst">slechtste</string>
     <string name="route_avg">gem.</string>
-    <string name="efficiency_trend_label">Efficiëntie per rit (oudste → nieuwste)</string>
+    <string name="efficiency_trend_label">Verbruik per rit (oudste → nieuwste)</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">Doelen &amp; Persoonlijke records</string>
     <string name="track_milestones_subtitle">Volg je rijmijlpalen</string>
     <string name="set_goals_action">Doelen instellen</string>
     <string name="personal_bests_section">Persoonlijke records</string>
-    <string name="best_efficiency_label">Beste efficiëntie</string>
+    <string name="best_efficiency_label">Beste verbruik</string>
     <string name="lowest_ever_label">Laagste ooit gemeten</string>
     <string name="longest_trip_label">Langste rit</string>
     <string name="longest_trip_subtitle">Afstand van een enkele rit</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">Doelen</string>
     <string name="no_goals_set">Nog geen doelen ingesteld</string>
     <string name="set_goals_hint">Tik op ✏️ hierboven om een verbruiks- of afstandsdoel in te stellen.</string>
-    <string name="efficiency_target_label">Efficiëntiedoel</string>
+    <string name="efficiency_target_label">Verbruiksdoel</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s (gemiddelde laatste 5 ritten)</string>
     <string name="monthly_distance_goal_label">Maandelijkse afstand</string>
     <string name="monthly_distance_subtitle">%1$s / %2$s %3$s deze maand</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">Tags</string>
-    <string name="per_tag_efficiency">Efficiëntie &amp; totalen per tag</string>
+    <string name="per_tag_efficiency">Verbruik &amp; totalen per tag</string>
     <string name="no_tags_yet">Nog geen tags</string>
     <string name="tag_usage_hint">Voeg een tag toe aan een rit via het detailscherm, of tag er meerdere tegelijk via de selectiemodus in Geschiedenis. Getagde ritten worden hier samengevat.</string>
     <string name="rename_tag_title">Tag hernoemen</string>
@@ -410,7 +426,7 @@
 
     <!-- Local Backup screen -->
     <string name="backup_restore_title">Database back-up &amp; herstellen</string>
-    <string name="backup_to_download_label">Back-up naar Downloads</string>
+    <string name="backup_to_download_label">Back-up naar Download</string>
     <string name="backup_download_desc">Slaat de volledige ritdatabase op in: Download/BydTripStats/byd_stats_backup_DATE.db</string>
     <string name="backup_now_action">Nu back-up maken</string>
     <string name="backup_to_sd_label">Back-up naar SD-kaart</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">Regeneratie</string>
     <string name="drive_mode_usage_label">Rijmodusgebruik</string>
     <string name="regen_mode_usage_label">Regeneratiemodusgebruik</string>
+    <string name="mode_of_mode_attributed_trip">van de rit met modusregistratie</string>
+    <string name="mode_recovered_via_regen">teruggewonnen via regen</string>
+    <string name="mode_eco_normal_same">Eco en Normal presteerden op deze rit vrijwel hetzelfde, dus route en verkeer waren bepalender dan de gekozen rijmodus.</string>
+    <string name="mode_sport_more_than_normal">Sport verbruikte %1$s %2$s meer dan Normal over vergelijkbare segmenten op deze rit.</string>
+    <string name="mode_high_regen_no_improvement">High regen heeft de teruggewonnen energie op deze rit niet merkbaar verbeterd — rijomstandigheden met remkansen waren waarschijnlijk bepalender dan de regen-instelling.</string>
     <string name="route_segments_label">Routesegmenten</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Waypoints</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">Momentaan verbruik</string>
     <string name="chart_drive_regen_modes">Rij- / regeneratiemodi</string>
     <string name="chart_mode_timeline">Modusverloop tijdens de rit</string>
+    <string name="heatmap_mode_filters">Modusfilters</string>
+    <string name="heatmap_legend_few">Weinig</string>
+    <string name="heatmap_legend_many">Veel</string>
+    <string name="heatmap_legend_density">Kleurintensiteit = steekproefdichtheid (log-schaal)</string>
+    <string name="heatmap_axis_speed">Snelheid (%1$s)</string>
+    <string name="heatmap_axis_power">Vermogen (kW)</string>
+    <string name="heatmap_axis_regen_power">Regen. vermogen (kW)</string>
+    <string name="heatmap_axis_front_motor_rpm">Voor motor RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">Achter motor RPM</string>
+    <string name="heatmap_axis_motor_rpm">Motor RPM</string>
+    <string name="heatmap_axis_accel">Versnelling (%1$s)</string>
+    <string name="heatmap_axis_hour_of_day">Uur van de dag</string>
+    <string name="heatmap_axis_battery_temp">Accu-temp. (°C)</string>
+    <string name="heatmap_axis_cell_spread">Celspreiding (V)</string>
+    <string name="heatmap_axis_gradient">Helling (%)</string>
+    <string name="heatmap_axis_front_rpm">Voor RPM</string>
+    <string name="heatmap_axis_rear_rpm">Achter RPM</string>
+    <string name="heatmap_axis_avg_tyre_pressure">Gem. bandendruk (PSI)</string>
+    <string name="mode_no_data">Geen rijmodus-/regeneratiegegevens opgenomen voor deze rit.</string>
+    <string name="mode_enable_hint">Schakel rijmodus of regeneratiemodus in om de tijdlijn te bekijken.</string>
+    <string name="mode_drive_lane_title">Rijmodus</string>
+    <string name="mode_regen_lane_title">Regeneratiemodus</string>
+    <string name="mode_drive_modes_label">Rijmodi</string>
+    <string name="mode_regen_modes_label">Regeneratiemodi</string>
     <string name="chart_speed_detailed">Snelheidsprofiel (gedetailleerd)</string>
     <string name="chart_rpm_detailed">Motor-TPM (gedetailleerd)</string>
     <string name="chart_power_detailed">Vermogensprofiel (gedetailleerd)</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">Geen gegevens beschikbaar</string>
     <string name="chart_insufficient_data">Onvoldoende gegevens</string>
     <string name="chart_not_enough_driving">Niet genoeg rijgegevens voor momentaan verbruik</string>
-    <string name="chart_weekly_consumption">Wekelijks verbruik</string>
-    <string name="chart_monthly_consumption">Maandelijks verbruik</string>
-    <string name="chart_yearly_consumption">Jaarlijks verbruik</string>
+    <string name="chart_weekly_consumption">Deze week</string>
+    <string name="chart_monthly_consumption">Deze maand</string>
+    <string name="chart_yearly_consumption">Dit jaar</string>
     <string name="chart_your_duration_avg">Jouw duurgemiddelde (%1$s %2$s)</string>
     <string name="chart_selected_car_avg">Geselecteerde autogemiddelde (%1$s %2$s)</string>
     <string name="chart_close">Grafiek sluiten</string>
     <string name="chart_no_data_yet">Nog geen gegevens</string>
     <string name="chart_instant_label">Momentaan</string>
     <string name="chart_avg_5pt">5-puntsgemiddelde</string>
+    <string name="chart_into_trip">in rit</string>
     <string name="chart_no_motor_data">Geen motorgegevens beschikbaar</string>
     <string name="chart_motor_smoothed_note">Zeer korte asuitbarstingen kunnen afgevlakt lijken - volledig scherm voor details</string>
     <string name="legend_rear_motor">Achterste motor</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh over tijd</string>
-    <string name="axis_soc_over_time">SoC%% over tijd</string>
+    <string name="axis_soc_over_time">SoC% over tijd</string>
     <string name="axis_speed_over_time">%1$s over tijd</string>
     <string name="axis_rpm_over_time">TPM over tijd</string>
     <string name="axis_altitude_over_time">Hoogte over tijd</string>
     <string name="axis_power_over_time">kW over tijd</string>
     <string name="axis_hv_cells">HV-bus + cel min/max (V)</string>
-    <string name="axis_tyre_wheels">Alle vier wielen (bar)</string>
-    <string name="axis_consumption_distance">%1$s over afstand</string>
+    <string name="axis_tyre_wheels">Alle vier wielen</string>
+    <string name="axis_consumption_distance">%1$s over tijd</string>
     <string name="axis_mode_timeline">Modusverloop tijdens de rit</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">Laadvermogen</string>
     <string name="charging_chart_cell_voltage">Celspanning</string>
     <string name="charging_chart_avg_temp">Gem.</string>
-    <string name="charging_chart_cell_min_temp">Cel min</string>
-    <string name="charging_chart_cell_max_temp">Cel max</string>
+    <string name="charging_chart_cell_min_temp">Laagste</string>
+    <string name="chart_cells_voltage_axis">Cellen (V)</string>
+    <string name="charging_chart_cell_max_temp">Hoogste</string>
     <string name="charging_chart_hv_bus">HV-bus (V)</string>
-    <string name="charging_chart_cell_min">Cel min (V)</string>
-    <string name="charging_chart_cell_max">Cel max (V)</string>
+    <string name="charging_chart_cell_min">Min. celspanning (V)</string>
+    <string name="charging_chart_cell_max">Max. celspanning (V)</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
     <string name="charging_chart_panel_soc">Paneel SoC</string>
     <string name="wheel_lf">LV</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">Vermogen vs. snelheid</string>
     <string name="heatmap_power_vs_speed_desc">Motorvermogen bij elke snelheid — toont waar de auto daadwerkelijk op werkt</string>
     <string name="heatmap_consumption_vs_speed">Verbruik vs. snelheid</string>
-    <string name="heatmap_consumption_vs_speed_desc">Momentane efficiëntie (%1$s) over het snelheidsbereik</string>
+    <string name="heatmap_consumption_vs_speed_desc">Momentaan verbruik (%1$s) over het snelheidsbereik</string>
     <string name="heatmap_regen_vs_speed">Regeneratievermogen vs. snelheid</string>
     <string name="heatmap_regen_vs_speed_desc">Sterkte van regeneratief remmen per snelheidsband</string>
     <string name="heatmap_front_rpm_vs_speed">Voorste motor-TPM vs. snelheid</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">Versnelling vs. snelheid</string>
     <string name="heatmap_accel_desc">Waar de bestuurder hard optrekken of uitrijdt — lager is efficiënter</string>
     <string name="heatmap_soc_vs_consumption">SoC vs. verbruik</string>
-    <string name="heatmap_soc_consumption_desc">Of efficiëntie verandert bij lage of hoge laadtoestanden</string>
+    <string name="heatmap_soc_consumption_desc">Of het verbruik verandert bij lage of hoge laadtoestanden</string>
     <string name="heatmap_time_vs_speed">Tijdstip vs. snelheid</string>
     <string name="heatmap_time_speed_desc">Wanneer en hoe snel je rijdt — onthult patronen van spitsuurfiles</string>
     <string name="heatmap_gradient_vs_consumption">Helling vs. verbruik</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">Voor- vs. achterste motor-TPM</string>
     <string name="heatmap_awd_desc">AWD-koppelverdeling — diagonaal = gelijk aandeel, buiten diagonaal = één motor dominant</string>
     <string name="heatmap_tyre_vs_consumption">Bandenspanning vs. verbruik</string>
-    <string name="heatmap_tyre_desc">Of hogere bandenspanning meetbaar de efficiëntie verbetert op jouw auto</string>
+    <string name="heatmap_tyre_desc">Of hogere bandenspanning meetbaar het verbruik verlaagt op jouw auto</string>
     <string name="heatmap_soc_vs_regen">SoC vs. regeneratierendement</string>
     <string name="heatmap_soc_regen_desc">Waar BMS regeneratief remmen beperkt — verwacht rond 100% SoC</string>
     <string name="heatmap_speed_vs_temp">Snelheid vs. batterijtemperatuur</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">Geen batterijtemperatuurgegevens opgenomen voor deze rit.</string>
     <string name="heatmap_no_mode">Geen %1$s-modus opgenomen — tik bij toekomstige ritten elke modus eenmaal aan op het autodisplay om analyses in te schakelen.</string>
     <string name="chart_no_route_data">Geen routegegevens beschikbaar</string>
+    <string name="map_no_gps_recorded">GPS-coördinaten verschijnen hier wanneer ze zijn opgenomen</string>
+    <string name="map_no_valid_gps">Geen geldige GPS-gegevens in deze rit</string>
+    <string name="map_traffic_label">Verkeer</string>
+    <string name="map_traffic_free_flow">Vrij rijden  (≥ %1$s)</string>
+    <string name="map_traffic_light">Licht verkeer  (%1$s)</string>
+    <string name="map_traffic_heavy">Druk verkeer  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">Energie-hotspots</string>
+    <string name="route_energy_hotspots_desc">Segmenten met het hoogste energieverbruik</string>
+    <string name="route_trip_timeline">Rit tijdlijn</string>
+    <string name="route_trip_started">Rit gestart</string>
+    <string name="route_hard_acceleration">Harde acceleratie</string>
+    <string name="route_hard_braking">Hard remmen</string>
+    <string name="route_trip_ended">Rit beëindigd</string>
+    <string name="stat_one_trip">1 rit</string>
+    <string name="stat_n_trips">%1$d ritten</string>
+    <string name="season_vs_ref">%1$s vs. ref.</string>
+    <string name="season_stat_km_total">%1$s km totaal</string>
+    <string name="season_stat_kwh_used">%1$s kWh verbruikt</string>
+    <string name="season_stat_avg_temp">gem. %1$s°C</string>
+    <string name="route_distance_label">%1$s %2$s route</string>
+    <string name="route_instance_trips">%1$d ritten · %2$s</string>
+    <string name="route_avg_unit">gem. %1$s</string>
+    <string name="schedule_daily">Dagelijks</string>
+    <string name="schedule_weekly">Wekelijks</string>
+    <string name="schedule_monthly">Maandelijks</string>
+    <string name="danger_zone_title">GEVAARZONE</string>
+    <string name="danger_zone_desc">Verwijdert permanent alle ritten, datapunten en statistieken. Voor het resetten wordt automatisch een lokale back-up gemaakt.</string>
+    <string name="send_diag_log_desc">Stuurt het volledige diagnoselogboek (speed-stall en \'telemetrie refresh vastgelopen\'-gebeurtenissen) rechtstreeks naar uw verbonden Telegram-bot — er wordt niets lokaal opgeslagen of gedeeld. Verbind eerst een bot via Backup &amp; Restore → Telegram Backup.</string>
+    <string name="compat_privacy_notice_body">Het rapport bevat ruwe waarden van elke gegevensbron van de head unit van uw auto — numerieke waarden, tekenreeksen en arrays.\n\nGPS-breedte- en lengtegraad zijn NIET inbegrepen.\n\nAl het andere is inbegrepen: batterijstatus, motorgegevens, versnelling, snelheid, rijmodi, klimaatstatus, laadstatus, PHEV-specifieke waarden, enz.\n\nEr wordt niets automatisch verzonden. "E-mail via QR-code" uploadt het rapport naar een tijdelijke openbare host (litterbox) en toont een link die na 12 uur automatisch wordt verwijderd; iedereen met de link kan het tot dan lezen. De andere opties houden het rapport op uw apparaat.</string>
+    <string name="compat_sending_label">Verzenden…</string>
+    <string name="compat_email_qr_label">E-mail via QR-code</string>
+    <string name="compat_uploading_label">Uploaden…</string>
+    <string name="compat_telegram_not_configured">Telegram niet geconfigureerd — stel het eerst in via Backup &amp; Restore.</string>
+    <string name="compat_sent_telegram">Verzonden via Telegram ✓</string>
+    <string name="compat_telegram_failed">Telegram verzending mislukt: %1$s</string>
+    <string name="compat_save_failed">Opslaan mislukt: %1$s</string>
+    <string name="compat_probe_cleared">Probe-gegevens gewist.</string>
+    <string name="compat_upload_failed">Upload mislukt: %1$s</string>
+    <string name="compat_qr_copy_link">Link kopiëren</string>
+    <string name="compat_qr_dialog_title">Scan om het rapport per e-mail te sturen</string>
+    <string name="compat_qr_dialog_desc">Scan met uw telefoon — het opent een vooraf ingevulde e-mail naar %1$s. Kies uw account en druk op Verzenden. De link verloopt na 12 uur.</string>
+    <string name="compat_qr_no_render">QR-code kon niet worden weergegeven. Gebruik "Link kopiëren" en stuur het per e-mail naar %1$s.</string>
+    <string name="compat_qr_content_desc">QR-code die een vooraf ingevulde e-mail opent met de probe-downloadlink</string>
+    <string name="web_access_pin_label">Toegangs-PIN</string>
+    <string name="web_pin_browser_hint">Wordt weergegeven op de browseraanmeldingspagina wanneer iemand de server-URL opent.</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">PIN verbergen</string>
+    <string name="web_pin_show_cd">PIN tonen</string>
+    <string name="web_pin_set">Instellen</string>
+    <string name="web_pin_regen">Vernieuwen</string>
+    <string name="web_pin_min_digits">Min. 4 cijfers. Het wijzigen van de PIN maakt alle actieve browsersessies ongeldig.</string>
+    <string name="web_ip_locked_one">1 IP-adres geblokkeerd</string>
+    <string name="web_ip_locked_many">%1$d IP-adressen geblokkeerd</string>
+    <string name="web_too_many_attempts">Te veel onjuiste PIN-pogingen gedetecteerd.</string>
+    <string name="web_server_failed">Starten mislukt: %1$s</string>
+    <string name="web_server_waiting">Wachten op IP-adres…</string>
+    <string name="web_server_open_hint">Open dit adres op elk apparaat dat verbonden is met hetzelfde WiFi-netwerk.</string>
+    <string name="web_copy_url_cd">URL kopiëren</string>
     <string name="chart_no_tyre_data">Geen bandenspanningsgegevens opgenomen voor deze rit</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTT-testpublicatie geslaagd</string>
     <string name="mqtt_test_failed_msg">MQTT-test mislukt: %1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT-instellingen opgeslagen</string>
+    <string name="connection_group_label">Verbinding</string>
+    <string name="hide_token_cd">Token verbergen</string>
+    <string name="show_token_cd">Token tonen</string>
+    <string name="abrp_status_label">ABRP-status</string>
+    <string name="mqtt_status_label">MQTT-status</string>
+    <string name="label_configured">Geconfigureerd</string>
+    <string name="label_enabled">Ingeschakeld</string>
+    <string name="label_last_upload">Laatste upload</string>
+    <string name="label_last_publish">Laatste publicatie</string>
+    <string name="label_last_status">Laatste status</string>
+    <string name="value_yes">Ja</string>
+    <string name="value_no">Nee</string>
+    <string name="value_na">n.v.t.</string>
 
     <!-- About screen -->
     <string name="about_version_label">Versie</string>
@@ -929,7 +1047,7 @@
     <string name="memory_chart_title_label">Geheugengebruik</string>
     <string name="last_60s_label">laatste 60s</string>
     <string name="adb_shell_label">ADB-shell</string>
-    <string name="adb_shell_desc_text">Wordt uitgevoerd via de geautoriseerde lokale ADB-daemon. Voer de opdracht precies in zoals na `adb shell`.</string>
+    <string name="adb_shell_desc_text">Wordt uitgevoerd via de geautoriseerde lokale ADB daemon. Voer de opdracht precies in zoals na `adb shell`.</string>
     <string name="shell_command_label">Shell-opdracht</string>
     <string name="run_shell_cmd_action">Shell-opdracht uitvoeren</string>
     <string name="samples_refresh_note">Monsters worden elke 2 seconden vernieuwd terwijl dit scherm open is.</string>
@@ -957,7 +1075,7 @@
 
     <!-- MainActivity dialogs -->
     <string name="autostart_dialog_title">⚠️ Actie vereist — Autostart</string>
-    <string name="autostart_dialog_msg">Er is een nieuwe versie geïnstalleerd. Je moet autostart uitschakelen voor deze app, wat achtergrondgegevensverzameling mogelijk maakt wanneer de auto uit is (bijv. \'s nachts opladen).\n\nVoor de beste betrouwbaarheid, herstart de auto eenmaal nadat je deze instelling hebt gewijzigd, open vervolgens BYD Trip Stats opnieuw.\nWAARSCHUWING: Als je snelheid en andere waarden niet ziet bijwerken tijdens het rijden, moet je de auto herstarten!</string>
+    <string name="autostart_dialog_msg">Er is een nieuwe versie geïnstalleerd. Je moet autostart uitschakelen voor deze app, wat achtergrondgegevensverzameling mogelijk maakt wanneer de auto uit is (bijv. \'s nachts opladen).\n\nVoor de beste betrouwbaarheid de auto eenmaal opnieuw opstarten nadat je deze instelling hebt gewijzigd, en dan BYD Trip Stats opnieuw openen.\nWAARSCHUWING: Als je geen snelheid en andere waarden ziet updaten tijdens het rijden, moet je de auto opnieuw opstarten!</string>
     <string name="autostart_got_it">Begrepen</string>
     <string name="adb_connecting_title">Verbinden…</string>
     <string name="adb_waiting_auth_title">Wachten op autorisatie</string>

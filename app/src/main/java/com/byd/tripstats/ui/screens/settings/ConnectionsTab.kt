@@ -58,6 +58,7 @@ internal fun ConnectionsTab() {
     var intervalInput by rememberSaveable { mutableStateOf(settings.uploadIntervalSeconds.toString()) }
     var lastSavedAt by remember { mutableStateOf(settings.lastUploadAtMs) }
     var testResult by remember { mutableStateOf<String?>(null) }
+    var testOk by remember { mutableStateOf(false) }
     var mqttSettings by remember { mutableStateOf(MqttConnectionStore.load(context)) }
     var mqttBrokerInput by rememberSaveable { mutableStateOf(mqttSettings.brokerUrl) }
     var mqttPortInput by rememberSaveable { mutableStateOf(mqttSettings.brokerPort.toString()) }
@@ -70,6 +71,7 @@ internal fun ConnectionsTab() {
     var mqttWsPathInput by rememberSaveable { mutableStateOf(mqttSettings.webSocketPath) }
     var mqttIntervalInput by rememberSaveable { mutableStateOf(mqttSettings.publishIntervalSeconds.toString()) }
     var mqttResult by remember { mutableStateOf<String?>(null) }
+    var mqttOk by remember { mutableStateOf(false) }
     var mqttTesting by remember { mutableStateOf(false) }
     var showAbrpToken by rememberSaveable { mutableStateOf(false) }
     var showConnectionDetails by rememberSaveable { mutableStateOf(false) }
@@ -233,7 +235,7 @@ internal fun ConnectionsTab() {
                     }
                     AnimatedVisibility(visible = enabled, enter = expandVertically(), exit = shrinkVertically()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            SettingsGroupLabel("Connection")
+                            SettingsGroupLabel(stringResource(R.string.connection_group_label))
                             OutlinedTextField(
                                 value = tokenInput,
                                 onValueChange = { tokenInput = it.trim() },
@@ -245,7 +247,7 @@ internal fun ConnectionsTab() {
                                     IconButton(onClick = { showAbrpToken = !showAbrpToken }) {
                                         Icon(
                                             imageVector = if (showAbrpToken) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                            contentDescription = if (showAbrpToken) "Hide token" else "Show token"
+                                            contentDescription = if (showAbrpToken) stringResource(R.string.hide_token_cd) else stringResource(R.string.show_token_cd)
                                         )
                                     }
                                 },
@@ -285,6 +287,7 @@ internal fun ConnectionsTab() {
                                             } else {
                                                 context.getString(R.string.service_not_connected_msg)
                                             }
+                                            testOk = false
                                             return@Button
                                         }
                                         val current = AbrpConnectionStore.load(context).copy(
@@ -298,6 +301,7 @@ internal fun ConnectionsTab() {
                                             val (ok, status) = abrpManager.testUpload(telemetry, selectedCarConfig, current)
                                             launch(Dispatchers.Main) {
                                                 testResult = if (ok) context.getString(R.string.test_upload_success) else status
+                                                testOk = ok
                                                 settings = AbrpConnectionStore.load(context)
                                             }
                                         }
@@ -316,21 +320,21 @@ internal fun ConnectionsTab() {
                     }
                 }
                 ConnectionStatusCard(
-                    title = "ABRP status",
+                    title = stringResource(R.string.abrp_status_label),
                     content = {
-                        SettingsDetailRow("Configured", if (settings.userToken.isBlank()) "No" else "Yes")
-                        SettingsDetailRow("Enabled", if (settings.enabled) "Yes" else "No")
-                        SettingsDetailRow("Last upload", if (settings.lastUploadAtMs > 0L) {
+                        SettingsDetailRow(stringResource(R.string.label_configured), if (settings.userToken.isBlank()) stringResource(R.string.value_no) else stringResource(R.string.value_yes))
+                        SettingsDetailRow(stringResource(R.string.label_enabled), if (settings.enabled) stringResource(R.string.value_yes) else stringResource(R.string.value_no))
+                        SettingsDetailRow(stringResource(R.string.label_last_upload), if (settings.lastUploadAtMs > 0L) {
                             formatFriendlyTimestamp(settings.lastUploadAtMs)
                         } else {
-                            "n/a"
+                            stringResource(R.string.value_na)
                         })
-                        SettingsDetailRow("Last status", settings.lastStatus)
+                        SettingsDetailRow(stringResource(R.string.label_last_status), settings.lastStatus)
                         if (!testResult.isNullOrBlank()) {
                             Text(
                                 testResult!!,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (testResult!!.contains("succeeded", ignoreCase = true)) {
+                                color = if (testOk) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.error
@@ -352,7 +356,7 @@ internal fun ConnectionsTab() {
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Publish live telemetry to an external broker such as HiveMQ.",
+                        stringResource(R.string.mqtt_card_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -388,6 +392,7 @@ internal fun ConnectionsTab() {
                                     )
                                     MqttConnectionStore.save(context, mqttSettings)
                                     mqttResult = context.getString(R.string.mqtt_disabled_saved_msg)
+                                    mqttOk = true
                                 }
                             },
                             thumbContent = if (!mqttEnabled) {
@@ -408,7 +413,7 @@ internal fun ConnectionsTab() {
                     }
                     AnimatedVisibility(visible = mqttEnabled, enter = expandVertically(), exit = shrinkVertically()) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            SettingsGroupLabel("Connection")
+                            SettingsGroupLabel(stringResource(R.string.connection_group_label))
                             OutlinedTextField(
                                 value = mqttBrokerInput,
                                 onValueChange = { mqttBrokerInput = it.trim() },
@@ -569,6 +574,7 @@ internal fun ConnectionsTab() {
                                         )
                                         MqttConnectionStore.save(context, mqttSettings)
                                         mqttResult = context.getString(R.string.mqtt_settings_saved_msg)
+                                        mqttOk = true
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
                                 ) {
@@ -580,6 +586,7 @@ internal fun ConnectionsTab() {
                                         val telemetry = liveTelemetry
                                         if (telemetry == null) {
                                             mqttResult = context.getString(R.string.no_live_telemetry_yet)
+                                            mqttOk = false
                                             return@Button
                                         }
                                         val interval = mqttIntervalInput.toIntOrNull()?.coerceIn(1, 120) ?: 1
@@ -599,15 +606,18 @@ internal fun ConnectionsTab() {
                                         MqttConnectionStore.save(context, current)
                                         mqttTesting = true
                                         mqttResult = null
+                                        mqttOk = false
                                         screenScope.launch {
                                             try {
                                                 val (ok, status) = withContext(Dispatchers.IO) {
                                                     mqttManager.testPublish(telemetry)
                                                 }
                                                 mqttResult = if (ok) context.getString(R.string.mqtt_test_success) else status
+                                                mqttOk = ok
                                                 mqttSettings = MqttConnectionStore.load(context)
                                             } catch (e: Exception) {
                                                 mqttResult = context.getString(R.string.mqtt_test_failed_msg, e.message)
+                                                mqttOk = false
                                             } finally {
                                                 mqttTesting = false
                                             }
@@ -627,22 +637,21 @@ internal fun ConnectionsTab() {
                     }
                 }
                 ConnectionStatusCard(
-                    title = "MQTT status",
+                    title = stringResource(R.string.mqtt_status_label),
                     content = {
-                        SettingsDetailRow("Configured", if (mqttSettings.brokerUrl.isBlank()) "No" else "Yes")
-                        SettingsDetailRow("Enabled", if (mqttSettings.enabled) "Yes" else "No")
-                        SettingsDetailRow("Last publish", if (mqttSettings.lastPublishAtMs > 0L) {
+                        SettingsDetailRow(stringResource(R.string.label_configured), if (mqttSettings.brokerUrl.isBlank()) stringResource(R.string.value_no) else stringResource(R.string.value_yes))
+                        SettingsDetailRow(stringResource(R.string.label_enabled), if (mqttSettings.enabled) stringResource(R.string.value_yes) else stringResource(R.string.value_no))
+                        SettingsDetailRow(stringResource(R.string.label_last_publish), if (mqttSettings.lastPublishAtMs > 0L) {
                             formatFriendlyTimestamp(mqttSettings.lastPublishAtMs)
                         } else {
-                            "n/a"
+                            stringResource(R.string.value_na)
                         })
-                        SettingsDetailRow("Last status", mqttSettings.lastStatus)
+                        SettingsDetailRow(stringResource(R.string.label_last_status), mqttSettings.lastStatus)
                         if (!mqttResult.isNullOrBlank()) {
                             Text(
                                 mqttResult!!,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (mqttResult!!.contains("saved", ignoreCase = true) ||
-                                    mqttResult!!.contains("succeeded", ignoreCase = true)) {
+                                color = if (mqttOk) {
                                     RegenGreen
                                 } else {
                                     MaterialTheme.colorScheme.error

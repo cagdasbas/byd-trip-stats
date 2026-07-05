@@ -54,7 +54,7 @@
     <string name="tab_analysis">Analysis</string>
     <string name="tab_power">Power</string>
     <string name="tab_voltage">Voltage</string>
-    <string name="tab_cell_voltage">Cell V</string>
+    <string name="tab_cell_voltage">Cells</string>
     <string name="tab_temperature">Temperature</string>
 
     <!-- Dashboard / live state -->
@@ -83,6 +83,15 @@
     <string name="screenshot_failed">Screenshot failed: %1$s</string>
     <string name="ev_range_label">EV range</string>
     <string name="wltp_label">WLTP</string>
+    <string name="stat_speed">Speed</string>
+    <string name="stat_range">Range</string>
+    <string name="label_time">Time</string>
+    <string name="label_now">now</string>
+    <string name="chart_hv_battery_voltage">HV Battery Voltage</string>
+    <string name="cell_low_label">Lowest</string>
+    <string name="cell_high_label">Highest</string>
+    <string name="crosshair_cell_high">Highest %.3f V</string>
+    <string name="crosshair_cell_low">Lowest %.3f V</string>
 
     <!-- Dashboard stat labels -->
     <string name="stat_time">TIME</string>
@@ -98,6 +107,7 @@
     <string name="stat_driving_dynamics">Driving Dynamics</string>
     <string name="stat_odometer">Odometer</string>
     <string name="stat_total_discharge">Total Discharge</string>
+    <string name="stat_total_consumed">Total consumed</string>
 
     <!-- Trip controls / states -->
     <string name="btn_stop">Stop</string>
@@ -198,7 +208,7 @@
     <string name="stat_avg_consumption">Avg Consumption</string>
     <string name="stat_energy_consumed">Energy consumed</string>
     <string name="stat_max_regen">Max Regen</string>
-    <string name="stat_regen_eff">Regen Eff.</string>
+    <string name="stat_regen_eff">Regen Efficiency</string>
     <string name="stat_avg_speed">Avg Speed</string>
     <string name="stat_max_speed">Max Speed</string>
     <string name="stat_soc_panel">SoC (Panel)</string>
@@ -238,7 +248,7 @@
     <!-- Export dialog -->
     <string name="export_title">Export Trip Data</string>
     <string name="export_copy_summary">Copy Summary to Clipboard</string>
-    <string name="export_save_downloads">Save to Download folder</string>
+    <string name="export_save_downloads">Save to Downloads folder</string>
     <string name="export_save_csv">Save as CSV</string>
     <string name="export_save_json">Save as JSON</string>
     <string name="export_save_html">Save as HTML viewer (double-click to open)</string>
@@ -283,7 +293,7 @@
     <string name="soc_end_label">SoC end</string>
     <string name="soc_added_label">SoC added</string>
     <string name="kwh_added_label">kWh added</string>
-    <string name="battery_car_label">Battery (car)</string>
+    <string name="battery_car_label">Battery (HV)</string>
     <string name="peak_power_label">Peak power</string>
     <string name="average_power_label">Average power</string>
     <string name="charge_rate_label">Charge rate</string>
@@ -314,6 +324,8 @@
     <string name="trips_analysed_label">Trips analysed</string>
     <string name="decline_rate_label">Decline rate</string>
     <string name="projected_80_label">Projected @ 80%</string>
+    <string name="soh_not_declining">Not declining</string>
+    <string name="soh_far_future">Far future</string>
     <string name="soh_history_section">SoH History</string>
     <string name="legend_recorded">Recorded</string>
     <string name="legend_trend">Trend</string>
@@ -327,6 +339,10 @@
     <string name="soh_warranty_tip">Tip: BYD\'s warranty covers the battery to 70% SoH for 8 years / 250,000 km.</string>
     <string name="battery_health_report_title">Battery health report</string>
     <string name="battery_report_desc">Export a report of your battery\'s State of Health, decline rate and 80% projection — useful evidence when selling the car or raising a warranty claim. Saved to Download/BydTripStats/ as a print-ready PDF or as HTML (opens in any browser). Generated entirely on-device.</string>
+    <string name="battery_report_warranty_note">BYD\'s battery warranty typically covers the pack to 70% State of Health for 8 years / 250,000 km. Check your vehicle\'s warranty booklet for the exact terms.</string>
+    <string name="battery_report_exclusion_note">Excludes %1$d earlier trip(s) recorded before %2$s using a legacy estimation method that under-reported State of Health.</string>
+    <string name="report_saved_msg">Report saved: %1$s</string>
+    <string name="report_failed_msg">Report failed: %1$s</string>
     <string name="btn_pdf">PDF</string>
     <string name="btn_html">HTML</string>
     <string name="battery_data_range_section">Battery data range</string>
@@ -346,7 +362,7 @@
 
     <!-- Seasonal Analysis -->
     <string name="seasonal_analysis_title">Seasonal Analysis</string>
-    <string name="winter_vs_summer_subtitle">Winter vs summer efficiency breakdown</string>
+    <string name="winter_vs_summer_subtitle">Winter vs summer consumption breakdown</string>
     <string name="no_seasonal_data">No seasonal data yet</string>
     <string name="complete_seasons_hint">Complete trips across multiple seasons to see how temperature affects your range.</string>
     <string name="avg_consumption_by_season">Avg Consumption by Season</string>
@@ -356,20 +372,20 @@
 
     <!-- Routes -->
     <string name="routes_title">Routes</string>
-    <string name="recurring_journeys_subtitle">Recurring journeys &amp; efficiency</string>
+    <string name="recurring_journeys_subtitle">Recurring journeys &amp; consumption</string>
     <string name="no_recurring_routes">No recurring routes yet</string>
-    <string name="recurring_route_hint">Drive the same journey at least 3 times — like a daily commute — and it\'ll appear here so you can compare efficiency across each trip.</string>
+    <string name="recurring_route_hint">Drive the same journey at least 3 times — like a daily commute — and it\'ll appear here so you can compare consumption across each trip.</string>
     <string name="route_best">best</string>
     <string name="route_worst">worst</string>
     <string name="route_avg">avg</string>
-    <string name="efficiency_trend_label">Efficiency per trip (oldest → newest)</string>
+    <string name="efficiency_trend_label">Consumption per trip (oldest → newest)</string>
 
     <!-- Trip Goals -->
     <string name="trip_goals_title">Goals &amp; Personal Bests</string>
     <string name="track_milestones_subtitle">Track your driving milestones</string>
     <string name="set_goals_action">Set goals</string>
     <string name="personal_bests_section">Personal Bests</string>
-    <string name="best_efficiency_label">Best efficiency</string>
+    <string name="best_efficiency_label">Best consumption</string>
     <string name="lowest_ever_label">Lowest ever recorded</string>
     <string name="longest_trip_label">Longest trip</string>
     <string name="longest_trip_subtitle">Single trip distance</string>
@@ -378,7 +394,7 @@
     <string name="goals_section_label">Goals</string>
     <string name="no_goals_set">No goals set yet</string>
     <string name="set_goals_hint">Tap ✏️ above to set a consumption or distance target.</string>
-    <string name="efficiency_target_label">Efficiency target</string>
+    <string name="efficiency_target_label">Consumption target</string>
     <string name="efficiency_target_subtitle">≤ %1$s %2$s (last 5 trips avg)</string>
     <string name="monthly_distance_goal_label">Monthly distance</string>
     <string name="monthly_distance_subtitle">%1$s / %2$s %3$s this month</string>
@@ -394,7 +410,7 @@
 
     <!-- Tags -->
     <string name="tags_title">Tags</string>
-    <string name="per_tag_efficiency">Per-tag efficiency &amp; totals</string>
+    <string name="per_tag_efficiency">Per-tag consumption &amp; totals</string>
     <string name="no_tags_yet">No tags yet</string>
     <string name="tag_usage_hint">Add a tag to a trip from its detail screen, or tag several at once from History\'s selection mode. Tagged trips are summarised here.</string>
     <string name="rename_tag_title">Rename tag</string>
@@ -478,6 +494,11 @@
     <string name="mode_regen_label">Regen</string>
     <string name="drive_mode_usage_label">Drive mode usage</string>
     <string name="regen_mode_usage_label">Regen mode usage</string>
+    <string name="mode_of_mode_attributed_trip">of mode-attributed trip</string>
+    <string name="mode_recovered_via_regen">recovered via regen</string>
+    <string name="mode_eco_normal_same">Eco and Normal were effectively the same on this trip, so route and traffic mattered more than the selected drive mode.</string>
+    <string name="mode_sport_more_than_normal">Sport used %1$s %2$s more than Normal over comparable segments in this trip.</string>
+    <string name="mode_high_regen_no_improvement">High regen did not materially improve recovered energy on this trip, so braking opportunities likely mattered more than the regen setting.</string>
     <string name="route_segments_label">Route Segments</string>
     <string name="segment_number_label">Segment %1$s</string>
     <string name="waypoints_label">Waypoints</string>
@@ -497,6 +518,30 @@
     <string name="chart_instant_consumption">Instantaneous Consumption</string>
     <string name="chart_drive_regen_modes">Drive / Regen Modes</string>
     <string name="chart_mode_timeline">Mode timeline across the trip</string>
+    <string name="heatmap_axis_avg_tyre_pressure">Avg Tyre Pressure (PSI)</string>
+    <string name="heatmap_axis_rear_rpm">Rear RPM</string>
+    <string name="heatmap_axis_front_rpm">Front RPM</string>
+    <string name="heatmap_axis_gradient">Gradient (%)</string>
+    <string name="heatmap_axis_cell_spread">Cell Spread (V)</string>
+    <string name="heatmap_axis_battery_temp">Battery Temp (°C)</string>
+    <string name="heatmap_axis_hour_of_day">Hour of day</string>
+    <string name="heatmap_axis_accel">Accel (%1$s)</string>
+    <string name="heatmap_axis_motor_rpm">Motor RPM</string>
+    <string name="heatmap_axis_rear_motor_rpm">Rear Motor RPM</string>
+    <string name="heatmap_axis_front_motor_rpm">Front Motor RPM</string>
+    <string name="heatmap_axis_regen_power">Regen Power (kW)</string>
+    <string name="heatmap_axis_power">Power (kW)</string>
+    <string name="heatmap_axis_speed">Speed (%1$s)</string>
+    <string name="heatmap_legend_density">Colour intensity = sample density (log scale)</string>
+    <string name="heatmap_legend_many">Many</string>
+    <string name="heatmap_legend_few">Few</string>
+    <string name="heatmap_mode_filters">Mode filters</string>
+    <string name="mode_no_data">No drive/regen mode data recorded for this trip.</string>
+    <string name="mode_enable_hint">Enable Drive mode or Regen mode to view the timeline.</string>
+    <string name="mode_drive_lane_title">Drive mode</string>
+    <string name="mode_regen_lane_title">Regen mode</string>
+    <string name="mode_drive_modes_label">Drive modes</string>
+    <string name="mode_regen_modes_label">Regen modes</string>
     <string name="chart_speed_detailed">Speed Profile (Detailed)</string>
     <string name="chart_rpm_detailed">Motor RPM (Detailed)</string>
     <string name="chart_power_detailed">Power Profile (Detailed)</string>
@@ -524,15 +569,16 @@
     <string name="chart_no_data">No data available</string>
     <string name="chart_insufficient_data">Insufficient data</string>
     <string name="chart_not_enough_driving">Not enough driving data for instantaneous consumption</string>
-    <string name="chart_weekly_consumption">Weekly consumption</string>
-    <string name="chart_monthly_consumption">Monthly consumption</string>
-    <string name="chart_yearly_consumption">Yearly consumption</string>
+    <string name="chart_weekly_consumption">This week</string>
+    <string name="chart_monthly_consumption">This month</string>
+    <string name="chart_yearly_consumption">This year</string>
     <string name="chart_your_duration_avg">Your duration avg (%1$s %2$s)</string>
     <string name="chart_selected_car_avg">Selected car avg (%1$s %2$s)</string>
     <string name="chart_close">Close chart</string>
     <string name="chart_no_data_yet">No data yet</string>
     <string name="chart_instant_label">Instant</string>
     <string name="chart_avg_5pt">5-pt average</string>
+    <string name="chart_into_trip">into trip</string>
     <string name="chart_no_motor_data">No motor data available</string>
     <string name="chart_motor_smoothed_note">Very short axle bursts may appear smoothed - fullscreen for details</string>
     <string name="legend_rear_motor">Rear motor</string>
@@ -544,25 +590,26 @@
 
     <!-- Chart axis labels -->
     <string name="axis_kwh_over_time">kWh over time</string>
-    <string name="axis_soc_over_time">SoC%% over time</string>
+    <string name="axis_soc_over_time">SoC% over time</string>
     <string name="axis_speed_over_time">%1$s over time</string>
     <string name="axis_rpm_over_time">RPM over time</string>
     <string name="axis_altitude_over_time">Altitude over time</string>
     <string name="axis_power_over_time">kW over time</string>
     <string name="axis_hv_cells">HV bus + cell min/max (V)</string>
-    <string name="axis_tyre_wheels">All four wheels (bar)</string>
-    <string name="axis_consumption_distance">%1$s over distance</string>
+    <string name="axis_tyre_wheels">All four wheels</string>
+    <string name="axis_consumption_distance">%1$s over time</string>
     <string name="axis_mode_timeline">Mode timeline over the trip</string>
 
     <!-- Charging chart labels -->
     <string name="charging_chart_charge_power">Charge Power</string>
     <string name="charging_chart_cell_voltage">Cell Voltage</string>
     <string name="charging_chart_avg_temp">Avg</string>
-    <string name="charging_chart_cell_min_temp">Cell min</string>
-    <string name="charging_chart_cell_max_temp">Cell max</string>
+    <string name="charging_chart_cell_min_temp">Lowest</string>
+    <string name="charging_chart_cell_max_temp">Highest</string>
     <string name="charging_chart_hv_bus">HV Bus (V)</string>
-    <string name="charging_chart_cell_min">Cell min (V)</string>
-    <string name="charging_chart_cell_max">Cell max (V)</string>
+    <string name="chart_cells_voltage_axis">Cells (V)</string>
+    <string name="charging_chart_cell_min">Min cell voltage (V)</string>
+    <string name="charging_chart_cell_max">Max cell voltage (V)</string>
     <string name="charging_chart_bms_soc">BMS SoC</string>
     <string name="charging_chart_panel_soc">Panel SoC</string>
     <string name="wheel_lf">LF</string>
@@ -582,7 +629,7 @@
     <string name="heatmap_power_vs_speed">Power vs Speed</string>
     <string name="heatmap_power_vs_speed_desc">Motor output at each speed — shows where the car actually operates</string>
     <string name="heatmap_consumption_vs_speed">Consumption vs Speed</string>
-    <string name="heatmap_consumption_vs_speed_desc">Instantaneous efficiency (%1$s) across the speed range</string>
+    <string name="heatmap_consumption_vs_speed_desc">Instantaneous consumption (%1$s) across the speed range</string>
     <string name="heatmap_regen_vs_speed">Regen Power vs Speed</string>
     <string name="heatmap_regen_vs_speed_desc">Regenerative braking strength by speed band</string>
     <string name="heatmap_front_rpm_vs_speed">Front Motor RPM vs Speed</string>
@@ -596,7 +643,7 @@
     <string name="heatmap_accel_vs_speed">Acceleration vs Speed</string>
     <string name="heatmap_accel_desc">Where the driver accelerates hard or coasts — lower is more efficient</string>
     <string name="heatmap_soc_vs_consumption">SOC vs Consumption</string>
-    <string name="heatmap_soc_consumption_desc">Whether efficiency changes at low or high charge states</string>
+    <string name="heatmap_soc_consumption_desc">Whether consumption changes at low or high charge states</string>
     <string name="heatmap_time_vs_speed">Time of Day vs Speed</string>
     <string name="heatmap_time_speed_desc">When and how fast you drive — reveals rush-hour congestion patterns</string>
     <string name="heatmap_gradient_vs_consumption">Gradient vs Consumption</string>
@@ -604,7 +651,7 @@
     <string name="heatmap_front_vs_rear_rpm">Front vs Rear Motor RPM</string>
     <string name="heatmap_awd_desc">AWD torque split — diagonal = equal share, off-diagonal = one motor dominant</string>
     <string name="heatmap_tyre_vs_consumption">Tyre Pressure vs Consumption</string>
-    <string name="heatmap_tyre_desc">Whether higher pressure measurably improves efficiency on your car</string>
+    <string name="heatmap_tyre_desc">Whether higher pressure measurably reduces consumption on your car</string>
     <string name="heatmap_soc_vs_regen">SOC vs Regen Efficiency</string>
     <string name="heatmap_soc_regen_desc">Where BMS throttles regenerative braking — expected near 100% SoC</string>
     <string name="heatmap_speed_vs_temp">Speed vs Battery Temperature</string>
@@ -622,6 +669,64 @@
     <string name="heatmap_no_battery_temp">No battery temperature data recorded on this trip.</string>
     <string name="heatmap_no_mode">No %1$s mode recorded — on future trips tap each mode on the car display once to enable analytics.</string>
     <string name="chart_no_route_data">No route data available</string>
+    <string name="map_no_gps_recorded">GPS coordinates will appear here when recorded</string>
+    <string name="map_no_valid_gps">No valid GPS data in this trip</string>
+    <string name="map_traffic_label">Traffic</string>
+    <string name="map_traffic_free_flow">Free flow  (≥ %1$s)</string>
+    <string name="map_traffic_light">Light traffic  (%1$s)</string>
+    <string name="map_traffic_heavy">Heavy traffic  (&lt; %1$s)</string>
+    <string name="route_energy_hotspots">Energy Hotspots</string>
+    <string name="route_energy_hotspots_desc">Segments with highest energy usage</string>
+    <string name="route_trip_timeline">Trip Timeline</string>
+    <string name="route_trip_started">Trip Started</string>
+    <string name="route_hard_acceleration">Hard Acceleration</string>
+    <string name="route_hard_braking">Hard Braking</string>
+    <string name="route_trip_ended">Trip Ended</string>
+    <string name="stat_one_trip">1 trip</string>
+    <string name="stat_n_trips">%1$d trips</string>
+    <string name="season_vs_ref">%1$s vs ref.</string>
+    <string name="season_stat_km_total">%1$s km total</string>
+    <string name="season_stat_kwh_used">%1$s kWh used</string>
+    <string name="season_stat_avg_temp">%1$s°C avg</string>
+    <string name="route_distance_label">%1$s %2$s route</string>
+    <string name="route_instance_trips">%1$d trips · %2$s</string>
+    <string name="route_avg_unit">avg %1$s</string>
+    <string name="schedule_daily">Daily</string>
+    <string name="schedule_weekly">Weekly</string>
+    <string name="schedule_monthly">Monthly</string>
+    <string name="danger_zone_title">DANGER ZONE</string>
+    <string name="danger_zone_desc">Permanently delete all trips, data points and statistics. A local backup is created automatically before the reset.</string>
+    <string name="send_diag_log_desc">Sends the full diagnostics log (speed-stall and \'telemetry refresh wedged\' events) straight to your connected Telegram bot — nothing is saved or shared locally. Connect a bot under Backup &amp; Restore → Telegram Backup first.</string>
+    <string name="compat_privacy_notice_body">The report captures raw values from every data source on your car\'s head unit — numeric values, strings, and arrays.\n\nGPS latitude and longitude are NOT included.\n\nEverything else is included: battery state, motor data, gear, speed, drive modes, climate state, charging state, PHEV-specific values, etc.\n\nNothing is sent automatically. \"Email via QR code\" uploads the report to a temporary public host (litterbox) and shows a link that auto-deletes after 12 hours; anyone with the link can read it until then. The other options keep the report on your device.</string>
+    <string name="compat_sending_label">Sending…</string>
+    <string name="compat_email_qr_label">Email via QR code</string>
+    <string name="compat_uploading_label">Uploading…</string>
+    <string name="compat_telegram_not_configured">Telegram not configured — set it up under Backup &amp; Restore first.</string>
+    <string name="compat_sent_telegram">Sent via Telegram ✓</string>
+    <string name="compat_telegram_failed">Telegram send failed: %1$s</string>
+    <string name="compat_save_failed">Save failed: %1$s</string>
+    <string name="compat_probe_cleared">Probe data cleared.</string>
+    <string name="compat_upload_failed">Upload failed: %1$s</string>
+    <string name="compat_qr_copy_link">Copy link</string>
+    <string name="compat_qr_dialog_title">Scan to email the report</string>
+    <string name="compat_qr_dialog_desc">Scan with your phone — it opens a pre-filled email to %1$s. Just choose your account and press Send. The link expires in 12 hours.</string>
+    <string name="compat_qr_no_render">Couldn\'t render the QR code. Use \"Copy link\" and email it to %1$s.</string>
+    <string name="compat_qr_content_desc">QR code that opens a pre-filled email with the probe download link</string>
+    <string name="web_access_pin_label">Access PIN</string>
+    <string name="web_pin_browser_hint">Shown on the browser login page when someone opens the server URL.</string>
+    <string name="web_pin_field_label">PIN</string>
+    <string name="web_pin_hide_cd">Hide PIN</string>
+    <string name="web_pin_show_cd">Show PIN</string>
+    <string name="web_pin_set">Set</string>
+    <string name="web_pin_regen">Regen</string>
+    <string name="web_pin_min_digits">Min 4 digits. Changing the PIN invalidates all active browser sessions.</string>
+    <string name="web_ip_locked_one">1 IP address locked out</string>
+    <string name="web_ip_locked_many">%1$d IP addresses locked out</string>
+    <string name="web_too_many_attempts">Too many incorrect PIN attempts detected.</string>
+    <string name="web_server_failed">Failed to start: %1$s</string>
+    <string name="web_server_waiting">Waiting for IP…</string>
+    <string name="web_server_open_hint">Open this address on any device connected to the same WiFi.</string>
+    <string name="web_copy_url_cd">Copy URL</string>
     <string name="chart_no_tyre_data">No tyre pressure data recorded on this trip</string>
 
     <!-- Initialization screen -->
@@ -826,6 +931,19 @@
     <string name="mqtt_test_success">MQTT test publish succeeded</string>
     <string name="mqtt_test_failed_msg">MQTT test failed: %1$s</string>
     <string name="mqtt_settings_saved_msg">MQTT settings saved</string>
+    <string name="connection_group_label">Connection</string>
+    <string name="hide_token_cd">Hide token</string>
+    <string name="show_token_cd">Show token</string>
+    <string name="abrp_status_label">ABRP status</string>
+    <string name="mqtt_status_label">MQTT status</string>
+    <string name="label_configured">Configured</string>
+    <string name="label_enabled">Enabled</string>
+    <string name="label_last_upload">Last upload</string>
+    <string name="label_last_publish">Last publish</string>
+    <string name="label_last_status">Last status</string>
+    <string name="value_yes">Yes</string>
+    <string name="value_no">No</string>
+    <string name="value_na">n/a</string>
 
     <!-- About screen -->
     <string name="about_version_label">Version</string>

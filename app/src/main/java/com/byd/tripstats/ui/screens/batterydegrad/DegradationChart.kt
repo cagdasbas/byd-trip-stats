@@ -192,9 +192,12 @@ private fun degradationStats(
     val msPerYear      = 365.25 * 24 * 3_600_000.0
     val declinePerYear = -regression.slope * msPerYear  // positive = declining
 
+    val maxReasonableMs = System.currentTimeMillis() + 100L * 365 * 24 * 3600 * 1000
+
     val projLabel = when {
         regression.slope >= 0 -> "Not declining"
         regression.projectedAt80Ms == null -> "Far future"
+        regression.projectedAt80Ms > maxReasonableMs -> "Far future"
         else -> {
             val calendar = java.util.Calendar.getInstance().apply {
                 timeInMillis = regression.projectedAt80Ms

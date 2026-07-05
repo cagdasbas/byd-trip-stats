@@ -405,7 +405,7 @@ internal fun AppDiagnosticsCard() {
                 Text(stringResource(R.string.send_diag_log_action))
             }
             Text(
-                "Sends the full diagnostics log (speed-stall and 'telemetry refresh wedged' events) straight to your connected Telegram bot — nothing is saved or shared locally. Connect a bot under Backup & Restore → Telegram Backup first.",
+                stringResource(R.string.send_diag_log_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

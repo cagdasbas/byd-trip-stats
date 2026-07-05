@@ -289,7 +289,7 @@ fun TripOverviewTab(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
                     )
 
-                    DetailRow("Total consumed", formatKwh(breakdown.totalConsumedKwh))
+                    DetailRow(stringResource(R.string.stat_total_consumed), formatKwh(breakdown.totalConsumedKwh))
 
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 2.dp),
@@ -365,7 +365,7 @@ fun TripOverviewTab(
 
                     DetailRow(
                         stringResource(R.string.vehicle_mass_label),
-                        breakdown.estimatedKerbMassKg?.let { "${it.toInt()} kg (estimate)" } ?: "n/a"
+                        breakdown.estimatedKerbMassKg?.let { "${it.toInt()} kg" } ?: "n/a"
                     )
                     DetailRow(
                         stringResource(R.string.cda_drag_area_label),

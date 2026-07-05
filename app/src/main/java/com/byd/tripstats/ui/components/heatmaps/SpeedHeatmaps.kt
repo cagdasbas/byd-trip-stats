@@ -39,8 +39,8 @@ internal fun PowerVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
-        yAxisLabel = "Power (kW)",
+        xAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
+        yAxisLabel = stringResource(R.string.heatmap_axis_power),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -75,7 +75,7 @@ internal fun ConsumptionVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
+        xAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
         yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
@@ -120,8 +120,8 @@ internal fun RegenVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
-        yAxisLabel = "Regen Power (kW)",
+        xAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
+        yAxisLabel = stringResource(R.string.heatmap_axis_regen_power),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -170,11 +170,11 @@ internal fun RpmVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins, transform = ::fmtRpm),
-        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
+        xAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
         yAxisLabel = when (drivetrain) {
-            Drivetrain.FWD -> "Front Motor RPM"
-            Drivetrain.RWD -> "Rear Motor RPM"
-            Drivetrain.AWD -> "Motor RPM"
+            Drivetrain.FWD -> stringResource(R.string.heatmap_axis_front_motor_rpm)
+            Drivetrain.RWD -> stringResource(R.string.heatmap_axis_rear_motor_rpm)
+            Drivetrain.AWD -> stringResource(R.string.heatmap_axis_motor_rpm)
         },
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         yValueFmt  = ::fmtRpm,
@@ -222,8 +222,8 @@ internal fun AccelerationVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins, "%.1f"),
-        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
-        yAxisLabel = "Accel (${if (useImperial) "mph/s" else "km/h/s"})",
+        xAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
+        yAxisLabel = stringResource(R.string.heatmap_axis_accel, if (useImperial) "mph/s" else "km/h/s"),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         yValueFmt  = { "%.1f".format(it) },
         modifier   = modifier
@@ -270,8 +270,8 @@ internal fun TimeOfDayVsSpeedHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Hour of day",
-        yAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
+        xAxisLabel = stringResource(R.string.heatmap_axis_hour_of_day),
+        yAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )
@@ -312,8 +312,8 @@ internal fun SpeedVsBatteryTempHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Speed (${if (useImperial) "mph" else "km/h"})",
-        yAxisLabel = "Battery Temp (°C)",
+        xAxisLabel = stringResource(R.string.heatmap_axis_speed, if (useImperial) "mph" else "km/h"),
+        yAxisLabel = stringResource(R.string.heatmap_axis_battery_temp),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
     )

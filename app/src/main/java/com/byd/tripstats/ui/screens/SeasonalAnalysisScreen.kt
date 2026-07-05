@@ -304,7 +304,9 @@ private fun SeasonCard(
                         Text(stat.season.label,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
-                        Text("${stat.tripCount} trip${if (stat.tripCount != 1) "s" else ""}",
+                        Text(
+                            if (stat.tripCount == 1) stringResource(R.string.stat_one_trip)
+                            else stringResource(R.string.stat_n_trips, stat.tripCount),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -317,7 +319,7 @@ private fun SeasonCard(
                     if (reference != null) {
                         val diff = unitSystem.convertEfficiency(stat.avgConsumption - reference)
                         val sign = if (diff >= 0) "+" else ""
-                        Text("${sign}${"%.1f".format(diff)} vs reference",
+                        Text(stringResource(R.string.season_vs_ref, "${sign}${"%.1f".format(diff)}"),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (diff <= 0) RegenGreen
                                     else MaterialTheme.colorScheme.error)
@@ -345,9 +347,9 @@ private fun SeasonCard(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                SeasonStatChip("🛣️", "${"%.0f".format(stat.totalDistanceKm)} km total")
-                SeasonStatChip("⚡", "${"%.1f".format(stat.totalKwh)} kWh used")
-                SeasonStatChip("🌡️", "${"%.0f".format(stat.avgTempC)}°C avg temp")
+                SeasonStatChip("🛣️", stringResource(R.string.season_stat_km_total, "%.0f".format(stat.totalDistanceKm)))
+                SeasonStatChip("⚡", stringResource(R.string.season_stat_kwh_used, "%.1f".format(stat.totalKwh)))
+                SeasonStatChip("🌡️", stringResource(R.string.season_stat_avg_temp, "%.0f".format(stat.avgTempC)))
             }
         }
     }

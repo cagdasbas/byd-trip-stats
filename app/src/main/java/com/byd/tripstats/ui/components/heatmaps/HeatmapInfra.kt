@@ -19,9 +19,11 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.ui.components.DriveModeFilter
 import com.byd.tripstats.ui.components.RegenModeFilter
@@ -256,7 +258,7 @@ internal fun HeatmapLegend() {
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            "Few",
+            stringResource(R.string.heatmap_legend_few),
             style    = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
             color    = labelColor
@@ -278,14 +280,14 @@ internal fun HeatmapLegend() {
             }
         }
         Text(
-            "Many",
+            stringResource(R.string.heatmap_legend_many),
             style    = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
             color    = labelColor
         )
     }
     Text(
-        "Colour intensity = sample density (log scale)",
+        stringResource(R.string.heatmap_legend_density),
         style    = MaterialTheme.typography.labelSmall,
         fontSize = 10.sp,
         color    = labelColor,

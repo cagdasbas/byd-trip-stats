@@ -435,12 +435,19 @@ fun RangeProjectionChart(
                 // X axis
                 drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
 
-                // X ticks — 5 evenly spaced labels
+                // X ticks — 5 evenly spaced labels. The first/last labels sit on the chart edges,
+                // so anchor them LEFT/RIGHT (not CENTER) or half the text spills past the canvas
+                // and gets clipped (the trailing digit of e.g. "12.6" was being cut off).
                 val xStep = maxDistanceKm / 4.0
                 for (i in 0..4) {
                     val dist = i * xStep
                     val x = xOf(dist)
                     drawLine(axisColor, Offset(x, padT + chartH), Offset(x, padT + chartH + 5f), 1.5f)
+                    xLabelPaint.textAlign = when (i) {
+                        0    -> android.graphics.Paint.Align.LEFT
+                        4    -> android.graphics.Paint.Align.RIGHT
+                        else -> android.graphics.Paint.Align.CENTER
+                    }
                     nc.drawText("%.1f".format(dist), x, h - 4f, xLabelPaint)
                 }
 

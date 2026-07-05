@@ -55,7 +55,7 @@ internal fun GradientVsConsumptionHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins, "%.0f"),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Gradient (%)",
+        xAxisLabel = stringResource(R.string.heatmap_axis_gradient),
         yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier
@@ -99,8 +99,8 @@ internal fun FrontVsRearRpmHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins, transform = ::fmtRpm),
         yLabels    = axisLabels(yMin, yMax, yBins, transform = ::fmtRpm),
-        xAxisLabel = "Front RPM",
-        yAxisLabel = "Rear RPM",
+        xAxisLabel = stringResource(R.string.heatmap_axis_front_rpm),
+        yAxisLabel = stringResource(R.string.heatmap_axis_rear_rpm),
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         xValueFmt  = ::fmtRpm,
         yValueFmt  = ::fmtRpm,
@@ -152,7 +152,7 @@ internal fun TyrePressureVsConsumptionHeatmap(
         cells      = cells,
         xLabels    = axisLabels(xMin, xMax, xBins, "%.0f"),
         yLabels    = axisLabels(yMin, yMax, yBins),
-        xAxisLabel = "Avg Tyre Pressure (PSI)",
+        xAxisLabel = stringResource(R.string.heatmap_axis_avg_tyre_pressure),
         yAxisLabel = if (useImperial) "kWh / 100 mi" else "kWh / 100 km",
         xMin = xMin, xMax = xMax, yMin = yMin, yMax = yMax,
         modifier   = modifier

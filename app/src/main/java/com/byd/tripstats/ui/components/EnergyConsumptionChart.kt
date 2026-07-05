@@ -26,6 +26,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.byd.tripstats.ui.theme.ChargingYellow
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import kotlin.math.roundToInt
 
 private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -103,6 +105,7 @@ fun EnergyConsumptionChart(
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val intoTrip = stringResource(R.string.chart_into_trip)
 
     val modes    = remember(points) { points.map { it.extractTripModes() } }
     val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
@@ -214,7 +217,7 @@ fun EnergyConsumptionChart(
                 val idx = ((tp.x - padL) / chartW * (values.size - 1)).roundToInt().coerceIn(0, values.size - 1)
                 val secs = (idx / (values.size - 1).toFloat()) * totalDuration
                 val realTime = timeFmt.format(Date(points[idx].timestamp))
-                val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
+                val durationStr = "+%d:%02d $intoTrip".format((secs / 60).toInt(), (secs % 60).toInt())
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(values[idx]), w = w,
                     padL = padL, padR = padR, padT = padT, chartH = chartH,

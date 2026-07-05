@@ -213,8 +213,8 @@ private fun TyreCell(
                 Text(
                     text = "${tempC}°",
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RegenGreen,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
             }

@@ -4,7 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.SocSource
-import com.byd.tripstats.ui.theme.*
+import com.byd.tripstats.ui.theme.AccelerationOrange
+import com.byd.tripstats.ui.theme.RegenGreen
 
 /**
  * Per-cell high/low voltage across a charge, with the high−low spread (cell imbalance) on the
@@ -20,6 +21,10 @@ internal fun ChargingCellVoltageTab(
     onXAxisModeChange: (ChargingXAxisMode) -> Unit,
 ) {
     val cellVoltageTitle = stringResource(R.string.charging_chart_cell_voltage)
+    val strCellLow  = stringResource(R.string.cell_low_label)
+    val strCellHigh = stringResource(R.string.cell_high_label)
+    val strXHigh    = stringResource(R.string.crosshair_cell_high)
+    val strXLow     = stringResource(R.string.crosshair_cell_low)
     ChargingSeriesChart(
         dataPoints  = dataPoints,
         isSynthetic = isSynthetic,
@@ -29,8 +34,8 @@ internal fun ChargingCellVoltageTab(
         xAxisMode   = xAxisMode,
         onXAxisModeChange = onXAxisModeChange,
         series = listOf(
-            ChargingSeriesSpec("Cell low", BydElectricAzure, 2.5f) { it.batteryCellVoltageMinV },
-            ChargingSeriesSpec("Cell high", AccelerationOrange, 2.5f) { it.batteryCellVoltageMaxV },
+            ChargingSeriesSpec(strCellLow,  RegenGreen,         2.5f) { it.batteryCellVoltageMinV },
+            ChargingSeriesSpec(strCellHigh, AccelerationOrange, 2.5f) { it.batteryCellVoltageMaxV },
         ),
         crosshairFor = { p ->
             val hi = p.batteryCellVoltageMaxV
@@ -39,8 +44,8 @@ internal fun ChargingCellVoltageTab(
                 ChargingCrosshairInfo(
                     anchor = hi,
                     lines = listOf(
-                        "High %.3f V".format(hi),
-                        "Low %.3f V".format(lo),
+                        strXHigh.format(hi),
+                        strXLow.format(lo),
                         "Δ %.0f mV".format((hi - lo) * 1000),
                     ),
                     color = AccelerationOrange,

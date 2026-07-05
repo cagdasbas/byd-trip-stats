@@ -24,9 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 
 @Composable
@@ -50,7 +52,7 @@ fun ModeTimelineChart(
     if (!hasAnyDriveMode && !hasAnyRegenMode) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                text = "No drive/regen mode data recorded for this trip.",
+                text = stringResource(R.string.mode_no_data),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -71,7 +73,7 @@ fun ModeTimelineChart(
         if ((!showDriveModes || !hasAnyDriveMode) && (!showRegenModes || !hasAnyRegenMode)) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "Enable Drive mode or Regen mode to view the timeline.",
+                    text = stringResource(R.string.mode_enable_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -85,7 +87,7 @@ fun ModeTimelineChart(
             ) {
                 if (showDriveModes && hasAnyDriveMode) {
                     ModeTimelineLane(
-                        title = "Drive mode",
+                        title = stringResource(R.string.mode_drive_lane_title),
                         pointsWithModes = pointsWithModes,
                         outlineColor = outlineColor,
                         laneHeight = laneHeight,
@@ -94,7 +96,7 @@ fun ModeTimelineChart(
                 }
                 if (showRegenModes && hasAnyRegenMode) {
                     ModeTimelineLane(
-                        title = "Regen mode",
+                        title = stringResource(R.string.mode_regen_lane_title),
                         pointsWithModes = pointsWithModes,
                         outlineColor = outlineColor,
                         laneHeight = laneHeight,
@@ -161,7 +163,7 @@ private fun ModeTimelineLegend(
         if (showDriveModes) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Drive modes",
+                    text = stringResource(R.string.mode_drive_modes_label),
                     style = labelStyle,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -179,7 +181,7 @@ private fun ModeTimelineLegend(
         if (showRegenModes) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Regen modes",
+                    text = stringResource(R.string.mode_regen_modes_label),
                     style = labelStyle,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -228,9 +230,11 @@ fun ModeTimelineControls(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        val strDriveModes = stringResource(R.string.mode_drive_modes_label)
+        val strRegenModes = stringResource(R.string.mode_regen_modes_label)
         listOf(
-            "Drive modes" to (showDriveModes to onToggleDriveModes),
-            "Regen modes" to (showRegenModes to onToggleRegenModes)
+            strDriveModes to (showDriveModes to onToggleDriveModes),
+            strRegenModes to (showRegenModes to onToggleRegenModes)
         ).forEach { (label, pair) ->
             val (selected, onClick) = pair
             Box(
