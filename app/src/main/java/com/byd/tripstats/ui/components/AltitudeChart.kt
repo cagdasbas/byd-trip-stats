@@ -27,6 +27,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.byd.tripstats.ui.theme.BydArcticBlue
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import kotlin.math.roundToInt
 
 private val timeFmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -49,6 +51,7 @@ fun AltitudeChart(
     val gridColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
     val axisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
     var touchPos by remember { mutableStateOf<Offset?>(null) }
+    val intoTrip = stringResource(R.string.chart_into_trip)
 
     val modes    = remember(dataPoints) { dataPoints.map { it.extractTripModes() } }
     val hasModes = remember(modes) { modes.any { it.driveMode != 0 } }
@@ -165,7 +168,7 @@ fun AltitudeChart(
                 val idx = ((tp.x - padL) / chartW * (dataPoints.size - 1)).roundToInt().coerceIn(0, dataPoints.size - 1)
                 val secs = (idx / (dataPoints.size - 1).toFloat()) * totalDuration
                 val realTime = timeFmt.format(Date(dataPoints[idx].timestamp))
-                val durationStr = "+%d:%02d into trip".format((secs / 60).toInt(), (secs % 60).toInt())
+                val durationStr = "+%d:%02d $intoTrip".format((secs / 60).toInt(), (secs % 60).toInt())
                 drawCrosshair(
                     cx = xOf(idx), cy = yOf(altitudes[idx]), w = w,
                     padL = padL, padR = padR, padT = padT, chartH = chartH,

@@ -2,6 +2,7 @@ package com.byd.tripstats.data.backup
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -11,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import com.byd.tripstats.R
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.DataOutputStream
@@ -73,10 +75,10 @@ class TelegramManager private constructor(private val context: Context) {
 
     // ── Schedule ──────────────────────────────────────────────────────────────
 
-    enum class Schedule(val label: String, val days: Long) {
-        DAILY("Daily", 1L),
-        WEEKLY("Weekly", 7L),
-        MONTHLY("Monthly", 30L)
+    enum class Schedule(@StringRes val labelRes: Int, val days: Long) {
+        DAILY(R.string.schedule_daily, 1L),
+        WEEKLY(R.string.schedule_weekly, 7L),
+        MONTHLY(R.string.schedule_monthly, 30L)
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
@@ -237,7 +239,7 @@ class TelegramManager private constructor(private val context: Context) {
         if (_autoEnabled.value && _config.value != null) {
             scheduleAutoBackup()
         }
-        Log.i(TAG, "Backup schedule set to ${newSchedule.label}")
+        Log.i(TAG, "Backup schedule set to ${newSchedule.name}")
     }
 
     fun setAutoEnabled(enabled: Boolean) {

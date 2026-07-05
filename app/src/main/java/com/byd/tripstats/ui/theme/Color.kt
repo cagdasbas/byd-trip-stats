@@ -68,6 +68,21 @@ val RegenGreen           = Color(0xFF4CAF50)
 val AccelerationOrange   = Color(0xFFFF9800)
 val ChargingYellow       = Color(0xFFFFC107)
 
+// Trip-tag palette — auto-assigned by colorIndex. Must have at least TAG_PALETTE_SIZE
+// (8) entries; tagColor() wraps defensively if a stored index ever exceeds the list.
+val TagPalette = listOf(
+    Color(0xFF42A5F5),   // blue
+    Color(0xFF66BB6A),   // green
+    Color(0xFFFFB300),   // amber
+    Color(0xFFEF5350),   // red
+    Color(0xFFAB47BC),   // purple
+    Color(0xFF26C6DA),   // cyan
+    Color(0xFFFF7043),   // deep orange
+    Color(0xFFEC407A)    // pink
+)
+
+fun tagColor(colorIndex: Int): androidx.compose.ui.graphics.Color = TagPalette[colorIndex.mod(TagPalette.size)]
+
 // Motor chart — violet for front motor, pairs with BydElectricAzure (rear)
 val MotorViolet          = Color(0xFFA78BFA)   // soft lavender-violet
 

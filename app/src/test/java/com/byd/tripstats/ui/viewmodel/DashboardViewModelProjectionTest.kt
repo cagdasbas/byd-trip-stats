@@ -231,4 +231,82 @@ class DashboardViewModelProjectionTest {
         assertEquals(null, series[2])           // still no consumption by 1.0 km
         assertTrue(series.last() != null && series.last()!! > 0.0)
     }
+
+    // ── projectedEvRangeKm optimism cap — bounds the downhill balloon ────────────
+
+    @Test
+    fun `optimism cap bounds an over-optimistic rate to a fraction of the reference`() {
+        // A downhill rolling rate of 60 Wh/km against a demonstrated trip average of 180.
+        // The cap floors the effective rate at OPTIMISM_CAP × 180, so the projection can't
+        // claim much more than the average-based range no matter how low the window read.
+        val remainingWh = 40_000.0
+        val cappedRate = DashboardViewModel.OPTIMISM_CAP * 180.0
+        val projected = DashboardViewModel.projectedEvRangeKm(
+            remainingEnergyWh = remainingWh,
+            whPerKm = 60.0,
+            baselineWhPerKm = 150.0,
+            isPhev = false,
+            referenceWhPerKm = 180.0
+        )
+        assertEquals(remainingWh / cappedRate, projected, 0.5)
+        assertTrue("cap must bound below the uncapped 60 Wh/km projection",
+            projected < remainingWh / 60.0)
+    }
+
+    @Test
+    fun `optimism cap is asymmetric - a rate above the reference passes through`() {
+        // A climb: measured 240 Wh/km vs a 180 average. The pessimistic side is never
+        // dampened, so the (shorter, honest) range shows through untouched.
+        val remainingWh = 40_000.0
+        val projected = DashboardViewModel.projectedEvRangeKm(
+            remainingEnergyWh = remainingWh,
+            whPerKm = 240.0,
+            baselineWhPerKm = 150.0,
+            isPhev = false,
+            referenceWhPerKm = 180.0
+        )
+        assertEquals(remainingWh / 240.0, projected, 0.0001)
+    }
+
+    @Test
+    fun `optimism cap is a no-op without a reference rate`() {
+        val remainingWh = 40_000.0
+        val projected = DashboardViewModel.projectedEvRangeKm(
+            remainingEnergyWh = remainingWh,
+            whPerKm = 60.0,
+            baselineWhPerKm = 150.0,
+            isPhev = false
+        )
+        assertEquals(remainingWh / 60.0, projected, 0.0001)
+    }
+
+    // ── windowSlopeWhPerKm — noise-robust rate vs a two-endpoint difference ──────
+
+    @Test
+    fun `window slope returns the least-squares slope of a linear series`() {
+        val samples = (0..50).map { i -> (i * 0.1) to (i * 0.1 * 160.0) }  // 160 Wh/km
+        assertEquals(160.0, DashboardViewModel.windowSlopeWhPerKm(samples)!!, 1e-6)
+    }
+
+    @Test
+    fun `window slope shrugs off endpoint quantization a two-point estimate takes raw`() {
+        // A clean 160 Wh/km ramp, but the two endpoints carry opposite ±100 Wh quantization.
+        // A two-point (last − first) estimate takes the full ±200 Wh; the regression barely moves.
+        val clean = (0..50).map { i -> (i * 0.1) to (i * 0.1 * 160.0) }.toMutableList()
+        val n = clean.size
+        clean[0] = clean[0].first to (clean[0].second + 100.0)
+        clean[n - 1] = clean[n - 1].first to (clean[n - 1].second - 100.0)
+        val twoPoint = (clean.last().second - clean.first().second) /
+            (clean.last().first - clean.first().first)
+        val slope = DashboardViewModel.windowSlopeWhPerKm(clean)!!
+        assertTrue("two-point estimate is pulled well off 160 (was $twoPoint)", twoPoint < 150.0)
+        assertEquals(160.0, slope, 6.0)
+    }
+
+    @Test
+    fun `window slope is null for too few points, flat energy, or a negative slope`() {
+        assertEquals(null, DashboardViewModel.windowSlopeWhPerKm(listOf(1.0 to 100.0)))
+        assertEquals(null, DashboardViewModel.windowSlopeWhPerKm(listOf(0.0 to 50.0, 1.0 to 50.0)))
+        assertEquals(null, DashboardViewModel.windowSlopeWhPerKm(listOf(0.0 to 100.0, 1.0 to 0.0)))
+    }
 }

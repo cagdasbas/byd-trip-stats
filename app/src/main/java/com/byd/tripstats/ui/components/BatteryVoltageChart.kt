@@ -17,7 +17,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.ui.theme.AccelerationOrange
 import com.byd.tripstats.ui.theme.BydElectricBlue
@@ -68,10 +70,12 @@ fun BatteryVoltageChart(
         ) {
             LegendDot(hvColor,  "HV Bus (V)")
             Spacer(Modifier.width(20.dp))
-            LegendDot(minColor, "Cell min (V)")
+            LegendDot(minColor, stringResource(R.string.charging_chart_cell_min))
             Spacer(Modifier.width(20.dp))
-            LegendDot(maxColor, "Cell max (V)")
+            LegendDot(maxColor, stringResource(R.string.charging_chart_cell_max))
         }
+
+        val strCellsV = stringResource(R.string.chart_cells_voltage_axis)
 
         Canvas(modifier = Modifier
             .fillMaxWidth()
@@ -184,7 +188,7 @@ fun BatteryVoltageChart(
                 textAlign = android.graphics.Paint.Align.CENTER; isAntiAlias = true
             }
             nc.save(); nc.rotate(90f, w - 14f, padT + chartH / 2f)
-            nc.drawText("Cell (V)", w - 14f, padT + chartH / 2f, rightAxisLabelPaint); nc.restore()
+            nc.drawText(strCellsV, w - 14f, padT + chartH / 2f, rightAxisLabelPaint); nc.restore()
 
             // X axis
             drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)

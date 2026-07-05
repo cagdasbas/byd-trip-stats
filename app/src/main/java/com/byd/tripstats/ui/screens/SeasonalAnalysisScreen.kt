@@ -2,6 +2,7 @@ package com.byd.tripstats.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,9 @@ import androidx.compose.ui.unit.sp
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
 import com.byd.tripstats.data.preferences.convertEfficiency
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import kotlin.math.roundToInt
@@ -45,17 +49,27 @@ fun SeasonalAnalysisScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Seasonal Analysis", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Winter vs summer efficiency breakdown",
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.seasonal_analysis_title), fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onNavigateBack() }
+                        )
+                        VerticalDivider(
+                            modifier = Modifier.height(14.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(stringResource(R.string.winter_vs_summer_subtitle),
                             fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 navigationIcon = {
+                  BrandNavigationBar {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back",
-                            modifier = Modifier.size(28.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back),
+                            modifier = Modifier.size(32.dp))
                     }
+                  }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -70,11 +84,11 @@ fun SeasonalAnalysisScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text("🌍", fontSize = 52.sp)
-                    Text("No seasonal data yet",
+                    Text(stringResource(R.string.no_seasonal_data),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold)
                     Text(
-                        "Complete trips across multiple seasons\nto see how temperature affects your range.",
+                        stringResource(R.string.complete_seasons_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -104,12 +118,12 @@ fun SeasonalAnalysisScreen(
                 )
             ) {
                 Column(Modifier.fillMaxSize().padding(12.dp)) {
-                    Text("Avg Consumption by Season",
+                    Text(stringResource(R.string.avg_consumption_by_season),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold)
                     if (reference != null) {
-                        Text("Dashed line = your car's reference (${
-                            "%.1f".format(unitSystem.convertEfficiency(reference))} ${unitSystem.consumptionUnit})",
+                        Text(stringResource(R.string.reference_line_label,
+                            "%.1f".format(unitSystem.convertEfficiency(reference)), unitSystem.consumptionUnit),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -149,15 +163,12 @@ fun SeasonalAnalysisScreen(
                         Icon(Icons.Filled.Lightbulb, null,
                             tint = AccelerationOrange, modifier = Modifier.size(22.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Winter penalty on your Seal",
+                            Text(stringResource(R.string.winter_penalty_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold)
                             Text(
-                                "Your winter consumption is ${"%.1f".format(delta)} ${unitSystem.consumptionUnit} " +
-                                "higher than summer (+${deltaPct}%). " +
-                                "This is primarily battery chemistry — lithium cells deliver less " +
-                                "capacity below 15°C and the BMS draws extra power to maintain " +
-                                "pack temperature. Cabin heating compounds the effect.",
+                                stringResource(R.string.winter_penalty_desc,
+                                    "%.1f".format(delta), unitSystem.consumptionUnit, deltaPct),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -305,7 +316,9 @@ private fun SeasonCard(
                         Text(stat.season.label,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold)
-                        Text("${stat.tripCount} trip${if (stat.tripCount != 1) "s" else ""}",
+                        Text(
+                            if (stat.tripCount == 1) stringResource(R.string.stat_one_trip)
+                            else stringResource(R.string.stat_n_trips, stat.tripCount),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -318,7 +331,7 @@ private fun SeasonCard(
                     if (reference != null) {
                         val diff = unitSystem.convertEfficiency(stat.avgConsumption - reference)
                         val sign = if (diff >= 0) "+" else ""
-                        Text("${sign}${"%.1f".format(diff)} vs reference",
+                        Text(stringResource(R.string.season_vs_ref, "${sign}${"%.1f".format(diff)}"),
                             style = MaterialTheme.typography.labelSmall,
                             color = if (diff <= 0) RegenGreen
                                     else MaterialTheme.colorScheme.error)
@@ -346,9 +359,9 @@ private fun SeasonCard(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                SeasonStatChip("🛣️", "${"%.0f".format(stat.totalDistanceKm)} km total")
-                SeasonStatChip("⚡", "${"%.1f".format(stat.totalKwh)} kWh used")
-                SeasonStatChip("🌡️", "${"%.0f".format(stat.avgTempC)}°C avg temp")
+                SeasonStatChip("🛣️", stringResource(R.string.season_stat_km_total, "%.0f".format(stat.totalDistanceKm)))
+                SeasonStatChip("⚡", stringResource(R.string.season_stat_kwh_used, "%.1f".format(stat.totalKwh)))
+                SeasonStatChip("🌡️", stringResource(R.string.season_stat_avg_temp, "%.0f".format(stat.avgTempC)))
             }
         }
     }

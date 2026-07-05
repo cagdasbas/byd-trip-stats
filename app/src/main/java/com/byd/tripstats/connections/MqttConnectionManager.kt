@@ -27,6 +27,7 @@ class MqttConnectionManager(context: Context) {
     @Volatile private var lastEndpoint: String = ""
     @Volatile private var currentDeviceId: String = ""
     @Volatile private var discoveryPublishedForId: String = ""
+    @Volatile private var lastOnlineAssertMs: Long = 0L
     @Volatile private var lastKnownLat: Double = 0.0
     @Volatile private var lastKnownLon: Double = 0.0
     @Volatile private var lastKnownAlt: Double = 0.0
@@ -128,7 +129,17 @@ class MqttConnectionManager(context: Context) {
                 .serverHost(config.brokerUrl.trim())
                 .serverPort(config.brokerPort.coerceIn(1, 65535))
 
-            if (config.brokerPort == 8883) {
+            // WebSocket transport lets users front the broker with a reverse proxy
+            // (nginx/Traefik/Caddy) that speaks HTTP/WS rather than raw MQTT TCP.
+            if (config.useWebSocket) {
+                builder.webSocketConfig()
+                    // HiveMQ expects the path without a leading slash (e.g. "mqtt").
+                    .serverPath(config.webSocketPath.trim().removePrefix("/").ifBlank { "mqtt" })
+                    .applyWebSocketConfig()
+            }
+
+            // wss:// = WebSocket + TLS; otherwise TLS over raw TCP (mqtts).
+            if (config.useTls) {
                 builder.sslWithDefaultConfig()
             }
 
@@ -186,6 +197,7 @@ class MqttConnectionManager(context: Context) {
                     }
                     // Then mark available — state arrives right after from publish()
                     publishRetained(avTopic, "online")
+                    lastOnlineAssertMs = System.currentTimeMillis()
                 } catch (e: Throwable) {
                     Log.w(TAG, "Failed to publish discovery/availability", e)
                 }
@@ -215,6 +227,18 @@ class MqttConnectionManager(context: Context) {
                 }
             latch.await(10, TimeUnit.SECONDS)
             if (!ok) synchronized(lock) { connected = false }
+            // Re-assert retained "online" periodically. The will only ever publishes
+            // "offline", and we otherwise publish "online" just once on connect — so a
+            // stray "offline" (e.g. a retained will that lands after a same-client-id
+            // takeover) can leave Home Assistant stuck "unavailable" even while state
+            // keeps flowing. Re-asserting here lets availability self-heal within ~30s.
+            if (ok) {
+                val now = System.currentTimeMillis()
+                if (now - lastOnlineAssertMs >= ONLINE_REASSERT_INTERVAL_MS) {
+                    lastOnlineAssertMs = now
+                    publishRetained(availabilityTopic, "online")
+                }
+            }
             return ok
         } catch (t: Throwable) {
             Log.e(TAG, "MQTT publish error", t)
@@ -273,6 +297,9 @@ class MqttConnectionManager(context: Context) {
             SensorDef("engine_power", "Engine Power", "kW", "power", "measurement"),
             SensorDef("engine_speed_front", "Engine Speed Front", "rpm", null, "measurement"),
             SensorDef("engine_speed_rear", "Engine Speed Rear", "rpm", null, "measurement"),
+            // Gross charge power on cars with a working m33 getter (e.g. Seal); on m33-dead cars
+            // (e.g. Atto 3) it falls back to a NET-into-battery rate that reads lower than engine_power
+            // and dips with accessory/aircon load. See effectiveChargingPowerKw in BydVehicleDataSource.
             SensorDef("charging_power", "Charging Power", "kW", "power", "measurement"),
             SensorDef("fuel_percentage", "Fuel Percentage", "%", null, "measurement"),
             SensorDef("fuel_driving_range_km", "Fuel Driving Range", "km", null, "measurement"),
@@ -425,5 +452,6 @@ class MqttConnectionManager(context: Context) {
 
     companion object {
         private const val TAG = "MqttConnectionMgr"
+        private const val ONLINE_REASSERT_INTERVAL_MS = 30_000L
     }
 }

@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 
 private const val ROLLING_WINDOW = 5   // points for rolling average
 private const val CLAMP_MAX = 120.0     // kWh/100km — clip outliers at extremes
@@ -93,9 +95,9 @@ fun InstantConsumptionChart(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LegendDot(rawColor,  "Instant")
+            LegendDot(rawColor,  stringResource(R.string.chart_instant_label))
             Spacer(Modifier.width(20.dp))
-            LegendDot(avgColor, "5-pt average")
+            LegendDot(avgColor, stringResource(R.string.chart_avg_5pt))
         }
 
         Canvas(modifier = Modifier

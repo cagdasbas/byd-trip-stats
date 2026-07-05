@@ -23,9 +23,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.preferences.consumptionUnit
@@ -89,10 +91,8 @@ fun ConsumptionThumbnail(
 
 // ── Unified expanded chart ────────────────────────────────────────────────────
 
-private enum class ConsumptionTab(val label: String) {
-    WEEK("Weekly consumption"),
-    MONTH("Monthly consumption"),
-    YEAR("Yearly consumption");
+private enum class ConsumptionTab {
+    WEEK, MONTH, YEAR;
 }
 
 /**
@@ -179,7 +179,11 @@ fun ConsumptionChartExpanded(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = tab.label,
+                            text = when (tab) {
+                                ConsumptionTab.WEEK  -> stringResource(R.string.chart_weekly_consumption)
+                                ConsumptionTab.MONTH -> stringResource(R.string.chart_monthly_consumption)
+                                ConsumptionTab.YEAR  -> stringResource(R.string.chart_yearly_consumption)
+                            },
                             fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected)
@@ -208,7 +212,7 @@ fun ConsumptionChartExpanded(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Close,
-                    contentDescription = "Close chart",
+                    contentDescription = stringResource(R.string.chart_close),
                     tint = BydErrorRedLight,
                     modifier = Modifier.size(22.dp)
                 )
@@ -225,14 +229,14 @@ fun ConsumptionChartExpanded(
             selectedDurationAverage?.let { avg ->
                 ConsumptionLegendItem(
                     color = RegenGreen.copy(alpha = 0.9f),
-                    label = "Your duration avg (${String.format("%.1f", avg)} ${unitSystem.consumptionUnit})"
+                    label = stringResource(R.string.chart_your_duration_avg, String.format("%.1f", avg), unitSystem.consumptionUnit)
                 )
             }
             referenceConsumptionKwhPer100km?.let { avg ->
                 if (selectedDurationAverage != null) Spacer(Modifier.width(20.dp))
                 ConsumptionLegendItem(
                     color = AccelerationOrange.copy(alpha = 0.9f),
-                    label = "Selected car avg (${String.format("%.1f", avg * efficiencyFactor)} ${unitSystem.consumptionUnit})"
+                    label = stringResource(R.string.chart_selected_car_avg, String.format("%.1f", avg * efficiencyFactor), unitSystem.consumptionUnit)
                 )
             }
         }
@@ -281,6 +285,7 @@ private fun ConsumptionCanvas(
     useImperial: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     // Resolve all theme-aware colors before entering DrawScope
     val lineColor     = BydElectricAzure.copy(alpha = 0.9f)
     val pointFill     = BydElectricAzure
@@ -307,7 +312,7 @@ private fun ConsumptionCanvas(
 
         if (data.isEmpty()) {
             nc.drawText(
-                "No data yet",
+                context.getString(R.string.chart_no_data_yet),
                 padL + chartW / 2f,
                 padT + chartH / 2f,
                 android.graphics.Paint().apply {

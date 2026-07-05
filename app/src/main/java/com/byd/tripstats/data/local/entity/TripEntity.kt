@@ -112,6 +112,10 @@ data class TripDataPointEntity(
     val tyrePressureLR: Double = 0.0,
     val tyrePressureRR: Double = 0.0,
     val soh: Int = 0,
+    /** Precise SoH (statistic-feature float, e.g. 97.6) when the car exposes it; 0.0 when unknown.
+     *  Promoted from rawJson in 2.9.1 so the degradation chart/report keep the decimal the
+     *  dashboard shows. AVG queries fall back to the integer [soh] for pre-2.9.1 rows. */
+    val sohPrecise: Double = 0.0,
     val batteryTotalVoltage: Int = 0,
     val battery12vVoltage: Double = 0.0,
     val batteryCellVoltageMax: Double = 0.0,
@@ -123,6 +127,13 @@ data class TripDataPointEntity(
     val tyreTempRF: Int = 0,
     val tyreTempLR: Int = 0,
     val tyreTempRR: Int = 0,
+    // ── DB v10 — EV-only remaining energy (PHEV charge-sustaining aware) ───────
+    /** BMS-reported remaining EV-usable energy (kWh), from `battery_remain_power_ev`.
+     *  Null on BEVs / firmwares that don't report it and on pre-v10 rows. Lets
+     *  restoreTripState reproduce the live EV-range projection exactly — the BMS
+     *  value already nets out the PHEV charge-sustaining reserve — instead of
+     *  capacity × SoC, which overstates EV energy near the charge-sustaining floor. */
+    val batteryRemainPowerEV: Double? = null,
     // Escape hatch for future telemetry keys that don't yet have a first-class column.
     // Store as JSON: {"hvacPower": 1.2, ...}
     // When a new key becomes stable/important, promote it to its own column

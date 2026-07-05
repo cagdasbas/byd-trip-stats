@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
-import com.byd.tripstats.ui.screens.TyrePressureUnit
+import com.byd.tripstats.ui.screens.dashboard.TyrePressureUnit
 import com.byd.tripstats.ui.theme.AccelerationOrange
 import com.byd.tripstats.ui.theme.BydElectricAzure
 import com.byd.tripstats.ui.theme.MotorViolet

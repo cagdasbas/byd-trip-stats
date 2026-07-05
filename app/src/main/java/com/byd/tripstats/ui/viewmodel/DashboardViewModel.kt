@@ -6,11 +6,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.byd.tripstats.data.local.BydStatsDatabase
 import com.byd.tripstats.data.local.dao.TripSohSummary
+import com.byd.tripstats.data.analysis.RouteGroup
+import com.byd.tripstats.data.analysis.RouteGrouping
+import com.byd.tripstats.data.analysis.RouteTripInput
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
+import com.byd.tripstats.data.local.entity.TagEntity
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripStatsEntity
+import com.byd.tripstats.data.local.entity.TripTagCrossRef
 import com.byd.tripstats.data.model.BatteryVoltageHistoryPoint
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
@@ -19,6 +24,8 @@ import com.byd.tripstats.data.preferences.UnitSystem
 import com.byd.tripstats.data.repository.BatteryVoltageHistoryRepository
 import com.byd.tripstats.data.repository.ChargingRepository
 import com.byd.tripstats.data.repository.LiveProjectionCache
+import com.byd.tripstats.data.repository.MergeEligibility
+import com.byd.tripstats.data.repository.MergeResult
 import com.byd.tripstats.data.repository.TripRepository
 import com.byd.tripstats.data.repository.UpdateRepository
 import com.byd.tripstats.BuildConfig
@@ -37,6 +44,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine as combineFlows
@@ -93,8 +101,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ── Car config ────────────────────────────────────────────────────────────
 
+    // Eagerly (not WhileSubscribed): the projection/telemetry loop reads
+    // selectedCarConfig.value directly without subscribing, and the UI subscribes to
+    // its OWN PreferencesManager flow — so under WhileSubscribed this StateFlow's
+    // upstream never started and .value stayed null, silently making the projection
+    // fall back to FALLBACK_BATTERY_KWH (82.56) with isPhev=false. That hugely
+    // inflated small-battery PHEV projections (a Sealion 6 DM-i saturating at WLTP)
+    // and only matched by luck on ~82 kWh BEVs. Eager keeps .value current.
     val selectedCarConfig = preferencesManager.selectedCarConfig
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, preferencesManager.getCachedSelectedCarConfig())
+
+    // Always-available car config for the synchronous reads in the telemetry loop:
+    // the eager StateFlow value, with the synchronous prefs cache as a startup-gap
+    // fallback. Never returns the catalog fallback unless no car was ever selected.
+    private fun currentCarConfig() =
+        selectedCarConfig.value ?: preferencesManager.getCachedSelectedCarConfig()
 
     // ── Electricity cost ──────────────────────────────────────────────────────
 
@@ -240,10 +261,41 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     val allTrips: StateFlow<List<TripEntity>> = tripRepository.getAllTrips()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // Level 3 prior (LIFETIME_AVERAGE): the driver's own lifetime Wh/km, recomputed only
+    // when the trip list changes. Eagerly so the projection/telemetry loop can read .value
+    // synchronously (same reasoning as selectedCarConfig); null until lifetime distance
+    // clears LIFETIME_MIN_KM, in which case the cold-start projection stays on BASELINE.
+    private val lifetimeWhPerKm: StateFlow<Double?> = allTrips
+        .map { trips ->
+            val valid = trips.filter { (it.distance ?: 0.0) > 0.0 && (it.energyConsumed ?: 0.0) > 0.0 }
+            val totalDistanceKm = valid.sumOf { it.distance!! }
+            if (totalDistanceKm > LIFETIME_MIN_KM)
+                valid.sumOf { it.energyConsumed!! * 1000.0 } / totalDistanceKm
+            else null
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     // Eagerly kept alive — drives multiple derived StateFlows simultaneously.
     // WhileSubscribed so Room only queries when a screen is actually showing stats.
     private val allTripStats: StateFlow<List<TripStatsEntity>> = tripRepository.getAllTripStats()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Tags ──────────────────────────────────────────────────────────────────
+    val allTags: StateFlow<List<TagEntity>> = tripRepository.getAllTags()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val tripTagRefs: StateFlow<List<TripTagCrossRef>> = tripRepository.getAllTripTagRefs()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** tripId → its tags (name-sorted). Drives the History chips and tag filter. */
+    val tripTagsMap: StateFlow<Map<Long, List<TagEntity>>> =
+        combine(allTags, tripTagRefs) { tags, refs ->
+            val tagsById = tags.associateBy { it.id }
+            refs.groupBy { it.tripId }
+                .mapValues { (_, rs) ->
+                    rs.mapNotNull { tagsById[it.tagId] }.sortedBy { it.name.lowercase() }
+                }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     // ── Selected trip — single source of truth for detail screens ────────────
 
@@ -478,38 +530,28 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     //   produced a valid Wh/km estimate. This is the primary operating mode.
     //   Equivalent to "last 30 km" Trip Range model.
     //
-    // LEVEL 2 — HISTORICAL_BINS (cumulative-across-bins model)
-    //   Live speed bins are accumulated on every telemetry tick (not just 100 m
-    //   samples) so they build up quickly within the same trip. Wh/km is computed
-    //   as totalBinEnergyWh / totalBinDistanceKm across *all* populated bins,
-    //   gated to a low total-distance threshold (BIN_MIN_DIST_KM ≈ 0.2 km).
-    //   This serves as the pre-stabilisation bridge between BASELINE and LIVE_TRIP:
-    //   it provides a meaningful trip-derived rate within ~15 s of starting to
-    //   drive, and stays valid through speed transitions (which used to drop the
-    //   chart back to BASELINE because only the current bin was consulted).
+    // LEVEL 2 — TRIP_AVERAGE (this trip's cumulative consumption)
+    //   Wh/km = clean trip-cumulative energy ÷ trip distance (tripWhPerKm), with the
+    //   summed-speed-bin rate kept only as a fallback for the brief window before trip
+    //   distance reaches BIN_MIN_DIST_KM ≈ 0.2 km. (Named TRIP_AVERAGE rather than the
+    //   old "HISTORICAL_BINS": the value shown is the trip average, not a per-bin blend.)
+    //   This is the pre-stabilisation bridge between LIFETIME/BASELINE and LIVE_TRIP:
+    //   it provides a meaningful trip-derived rate within ~15 s of starting to drive.
     //   Activated only when Level 1 is not yet available.
     //
-    // LEVEL 3 — LIFETIME_AVERAGE  ← TODO Phase 2
-    //   Aggregate past-trip consumption: sum(energyConsumed) / sum(distance)
-    //   across all completed TripEntity records.
-    //   Use when: no Level 2 bin data and lifetime distance > LIFETIME_MIN_KM.
-    //   Data is available via allTrips StateFlow (TripEntity.energyConsumed / .distance).
+    // LEVEL 3 — LIFETIME_AVERAGE (personalised cold-start prior)
+    //   Aggregate past-trip consumption: sum(energyConsumed) / sum(distance) across all
+    //   completed TripEntity records (see lifetimeWhPerKm), gated to lifetime distance
+    //   > LIFETIME_MIN_KM. Used when the current trip hasn't produced a usable rate yet
+    //   (Level 2 unavailable, i.e. the first ~0.2 km, or before any energy is recorded):
+    //   the driver's own lifetime average is a far better starting estimate than the
+    //   catalog rate. Falls through to BASELINE when history is too thin.
     //
     // LEVEL 4 — BASELINE (static fallback)
     //   BYD Seal AWD Excellence WLTP-based static rate: BASELINE_WH_PER_KM = 185 Wh/km.
     //   Always available. Only used when all other levels fail.
     //
     // ── TODO Phase 2 ──────────────────────────────────────────────────────────
-    // [ ] Level 3 — Lifetime average
-    //     val lifetimeWhPerKm = allTrips.value
-    //         .filter { it.distance != null && it.energyConsumed != null }
-    //         .takeIf { trips -> trips.sumOf { it.distance!! } > LIFETIME_MIN_KM }
-    //         ?.let { trips ->
-    //             trips.sumOf { it.energyConsumed!! * 1000.0 } /
-    //             trips.sumOf { it.distance!! }
-    //         }
-    //     Condition: lifetimeWhPerKm != null && distKm < STABILISATION_KM
-    //
     // [ ] Merge past-trip speed bins with live bins (Bayesian prior)
     //     Each bin: mergedWhPerKm = (historicalSamples × historicalRate +
     //                                liveSamples × liveRate) /
@@ -520,7 +562,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     //     As live data accumulates it dominates the prior automatically.
     // ─────────────────────────────────────────────────────────────────────────
 
-    enum class RangeModel { LIVE_TRIP, HISTORICAL_BINS, LIFETIME_AVERAGE, BASELINE }
+    enum class RangeModel { LIVE_TRIP, TRIP_AVERAGE, LIFETIME_AVERAGE, BASELINE }
 
     companion object {
         // BATTERY_CAPACITY_KWH and BASELINE_WH_PER_KM are no longer hardcoded here —
@@ -530,6 +572,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         const val MAX_VALID_CONSUMPTION_KWH_PER_100KM = 35.0
         const val FALLBACK_BATTERY_KWH      = 82.56   // Seal AWD Excellence — worst case
         const val FALLBACK_BASELINE_WH_PER_KM = 185.0 // Seal AWD Excellence reference
+        // Sanity floor for the projection divisor (Wh/km). Far below any sustained
+        // real-world EV average (efficient production EVs cruise ~120–200 Wh/km; even
+        // aggressive hypermiling rarely holds < 80), so it never clips genuine efficiency
+        // — it exists only to stop a near-zero rate (a regen-heavy / downhill rolling
+        // window, where net discharge ≈ 0) from dividing out to an absurd range.
+        const val MIN_PLAUSIBLE_WH_PER_KM   = 40.0
+        // Asymmetric optimism cap. The projected range may never claim you're driving more
+        // than 1/OPTIMISM_CAP better than your own demonstrated reference rate (this trip's
+        // average, else lifetime, else catalog). It bounds the descent balloon *structurally* —
+        // independent of how the rolling window got low — while only ever flooring the
+        // optimistic side: a rate ABOVE your reference (a climb, the "burning faster than
+        // rated" warning) passes through untouched, so range is never over-stated toward
+        // stranding. 0.65 ⇒ at most ~1.5× your average range. Raising it toward 1.0 makes the
+        // curve steadier (this is the knob a future "projection stability" setting would drive).
+        const val OPTIMISM_CAP              = 0.65
+        // Per-sample energy-delta ceiling (Wh per km travelled) when building the rolling
+        // window's cumulative-energy series from per-sample deltas. Clips the kWh-scale steps a
+        // mid-trip discharge-anchor rebase or a power↔BMS source switch would otherwise inject
+        // into the window, and amortises idle drain (AC at a red light) instead of dumping it on
+        // one 100 m sample — without touching real driving, which never approaches this rate.
+        const val MAX_SAMPLE_WH_PER_KM      = 1500.0
 
         const val STABILISATION_KM      = 3.0    // km before Level 1 is trusted
         // 2.0 was too short: parking-lot crawl at trip start (high power, near-zero speed)
@@ -558,13 +621,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         const val SEGMENT_RESET_OFF_THRESHOLD_MS = 5 * 60_000L   // 5 min
         // Level 2: minimum *total* km accumulated across all populated speed bins
         // before the historical-bins rate is trusted. Lowered from 0.5 to 0.2 in
-        // the rework that switched HISTORICAL_BINS from "current bin only" to
+        // the rework that switched TRIP_AVERAGE from "current bin only" to
         // "cumulative across all bins". With the new aggregation we hit 0.2 km
         // within ~10–15 s of moving, which makes the tier a useful pre-stabilisation
         // bridge instead of a path that almost never fires.
         const val BIN_MIN_DIST_KM       = 0.2
-        // TODO Phase 2:
-        // const val LIFETIME_MIN_KM    = 50.0   // Level 3: min lifetime km before using average
+        // Level 3: minimum lifetime distance (km) across completed trips before the
+        // lifetime-average rate is trusted as a cold-start prior. Below this the history
+        // is too thin to beat the catalog baseline, so we stay on BASELINE.
+        const val LIFETIME_MIN_KM       = 50.0
         private val SOUTHERN_HEMISPHERE_COUNTRY_CODES = setOf(
             "AU", "NZ", "ZA", "AR", "CL", "UY", "PY",
             "BW", "LS", "NA", "SZ", "ZW", "MZ", "MG"
@@ -614,10 +679,31 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             remainingEnergyWh: Double,
             whPerKm: Double,
             baselineWhPerKm: Double,
-            isPhev: Boolean
+            isPhev: Boolean,
+            referenceWhPerKm: Double? = null
         ): Double {
-            val rate = if (isPhev) maxOf(whPerKm, baselineWhPerKm) else whPerKm
-            if (rate <= 0.0) return 0.0
+            val phevFloored = if (isPhev) maxOf(whPerKm, baselineWhPerKm) else whPerKm
+            // A non-positive rate is a "no valid data" signal (callers never pass one in
+            // practice — the live/restore tiers all resolve to a positive rate) → return 0
+            // rather than NaN/Infinity.
+            if (phevFloored <= 0.0) return 0.0
+            // Optimism cap: bound the projection to at most 1/OPTIMISM_CAP better than the
+            // caller's demonstrated reference rate (this trip's / lifetime average). This is
+            // what structurally contains a downhill balloon — a rolling window that has drifted
+            // far below your own average can't project a fantasy range. Asymmetric: a rate above
+            // the reference (a climb) is left alone, so the pessimistic "burning faster than
+            // rated" signal is never dampened. Absent a reference it's a no-op.
+            val optimismFloored =
+                if (referenceWhPerKm != null && referenceWhPerKm > 0.0)
+                    maxOf(phevFloored, OPTIMISM_CAP * referenceWhPerKm)
+                else phevFloored
+            // Sanity floor against a *small-positive* rate exploding the quotient. totalDischarge
+            // is net-of-regen, so a sustained downhill / heavy-regen rolling window can drive the
+            // measured Wh/km toward 0; dividing remaining energy by that yields an absurd range.
+            // Kept as the absolute backstop for when no reference rate is available (the optimism
+            // cap above is the adaptive, usually-tighter bound). It sits far below normal driving,
+            // so it only bites in the broken near-zero case.
+            val rate = optimismFloored.coerceAtLeast(MIN_PLAUSIBLE_WH_PER_KM)
             return (remainingEnergyWh / rate).coerceAtLeast(0.0)
         }
 
@@ -708,6 +794,33 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
          * shape lives in how the rate changes, not in SoC). [samples] must be ordered by
          * non-decreasing distance — the caller builds them that way from stored points.
          */
+        /**
+         * Least-squares slope (Wh/km) of cumulative energy vs distance over [samples]
+         * (distance → cumulative energy Wh). Returns the positive slope, or `null` when there
+         * are fewer than two points, zero distance spread, or a non-positive slope.
+         *
+         * Used instead of a two-endpoint difference (`last − first`): with the BMS discharge
+         * counter moving in coarse quanta, an endpoint-only estimate takes the full quantization
+         * error on each of its two samples, so the rolling rate — and the 1/rate projection —
+         * jitters as samples enter and leave the window. A regression averages that noise across
+         * all ~50 window points, giving a much steadier rate for the same underlying data.
+         */
+        internal fun windowSlopeWhPerKm(samples: List<Pair<Double, Double>>): Double? {
+            val n = samples.size
+            if (n < 2) return null
+            var sumD = 0.0; var sumE = 0.0
+            for (s in samples) { sumD += s.first; sumE += s.second }
+            val meanD = sumD / n; val meanE = sumE / n
+            var sxx = 0.0; var sxy = 0.0
+            for (s in samples) {
+                val dx = s.first - meanD
+                sxx += dx * dx
+                sxy += dx * (s.second - meanE)
+            }
+            if (sxx <= 1e-9) return null
+            return (sxy / sxx).takeIf { it > 0.0 }
+        }
+
         internal fun rollingWhPerKmSeries(
             samples: List<Pair<Double, Double>>,
             windowKm: Double = ROLLING_WINDOW_KM,
@@ -721,13 +834,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 while (windowStart < i && samples[windowStart].first < di - windowKm) {
                     windowStart++
                 }
-                if (i > windowStart) {
-                    val wEnergy = samples[i].second - samples[windowStart].second
-                    val wDist = di - samples[windowStart].first
-                    if (wDist > 0.0 && wEnergy > 0.0) {
-                        val raw = wEnergy / wDist
-                        ema = ema?.let { emaAlpha * raw + (1.0 - emaAlpha) * it } ?: raw
-                    }
+                // Least-squares slope over the whole window (subList is a view, no copy),
+                // mirroring the live loop so the rebuilt curve stays a faithful twin.
+                val raw = if (i > windowStart)
+                    windowSlopeWhPerKm(samples.subList(windowStart, i + 1)) else null
+                if (raw != null) {
+                    ema = ema?.let { emaAlpha * raw + (1.0 - emaAlpha) * it } ?: raw
                 }
                 out.add(ema)
             }
@@ -816,6 +928,17 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _activeRangeModel = MutableStateFlow(RangeModel.BASELINE)
     val activeRangeModel: StateFlow<RangeModel> = _activeRangeModel.asStateFlow()
 
+    /** Sets the active range-model tier, logging only on a genuine transition (e.g.
+     *  BASELINE → LIFETIME_AVERAGE → TRIP_AVERAGE → LIVE_TRIP, and any fallback) so an
+     *  unexpectedly low-tier projection on a given car/firmware is diagnosable from logs.
+     *  Per-tick no-op when the tier is unchanged, so the high-frequency loop never spams. */
+    private fun setActiveRangeModel(model: RangeModel) {
+        if (_activeRangeModel.value != model) {
+            Log.i(TAG, "Range model: ${_activeRangeModel.value} → $model")
+        }
+        _activeRangeModel.value = model
+    }
+
     // Odometer-only trip distance (no integration fallback). Used for avg speed display
     // to match the formula the finalized trip stats will use (endOdometer - startOdometer).
     private val _liveOdometerDistanceKm = MutableStateFlow(0.0)
@@ -831,6 +954,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
      *  as ~0 for long stretches, starving the rolling-window and bin accumulators and
      *  pinning the projection in BASELINE forever. */
     private var lastTotalDischargeKwh: Double? = null
+    /** Previous sample's raw cumulative trip energy (Wh), so the rolling-window series is built
+     *  from clamped per-sample deltas (monotone, spike-clipped) rather than raw values. */
+    private var lastSampleRawEnergyWh: Double? = null
+    /** Whether the optimism cap was flooring the rate last tick — logged only on transition. */
+    private var optimismCapBiting: Boolean = false
     private var integratedDistanceKm: Double  = 0.0
     private var integratedSegmentDistanceKm: Double = 0.0
     // Trip-cumulative *net* traction energy (signed): positive power × dt
@@ -959,6 +1087,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _liveAccumulatedKwh.value = 0.0
             _liveOdometerDistanceKm.value = 0.0
             smoothedWhPerKm = null
+            lastSampleRawEnergyWh = null
+            optimismCapBiting = false
             energySamples.clear()
             liveSpeedBins.clear()
             // Back-date the session start to match the back-anchored odometer so
@@ -1001,12 +1131,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val initialTripDistanceKm = currentLiveSessionDistanceKm(telemetry)
         _liveDistanceKm.value = initialTripDistanceKm
         _liveSegmentDistanceKm.value = if (isFirstTripStart) initialTripDistanceKm else 0.0
-        _activeRangeModel.value = RangeModel.BASELINE
+        setActiveRangeModel(RangeModel.BASELINE)
         if (clearPoints) {
             _tripDataPoints.value = listOf(
                 RangeDataPoint(
                     distanceKm = initialTripDistanceKm,
-                    soc = telemetry.soc,
+                    soc = telemetry.soc.takeIf { it > 0 } ?: telemetry.socPanel.toDouble(),
                     electricDrivingRangeKm = telemetry.electricDrivingRangeKm,
                     projectedRangeKm = null,
                     isStabilised = initialTripDistanceKm >= STABILISATION_KM
@@ -1035,6 +1165,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _liveAccumulatedKwh.value = 0.0
         _liveOdometerDistanceKm.value = 0.0
         smoothedWhPerKm = null
+        lastSampleRawEnergyWh = null
+        optimismCapBiting = false
         energySamples.clear()
         liveSpeedBins.clear()
         _liveDistanceKm.value = 0.0
@@ -1047,7 +1179,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         // badge to BASELINE in that state lies to the user about what the
         // displayed line was computed from.
         if (!keepPoints) {
-            _activeRangeModel.value = RangeModel.BASELINE
+            setActiveRangeModel(RangeModel.BASELINE)
         }
         lastTelemetryWasCarOn = null
         segmentOffSinceMs = null
@@ -1063,6 +1195,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     // ── Init ──────────────────────────────────────────────────────────────────
 
     init {
+        // One-time (2.9.1): backfill precise SoH from each data point's rawJson into the
+        // sohPrecise column so the degradation chart/report are decimal-accurate across all
+        // history (no false up-tick where rounded data meets the new precise recording).
+        // Runs off the main thread and only once — cheap no-op on later launches.
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val prefs = getApplication<Application>()
+                    .getSharedPreferences("maintenance", android.content.Context.MODE_PRIVATE)
+                if (!prefs.getBoolean("soh_precise_backfill_done", false)) {
+                    tripRepository.backfillPreciseSoh()
+                    prefs.edit().putBoolean("soh_precise_backfill_done", true).apply()
+                }
+            }
+        }
+
         viewModelScope.launch {
             var wasInTrip = false
             var wasTripOpen = false
@@ -1329,7 +1476,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val tripStartTd = tripRepository.currentTripStartTotalDischarge()
                     val bmsDeltaKwh = if (tripStartTd != null)
                         telemetry.totalDischarge - tripStartTd else 0.0
-                    val sanityBatteryKwh = selectedCarConfig.value?.let {
+                    val sanityBatteryKwh = currentCarConfig()?.let {
                         if (it.isPhev) it.phevUsableBatteryKwh ?: it.batteryKwh else it.batteryKwh
                     } ?: FALLBACK_BATTERY_KWH
                     val fallbackKwh = (accumulatedEnergyWh / 1000.0).coerceAtLeast(0.0)
@@ -1378,21 +1525,34 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     // is unavailable), so the window now matches actual consumption and the
                     // rebuilt curve. It still engages reliably on lumpy feeds because the
                     // end-start total grows smoothly even when the per-tick delta is 0.
-                    energySamples.add(EnergySample(distKm, liveEnergyKwh * 1000.0))
+                    // Build the window's cumulative-energy series from *clamped per-sample deltas*
+                    // rather than storing liveEnergyKwh verbatim. liveEnergyKwh isn't a clean
+                    // cumulative — a mid-trip discharge-anchor rebase or a power↔BMS source switch
+                    // can step it, and maxOf(plainBmsKwh, cumulativeBmsKwh) can dip on regen — any
+                    // of which injects a kWh-scale step inside the window that spikes the rate for
+                    // up to a full window length. Coercing each delta to [0, MAX_SAMPLE_WH_PER_KM ×
+                    // Δkm] makes the series monotone by construction and clips those steps (and
+                    // long idle drain) to a plausible per-100 m cost, while leaving real driving
+                    // untouched. This also makes the live series structurally identical to the
+                    // restore rebuild, which already sums clamped per-pair deltas.
+                    val rawNowWh = liveEnergyKwh * 1000.0
+                    val prevSample = energySamples.lastOrNull()
+                    val dDistKm = (distKm - (prevSample?.distanceKm ?: distKm)).coerceAtLeast(SAMPLE_INTERVAL_KM)
+                    val deltaWh = lastSampleRawEnergyWh
+                        ?.let { (rawNowWh - it).coerceIn(0.0, MAX_SAMPLE_WH_PER_KM * dDistKm) }
+                        ?: 0.0
+                    energySamples.add(EnergySample(distKm, (prevSample?.cumulativeEnergyWh ?: 0.0) + deltaWh))
+                    lastSampleRawEnergyWh = rawNowWh
                     val windowFloor = distKm - ROLLING_WINDOW_KM
                     while (energySamples.size > 1 && energySamples[0].distanceKm < windowFloor) {
                         energySamples.removeAt(0)
                     }
 
-                    val rawWhPerKm: Double? = if (energySamples.size >= 2) {
-                        val wEnergyWh = energySamples.last().cumulativeEnergyWh -
-                            energySamples.first().cumulativeEnergyWh
-                        val wDistKm = energySamples.last().distanceKm -
-                            energySamples.first().distanceKm
-                        if (wDistKm > 0 && wEnergyWh > 0) wEnergyWh / wDistKm else null
-                    } else {
-                        null
-                    }
+                    // Least-squares slope across the whole window (see windowSlopeWhPerKm) instead
+                    // of a two-endpoint difference, so BMS-counter quantization doesn't jitter the
+                    // rate as samples enter and leave the window.
+                    val rawWhPerKm: Double? =
+                        windowSlopeWhPerKm(energySamples.map { it.distanceKm to it.cumulativeEnergyWh })
 
                     if (rawWhPerKm != null) {
                         smoothedWhPerKm = smoothedWhPerKm
@@ -1439,7 +1599,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     val nonBaselineWhPerKm: Double? = tripWhPerKm ?: binWhPerKm
 
                     val isStabilised = distKm >= STABILISATION_KM
-                    val car = selectedCarConfig.value
+                    val car = currentCarConfig()
                     // PHEVs: use the usable EV-only battery capacity for the EV range leg;
                     // fall back to gross batteryKwh if phevUsableBatteryKwh is not defined.
                     val batteryKwh = car?.let {
@@ -1464,23 +1624,75 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     // Fuel range isn't driven by EV consumption, so it doesn't belong on this curve.
                     // projectedEvRangeKm floors the rate at the reference consumption for PHEVs so
                     // ICE-diluted (near-zero) measured Wh/km can't balloon the EV range — see its doc.
-                    val (projectedRange, model) = when {
-                        isStabilised && smoothedWhPerKm != null && smoothedWhPerKm!! > 0.0 ->
-                            projectedEvRangeKm(remainingEnergyWh, smoothedWhPerKm!!, baselineWhPerKm, isPhev) to
-                                RangeModel.LIVE_TRIP
-                        nonBaselineWhPerKm != null ->
-                            projectedEvRangeKm(remainingEnergyWh, nonBaselineWhPerKm, baselineWhPerKm, isPhev) to
-                                RangeModel.HISTORICAL_BINS
-                        else ->
-                            projectedEvRangeKm(remainingEnergyWh, baselineWhPerKm, baselineWhPerKm, isPhev) to
-                                RangeModel.BASELINE
+                    // Shrink the trip-cumulative rate toward a stable prior (lifetime, else catalog)
+                    // until STABILISATION_KM of distance has accumulated. tripWhPerKm = energy ÷
+                    // distance is numerically wild in the first few hundred metres — a parking-lot
+                    // crawl reads huge Wh/km, a gentle roll-out reads tiny — which made the projected
+                    // line spike violently right at trip start. Weighting it by how far you've driven
+                    // pulls those early points onto the stable prior and eases them onto the real trip
+                    // average by STABILISATION_KM. This "demonstrated rate" is also the optimism-cap
+                    // anchor, so the cap can never fight the shrink.
+                    val smoothed = smoothedWhPerKm?.takeIf { it > 0.0 }
+                    val stablePrior = lifetimeWhPerKm.value ?: baselineWhPerKm
+                    val tripConfidence = (distKm / STABILISATION_KM).coerceIn(0.0, 1.0)
+                    val demonstratedRate: Double? = nonBaselineWhPerKm?.let {
+                        tripConfidence * it + (1.0 - tripConfidence) * stablePrior
                     }
+                    // Pick the consumption-rate tier (and the badge it drives), crossfading from
+                    // TRIP_AVERAGE to LIVE_TRIP over a STABILISATION_KM-wide ramp so neither the rate
+                    // nor the line steps when the tier flips — the EMA-smoothed rolling rate and the
+                    // (shrunk) trip rate can differ by 10-20% there.
+                    val (rate, model) = when {
+                        smoothed != null && demonstratedRate != null && isStabilised -> {
+                            val liveBlend = ((distKm - STABILISATION_KM) / STABILISATION_KM).coerceIn(0.0, 1.0)
+                            val blended = liveBlend * smoothed + (1.0 - liveBlend) * demonstratedRate
+                            blended to if (liveBlend >= 0.5) RangeModel.LIVE_TRIP else RangeModel.TRIP_AVERAGE
+                        }
+                        smoothed != null && isStabilised ->
+                            smoothed to RangeModel.LIVE_TRIP
+                        demonstratedRate != null ->
+                            demonstratedRate to when {
+                                tripConfidence >= 0.5         -> RangeModel.TRIP_AVERAGE
+                                lifetimeWhPerKm.value != null -> RangeModel.LIFETIME_AVERAGE
+                                else                          -> RangeModel.BASELINE
+                            }
+                        lifetimeWhPerKm.value != null ->
+                            lifetimeWhPerKm.value!! to RangeModel.LIFETIME_AVERAGE
+                        else ->
+                            baselineWhPerKm to RangeModel.BASELINE
+                    }
+                    // Optimism-cap anchor: the demonstrated rate above (shrunk trip average, →
+                    // tripWhPerKm once confident), else the stable prior. Bounds a downhill balloon
+                    // inside projectedEvRangeKm. Log only when the cap's biting state flips — a cap
+                    // that stays engaged means the rolling window is systematically low (an
+                    // energy-accounting problem, not terrain), worth catching in logs.
+                    val referenceWhPerKm = demonstratedRate ?: stablePrior
+                    val capBiting = remainingEnergyWh > 0.0 && referenceWhPerKm > 0.0 &&
+                        OPTIMISM_CAP * referenceWhPerKm > rate
+                    if (capBiting != optimismCapBiting) {
+                        optimismCapBiting = capBiting
+                        Log.i(TAG, "Optimism cap ${if (capBiting) "engaged" else "released"}: " +
+                            "rate=${"%.0f".format(rate)} ref=${"%.0f".format(referenceWhPerKm)} Wh/km")
+                    }
+                    // A non-positive remaining-energy read — a transient telemetry glitch, or a
+                    // cold BMS reporting soc=socPanel=0 — would divide out to a projected 0. That
+                    // false spike-to-zero would be appended to the curve AND frozen into the
+                    // LiveProjectionCache permanently, surviving every reopen. Emit null instead so
+                    // the projected line simply leaves a gap (the chart drops null points) rather
+                    // than diving to 0 and back.
+                    val projectedRange: Double? =
+                        if (remainingEnergyWh > 0.0)
+                            projectedEvRangeKm(remainingEnergyWh, rate, baselineWhPerKm, isPhev, referenceWhPerKm)
+                        else null
 
-                    _activeRangeModel.value = model
+                    setActiveRangeModel(model)
 
                     _tripDataPoints.value = _tripDataPoints.value + RangeDataPoint(
                         distanceKm = distKm,
-                        soc = telemetry.soc,
+                        // effectiveSoc, not raw telemetry.soc, so the persisted point's SoC
+                        // matches the value the projection above was computed from (raw soc can
+                        // read 0 while socPanel is valid).
+                        soc = effectiveSoc,
                         electricDrivingRangeKm = telemetry.electricDrivingRangeKm,
                         projectedRangeKm = projectedRange,
                         isStabilised = isStabilised || model != RangeModel.BASELINE
@@ -1757,8 +1969,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         if (dt in 0.0..restoreMaxGapSeconds) {
                             val bmsDeltaWh = (dp.totalDischarge - prev.totalDischarge) * 1000.0
                             val powerDeltaWh = prev.power * 1000.0 * (dt / 3600.0)
-                            cumEnergyWh += if (bmsDeltaWh.isFinite() && bmsDeltaWh in 0.0..10_000.0)
+                            val chosenWh = if (bmsDeltaWh.isFinite() && bmsDeltaWh in 0.0..10_000.0)
                                 bmsDeltaWh else powerDeltaWh
+                            // Clamp to a monotone, spike-free per-pair contribution exactly like the
+                            // live series (MAX_SAMPLE_WH_PER_KM × Δkm), so a regen dip or a stale-0
+                            // power fallback can't decrease cumulative energy or inject a window step.
+                            val dPairKm = (dp.odometer - prev.odometer).coerceAtLeast(SAMPLE_INTERVAL_KM)
+                            cumEnergyWh += chosenWh.coerceIn(0.0, MAX_SAMPLE_WH_PER_KM * dPairKm)
                         }
                     }
                     val dKm = (dp.odometer - trip.startOdometer).coerceAtLeast(0.0)
@@ -1766,6 +1983,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 accumulatedEnergyWh = cumEnergyWh
                 _liveAccumulatedKwh.value = (cumEnergyWh / 1000.0).coerceAtLeast(0.0)
+                // Seed the live per-sample delta tracker so the first post-resume live sample
+                // diffs against the restored cumulative energy (≈ trip energy) rather than
+                // restarting from null and dropping a sample.
+                lastSampleRawEnergyWh = cumEnergyWh
                 // Seed the per-tick BMS-delta tracker from the last restored data point
                 // so the next live tick computes (currentTd − lastTd) cleanly. Without
                 // this, the first post-resume tick has prevTd=null → falls back to
@@ -1805,15 +2026,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 // head point and the first new live tick agree, with no jump at resume.
                 // Falls back to the full-window average when no rolling value exists.
                 smoothedWhPerKm = perPointSmoothed.lastOrNull()?.takeIf { it > 0.0 }
-                    ?: if (energySamples.size >= 2) {
-                        val wEnergy = energySamples.last().cumulativeEnergyWh - energySamples.first().cumulativeEnergyWh
-                        val wDist   = energySamples.last().distanceKm - energySamples.first().distanceKm
-                        if (wDist > 1.0) wEnergy / wDist else null
-                    } else null
+                    ?: windowSlopeWhPerKm(energySamples.map { it.distanceKm to it.cumulativeEnergyWh })
 
                 // Reconstruct graph points with projected range so the projection line
                 // starts from trip start, not from when the Activity opened.
-                val car = selectedCarConfig.value
+                val car = currentCarConfig()
                 val batteryKwh = car?.let {
                     if (it.isPhev) it.phevUsableBatteryKwh ?: it.batteryKwh else it.batteryKwh
                 } ?: FALLBACK_BATTERY_KWH
@@ -1861,22 +2078,51 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     // A point is stabilised if past the distance threshold OR a non-baseline
                     // rate exists — matches the live `isStabilised || model != BASELINE`.
                     val stabilised = pastStabilisation || ppTrip != null
-                    val remainingWh = batteryKwh * 1000.0 * ((dp.soc.takeIf { it > 0 } ?: dp.socPanel.toDouble()) / 100.0)
-                    // Null for non-stabilised points — matches live path behaviour so the
-                    // orange projected line doesn't appear before it would on a live drive.
-                    // Same PHEV consumption floor as the live path (see projectedEvRangeKm).
+                    val pointSoc = dp.soc.takeIf { it > 0 } ?: dp.socPanel.toDouble()
+                    // Match the live path's numerator exactly: for PHEVs prefer the BMS's own
+                    // remaining-EV-energy reading (persisted per point since DB v10), which nets
+                    // out the charge-sustaining reserve, over capacity × SoC. Pre-v10 / BEV /
+                    // non-reporting rows have batteryRemainPowerEV == null and fall back to the
+                    // SoC product, exactly as before — so this can only improve a PHEV rebuild,
+                    // never regress one, and never touches BEVs.
+                    val remainingWh = remainingEvEnergyWh(
+                        batteryKwh, pointSoc, dp.batteryRemainPowerEV, isPhevCar
+                    )
+                    // Same early-distance shrinkage toward the stable prior as the live path, so a
+                    // rebuilt curve doesn't spike at trip start where ppTrip = energy ÷ tiny distance
+                    // is numerically wild.
+                    val ppStablePrior = lifetimeWhPerKm.value ?: baselineWhPerKm
+                    val ppConfidence = (dKm / STABILISATION_KM).coerceIn(0.0, 1.0)
+                    val ppDemonstrated: Double? = ppTrip?.let {
+                        ppConfidence * it + (1.0 - ppConfidence) * ppStablePrior
+                    }
+                    // Rate tier with the same TRIP_AVERAGE→LIVE_TRIP crossfade as the live path,
+                    // so the rebuilt line keeps the live curve's shape (no step at STABILISATION_KM).
+                    val ppRate: Double = when {
+                        ppSmoothed != null && ppDemonstrated != null && pastStabilisation -> {
+                            val liveBlend = ((dKm - STABILISATION_KM) / STABILISATION_KM).coerceIn(0.0, 1.0)
+                            liveBlend * ppSmoothed + (1.0 - liveBlend) * ppDemonstrated
+                        }
+                        pastStabilisation && ppSmoothed != null -> ppSmoothed
+                        ppDemonstrated != null -> ppDemonstrated
+                        else -> baselineWhPerKm
+                    }
+                    // Same optimism-cap anchor as the live path (the shrunk demonstrated rate, else
+                    // the stable prior), so the rebuilt curve's downhill excursions are bounded
+                    // identically.
+                    val ppReference = ppDemonstrated ?: ppStablePrior
+                    // Null for non-stabilised points — matches the live path so the orange line
+                    // doesn't appear before it would on a live drive. A non-positive remaining-
+                    // energy read (a cold-BMS point with soc=socPanel=0) is emitted as null, not a
+                    // projected 0 — mirrors the live guard against a false spike-to-zero.
                     val projected: Double? = when {
                         !stabilised -> null
-                        pastStabilisation && ppSmoothed != null ->
-                            projectedEvRangeKm(remainingWh, ppSmoothed, baselineWhPerKm, isPhevCar)
-                        ppTrip != null ->
-                            projectedEvRangeKm(remainingWh, ppTrip, baselineWhPerKm, isPhevCar)
-                        else ->
-                            projectedEvRangeKm(remainingWh, baselineWhPerKm, baselineWhPerKm, isPhevCar)
+                        remainingWh <= 0.0 -> null
+                        else -> projectedEvRangeKm(remainingWh, ppRate, baselineWhPerKm, isPhevCar, ppReference)
                     }
                     RangeDataPoint(
                         distanceKm             = dKm,
-                        soc                    = dp.soc,
+                        soc                    = pointSoc,
                         electricDrivingRangeKm = dp.electricDrivingRangeKm,
                         projectedRangeKm       = projected,
                         isStabilised           = stabilised
@@ -1899,11 +2145,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 // wrongly show BASELINE on the badge even though the line is drawn from
                 // a non-baseline calculation. Reuses [restoredBinWhPerKm] computed above
                 // for the stabilised gating.
-                _activeRangeModel.value = when {
+                setActiveRangeModel(when {
                     smoothedWhPerKm != null && smoothedWhPerKm!! > 0.0 -> RangeModel.LIVE_TRIP
-                    restoredBinWhPerKm != null                          -> RangeModel.HISTORICAL_BINS
+                    restoredBinWhPerKm != null                          -> RangeModel.TRIP_AVERAGE
+                    lifetimeWhPerKm.value != null                       -> RangeModel.LIFETIME_AVERAGE
                     else                                                -> RangeModel.BASELINE
-                }
+                })
                 lastTelemetryWasCarOn = telemetry.isCarOn
                 segmentOffSinceMs = null
                 Log.i(TAG, "Restored trip state for id=$tripId with ${dataPoints.size} points")
@@ -2068,13 +2315,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val maxSpeedMax:    Float? = null,
         // Quick toggle (separate star chip in the UI) — not part of the numeric
         // range-filter sheet, so deliberately excluded from activeFilterCount.
-        val favouritesOnly: Boolean = false
+        val favouritesOnly: Boolean = false,
+        // Tag filter (chosen inside the filter sheet). A trip passes when it carries
+        // at least one of these tags (OR). Empty = no tag filter.
+        val tagIds: Set<Long> = emptySet()
     ) {
         val activeFilterCount: Int get() = listOf(
             distanceMin, distanceMax, durationMin, durationMax,
             consumptionMin, consumptionMax, regenEffMin, regenEffMax,
             maxSpeedMin, maxSpeedMax
-        ).count { it != null }
+        ).count { it != null } + (if (tagIds.isEmpty()) 0 else 1)
     }
 
     private val historyPrefs: SharedPreferences by lazy {
@@ -2114,7 +2364,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             regenEffMax    = getFloatOrNull("f_regen_max"),
             maxSpeedMin    = getFloatOrNull("f_speed_min"),
             maxSpeedMax    = getFloatOrNull("f_speed_max"),
-            favouritesOnly = getBoolean("f_favourites_only", false)
+            favouritesOnly = getBoolean("f_favourites_only", false),
+            tagIds         = getString("f_tag_ids", "")
+                ?.split(",")?.mapNotNull { it.toLongOrNull() }?.toSet() ?: emptySet()
         )
     }
 
@@ -2171,12 +2423,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             putFloatOrRemove("f_regen_min", f.regenEffMin);    putFloatOrRemove("f_regen_max", f.regenEffMax)
             putFloatOrRemove("f_speed_min", f.maxSpeedMin);    putFloatOrRemove("f_speed_max", f.maxSpeedMax)
             putBoolean("f_favourites_only", f.favouritesOnly)
+            if (f.tagIds.isEmpty()) remove("f_tag_ids")
+            else putString("f_tag_ids", f.tagIds.joinToString(","))
             apply()
         }
     }
 
     /** Clears only the numeric range filters; preserves the favourites-only toggle. */
     fun clearFilters() = setFilter(TripFilterState(favouritesOnly = _filterState.value.favouritesOnly))
+
+    /** Sets the History tag filter (used by the Tags screen's "view trips" action). */
+    fun setTagFilter(tagIds: Set<Long>) =
+        setFilter(_filterState.value.copy(tagIds = tagIds))
 
     fun toggleFavouritesOnly() {
         setFilter(_filterState.value.copy(favouritesOnly = !_filterState.value.favouritesOnly))
@@ -2190,10 +2448,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { chargingRepository.setFavourite(sessionId, favourite) }
     }
 
-    val sortedFilteredTrips: StateFlow<List<TripEntity>> =
-        combine(allTrips, tripDisplayMetrics, _sortField, _sortOrder, _filterState) {
-            trips, metrics, field, order, filter ->
+    // Folded so sortedFilteredTrips stays within combine's 5-flow arity while still
+    // seeing per-trip tag membership for the tag filter.
+    private val filterAndTags = combine(_filterState, tripTagsMap) { f, m -> f to m }
 
+    val sortedFilteredTrips: StateFlow<List<TripEntity>> =
+        combine(allTrips, tripDisplayMetrics, _sortField, _sortOrder, filterAndTags) {
+            trips, metrics, field, order, filterTags ->
+
+            val (filter, tagMap) = filterTags
             val active    = trips.filter { it.isActive }
             val completed = trips.filter { !it.isActive }
 
@@ -2215,7 +2478,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 (filter.regenEffMax    == null || regen  <= filter.regenEffMax)    &&
                 (filter.maxSpeedMin    == null || spd    >= filter.maxSpeedMin)    &&
                 (filter.maxSpeedMax    == null || spd    <= filter.maxSpeedMax)    &&
-                (!filter.favouritesOnly || trip.isFavourite)
+                (!filter.favouritesOnly || trip.isFavourite)                       &&
+                (filter.tagIds.isEmpty() ||
+                    tagMap[trip.id]?.any { it.id in filter.tagIds } == true)
             }
 
             val sorted = when (field) {
@@ -2240,6 +2505,27 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteTrips(tripIds: List<Long>) {
         viewModelScope.launch { tripRepository.deleteTrips(tripIds) }
+    }
+
+    // ── Trip merging ────────────────────────────────────────────────────────────
+
+    /** Pure eligibility check the UI uses to gate the merge action / show a reason. */
+    fun checkMergeEligibility(a: TripEntity, b: TripEntity): MergeEligibility =
+        TripRepository.checkMergeEligibility(a, b)
+
+    /**
+     * Merges exactly two completed trips into one (earlier survives). [onResult] is
+     * invoked on the main thread so the caller can surface success/failure.
+     */
+    fun mergeTrips(tripIds: List<Long>, onResult: (MergeResult) -> Unit) {
+        viewModelScope.launch {
+            val result = if (tripIds.size != 2) {
+                MergeResult.Failure("Select exactly two trips to merge")
+            } else {
+                tripRepository.mergeTrips(tripIds[0], tripIds[1])
+            }
+            onResult(result)
+        }
     }
 
     // --- Delete charging sessions
@@ -2377,6 +2663,125 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Recurring route detection ───────────────────────────────────────────────
+
+    /**
+     * Completed trips grouped into recurring routes (same start, end and ~distance;
+     * direction-sensitive), each driven at least [RouteGrouping.DEFAULT_MIN_INSTANCES]
+     * times. Joins [allTrips] (efficiency / distance / duration) with [allTripStats]
+     * (start/end coordinates). The clustering runs on Dispatchers.Default so a large
+     * history doesn't block the main thread. See [RouteGrouping].
+     */
+    val recurringRoutes: StateFlow<List<RouteGroup>> =
+        combine(allTrips, allTripStats) { trips, stats ->
+            val statsById = stats.associateBy { it.tripId }
+            val inputs = trips.mapNotNull { trip ->
+                if (trip.isActive) return@mapNotNull null
+                val s = statsById[trip.id] ?: return@mapNotNull null
+                val eff = trip.efficiency ?: return@mapNotNull null
+                val dist = trip.distance ?: return@mapNotNull null
+                val dur = trip.duration ?: return@mapNotNull null
+                if (dist < 0.5) return@mapNotNull null
+                if (!RouteGrouping.hasValidGps(s.startLatitude, s.startLongitude)) return@mapNotNull null
+                if (!RouteGrouping.hasValidGps(s.endLatitude, s.endLongitude)) return@mapNotNull null
+                RouteTripInput(
+                    tripId = trip.id,
+                    startTime = trip.startTime,
+                    startLat = s.startLatitude,
+                    startLon = s.startLongitude,
+                    endLat = s.endLatitude,
+                    endLon = s.endLongitude,
+                    distanceKm = dist,
+                    efficiencyKwhPer100km = eff,
+                    durationMs = dur,
+                    energyKwh = trip.energyConsumed ?: 0.0
+                )
+            }
+            RouteGrouping.group(inputs)
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // ── Tag operations & per-tag analytics ──────────────────────────────────────
+
+    /** Tags on a single trip — observed by the Trip Detail screen. */
+    fun tagsForTrip(tripId: Long): Flow<List<TagEntity>> = tripRepository.getTagsForTrip(tripId)
+
+    /** Creates [name] if needed (case-insensitive) and applies it to [tripId]. */
+    fun addNewTagToTrip(tripId: Long, name: String) {
+        viewModelScope.launch {
+            tripRepository.createOrGetTag(name)?.let { tripRepository.addTagToTrip(tripId, it.id) }
+        }
+    }
+
+    fun addTagToTrip(tripId: Long, tagId: Long) {
+        viewModelScope.launch { tripRepository.addTagToTrip(tripId, tagId) }
+    }
+
+    fun removeTagFromTrip(tripId: Long, tagId: Long) {
+        viewModelScope.launch { tripRepository.removeTagFromTrip(tripId, tagId) }
+    }
+
+    /** Bulk-applies an existing tag to several trips (History selection mode). */
+    fun applyTagToTrips(tagId: Long, tripIds: List<Long>) {
+        viewModelScope.launch { tripRepository.applyTagToTrips(tagId, tripIds) }
+    }
+
+    /** Creates [name] if needed and bulk-applies it to [tripIds]. */
+    fun addNewTagToTrips(tripIds: List<Long>, name: String) {
+        viewModelScope.launch {
+            tripRepository.createOrGetTag(name)?.let {
+                tripRepository.applyTagToTrips(it.id, tripIds)
+            }
+        }
+    }
+
+    fun renameTag(tagId: Long, newName: String) {
+        viewModelScope.launch { tripRepository.renameTag(tagId, newName) }
+    }
+
+    fun recolorTag(tagId: Long, colorIndex: Int) {
+        viewModelScope.launch { tripRepository.recolorTag(tagId, colorIndex) }
+    }
+
+    fun deleteTag(tagId: Long) {
+        viewModelScope.launch {
+            tripRepository.deleteTag(tagId)
+            // Drop the now-stale tag from any active filter so it can't hide trips.
+            if (tagId in _filterState.value.tagIds) {
+                setFilter(_filterState.value.copy(tagIds = _filterState.value.tagIds - tagId))
+            }
+        }
+    }
+
+    data class TagStat(
+        val tag: TagEntity,
+        val tripCount: Int,
+        val totalDistanceKm: Double,
+        val avgConsumption: Double,   // kWh/100km; 0 when no trip carries an efficiency
+        val totalKwh: Double
+    )
+
+    /** Per-tag rollups for the Tags screen (count, distance, avg efficiency). */
+    val tagStats: StateFlow<List<TagStat>> =
+        combine(allTrips, tripTagRefs, allTags) { trips, refs, tags ->
+            val completedById = trips.filter { !it.isActive }.associateBy { it.id }
+            val tripsByTag = refs.groupBy { it.tagId }
+            tags.map { tag ->
+                val tagTrips = tripsByTag[tag.id].orEmpty().mapNotNull { completedById[it.tripId] }
+                val effs = tagTrips.mapNotNull { it.efficiency }
+                TagStat(
+                    tag             = tag,
+                    tripCount       = tagTrips.size,
+                    totalDistanceKm = tagTrips.sumOf { it.distance ?: 0.0 },
+                    avgConsumption  = if (effs.isNotEmpty()) effs.average() else 0.0,
+                    totalKwh        = tagTrips.sumOf { it.energyConsumed ?: 0.0 }
+                )
+            }.sortedWith(compareByDescending<TagStat> { it.tripCount }.thenBy { it.tag.name.lowercase() })
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // ── Trip goals ────────────────────────────────────────────────────────────
 

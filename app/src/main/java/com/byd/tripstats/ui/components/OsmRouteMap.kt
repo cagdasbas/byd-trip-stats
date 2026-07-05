@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import androidx.compose.ui.viewinterop.AndroidView
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.preferences.UnitSystem
@@ -68,13 +70,13 @@ fun OsmRouteMap(
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "No route data available",
+                    stringResource(R.string.chart_no_route_data),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "GPS coordinates will appear here when recorded",
+                    stringResource(R.string.map_no_gps_recorded),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -88,7 +90,7 @@ fun OsmRouteMap(
     if (validPoints.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                "No valid GPS data in this trip",
+                stringResource(R.string.map_no_valid_gps),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -171,7 +173,7 @@ private fun buildAndAddOverlays(
         mapView.overlays.add(
             Marker(mapView).apply {
                 position = GeoPoint(pt.latitude, pt.longitude)
-                title    = "Start"
+                title    = context.getString(R.string.waypoint_start)
                 icon     = createCircleMarker(context, android.graphics.Color.rgb(56, 142, 60), "S")
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             }
@@ -183,7 +185,7 @@ private fun buildAndAddOverlays(
         mapView.overlays.add(
             Marker(mapView).apply {
                 position = GeoPoint(pt.latitude, pt.longitude)
-                title    = "End"
+                title    = context.getString(R.string.waypoint_end)
                 icon     = createCircleMarker(context, android.graphics.Color.rgb(183, 28, 28), "E")
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
             }
@@ -264,14 +266,14 @@ private fun SpeedLegend(useImperial: Boolean = false, modifier: Modifier = Modif
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                "Traffic",
+                stringResource(R.string.map_traffic_label),
                 style      = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize   = 11.sp
             )
-            LegendDot(Color(0xFF2196F3), if (useImperial) "Free flow  (≥ 50 mph)" else "Free flow  (≥ 80 km/h)")
-            LegendDot(Color(0xFFFF9800), if (useImperial) "Light traffic  (25–50 mph)" else "Light traffic  (40–80 km/h)")
-            LegendDot(Color(0xFFE53935), if (useImperial) "Heavy traffic  (< 25 mph)" else "Heavy traffic  (< 40 km/h)")
+            LegendDot(Color(0xFF2196F3), stringResource(R.string.map_traffic_free_flow, if (useImperial) "50 mph" else "80 km/h"))
+            LegendDot(Color(0xFFFF9800), stringResource(R.string.map_traffic_light, if (useImperial) "25–50 mph" else "40–80 km/h"))
+            LegendDot(Color(0xFFE53935), stringResource(R.string.map_traffic_heavy, if (useImperial) "25 mph" else "40 km/h"))
         }
     }
 }

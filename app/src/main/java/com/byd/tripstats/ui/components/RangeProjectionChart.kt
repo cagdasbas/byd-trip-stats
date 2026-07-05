@@ -23,10 +23,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.byd.tripstats.R
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
@@ -149,11 +151,11 @@ fun RangeProjectionChart(
         val maxDistanceKm = points.lastOrNull()?.distanceKm?.coerceAtLeast(1.0) ?: 1.0
 
         // Include every point that has a non-null projectedRangeKm — both the
-        // stabilised ones (LIVE_TRIP / HISTORICAL_BINS) and the pre-stabilisation
+        // stabilised ones (LIVE_TRIP / TRIP_AVERAGE) and the pre-stabilisation
         // baseline-tier ones at the very start of a drive. The earlier filter
         // (isStabilised only) was put in place when BASELINE-only could persist
         // for an entire trip — that risk is gone now that bin distance counts
-        // every tick and HISTORICAL_BINS engages within ~0.2 km — so dropping
+        // every tick and TRIP_AVERAGE engages within ~0.2 km — so dropping
         // the filter is safe and lets the orange line touch the origin instead
         // of starting at the first stabilised point.
         val projectedPoints: List<Pair<Double, Double>> = remember(points) {
@@ -219,14 +221,14 @@ fun RangeProjectionChart(
         // ── Header ────────────────────────────────────────────────────────────────
         Column(modifier = modifier.fillMaxSize()) {
             val modelLabel = when (activeRangeModel) {
-                DashboardViewModel.RangeModel.LIVE_TRIP        -> "● Live trip"
-                DashboardViewModel.RangeModel.HISTORICAL_BINS  -> "● Speed bins"
-                DashboardViewModel.RangeModel.LIFETIME_AVERAGE -> "● Lifetime avg"
-                DashboardViewModel.RangeModel.BASELINE         -> "● Baseline"
+                DashboardViewModel.RangeModel.LIVE_TRIP        -> stringResource(R.string.legend_live_trip)
+                DashboardViewModel.RangeModel.TRIP_AVERAGE  -> stringResource(R.string.legend_trip_average)
+                DashboardViewModel.RangeModel.LIFETIME_AVERAGE -> stringResource(R.string.legend_lifetime_avg)
+                DashboardViewModel.RangeModel.BASELINE         -> stringResource(R.string.legend_baseline)
             }
             val modelColor = when (activeRangeModel) {
                 DashboardViewModel.RangeModel.LIVE_TRIP       -> RegenGreen
-                DashboardViewModel.RangeModel.HISTORICAL_BINS -> AccelerationOrange
+                DashboardViewModel.RangeModel.TRIP_AVERAGE -> AccelerationOrange
                 else                                          -> MaterialTheme.colorScheme.onSurfaceVariant
             }
 
@@ -245,21 +247,21 @@ fun RangeProjectionChart(
                     val wltpDisplay = if (useImperial) (wltpKm * 0.621371).toInt() else wltpKm.toInt()
                     if (!isStabilised && activeRangeModel == DashboardViewModel.RangeModel.BASELINE) {
                         Text(
-                            text  = "BMS: ${"%.0f".format(currentBms)} $distUnit (collecting data)",
+                            text  = stringResource(R.string.proj_bms_low_cold, "${"%.0f".format(currentBms)} $distUnit"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else if (isSaturated) {
                         Text(
-                            text  = "≥ $wltpDisplay $distUnit projected (WLTP limit)",
+                            text  = stringResource(R.string.proj_wltp_limit, "$wltpDisplay $distUnit"),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = textColor.copy(alpha = 0.7f)
                         )
                         val satSubtitle = when (activeRangeModel) {
                             DashboardViewModel.RangeModel.BASELINE ->
-                                "Low-speed calibration — capped at WLTP"
+                                stringResource(R.string.chart_low_speed_cap)
                             else ->
-                                "Value above WLTP average — capped at rated range"
+                                stringResource(R.string.chart_above_wltp_cap)
                         }
                         Text(
                             text  = satSubtitle,
@@ -268,13 +270,13 @@ fun RangeProjectionChart(
                         )
                     } else {
                         Text(
-                            text  = "%.0f $distUnit projected range".format(currentProjected),
+                            text  = stringResource(R.string.proj_range, "${"%.0f".format(currentProjected)} $distUnit"),
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = textColor
                         )
                         val sign = if (beating) "+" else ""
                         Text(
-                            text  = "$sign${"%.0f".format(deltaKm)} $distUnit vs BMS estimate",
+                            text  = stringResource(R.string.proj_vs_bms, "$sign${"%.0f".format(deltaKm)} $distUnit"),
                             style = MaterialTheme.typography.bodySmall,
                             color = accentColor
                         )
@@ -433,12 +435,19 @@ fun RangeProjectionChart(
                 // X axis
                 drawLine(axisColor, Offset(padL, padT + chartH), Offset(w - padR, padT + chartH), 1.5f)
 
-                // X ticks — 5 evenly spaced labels
+                // X ticks — 5 evenly spaced labels. The first/last labels sit on the chart edges,
+                // so anchor them LEFT/RIGHT (not CENTER) or half the text spills past the canvas
+                // and gets clipped (the trailing digit of e.g. "12.6" was being cut off).
                 val xStep = maxDistanceKm / 4.0
                 for (i in 0..4) {
                     val dist = i * xStep
                     val x = xOf(dist)
                     drawLine(axisColor, Offset(x, padT + chartH), Offset(x, padT + chartH + 5f), 1.5f)
+                    xLabelPaint.textAlign = when (i) {
+                        0    -> android.graphics.Paint.Align.LEFT
+                        4    -> android.graphics.Paint.Align.RIGHT
+                        else -> android.graphics.Paint.Align.CENTER
+                    }
                     nc.drawText("%.1f".format(dist), x, h - 4f, xLabelPaint)
                 }
 
@@ -696,9 +705,9 @@ fun RangeProjectionChart(
                         isAntiAlias = true
                         typeface = android.graphics.Typeface.MONOSPACE
                     }
-                    nc.drawText("SCANNING…",
+                    nc.drawText(context.getString(R.string.chart_scanning),
                         padL + chartW / 2f, padT + chartH / 2f - 4f, scanPaint)
-                    nc.drawText("acquiring telemetry · drive to begin",
+                    nc.drawText(context.getString(R.string.chart_acquiring),
                         padL + chartW / 2f, padT + chartH / 2f + 22f, subPaint)
                 }
             }
@@ -720,7 +729,7 @@ fun RangeProjectionChart(
                 }
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    text  = "BMS estimate",
+                    text  = stringResource(R.string.chart_bms_estimate),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -733,7 +742,7 @@ fun RangeProjectionChart(
                 }
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    text  = "Projected (actual)",
+                    text  = stringResource(R.string.chart_projected_actual),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

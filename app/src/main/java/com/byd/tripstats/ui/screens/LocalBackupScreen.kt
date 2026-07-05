@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -29,9 +30,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.widget.Toast
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import com.byd.tripstats.data.backup.LocalBackupManager
 import com.byd.tripstats.data.backup.TelegramManager
 import com.byd.tripstats.data.entitlement.EntitlementManager
+import com.byd.tripstats.ui.components.BrandNavigationBar
 import com.byd.tripstats.ui.theme.*
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 import com.byd.tripstats.worker.DatabaseTrimmer
@@ -145,13 +149,16 @@ fun LocalBackupScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Database Backup & Restore",
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.backup_restore_title),
+                        fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onNavigateBack() })
                 },
                 navigationIcon = {
+                  BrandNavigationBar {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(28.dp))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(32.dp))
                     }
+                  }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -196,10 +203,10 @@ fun LocalBackupScreen(
 
             // ── LOCAL group ───────────────────────────────────────────────────
             item {
-                GroupSection(title = "Local", icon = Icons.Filled.Storage) {
-                    SectionCard(title = "Backup to Download", icon = Icons.Filled.CloudUpload) {
+                GroupSection(title = stringResource(R.string.app_mgmt_backup_local_label), icon = Icons.Filled.Storage) {
+                    SectionCard(title = stringResource(R.string.backup_to_download_label), icon = Icons.Filled.CloudUpload) {
                 Text(
-                    "Saves the full trip database to:\nDownload/BydTripStats/byd_stats_backup_DATE.db",
+                    stringResource(R.string.backup_download_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -222,15 +229,13 @@ fun LocalBackupScreen(
                         Icon(Icons.Filled.Save, null, modifier = Modifier.size(20.dp))
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text(if (isBusy) "Working…" else "Backup Now")
+                    Text(if (isBusy) stringResource(R.string.running) else stringResource(R.string.backup_now_action))
                 }
             }
                     Spacer(Modifier.height(8.dp))
-                    SectionCard(title = "Backup to SD card", icon = Icons.Filled.SdCard) {
+                    SectionCard(title = stringResource(R.string.backup_to_sd_label), icon = Icons.Filled.SdCard) {
                         Text(
-                            "Saves a copy of the database to a BydTripStats folder on the SD card. " +
-                                "Unlike the Download backup, these survive an app uninstall — off-device " +
-                                "redundancy you can pull out and read on a computer.",
+                            stringResource(R.string.sd_backup_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -243,7 +248,7 @@ fun LocalBackupScreen(
                                 Icon(Icons.Filled.Lock, null, modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text(
-                                    "This is a BYD Trip Stats Pro feature.",
+                                    stringResource(R.string.sd_card_pro_notice),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -253,7 +258,7 @@ fun LocalBackupScreen(
                                 onClick = {
                                     Toast.makeText(
                                         context,
-                                        "SD card backup is a Pro feature — unlock Pro in Settings → Preferences.",
+                                        context.getString(R.string.sd_card_pro_notice),
                                         Toast.LENGTH_LONG
                                     ).show()
                                 },
@@ -261,13 +266,13 @@ fun LocalBackupScreen(
                             ) {
                                 Icon(Icons.Filled.Lock, null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Unlock with Pro")
+                                Text(stringResource(R.string.unlock_pro_action))
                             }
                         } else {
                             val sdAvailable = manager.isSdCardAvailable()
                             if (!sdAvailable) {
                                 Text(
-                                    "No SD card detected. Insert a card, then reopen this screen.",
+                                    stringResource(R.string.sd_card_not_detected),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -291,14 +296,14 @@ fun LocalBackupScreen(
                                     Icon(Icons.Filled.SdCard, null, modifier = Modifier.size(20.dp))
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                Text(if (isBusy) "Working…" else "Backup to SD card")
+                                Text(if (isBusy) stringResource(R.string.running) else stringResource(R.string.backup_to_sd_label))
                             }
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    SectionCard(title = "Restore", icon = Icons.Filled.CloudDownload) {
+                    SectionCard(title = stringResource(R.string.restore_section_label), icon = Icons.Filled.CloudDownload) {
                     Text(
-                        "Restoring will replace ALL current trip data. The app will close and reopen automatically.",
+                        stringResource(R.string.restore_warning_msg),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -311,7 +316,7 @@ fun LocalBackupScreen(
                         verticalAlignment     = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Available backups:",
+                            stringResource(R.string.available_backups_label),
                             style      = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -319,7 +324,7 @@ fun LocalBackupScreen(
                             onClick  = { scope.launch { manager.scanLocalBackups() } },
                             enabled  = !isBusy
                         ) {
-                            Icon(Icons.Filled.Refresh, "Refresh", modifier = Modifier.size(22.dp))
+                            Icon(Icons.Filled.Refresh, stringResource(R.string.refresh), modifier = Modifier.size(22.dp))
                         }
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -327,7 +332,7 @@ fun LocalBackupScreen(
                     if (localBackups.isEmpty()) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "No backups found. Run a backup first.",
+                            stringResource(R.string.no_backups_found),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -353,8 +358,8 @@ fun LocalBackupScreen(
 
             // ── TELEGRAM group ────────────────────────────────────────────────
             item {
-                GroupSection(title = "Telegram", icon = Icons.AutoMirrored.Filled.Send) {
-                    SectionCard(title = "Telegram Backup", icon = Icons.AutoMirrored.Filled.Send) {
+                GroupSection(title = stringResource(R.string.app_mgmt_telegram_label), icon = Icons.AutoMirrored.Filled.Send) {
+                    SectionCard(title = stringResource(R.string.telegram_backup_label), icon = Icons.AutoMirrored.Filled.Send) {
                 // Telegram status banner
                 when (val s = telegramState) {
                     is TelegramManager.TelegramState.InProgress -> StatusBanner(
@@ -410,7 +415,7 @@ fun LocalBackupScreen(
                             )
                             telegramManager.lastAutoBackup?.let {
                                 Text(
-                                    "Last auto-backup: $it",
+                                    stringResource(R.string.last_auto_backup_label, it),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -426,7 +431,7 @@ fun LocalBackupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Automatic backup",
+                            stringResource(R.string.auto_backup_label),
                             style    = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f)
                         )
@@ -464,7 +469,7 @@ fun LocalBackupScreen(
 
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Backup interval",
+                            stringResource(R.string.backup_interval_label),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -482,12 +487,12 @@ fun LocalBackupScreen(
                                     onClick  = {
                                         if (s != telegramSchedule) {
                                             telegramManager.setSchedule(s)
-                                            scheduleChanged = s.label
+                                            scheduleChanged = context.getString(s.labelRes)
                                         }
                                     }
                                 )
                                 Text(
-                                    text  = s.label,
+                                    text  = stringResource(s.labelRes),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
@@ -497,7 +502,7 @@ fun LocalBackupScreen(
                         scheduleChanged?.let { label ->
                             Spacer(Modifier.height(4.dp))
                             StatusBanner(
-                                text     = "Schedule updated to $label. Next auto-backup will follow the new interval.",
+                                text     = stringResource(R.string.schedule_updated_msg, label),
                                 color    = RegenGreen.copy(alpha = 0.15f),
                                 icon     = Icons.Filled.CheckCircle,
                                 iconTint = RegenGreen,
@@ -527,7 +532,7 @@ fun LocalBackupScreen(
                             Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(20.dp))
                         }
                         Spacer(Modifier.width(8.dp))
-                        Text(if (telegramBusy) "Sending…" else "Send Backup Now")
+                        Text(if (telegramBusy) stringResource(R.string.sending) else stringResource(R.string.send_backup_now_action))
                     }
 
                     Spacer(Modifier.height(4.dp))
@@ -538,7 +543,7 @@ fun LocalBackupScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            "Disconnect bot",
+                            stringResource(R.string.disconnect_bot_action),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -548,9 +553,7 @@ fun LocalBackupScreen(
                     // ── Setup state ───────────────────────────────────────
 
                     StatusBanner(
-                        text = "Once connected, backups can be sent manually or on a schedule. " +
-                                   "Each backup lands as a .db file in your private chat, " +
-                                   "accessible from any device with Telegram.",
+                        text = stringResource(R.string.telegram_setup_info),
                         color = MaterialTheme.colorScheme.primaryContainer,
                         icon = Icons.Filled.Info,
                         iconTint = MaterialTheme.colorScheme.primary
@@ -559,9 +562,7 @@ fun LocalBackupScreen(
                     Spacer(Modifier.height(10.dp))
 
                     Text(
-                        "1. Message @BotFather on Telegram → /newbot → copy the token\n" +
-                        "2. Send any message to your new bot\n" +
-                        "3. Paste the token below and tap Validate",
+                        stringResource(R.string.telegram_instructions),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -571,7 +572,7 @@ fun LocalBackupScreen(
                     OutlinedTextField(
                         value         = tokenInput,
                         onValueChange = { tokenInput = it },
-                        label         = { Text("Bot Token") },
+                        label         = { Text(stringResource(R.string.bot_token_label)) },
                         placeholder   = { Text("123456789:ABCdef…") },
                         singleLine    = true,
                         modifier      = Modifier.fillMaxWidth(),
@@ -595,14 +596,14 @@ fun LocalBackupScreen(
                             Icon(Icons.Filled.Check, null, modifier = Modifier.size(20.dp))
                         }
                         Spacer(Modifier.width(8.dp))
-                        Text(if (telegramBusy) "Validating…" else "Validate & Save")
+                        Text(if (telegramBusy) stringResource(R.string.uploading) else stringResource(R.string.validate_save_action))
                     }
                 }
             }
                     Spacer(Modifier.height(8.dp))
-                    SectionCard(title = "Restore from Telegram", icon = Icons.Filled.CloudDownload) {
+                    SectionCard(title = stringResource(R.string.restore_from_telegram_label), icon = Icons.Filled.CloudDownload) {
                         Text(
-                        "Restoring will replace ALL current trip data. The app will close and reopen automatically.",
+                        stringResource(R.string.restore_warning_msg),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -627,7 +628,7 @@ fun LocalBackupScreen(
                     if (telegramConfig == null) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Connect a Telegram private bot first (see Telegram Backup above).",
+                            stringResource(R.string.connect_telegram_first),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -639,7 +640,7 @@ fun LocalBackupScreen(
                             verticalAlignment     = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Backups in your chat:",
+                                stringResource(R.string.backups_in_chat_label),
                                 style      = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -651,14 +652,14 @@ fun LocalBackupScreen(
                                 },
                                 enabled = !telegramBusy && !isBusy
                             ) {
-                                Icon(Icons.Filled.Refresh, "Refresh", modifier = Modifier.size(22.dp))
+                                Icon(Icons.Filled.Refresh, stringResource(R.string.refresh), modifier = Modifier.size(22.dp))
                             }
                         }
                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                         if (telegramBackups.isEmpty()) {
                             Text(
-                                "Tap refresh to scan your Telegram chat for .db backups.",
+                                stringResource(R.string.scan_telegram_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -681,10 +682,9 @@ fun LocalBackupScreen(
             item {
                 var showResetConfirm by remember { mutableStateOf(false) }
                 val resetBusy = backupState is LocalBackupManager.BackupState.InProgress
-                SectionCard(title = "DANGER ZONE", icon = Icons.Filled.DeleteForever) {
+                SectionCard(title = stringResource(R.string.danger_zone_title), icon = Icons.Filled.DeleteForever) {
                     Text(
-                        text = "Permanently delete all trips, data points and statistics. " +
-                               "A local backup is created automatically before the reset.",
+                        text = stringResource(R.string.danger_zone_desc),
                         style = MaterialTheme.typography.bodyLarge,
                         color = BydErrorRed
                     )
@@ -699,7 +699,7 @@ fun LocalBackupScreen(
                     ) {
                         Icon(Icons.Filled.DeleteForever, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Reset all trip data")
+                        Text(stringResource(R.string.reset_all_data_label))
                     }
 
                     if (showResetConfirm) {
@@ -711,12 +711,10 @@ fun LocalBackupScreen(
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(32.dp))
                             },
-                            title = { Text("Reset all trip data?", fontWeight = FontWeight.Bold) },
+                            title = { Text(stringResource(R.string.reset_confirm_title), fontWeight = FontWeight.Bold) },
                             text  = {
                                 Text(
-                                    "This will permanently delete all trips and statistics.\n\n" +
-                                    "A backup will be saved to Download automatically before the reset. " +
-                                    "The app will close and reopen.",
+                                    stringResource(R.string.reset_confirm_msg),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             },
@@ -748,10 +746,10 @@ fun LocalBackupScreen(
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = BydErrorRed
                                     )
-                                ) { Text("Yes, reset everything") }
+                                ) { Text(stringResource(R.string.yes_reset_everything)) }
                             },
                             dismissButton = {
-                                TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+                                TextButton(onClick = { showResetConfirm = false }) { Text(stringResource(R.string.cancel)) }
                             }
                         )
                     }
@@ -793,8 +791,8 @@ fun LocalBackupScreen(
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Delete backup?") },
-            text  = { Text("\"${backup.name}\" will be permanently deleted.") },
+            title = { Text(stringResource(R.string.delete_charging_session_title)) },
+            text  = { Text(stringResource(R.string.delete_backup_confirm, backup.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     val b = backup
@@ -809,10 +807,10 @@ fun LocalBackupScreen(
                     } else {
                         scope.launch { manager.deleteBackup(b) }
                     }
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("Cancel") }
+                TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -966,7 +964,7 @@ private fun BackupListItem(
                     color = MaterialTheme.colorScheme.primary)
             }
         }
-        TextButton(onClick = onRestore, enabled = enabled) { Text("Restore") }
+        TextButton(onClick = onRestore, enabled = enabled) { Text(stringResource(R.string.restore_section_label)) }
         IconButton(onClick = onDelete, enabled = enabled) {
             Icon(
                 Icons.Filled.DeleteOutline, "Delete backup",
@@ -1012,7 +1010,7 @@ private fun TelegramBackupListItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        TextButton(onClick = onRestore, enabled = enabled) { Text("Restore") }
+        TextButton(onClick = onRestore, enabled = enabled) { Text(stringResource(R.string.restore_section_label)) }
     }
 }
 
@@ -1030,21 +1028,18 @@ private fun RestoreConfirmDialog(
                 tint     = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(32.dp))
         },
-        title = { Text("Restore Database?") },
+        title = { Text(stringResource(R.string.restore_database_title)) },
         text  = {
-            Text(
-                "This will permanently replace ALL current trip data with $description.\n\n" +
-                "The app will close and reopen automatically after restore."
-            )
+            Text(stringResource(R.string.restore_database_msg, description))
         },
         confirmButton = {
             Button(
                 onClick = onConfirm,
                 colors  = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text("Restore") }
+            ) { Text(stringResource(R.string.restore_section_label)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -1089,17 +1084,10 @@ private fun DatabaseTrimSection(
     val running = trimState is DatabaseTrimmer.State.InProgress
     val dateFmt = remember { SimpleDateFormat("dd MMM yyyy  HH:mm", Locale.getDefault()) }
 
-    GroupSection(title = "Maintenance", icon = Icons.Filled.CleaningServices) {
-        SectionCard(title = "Trim database", icon = Icons.Filled.CleaningServices) {
+    GroupSection(title = stringResource(R.string.trim_database_label), icon = Icons.Filled.CleaningServices) {
+        SectionCard(title = stringResource(R.string.trim_database_label), icon = Icons.Filled.CleaningServices) {
             Text(
-                "Removes diagnostic data and downsamples old recordings to free up space:\n" +
-                "  • Strips redundant fields from every data point.\n" +
-                "  • Clears full-detail diagnostic payloads for non-favourite trips and charging sessions older than 45 days.\n" +
-                "  • Downsamples trip points older than 1) 45-90 days to 30 samples per minute, b) 90-180 days to 15 samples per minute and c) 180 days to six samples per minute.\n" +
-                "  • Deletes second-by-second AC charging history older than 45 days (DC fast-charging history is preserved).\n" +
-                "  • Reclaims freed space (VACUUM).\n\n" +
-                "Trip summaries, statistics, charging session totals, and all DC charging detail are not affected.\n" +
-                "It should be run when no trip/charging recording session in order not to disrupt that session",
+                stringResource(R.string.trim_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1107,9 +1095,7 @@ private fun DatabaseTrimSection(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                "WARNING: Downsampling means that charts/heatmaps from trimmed sessions will have very scarce points thus not be in detail.\n" +
-                "If you just want to reduce storage usage, you might want to delete older trips instead of trimming.\n" +
-                "THIS ACTION IS IRREVERSIBLE! ",
+                stringResource(R.string.trim_warning_msg),
                 style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color      = BydErrorRed
@@ -1118,8 +1104,8 @@ private fun DatabaseTrimSection(
             Spacer(Modifier.height(8.dp))
 
             // Last-run info
-            val lastRunText = lastRun?.let { "Last trimmed: ${dateFmt.format(Date(it.timestamp))}" }
-                ?: "Never trimmed."
+            val lastRunText = lastRun?.let { stringResource(R.string.last_trimmed_label, dateFmt.format(Date(it.timestamp))) }
+                ?: stringResource(R.string.never_trimmed)
             Text(
                 lastRunText,
                 style      = MaterialTheme.typography.bodySmall,
@@ -1146,16 +1132,16 @@ private fun DatabaseTrimSection(
                 )
                 is DatabaseTrimmer.State.Success -> StatusBanner(
                     text      = if (s.restartRequired)
-                        "Trim complete — app will restart in a few seconds to finalise space reclaim."
+                        stringResource(R.string.trim_complete_msg)
                     else
-                        "Trim complete. (VACUUM was skipped; restart the app later to reclaim space.)",
+                        stringResource(R.string.trim_skip_vacuum_msg),
                     color     = RegenGreen.copy(alpha = 0.15f),
                     icon      = Icons.Filled.CheckCircle,
                     iconTint  = RegenGreen,
                     onDismiss = if (s.restartRequired) null else ({ DatabaseTrimmer.resetState() })
                 )
                 is DatabaseTrimmer.State.Error -> StatusBanner(
-                    text      = "Trim failed: ${s.message}",
+                    text      = stringResource(R.string.trim_failed_msg, s.message),
                     color     = MaterialTheme.colorScheme.errorContainer,
                     icon      = Icons.Filled.Error,
                     iconTint  = MaterialTheme.colorScheme.error,
@@ -1181,7 +1167,7 @@ private fun DatabaseTrimSection(
                     Icon(Icons.Filled.CleaningServices, null, modifier = Modifier.size(20.dp))
                 }
                 Spacer(Modifier.width(8.dp))
-                Text(if (running) "Trimming…" else "Trim database now")
+                Text(if (running) stringResource(R.string.running) else stringResource(R.string.trim_now_action))
             }
         }
     }
@@ -1195,7 +1181,7 @@ private fun DatabaseTrimSection(
                     tint     = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp))
             },
-            title = { Text("Trim database?", fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.trim_confirm_title), fontWeight = FontWeight.Bold) },
             text  = {
                 Text(
                     "Diagnostic data for trips older than 45 days will be cleared, trip points " +
@@ -1212,10 +1198,10 @@ private fun DatabaseTrimSection(
                 Button(onClick = {
                     showConfirm = false
                     scope.launch(Dispatchers.IO) { DatabaseTrimmer.trim(context) }
-                }) { Text("Trim now") }
+                }) { Text(stringResource(R.string.trim_now_action)) }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirm = false }) { Text("Cancel") }
+                TextButton(onClick = { showConfirm = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }

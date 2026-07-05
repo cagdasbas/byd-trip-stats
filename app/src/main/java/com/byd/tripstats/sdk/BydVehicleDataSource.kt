@@ -12,6 +12,7 @@ import android.hardware.bydauto.gearbox.BYDAutoGearboxDevice
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.os.Looper
 import android.os.SystemClock
 import android.hardware.bydauto.tyre.AbsBYDAutoTyreListener
@@ -47,6 +48,7 @@ private val ENABLE_LAB_DIAGNOSTICS = BuildConfig.SENSITIVE_DIAGNOSTICS_ENABLED
 private const val ENABLE_VERBOSE_SNAPSHOT_LOGS = false
 private const val ENABLE_VERBOSE_RAW_EVENT_LOGS = false
 private val ENABLE_MODE_STATE_LOGS = BuildConfig.SENSITIVE_DIAGNOSTICS_ENABLED && RuntimeExtensionBridge.isAvailable
+private const val WIFI_SSID_TTL_MS = 30_000L
 private const val VEHICLE_STATE_CACHE = "vehicle_state_cache"
 private const val KEY_CHARGER_SIGNALS_UNRELIABLE = "charger_signals_unreliable"
 // Bump this when the persisted value mapping changes so stale cached values are cleared.
@@ -58,6 +60,14 @@ private const val KEY_CHARGER_SIGNALS_UNRELIABLE = "charger_signals_unreliable"
 //     0x44700010=low, 0x44700020=high, 0x44700038=avg.
 private const val STAT_CACHE_VERSION = 8
 private const val DIRECT_CHARGING_POWER_TIMEOUT_MS = 4_000L
+// DC-charge inference fallback: minimum |pack power| (kW flowing into the battery, read from the
+// synchronous enginePower getter) for treating a parked, car-on charge as active when the BMS
+// charging listener is silent (its pushed callbacks can wedge; a DC charge started while the head
+// unit is fully on may never populate gun/work/capacity). Sits above the 22 kW three-phase-AC
+// ceiling (AC tops out ~21 kW at the pack), so AC charging is left entirely to the listener path,
+// and matches the service's existing >23 kW DC-fast cadence threshold. BEV-only at the call site
+// to avoid a PHEV's engine-charging-in-Park reading as a plug-in charge. See toTelemetry().
+private const val DC_CHARGE_INFER_MIN_KW = 23.0
 // Some firmwares (notably DM-i PHEV) don't return chargerWorkState to 0 after
 // charging completes — the BMS only resets it when the user manually clears
 // charging-data in the car UI. If we've seen capacity activity during this
@@ -105,6 +115,11 @@ private enum class InstrumentTyrePressureEncoding {
 data class VehicleTelemetrySnapshot(
     val isChargingActive: Boolean = false,
     val chargingPower: Double = 0.0,
+    /** True when [chargingPower] came from the capacity-rate tier (NET energy into the cells, which
+     *  under-reports the charger's gross output). False when it came from a gross getter
+     *  (instrument getChargePower / m33) — those are decimal-accurate and match the BYD app, so the
+     *  whole-kW enginePower fallback must NOT override them. */
+    val chargingPowerIsNet: Boolean = false,
     val chargingPowerRaw: Double = 0.0,
     val chargingCapacity: Double = 0.0,
     val chargingCapState: Int = 0,
@@ -246,6 +261,8 @@ data class VehicleTelemetrySnapshot(
     val tecControlTempRaw: Int? = null,
     val hvacEstimatedKw: Double? = null,
     val roadSlopeDeg: Double? = null,
+    /** Connected Wi-Fi SSID (head unit), populated by the data source; "" if unavailable. */
+    val wifiSsid: String = "",
 ) {
     private fun estimateSohFromBodyworkCapacity(carConfig: CarConfig?): Double? {
         val capacityAh = bodyworkBatteryCapacity?.toDouble()?.takeIf { it > 0.0 } ?: return null
@@ -341,16 +358,69 @@ data class VehicleTelemetrySnapshot(
         val odometerValue = odometerCandidate
             ?: statisticTotalMileageValue?.toDouble()
             ?: 0.0
-        val chargingActive = isChargingActive ||
-            chargingPower > 0.0
-        val inferredChargingPower = when {
-            chargingPower > 0.0 -> chargingPower
-            else -> 0.0
-        }
         val currentDatetime = Instant.now().toString()
         val derivedCarOn = powerStateRaw?.coerceIn(0, 2)
             ?: powerMcuStatus?.coerceIn(0, 2)
             ?: 0
+
+        // DC-charge synchronous fallback. The BMS charging listener (gun/work/capacity) is the
+        // primary detector, but its *pushed* callbacks can go silent — the SDK event-delivery
+        // channel wedges on this firmware, and a DC charge begun while the head unit is fully on
+        // has been observed to never populate them: the charge runs, yet isChargingActive stays
+        // false and chargingPower stays 0, so no session is ever opened. The one signal that
+        // survives is the *synchronous* pack-power getter (enginePower), which reads strongly
+        // negative while current flows into the pack. In Park there is no regen and the 12 V DC-DC
+        // draw is sub-kW, so a large sustained negative pack power can only be a charge. Gated to:
+        //   • gear P  — charging requires Park (the reliable gear reading; never wedges to D/R here);
+        //   • BEV     — a PHEV can push power into the pack from its engine while parked, which is
+        //               not a plug-in charge;
+        //   • |power| above the 22 kW three-phase-AC ceiling, so AC charging is left to the listener;
+        //   • listener silent (isChargingActive false, chargingPower 0), so a working detection is
+        //     never overridden.
+        // NB: deliberately NOT gated on carOn — an on-car AC test showed the power-state device
+        // reports null (carOn=-) throughout a charge, so a carOn>0 gate would defeat this in the very
+        // scenario it exists for. The threshold is self-validating instead: a sustained pack power
+        // below -23 kW in Park requires a live HV system pushing big power, which only a charge does,
+        // and enginePower reads ~0 once current stops (it tracked reality at -5 kW during a 3 kW AC
+        // charge), so a value can't latch a phantom after the car powers off.
+        // chargingPower is taken straight from the pack reading so DC sessions get a real power
+        // curve instead of the 0 kW the listener path records when it can't see the magnitude.
+        // Pack power for the charging magnitude. On the Seal this is only available as a whole-kW
+        // integer (getEnginePower / m23); the decimal-precise sources — getChargingPower (m33),
+        // the Power device V/I (m50) and total voltage (m37) — all read 0/null on this firmware,
+        // so the charge power is quantized to whole kW here (a ~6.1 kW charge reports 6).
+        val packPowerKw = enginePower ?: 0
+        val parkedBev = gear == "P" && carConfig?.isPhev != true
+        val dcChargeInferred = parkedBev &&
+            !isChargingActive &&
+            chargingPower <= 0.0 &&
+            packPowerKw <= -DC_CHARGE_INFER_MIN_KW
+
+        val chargingActive = isChargingActive ||
+            chargingPower > 0.0 ||
+            dcChargeInferred
+
+        // Charging-power magnitude. Source priority:
+        //   1. chargingPower from a GROSS getter (instrument getChargePower / m33) — decimal-accurate
+        //      and matches the BYD app (e.g. the Seal reads 6.14 kW). chargingPowerIsNet is false here,
+        //      so it wins outright; never override an accurate decimal with the whole-kW enginePower.
+        //   2. enginePower (pack V×I, whole-kW) — used when chargingPower is either absent (the
+        //      DC-charge-while-on wedge: listener silent, isChargingActive false, chargingPower 0 —
+        //      enginePower is the only surviving signal) OR is the capacity-rate NET value, which
+        //      under-reports the charger's gross output badly on some firmware (an Atto 3 reported a
+        //      flat ~2 kW for a ~4 kW charge, wall socket confirmed 4.6 kW). enginePower tracks the
+        //      real gross rate and even follows aux draw (it dips when the AC compressor runs).
+        //   3. chargingPower (net) as a last resort when enginePower shows no charge (e.g. car fully
+        //      off → pack getter idle; off-state charging is reconstructed from SoC anyway).
+        // kwhAdded still comes from the SoC delta, so energy totals are unaffected regardless — only
+        // the live/recorded power curve and the MQTT charging_power sensor.
+        val packChargeKw = if (chargingActive && parkedBev && packPowerKw < 0) -packPowerKw.toDouble() else 0.0
+        val inferredChargingPower = when {
+            chargingPower > 0.0 && !chargingPowerIsNet -> chargingPower  // gross getter — accurate, keep decimals
+            packChargeKw > 0.0 -> packChargeKw                           // enginePower gross fallback
+            chargingPower > 0.0 -> chargingPower                         // capacity-net, only if enginePower absent
+            else -> 0.0
+        }
 
         // Use GPS speed as fallback when SpeedDevice returns 0 — ensures
         // shouldAutoStart and trip recording have a valid speed even if
@@ -393,7 +463,7 @@ data class VehicleTelemetrySnapshot(
             energyMode = energyMode,
             regenMode = regenMode,
             drivetrainState = drivetrainState,
-            wifiSsid = "",
+            wifiSsid = wifiSsid,
             // Derive HV from live cell voltage × cell count if Battery Device is silent
             batteryTotalVoltage = inferredPackVoltage ?: 0,
             electricDrivingRangeKm = statisticElecDrivingRangeValue ?: 0,
@@ -470,6 +540,27 @@ class BydVehicleDataSource(context: Context) {
 
     // Wrap the real context so BYD permission checks become no-ops
     private val appContext = context.applicationContext
+
+    // Connected Wi-Fi SSID, read at most once per TTL (the telemetry build is a hot path).
+    // Reading the SSID needs ACCESS_FINE_LOCATION (granted) — without it, or with location
+    // off, the system returns "<unknown ssid>", which we normalise to blank.
+    @Volatile private var cachedWifiSsid: String = ""
+    @Volatile private var lastWifiSsidReadMs: Long = 0L
+
+    private fun currentWifiSsid(): String {
+        val now = SystemClock.elapsedRealtime()
+        if (lastWifiSsidReadMs != 0L && now - lastWifiSsidReadMs < WIFI_SSID_TTL_MS) return cachedWifiSsid
+        lastWifiSsidReadMs = now
+        cachedWifiSsid = try {
+            val wm = appContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            @Suppress("DEPRECATION")
+            val raw = wm?.connectionInfo?.ssid?.trim('"').orEmpty()
+            if (raw.isBlank() || raw.equals("<unknown ssid>", ignoreCase = true)) "" else raw
+        } catch (e: Exception) {
+            ""
+        }
+        return cachedWifiSsid
+    }
 
     private val runtimeScale01: Double by lazy { RuntimeExtensionBridge.doubleValue("d01", 3.0) }
 
@@ -728,6 +819,11 @@ class BydVehicleDataSource(context: Context) {
     private val _chargingPowerKw   = MutableStateFlow(0.0)
     private val _chargingPowerRaw  = MutableStateFlow(0.0)
     private val _chargingPowerCandidateKw = MutableStateFlow(0.0)
+    // Charging device getChargingPower() (m33) — instantaneous pack power (V×I, up to 500 kW), the
+    // only source that sees DC (the instrument getter is clamped 0.1..50, onChargingPowerChanged is
+    // inert). Kept separate from _chargingPowerRaw so the instrument path's null-clears can't wipe a
+    // live DC reading.
+    private val _packChargingPowerKw = MutableStateFlow(0.0)
     private val _chargingCapacity  = MutableStateFlow(0.0)
     private val _chargingCapState  = MutableStateFlow(0)
     private val _chargingCapValue  = MutableStateFlow(0)
@@ -824,6 +920,8 @@ class BydVehicleDataSource(context: Context) {
     @Volatile private var chargerSignalsUnreliable =
         runCatching { statCache.getBoolean(KEY_CHARGER_SIGNALS_UNRELIABLE, false) }.getOrDefault(false)
     private var lastChargingPowerCandidateElapsedMs: Long = 0L
+    private var lastPackChargingPowerElapsedMs: Long = 0L
+    private var lastChargingDiagMs: Long = 0L
     private val _speedAccelerateDeepness = MutableStateFlow<Int?>(null)
     private val _speedBrakeDeepness = MutableStateFlow<Int?>(null)
     private val _gearboxBrakePedalState = MutableStateFlow<Int?>(null)
@@ -1379,13 +1477,21 @@ class BydVehicleDataSource(context: Context) {
             }
         }
 
-        tryDynamicDevice(
+        // Bodywork is the only device exposing getBatteryCapacity(), which is how other apps
+        // derive SoH on PHEV/DM-i (where the statistic "soh" feature is bogus). On these
+        // firmwares the reflective s10 class name doesn't resolve, so also try the canonical
+        // SDK class directly (Electro registers it this way). BEV-safe: purely additive — BEV
+        // SoH still comes from the statistic feature, this only adds a capacity source.
+        tryDynamicDeviceCandidates(
             label = "Bodywork",
-            className = RuntimeExtensionBridge.stringList("s10").firstOrNull().orEmpty(),
+            classNames = (RuntimeExtensionBridge.stringList("s10") +
+                "android.hardware.bydauto.bodywork.BYDAutoBodyworkDevice")
+                .filter { it.isNotEmpty() }
+                .distinct(),
             listenerInterfaceName = null,
             onRegistered = { device ->
                 bodyworkDevice = device
-                Log.i(TAG, "✅ BodyworkDevice registered")
+                Log.i(TAG, "✅ BodyworkDevice registered (${device.javaClass.name})")
                 dumpForCompatProbe("bodywork", device)
                 logBodyworkSnapshot(device)
                 registerEventMirrorListener(device, "Bodywork")
@@ -2144,6 +2250,13 @@ class BydVehicleDataSource(context: Context) {
             val chargingMode = m34["chargingMode"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
 
             state?.let { _chargeState.value = it }
+            // m33 = getChargingPower() — instantaneous pack power (V×I, up to 500 kW) and the only
+            // getter that sees DC (the instrument getter is clamped 0.1..50, onChargingPowerChanged
+            // is inert). Feed it as the pack-power source while parked: idle pack power is ~0 so it
+            // can't assert a phantom charge, and the driving gate in computeChargingActive clears it.
+            // This drives both powerActive (so a DC-while-on charge is detected even when the pushed
+            // callbacks are silent) and the session's real kW.
+            if (_vehicleSnapshot.value.gear !in setOf("D", "R")) updatePackChargingPower(power)
             // Prefer the instrument external-charging-power path over charging-device
             // callbacks, which can stay stale on some firmware.
             chargingCapState?.first?.let { _chargingCapState.value = it }
@@ -2200,6 +2313,32 @@ class BydVehicleDataSource(context: Context) {
                         "gunState=${chargingGunState ?: "n/a"} type=${chargingType ?: "n/a"} " +
                         "mode=${chargingMode ?: "n/a"} cap=${chargingCapacity ?: "n/a"}"
                 )
+            }
+
+            // Persisted charging diagnostic (survives DiLink's ~7-min logcat shred) — records the raw
+            // charging getters incl. m33 getChargingPower() so an on-car charge can be validated from
+            // diag.log. Throttled to 10 s; fires while any charge signal is live, *including* the
+            // silent-callback case (parked + meaningful power into the pack) that the DC-while-on bug
+            // exhibited — so the file captures exactly what the SDK reported either way.
+            run {
+                val snap = _vehicleSnapshot.value
+                val parked = snap.gear !in setOf("D", "R")
+                val chargingDiagActive = (power?.let { it > 0.1 } == true) ||
+                    (chargingGunState ?: 0) != 0 || (chargerWorkState ?: 0) != 0 ||
+                    (chargingCapacity?.let { it > 0.0 } == true) ||
+                    (parked && (snap.enginePower ?: 0) <= -3)
+                val nowMs = SystemClock.elapsedRealtime()
+                if (chargingDiagActive && nowMs - lastChargingDiagMs > 10_000L) {
+                    lastChargingDiagMs = nowMs
+                    runCatching {
+                        DiagLog.event(appContext, TAG,
+                            "🔌 charge getters: m33Power=${power ?: "-"} gun=${chargingGunState ?: "-"} " +
+                                "work=${chargerWorkState ?: "-"} type=${chargingType ?: "-"} mode=${chargingMode ?: "-"} " +
+                                "cap=${chargingCapacity ?: "-"} chargeState=${state ?: "-"} " +
+                                "gear=${snap.gear} enginePower=${snap.enginePower} " +
+                                "carOn=${snap.powerStateRaw ?: snap.powerMcuStatus ?: "-"}")
+                    }
+                }
             }
 
             if (
@@ -2359,7 +2498,10 @@ class BydVehicleDataSource(context: Context) {
         try {
             val autoSystemState = m29["autoSystemState"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
             val autoVin = m29["autoVin"]?.takeIf { it.isNotEmpty() }?.let { invokeStringGetter(device, it) }
-            val batteryCapacity = m29["batteryCapacity"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
+            // Prefer the private-extension mapping; fall back to the canonical SDK getter name
+            // so PHEV/DM-i bodywork capacity (other apps' SoH source) flows even without an s10 map.
+            val batteryCapacity = (m29["batteryCapacity"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) })
+                ?: invokeIntGetter(device, "getBatteryCapacity")
             val batteryPowerHev = m29["batteryPowerHEV"]?.takeIf { it.isNotEmpty() }?.let { invokeDoubleGetter(device, it) }
             val batteryPowerValue = m29["batteryPowerValue"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
             val batteryVoltageLevel = m29["batteryVoltageLevel"]?.takeIf { it.isNotEmpty() }?.let { invokeIntGetter(device, it) }
@@ -2855,7 +2997,7 @@ class BydVehicleDataSource(context: Context) {
                 "statisticPoll",
                 "🔬 poll: cellVMin=$vMin cellVMax=$vMax cellTMin=$tMin cellTAvg=$effectiveTAvg cellTMax=$tMax " +
                     "cellTCandidate=$tCandidate " +
-                    "sohRaw=$sohRaw soh=$soh socBms=$socB socPanel=$socPanel availPower=$availPower"
+                    "sohRaw=$sohRaw soh=$soh socBms=$socB socPanel=$socPanel availPowerRaw=$availPowerRaw availPower=$availPower"
             )
             logInfoIfChanged(
                 "statisticVoltageValues",
@@ -5067,17 +5209,36 @@ class BydVehicleDataSource(context: Context) {
 
     private fun publishSnapshotNow() {
         val nowElapsedMs = SystemClock.elapsedRealtime()
+        val recentPackPower = hasFreshPackChargingPower(nowElapsedMs)
         val recentDirectPower = hasFreshDirectChargingPower(nowElapsedMs)
         val recentCapacityActivity = lastChargingActivityElapsedMs != 0L &&
             nowElapsedMs - lastChargingActivityElapsedMs <= 8_000L
+        // Charging-power source priority. NOTE the last tier measures a DIFFERENT physical quantity:
+        //   recentPackPower (m33) and recentDirectPower are GROSS charge power
+        //     (what the charger pushes), matching the BYD app's figure. Available on e.g. the Seal.
+        //   recentCapacityActivity falls back to _chargingPowerKw, derived from the chargingCapacity
+        //     counter's rate. That counter accrues NET energy reaching the cells, i.e. gross minus
+        //     whatever accessories divert. So on cars where m33 returns 0 the whole charge (verified
+        //     on an Atto 3: m33Power=0.0 throughout, enginePower=-4 ≈ 4 kW gross, cap-rate ≈ 2.2 kW),
+        //     charging_power reads LOWER than engine_power and visibly dips with load — e.g. the owner
+        //     saw 4.1→2.1 kW with aircon on, 4.1→3.5 kW with the car powered on without aircon.
+        //   This is intentional/known, not a bug. If a future change should report gross on those
+        //   cars instead, add a tier here sourcing |enginePower| (m23) while charging.
         val effectiveChargingPowerKw = when {
+            recentPackPower -> _packChargingPowerKw.value     // m33 pack power — authoritative, sees DC (to 500 kW)
             recentDirectPower -> _chargingPowerRaw.value
-            recentCapacityActivity -> _chargingPowerKw.value
+            recentCapacityActivity -> _chargingPowerKw.value  // capacity-rate = NET into battery (see note above)
             else -> 0.0
         }
+        // Only the capacity-rate tier is NET (under-reports); the pack/direct getters are gross and
+        // decimal-accurate. toTelemetry uses this to know when the whole-kW enginePower fallback is
+        // allowed to override chargingPower (net) vs. must defer to it (gross getter).
+        val chargingPowerFromNet = !recentPackPower && !recentDirectPower && recentCapacityActivity
         _vehicleSnapshot.value = VehicleTelemetrySnapshot(
+            wifiSsid = currentWifiSsid(),
             isChargingActive = computeChargingActive(),
             chargingPower = effectiveChargingPowerKw,
+            chargingPowerIsNet = chargingPowerFromNet,
             chargingPowerRaw = _chargingPowerRaw.value,
             chargingCapacity = _chargingCapacity.value,
             chargingCapState = _chargingCapState.value,
@@ -5992,9 +6153,14 @@ class BydVehicleDataSource(context: Context) {
             if (_chargerWorkState.value != 0) { _chargerWorkState.value = 0; chargerWorkStateSetElapsedMs = 0L }
             lastChargingActivityElapsedMs = 0L
             updateDirectChargingPower(null)
+            lastPackChargingPowerElapsedMs = 0L
             return false
         }
-        val powerActive = hasFreshDirectChargingPower(nowElapsedMs)
+        // Pack power (m33) is the authoritative DC source; OR it in so a DC charge started while the
+        // car is on trips powerActive even when the instrument/event power paths are silent. Purely
+        // additive — it only contributes when getChargingPower() actually reports > 0.1 kW.
+        val powerActive = hasFreshDirectChargingPower(nowElapsedMs) ||
+            hasFreshPackChargingPower(nowElapsedMs)
         val recentCapacityActivity = lastChargingActivityElapsedMs != 0L &&
             nowElapsedMs - lastChargingActivityElapsedMs <= 3_000L
         // chargerWorkState is set by AbsBYDAutoChargingListener.onChargerWorkStateChanged,
@@ -6080,6 +6246,21 @@ class BydVehicleDataSource(context: Context) {
             _chargingPowerRaw.value = 0.0
             lastChargingPowerRawElapsedMs = 0L
         }
+    }
+
+    private fun hasFreshPackChargingPower(nowElapsedMs: Long = SystemClock.elapsedRealtime()): Boolean {
+        return lastPackChargingPowerElapsedMs != 0L &&
+            nowElapsedMs - lastPackChargingPowerElapsedMs <= DIRECT_CHARGING_POWER_TIMEOUT_MS &&
+            _packChargingPowerKw.value > 0.1
+    }
+
+    // Charging device getChargingPower() (m33), pack V×I up to 500 kW. Unlike updateDirectChargingPower
+    // this never clears on a missing read — it self-expires via the 4 s freshness window — so a brief
+    // poll gap during a DC charge can't drop the session. Cleared explicitly only by the driving gate.
+    private fun updatePackChargingPower(power: Double?) {
+        val sanitized = power?.takeIf { it.isFinite() && it in 0.1..500.0 } ?: return
+        _packChargingPowerKw.value = sanitized
+        lastPackChargingPowerElapsedMs = SystemClock.elapsedRealtime()
     }
 
     private fun handleChargingEvent(eventId: Int, value: BYDAutoEventValue) {
@@ -6720,6 +6901,12 @@ class BydVehicleDataSource(context: Context) {
      * Updates the backing field and rebuilds the snapshot before persistence.
      */
     private fun dispatchStatisticFeatureEvent(featureId: Int, rawNumber: Number) {
+        // Capture the pushed event channel for the compat probe — this is where SoH actually
+        // arrives (synchronous polls return null on these firmwares). Records EVERY id incl.
+        // ones we don't map, so an unmapped real-SoH register (e.g. other apps' 100%) shows up.
+        if (VehicleCompatibilityProbe.isEnabled.value) {
+            VehicleCompatibilityProbe.recordDispatchedFeature("statistic", featureId, rawNumber)
+        }
         val v = rawNumber.toDouble()
         val sdf = statisticDispatchFields
         var matched = true

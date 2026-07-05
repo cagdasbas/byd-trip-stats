@@ -38,14 +38,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.R
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.byd.tripstats.adb.AdbPermissionManager
+import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.ThemeMode
 import com.byd.tripstats.service.VehicleTelemetryService
+import com.byd.tripstats.ui.components.ScreenshotFlashOverlay
 import com.byd.tripstats.ui.navigation.AppNavigation
 import com.byd.tripstats.ui.screens.InitializationScreen
 import com.byd.tripstats.ui.theme.BydTripStatsTheme
@@ -63,6 +67,12 @@ class MainActivity : ComponentActivity() {
     // Shown once per app version update to remind the user to re-enable Autostart
     private val showAutostartReminder = mutableStateOf(false)
     private val showSetupRequired   = mutableStateOf(false)
+
+    // ── Locale override ───────────────────────────────────────────────────────
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleHelper.applyLocale(newBase))
+    }
 
     // ── Service binding ───────────────────────────────────────────────────────
 
@@ -124,20 +134,11 @@ class MainActivity : ComponentActivity() {
                         AlertDialog(
                             onDismissRequest = { dismissAutostartReminder() },
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            title = { Text("⚠️ Action Required — Autostart") },
-                            text = {
-                                Text(
-                                    "A new version was installed. You need to toggle-off disable " +
-                                    "autostart for this app, which enables background data collection " +
-                                    "when the car is off (e.g. charging overnight).\n\n" +
-                                    "For best reliability, reboot the car once after changing this " +
-                                    "setting, then open BYD Trip Stats again.\n" +
-                                    "WARNING: In case you don't see speed and other values updating while driving, you need to reboot the car!"
-                                )
-                            },
+                            title = { Text(stringResource(R.string.autostart_dialog_title)) },
+                            text = { Text(stringResource(R.string.autostart_dialog_msg)) },
                             confirmButton = {
                                 TextButton(onClick = { openAutostartManagementDialog() }) {
-                                    Text("Got it")
+                                    Text(stringResource(R.string.autostart_got_it))
                                 }
                             }
                         )
@@ -239,6 +240,8 @@ class MainActivity : ComponentActivity() {
                             viewModel = viewModel
                         )
                     }
+
+                    ScreenshotFlashOverlay()
                 }
             }
         }

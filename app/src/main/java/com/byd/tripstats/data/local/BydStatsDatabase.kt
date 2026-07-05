@@ -13,12 +13,15 @@ import com.byd.tripstats.data.local.dao.TripDataPointDao
 import com.byd.tripstats.data.local.dao.TripStatsDao
 import com.byd.tripstats.data.local.dao.TripSegmentDao
 import com.byd.tripstats.data.local.dao.ChargingSessionDao
+import com.byd.tripstats.data.local.dao.TagDao
 import com.byd.tripstats.data.local.entity.TripDataPointEntity
 import com.byd.tripstats.data.local.entity.TripEntity
 import com.byd.tripstats.data.local.entity.TripStatsEntity
 import com.byd.tripstats.data.local.entity.TripSegmentEntity
 import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
+import com.byd.tripstats.data.local.entity.TagEntity
+import com.byd.tripstats.data.local.entity.TripTagCrossRef
 import android.os.Environment
 import java.io.File
 import java.io.IOException
@@ -30,9 +33,11 @@ import java.io.IOException
         TripStatsEntity::class,
         TripSegmentEntity::class,
         ChargingSessionEntity::class,
-        ChargingDataPointEntity::class
+        ChargingDataPointEntity::class,
+        TagEntity::class,
+        TripTagCrossRef::class
     ],
-    version = 7,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -42,6 +47,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
     abstract fun tripStatsDao(): TripStatsDao
     abstract fun tripSegmentDao(): TripSegmentDao
     abstract fun chargingSessionDao(): ChargingSessionDao
+    abstract fun tagDao(): TagDao
 
     companion object {
         private const val TAG = "BydStatsDatabase"
@@ -70,7 +76,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
                 )
                     // .fallbackToDestructiveMigration()
                     // .fallbackToDestructiveMigrationOnDowngrade()
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build()
                 INSTANCE = instance
                 instance
@@ -210,6 +216,49 @@ abstract class BydStatsDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE trips ADD COLUMN isFavourite INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE charging_sessions ADD COLUMN isFavourite INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        // v8 (2.9.1): precise SoH (statistic-feature float) promoted from rawJson to its own
+        // column so the degradation chart/report keep the decimal the dashboard shows. Old rows
+        // stay 0 and fall back to the integer `soh` in getAvgSohPerTrip.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN sohPrecise REAL NOT NULL DEFAULT 0")
+            }
+        }
+
+        // v9 (2.10.0): trip tagging. Adds a `tags` table (reusable coloured labels)
+        // and a `trip_tags` many-to-many link table. Column shapes / index names
+        // match what Room generates for TagEntity and TripTagCrossRef so the runtime
+        // schema-identity check passes. No data is touched on existing rows.
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `tags` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`name` TEXT NOT NULL, " +
+                        "`colorIndex` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tags_name` ON `tags` (`name`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `trip_tags` (" +
+                        "`tripId` INTEGER NOT NULL, " +
+                        "`tagId` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`tripId`, `tagId`))"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_trip_tags_tagId` ON `trip_tags` (`tagId`)")
+            }
+        }
+
+        // v10: persist the BMS remaining-EV-energy reading (battery_remain_power_ev) per
+        // data point so restoreTripState can reproduce the live EV-range projection exactly
+        // for PHEVs instead of falling back to capacity × SoC (which overstates EV energy
+        // near the charge-sustaining floor). Nullable — old rows and BEV/non-reporting
+        // firmwares stay NULL and transparently fall back to the SoC product, as before.
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE trip_data_points ADD COLUMN batteryRemainPowerEV REAL")
             }
         }
 
