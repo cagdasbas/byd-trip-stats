@@ -140,15 +140,15 @@ class Dilink5Client {
         reflGetInt(healthDev, "getBatteryHealthStatus")?.takeIf { it in 50..110 }
             ?.let { ds.applyDilink5Telemetry(sohPct = it.toDouble()) }
         // TICKET-003: per-wheel tyre pressure via getTyrePressureValueByType(area) — area LF=1/RF=2/
-        // LR=3/RR=4, value in tenths of psi. Plus per-wheel state. Changes slowly → slow tick only.
-        // Temperature is NOT read: getTyreTemperatureValue ignores the area arg (one value for all 4,
-        // an unreliable default) — see applyDilink5Tyre. So we don't pass it.
+        // LR=3/RR=4, value in tenths of psi. Plus state + temp (°C). Changes slowly → slow tick only.
         tyreDev?.let { t ->
             ds.applyDilink5Tyre(
                 reflGetIntArg(t, "getTyrePressureValueByType", 1), reflGetIntArg(t, "getTyrePressureValueByType", 2),
                 reflGetIntArg(t, "getTyrePressureValueByType", 3), reflGetIntArg(t, "getTyrePressureValueByType", 4),
                 reflGetIntArg(t, "getTyrePressureState", 1), reflGetIntArg(t, "getTyrePressureState", 2),
                 reflGetIntArg(t, "getTyrePressureState", 3), reflGetIntArg(t, "getTyrePressureState", 4),
+                reflGetIntArg(t, "getTyreTemperatureValue", 1), reflGetIntArg(t, "getTyreTemperatureValue", 2),
+                reflGetIntArg(t, "getTyreTemperatureValue", 3), reflGetIntArg(t, "getTyreTemperatureValue", 4),
             )
         }
     }
