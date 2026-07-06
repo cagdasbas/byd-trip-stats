@@ -572,8 +572,8 @@ object CarCatalog {
         estimatedKerbMassKg = 2225.0,// estimate (RWD)
         wltpKm = 460,                // estimate for the 71 kWh RWD variant — verify
         referenceConsumptionKwhPer100km = 19.0, // estimate — verify
-        frontTyrePressureBar = 2.5,
-        rearTyrePressureBar = 2.5,
+        frontTyrePressureBar = 2.5,  // door-placard normal load — verify on your car's sticker
+        rearTyrePressureBar = 2.9,   // rear higher on Seal platform (was 2.5 → flagged real ~2.85 as HIGH)
         rearMotorRatedKw = 230,      // RWD rear motor — verify
         cdA = 0.78                   // Cd ~0.29 × A ~2.7 m² — estimate
     )
