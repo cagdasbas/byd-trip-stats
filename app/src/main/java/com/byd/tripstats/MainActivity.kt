@@ -48,6 +48,7 @@ import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.ThemeMode
+import com.byd.tripstats.sdk.DiLink5Platform
 import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.ui.components.ScreenshotFlashOverlay
 import com.byd.tripstats.ui.navigation.AppNavigation
@@ -277,10 +278,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkSetupRequired() {
-        // Always (idempotently) re-assert DiLink-5 vehicle-API access on startup: the hidden-API
-        // exemption that lets the bydauto SDK bind can reset on reboot, and without it all
-        // telemetry reads 0. No-ops if adb isn't authorised yet (the setup flow below handles
-        // first-time authorisation, and applies the same tweaks once authorised).
+        // DiLink-5 ONLY. The adb setup + hidden-API exemption exist solely so the DiLink-5 bydauto
+        // SDK can bind. On DiLink-3 none of it is needed, and running it would (a) prompt existing
+        // D3 users for an adb setup they don't need and (b) silently apply hidden_api_policy/
+        // exemptions to a device that doesn't need them. Gate the whole flow so D3 is unaffected.
+        if (!DiLink5Platform.isDiLink5) return
+
+        // Idempotently re-assert DiLink-5 vehicle-API access on startup: the hidden-API exemption
+        // that lets the bydauto SDK bind can reset on reboot, and without it all telemetry reads 0.
+        // No-ops if adb isn't authorised yet (the setup flow below handles first-time authorisation,
+        // and applies the same tweaks once authorised).
         lifecycleScope.launch {
             AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
         }
