@@ -19,11 +19,13 @@ object DiLink5Platform {
 
     val vehicleType: String by lazy { systemProp("ro.vehicle.type") }
 
-    /** True on DiLink-5 hardware (ro.vehicle.type starts with "Di5", or SDK >= 30 as a fallback). */
+    /**
+     * True on DiLink-5 hardware — detected solely by `ro.vehicle.type` starting with "Di5".
+     * No SDK-version fallback: an SDK>=30 check would misdetect a newer-Android DiLink-3 unit that
+     * doesn't expose `ro.vehicle.type` as D5.
+     */
     val isDiLink5: Boolean by lazy {
-        val byType = vehicleType.startsWith("Di5", ignoreCase = true)
-        val bySdk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R // 30
-        val result = byType || (bySdk && vehicleType.isBlank())
+        val result = vehicleType.startsWith("Di5", ignoreCase = true)
         Log.i(TAG, "isDiLink5=$result (ro.vehicle.type='$vehicleType', sdk=${Build.VERSION.SDK_INT})")
         result
     }
