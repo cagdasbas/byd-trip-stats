@@ -17,4 +17,7 @@ public abstract class AbsBYDAutoTyreListener {
     public void onTyreSignalStateChanged(int wheel, int state) {}
     public void onTyreSystemStateChanged(int state) {}
     public void onTyreTemperatureStateChanged(int state) {}
+    // DiLink-5: per-wheel temp/pressure pushes (wheel 1=LF/2=RF/3=LR/4=RR, 0=sentinel).
+    public void onTyreTemperatureValueChanged(int wheel, int value) {}
+    public void onTyrePressureValueByTypeChanged(int wheel, float value) {}
 }

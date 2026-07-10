@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.hardware.bydauto.statistic.AbsBYDAutoStatisticListener
 import android.hardware.bydauto.statistic.BYDAutoStatisticDevice
+import android.hardware.bydauto.tyre.AbsBYDAutoTyreListener
 
 /**
  * DiLink-5 (Sealion 7) telemetry client — present ONLY in the `dilink5` flavor; loaded reflectively
@@ -32,6 +33,7 @@ class Dilink5Client {
     private var healthDev: Any? = null
     private var motorDev: Any? = null
     private var tyreDev: Any? = null
+    private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
 
     // derived-power state
     private var lastUsableKwh: Double = Double.NaN
@@ -72,6 +74,9 @@ class Dilink5Client {
         motorDev    = bind(ctx, "android.hardware.bydauto.motor.BYDAutoMotorDevice")
         // Tyre: per-wheel pressure via getTyrePressureValueByType(area). Needs BYDAUTO_TYRE_COMMON.
         tyreDev     = bind(ctx, "android.hardware.bydauto.tyre.BYDAutoTyreDevice")
+        // Per-wheel tyre TEMPERATURE is event-only (getter returns an index-0 sentinel). Register a
+        // typed listener; wheel 1=LF/2=RF/3=LR/4=RR, 0=sentinel (dropped in applyDilink5TyreTemp).
+        tyreDev?.let { registerTyreListener(it, ds) }
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -111,6 +116,8 @@ class Dilink5Client {
         pollThread?.interrupt(); pollThread = null
         try { statListener?.let { statDevice?.unregisterListener(it) } } catch (_: Throwable) {}
         statListener = null; statDevice = null
+        try { tyreListener?.let { l -> tyreDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoTyreListener::class.java)?.invoke(tyreDev, l) } } catch (_: Throwable) {}
+        tyreListener = null
         chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null
         Log.i(tag, "stopped")
     }
@@ -139,16 +146,16 @@ class Dilink5Client {
         }
         reflGetInt(healthDev, "getBatteryHealthStatus")?.takeIf { it in 50..110 }
             ?.let { ds.applyDilink5Telemetry(sohPct = it.toDouble()) }
-        // TICKET-003: per-wheel tyre pressure via getTyrePressureValueByType(area) — area LF=1/RF=2/
-        // LR=3/RR=4, value in tenths of psi. Plus state + temp (°C). Changes slowly → slow tick only.
+        // TICKET-003: per-wheel tyre PRESSURE via getTyrePressureValueByType(area) — area LF=1/RF=2/
+        // LR=3/RR=4, tenths of psi (respects area). Slow tick. TEMPERATURE is NOT polled: the getter
+        // returns an index-0 sentinel (uniform/wrong) — real per-wheel temp comes from the tyre
+        // listener (registerTyre → applyDilink5TyreTemp).
         tyreDev?.let { t ->
             ds.applyDilink5Tyre(
                 reflGetIntArg(t, "getTyrePressureValueByType", 1), reflGetIntArg(t, "getTyrePressureValueByType", 2),
                 reflGetIntArg(t, "getTyrePressureValueByType", 3), reflGetIntArg(t, "getTyrePressureValueByType", 4),
                 reflGetIntArg(t, "getTyrePressureState", 1), reflGetIntArg(t, "getTyrePressureState", 2),
                 reflGetIntArg(t, "getTyrePressureState", 3), reflGetIntArg(t, "getTyrePressureState", 4),
-                reflGetIntArg(t, "getTyreTemperatureValue", 1), reflGetIntArg(t, "getTyreTemperatureValue", 2),
-                reflGetIntArg(t, "getTyreTemperatureValue", 3), reflGetIntArg(t, "getTyreTemperatureValue", 4),
             )
         }
     }
@@ -168,6 +175,25 @@ class Dilink5Client {
                 lastUsableKwh = usableKwh; lastUsableAtMs = now
             }
         } else { lastUsableKwh = usableKwh; lastUsableAtMs = now }
+    }
+
+    // Typed tyre listener for per-wheel temperature (event-only). Registered reflectively so the
+    // dilink5 flavor stays reflection-based for device handles; the listener subclasses the (compile)
+    // stub AbsBYDAutoTyreListener, which the real class shadows at runtime.
+    private fun registerTyreListener(dev: Any, ds: BydVehicleDataSource) {
+        try {
+            val l = object : AbsBYDAutoTyreListener() {
+                override fun onTyreTemperatureValueChanged(wheel: Int, value: Int) {
+                    ds.applyDilink5TyreTemp(wheel, value)
+                }
+            }
+            dev.javaClass.getMethod("registerListener", AbsBYDAutoTyreListener::class.java).invoke(dev, l)
+            tyreListener = l
+            Log.i(tag, "tyre listener registered")
+        } catch (t: Throwable) {
+            val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
+            Log.w(tag, "tyre listener failed: ${c.javaClass.simpleName}: ${c.message}")
+        }
     }
 
     private fun bind(ctx: Context, className: String): Any? = try {
