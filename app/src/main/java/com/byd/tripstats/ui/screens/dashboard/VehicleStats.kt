@@ -51,9 +51,7 @@ fun VehicleStats(
     val distanceUnit = unitSystem.distanceUnit
 
     val colModifier = if (fillHeight) modifier.fillMaxHeight() else modifier.verticalScroll(rememberScrollState())
-    // 8dp (not 4) so each card's drop shadow has room and the 3-D reads uniformly —
-    // at 4dp the next card covered the previous card's bottom shadow.
-    val spacing     = if (fillHeight) 8.dp else 8.dp
+    val spacing     = if (fillHeight) 4.dp else 8.dp
 
     Column(
         modifier = colModifier,
