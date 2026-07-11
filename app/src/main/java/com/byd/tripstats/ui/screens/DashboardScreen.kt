@@ -123,7 +123,7 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                modifier = Modifier.shadow(elevation = 6.dp),
+                modifier = Modifier.shadow(elevation = 8.dp),
                 title = {
                     selectedCar?.let { car ->
                         Text(

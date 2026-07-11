@@ -51,7 +51,9 @@ fun VehicleStats(
     val distanceUnit = unitSystem.distanceUnit
 
     val colModifier = if (fillHeight) modifier.fillMaxHeight() else modifier.verticalScroll(rememberScrollState())
-    val spacing     = if (fillHeight) 4.dp else 8.dp
+    // 8dp (not 4) so each card's drop shadow has room and the 3-D reads uniformly —
+    // at 4dp the next card covered the previous card's bottom shadow.
+    val spacing     = if (fillHeight) 8.dp else 8.dp
 
     Column(
         modifier = colModifier,
@@ -312,7 +314,9 @@ fun StatCard(
             disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        // disabledElevation matters: cards without an onClick use the clickable-Card's
+        // `enabled = false` path, whose default disabled elevation is ~0 (they'd look flat).
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp, disabledElevation = 6.dp)
     ) {
         Row(
             modifier = Modifier
