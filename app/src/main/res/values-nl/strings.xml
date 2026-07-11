@@ -44,7 +44,12 @@
     <string name="settings_tab_app">App</string>
     <string name="settings_tab_connections">Verbindingen</string>
     <string name="settings_tab_preferences">Voorkeuren</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Over &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Kaarten-dashboardindeling</string>
+    <string name="pro_cards_layout_info">Een groter, volledig aanpasbaar dashboard: grote, goed verdeelde tegels in plaats van de centrale grafiek. Tik op het potlood om tegels te herordenen door slepen, de gewenste te tonen of verbergen, en tik op de tegel Bereik om de projectiegrafiek op volledig formaat te openen. Kies het onder Voorkeuren → Dashboardindeling zodra het is ontgrendeld.</string>
+    <string name="pro_neon_theme_title">Neon-thema</string>
+    <string name="pro_neon_theme_info">Een gitzwart, OLED-vriendelijk donker thema waarvan de cijfers van de vermogensmetingen en accentstrepen als neon oplichten, met een subtiele accentrand op elke kaart. Kies het onder Voorkeuren → Thema zodra het is ontgrendeld.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Overzicht</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">Bot ontkoppelen</string>
     <string name="auto_backup_label">Automatische back-up</string>
     <string name="backup_interval_label">Back-upinterval</string>
+    <string name="wifi_only_label">Alleen wifi</string>
+    <string name="wifi_only_desc">Automatische back-ups draaien alleen op wifi om mobiele data te besparen</string>
     <string name="last_auto_backup_label">Laatste automatische back-up: %1$s</string>
     <string name="schedule_updated_msg">Schema bijgewerkt naar %1$s. De volgende automatische back-up volgt het nieuwe interval.</string>
     <string name="telegram_setup_info">Eenmaal verbonden kunnen back-ups handmatig of op schema worden verzonden. Elke back-up komt aan als een .db-bestand in je privéchat, toegankelijk vanaf elk apparaat met Telegram.</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">Systeem</string>
     <string name="theme_light">Licht</string>
     <string name="theme_dark">Donker</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Taal</string>
     <string name="language_desc">Kies de weergavetaal van de app. Het selecteren van een taal overschrijft de systeemtaal van het apparaat voor deze app.</string>
     <string name="change_language_action">Taal wijzigen</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">Actief — Pro ontgrendeld voor dit voertuig (levenslang).</string>
     <string name="remove_code_action">Code verwijderen</string>
     <string name="remove_code_title">Pro-ontgrendelcode verwijderen?</string>
-    <string name="remove_code_msg">Dit schakelt Pro uit op dit voertuig en schakelt de Pro-functies uit (celonbalanswaarschuwing, batterijgezondheidsrapport, screenshots, SD-kaart back-up). Je code is niet verloren — je kunt hem altijd opnieuw invoeren om opnieuw te ontgrendelen.</string>
-    <string name="pro_unlock_desc">Ontgrendel premiumfuncties zoals de batterijcelonbalanswaarschuwing en dashboard-screenshots met een eenmalige code voor je voertuig — €9,99, levenslang, één auto. Geverifieerd op het apparaat — niets verlaat je auto.</string>
+    <string name="remove_code_msg">Dit schakelt Pro uit op dit voertuig en schakelt de Pro-functies uit (kaarten-dashboardindeling, Neon-thema, melding voor celonbalans, batterijconditierapport, schermafbeeldingen, back-up op SD-kaart). Je code gaat niet verloren — je kunt hem altijd opnieuw invoeren om opnieuw te ontgrendelen.</string>
+    <string name="pro_unlock_desc">Ontgrendel premiumfuncties zoals de kaarten-dashboardindeling, het Neon-thema, de melding voor celonbalans en dashboardscreenshots met een eenmalige code voor uw voertuig — € 9,99, levenslang, één auto. Op het apparaat geverifieerd — er verlaat niets uw auto.</string>
     <string name="vehicle_id_section_label">Het ID van dit voertuig (stuur dit bij het kopen van een licentie):</string>
     <string name="vehicle_id_reading">Lezen… start de auto en open Instellingen opnieuw</string>
     <string name="vehicle_id_copied_msg">Voertuig-ID gekopieerd</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">Heb ik internet of mobiel signaal nodig?</string>
     <string name="faq_a_internet">Nee voor normaal gebruik. Ritten, laadsessies, grafieken en lokale geschiedenis worden volledig op het apparaat opgeslagen.\n\nInternet is alleen nodig voor optionele functies zoals controles op app-updates, het openen van weblinks, MQTT/ABRP-integratie en Telegram-back-ups als je die inschakelt.</string>
     <string name="faq_q_pro">Wat is BYD Trip Stats Pro en wat bevat het?</string>
-    <string name="faq_a_pro">Pro is een optionele eenmalige ontgrendeling voor premium extra\'s — een kleine dankjewel die de ontwikkeling ondersteunt. Het is €9,99, eenmalig betaald, voor de levensduur van één voertuig (geen abonnement). Alles wat gratis was blijft gratis; Pro voegt alleen nieuwe functies toe:\n\n• Celonbalanswaarschuwing — ontvang een melding wanneer het celspanningsverschil van het pakket boven een limiet blijft\n• Batterijgezondheidsrapport — exporteer een afdrukbare PDF/HTML van je State of Health, achteruitgangssnelheid en geprojecteerde datum tot 80%%\n• Dashboard-screenshots — tik op het BYD-logo om het huidige scherm op te slaan\n• SD-kaart back-up — sla de database op in een BydTripStats-map op een verwijderbare SD-kaart\n\nOntgrendelen: de code is gekoppeld aan je specifieke auto. Open Instellingen → Voorkeuren → BYD Trip Stats Pro, scan de QR-code met je telefoon (of kopieer je voertuig-ID) om een code aan te vragen, plak hem dan terug. Het wordt volledig op het apparaat geverifieerd — geen account, geen aanmelding, niets verlaat je auto.</string>
+    <string name="faq_a_pro">Pro is een optionele eenmalige ontgrendeling voor premium extra\'s — een kleine dankjewel die de ontwikkeling ondersteunt. Het is €9,99, eenmalig betaald, voor de levensduur van één voertuig (geen abonnement). Alles wat gratis was blijft gratis; Pro voegt alleen nieuwe functies toe:\n\n• Kaarten-dashboardindeling — een groter, volledig aanpasbaar dashboard van grote tegels die je kunt herordenen door slepen, tonen of verbergen\n• Neon-thema — een gitzwarte, OLED-vriendelijke look met oplichtende vermogenscijfers\n• Celonbalanswaarschuwing — ontvang een melding wanneer het celspanningsverschil van het pakket boven een limiet blijft\n• Batterijgezondheidsrapport — exporteer een afdrukbare PDF/HTML van je State of Health, achteruitgangssnelheid en geprojecteerde datum tot 80%%\n• Dashboard-screenshots — tik op het BYD-logo om het huidige scherm op te slaan\n• SD-kaart back-up — sla de database op in een BydTripStats-map op een verwijderbare SD-kaart\n\nOntgrendelen: de code is gekoppeld aan je specifieke auto. Open Instellingen → Pro, scan de QR-code met je telefoon (of kopieer je voertuig-ID) om een code aan te vragen, plak hem dan terug. Het wordt volledig op het apparaat geverifieerd — geen account, geen aanmelding, niets verlaat je auto.</string>
     <string name="faq_q_drive_modes">Waarom wordt \'auto/onbekend\' weergegeven bij rij-/regeneratiemodi?</string>
     <string name="faq_a_drive_modes">De app leest rij- en regeneratiemodi rechtstreeks uit het instrumentenpaneel van de auto, maar de auto zendt alleen een moduswaarde uit wanneer je deze actief wijzigt — hij rapporteert de huidige modus niet bij het opstarten.\n\nTotdat je een modus op het autodisplay tikt, heeft de app geen waarde om te tonen en valt terug op \'Auto\' (regeneratie) of \'Onbekend\' (rijden). Om dit op te lossen:\n\n1. Doorloop elk regeneratieniveau op het touchscreen van de auto eenmaal\n2. Doorloop elke rijmodus (Eco / Normaal / Sport) eenmaal\n\nDe app neemt onmiddellijk beide waarden op en begint ze bij elk ritgegevenspunt op te nemen. Je hoeft dit maar één keer te doen.</string>
     <string name="faq_q_offline_trip">Geen netwerkverbinding betekent dat de rit ontbreekt in de geschiedenis?</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">Er zou een dialoogvenster op het scherm moeten verschijnen om USB-foutopsporing toe te staan. Tik op Toestaan en kom dan hier terug.\n\nDit is een eenmalige actie. Toekomstige updates zijn volledig automatisch.</string>
     <string name="adb_granting_msg">Achtergrondbevoegdheden verlenen…</string>
     <string name="authorize_action">Autoriseren</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Banden</string>
+    <string name="close">Sluiten</string>
+    <string name="range_projection_title">Dynamische projectie</string>
+    <string name="dashboard_no_cards_hint">Alle kaarten verborgen. Tik op het potlood om er weer toe te voegen.</string>
+    <string name="reorder_card">Sleep om te herordenen</string>
+    <string name="pref_dashboard_layout">Dashboardindeling</string>
+    <string name="dashboard_layout_desc">Kies hoe het dashboard is ingedeeld. Kaarten is een grotere, aanpasbare indeling — tik op het potlood op het dashboard om tegels te tonen, verbergen en herordenen.</string>
+    <string name="dashboard_layout_classic">Klassiek</string>
+    <string name="dashboard_layout_cards">Kaarten</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Inactief</string>
+    <string name="power_state_accelerating">Versnellen</string>
+    <string name="power_state_decelerating">Vertragen</string>
+    <string name="power_state_charging">Opladen</string>
+    <string name="speed_state_parked">Stilstaand</string>
+    <string name="speed_state_driving">Rijden</string>
+    <string name="soc_subtitle_usable">Bruikbare lading</string>
+    <string name="range_subtitle_projection">Dynamische projectie</string>
+    <string name="distance_subtitle_session">Deze sessie</string>
+    <string name="odometer_subtitle_lifetime">Totale afstand</string>
+    <string name="discharge_subtitle_lifetime">Totale afgegeven energie</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s druk</string>
 </resources>

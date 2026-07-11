@@ -41,7 +41,12 @@
     <string name="settings_tab_app">Aplikasi</string>
     <string name="settings_tab_connections">Koneksi</string>
     <string name="settings_tab_preferences">Preferensi</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Tentang &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Tata letak dasbor kartu</string>
+    <string name="pro_cards_layout_info">Dasbor yang lebih besar dan sepenuhnya dapat disesuaikan: ubin besar dengan jarak yang baik alih-alih grafik tengah. Ketuk pensil untuk menyusun ulang ubin dengan menyeret, menampilkan atau menyembunyikan yang Anda inginkan, dan ketuk ubin Jangkauan untuk membuka grafik proyeksi ukuran penuh. Pilih di Preferensi → Tata Letak Dasbor setelah dibuka.</string>
+    <string name="pro_neon_theme_title">Tema Neon</string>
+    <string name="pro_neon_theme_info">Tema gelap hitam pekat yang ramah OLED, yang angka metrik dayanya dan garis aksennya menyala seperti neon, dengan tepi aksen halus di setiap kartu. Pilih di Preferensi → Tema setelah dibuka.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Ringkasan</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">Putuskan bot</string>
     <string name="auto_backup_label">Cadangan otomatis</string>
     <string name="backup_interval_label">Interval cadangan</string>
+    <string name="wifi_only_label">Hanya Wi-Fi</string>
+    <string name="wifi_only_desc">Cadangan otomatis hanya berjalan di Wi-Fi untuk menghemat data seluler</string>
     <string name="last_auto_backup_label">Cadangan otomatis terakhir: %1$s</string>
     <string name="schedule_updated_msg">Jadwal diperbarui ke %1$s. Cadangan otomatis berikutnya akan mengikuti interval baru.</string>
     <string name="telegram_setup_info">Setelah terhubung, cadangan dapat dikirim manual atau terjadwal. Setiap cadangan mendarat sebagai file .db di obrolan pribadi Anda, dapat diakses dari perangkat apa pun dengan Telegram.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">Sistem</string>
     <string name="theme_light">Terang</string>
     <string name="theme_dark">Gelap</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Bahasa</string>
     <string name="language_desc">Pilih bahasa tampilan aplikasi. Memilih bahasa menimpa bahasa sistem perangkat untuk aplikasi ini.</string>
     <string name="change_language_action">Ubah bahasa</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">Aktif — Pro dibuka untuk kendaraan ini (seumur hidup).</string>
     <string name="remove_code_action">Hapus kode</string>
     <string name="remove_code_title">Hapus kode buka Pro?</string>
-    <string name="remove_code_msg">Ini mematikan Pro pada kendaraan ini dan menonaktifkan fitur Pro (peringatan ketidakseimbangan sel, laporan kesehatan baterai, tangkapan layar, cadangan kartu SD). Kode Anda tidak hilang — Anda dapat memasukkannya lagi kapan saja untuk membuka kembali.</string>
-    <string name="pro_unlock_desc">Buka fitur premium seperti peringatan ketidakseimbangan sel baterai dan tangkapan layar dasbor dengan kode sekali pakai untuk kendaraan Anda — 9,99 €, seumur hidup, satu mobil. Diverifikasi di perangkat — tidak ada yang meninggalkan mobil Anda.</string>
+    <string name="remove_code_msg">Ini menonaktifkan Pro pada kendaraan ini dan menonaktifkan fitur Pro (tata letak dasbor kartu, tema Neon, peringatan ketidakseimbangan sel, laporan kesehatan baterai, tangkapan layar, cadangan kartu SD). Kode Anda tidak hilang — Anda dapat memasukkannya lagi kapan saja untuk membuka kembali.</string>
+    <string name="pro_unlock_desc">Buka fitur premium seperti tata letak dasbor kartu, tema Neon, peringatan ketidakseimbangan sel, dan tangkapan layar dasbor dengan kode sekali pakai untuk kendaraan Anda — 9,99 €, seumur hidup, satu mobil. Diverifikasi di perangkat — tidak ada yang meninggalkan mobil Anda.</string>
     <string name="vehicle_id_section_label">ID kendaraan ini (kirim ini saat membeli lisensi):</string>
     <string name="vehicle_id_reading">Membaca… nyalakan mobil, lalu buka kembali Pengaturan</string>
     <string name="vehicle_id_copied_msg">ID kendaraan disalin</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">Apakah saya perlu internet atau sinyal seluler?</string>
     <string name="faq_a_internet">Tidak untuk penggunaan normal. Perjalanan, sesi pengisian, grafik, dan riwayat lokal direkam sepenuhnya di perangkat.\n\nInternet hanya diperlukan untuk fitur opsional seperti pemeriksaan pembaruan aplikasi, membuka tautan web, integrasi MQTT / ABRP, dan cadangan Telegram jika Anda mengaktifkannya.</string>
     <string name="faq_q_pro">Apa itu BYD Trip Stats Pro dan apa isinya?</string>
-    <string name="faq_a_pro">Pro adalah buka sekali pakai opsional untuk ekstra premium — ucapan terima kasih kecil yang membantu mendukung pengembangan. Harganya 9,99 €, dibayar sekali, untuk seumur hidup satu kendaraan (tanpa langganan). Semua yang gratis tetap gratis; Pro hanya menambah fitur baru:\n\n• Peringatan ketidakseimbangan sel — dapatkan notifikasi saat sebaran tegangan sel pak tetap di atas batas\n• Laporan kesehatan baterai — ekspor PDF/HTML siap cetak dari Status Kesehatan, laju penurunan, dan tanggal proyeksi ke 80%%\n• Tangkapan layar dasbor — ketuk logo BYD untuk menyimpan layar saat ini\n• Cadangan kartu SD — simpan basis data ke folder BydTripStats di kartu SD yang dapat dilepas\n\nMembuka: kode terikat pada mobil spesifik Anda. Buka Pengaturan → Preferensi → BYD Trip Stats Pro, pindai kode QR dengan ponsel Anda (atau salin ID Kendaraan Anda) untuk meminta kode, lalu tempel kembali. Diverifikasi sepenuhnya di perangkat — tanpa akun, tanpa masuk, tidak ada yang meninggalkan mobil Anda.</string>
+    <string name="faq_a_pro">Pro adalah buka sekali pakai opsional untuk ekstra premium — ucapan terima kasih kecil yang membantu mendukung pengembangan. Harganya 9,99 €, dibayar sekali, untuk seumur hidup satu kendaraan (tanpa langganan). Semua yang gratis tetap gratis; Pro hanya menambah fitur baru:\n\n• Tata letak dasbor kartu — dasbor yang lebih besar dan sepenuhnya dapat disesuaikan dari ubin besar yang dapat Anda seret untuk menyusun ulang, tampilkan, atau sembunyikan\n• Tema Neon — tampilan hitam pekat yang ramah OLED dengan angka daya yang menyala\n• Peringatan ketidakseimbangan sel — dapatkan notifikasi saat sebaran tegangan sel pak tetap di atas batas\n• Laporan kesehatan baterai — ekspor PDF/HTML siap cetak dari Status Kesehatan, laju penurunan, dan tanggal proyeksi ke 80%%\n• Tangkapan layar dasbor — ketuk logo BYD untuk menyimpan layar saat ini\n• Cadangan kartu SD — simpan basis data ke folder BydTripStats di kartu SD yang dapat dilepas\n\nMembuka: kode terikat pada mobil spesifik Anda. Buka Pengaturan → Pro, pindai kode QR dengan ponsel Anda (atau salin ID Kendaraan Anda) untuk meminta kode, lalu tempel kembali. Diverifikasi sepenuhnya di perangkat — tanpa akun, tanpa masuk, tidak ada yang meninggalkan mobil Anda.</string>
     <string name="faq_q_drive_modes">Mengapa \'otomatis/tidak diketahui\' ditampilkan pada mode berkendara / regen?</string>
     <string name="faq_a_drive_modes">Aplikasi membaca mode berkendara dan regen langsung dari klaster instrumen mobil, tapi mobil hanya menyiarkan nilai mode saat Anda mengubahnya secara aktif — tidak melaporkan mode saat ini pada awal.\n\nSampai Anda mengetuk mode di layar mobil, aplikasi tidak punya nilai untuk ditampilkan dan kembali ke \'Otomatis\' (regen) atau \'Tidak diketahui\' (berkendara). Untuk memperbaiki ini:\n\n1. Putar tiap tingkat regen di layar sentuh mobil sekali\n2. Putar tiap mode berkendara (Eco / Normal / Sport) sekali\n\nAplikasi akan langsung mengambil kedua nilai dan mulai merekamnya dengan setiap titik data perjalanan. Anda hanya perlu melakukannya sekali.</string>
     <string name="faq_q_offline_trip">Tidak ada konektivitas jaringan berarti perjalanan akan hilang dari riwayat?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">Dialog akan muncul di layar meminta izin debug USB. Ketuk Izinkan, lalu kembali ke sini.\n\nIni tindakan sekali pakai. Pembaruan mendatang sepenuhnya otomatis.</string>
     <string name="adb_granting_msg">Memberikan izin latar…</string>
     <string name="authorize_action">Otorisasi</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Ban</string>
+    <string name="close">Tutup</string>
+    <string name="range_projection_title">Proyeksi Dinamis</string>
+    <string name="dashboard_no_cards_hint">Semua kartu disembunyikan. Ketuk pensil untuk menambahkan kembali beberapa.</string>
+    <string name="reorder_card">Seret untuk menyusun ulang</string>
+    <string name="pref_dashboard_layout">Tata Letak Dasbor</string>
+    <string name="dashboard_layout_desc">Pilih cara dasbor disusun. Kartu adalah tata letak yang lebih besar dan dapat disesuaikan — ketuk pensil di dasbor untuk menampilkan, menyembunyikan, dan menyusun ulang ubin.</string>
+    <string name="dashboard_layout_classic">Klasik</string>
+    <string name="dashboard_layout_cards">Kartu</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Diam</string>
+    <string name="power_state_accelerating">Berakselerasi</string>
+    <string name="power_state_decelerating">Melambat</string>
+    <string name="power_state_charging">Mengisi</string>
+    <string name="speed_state_parked">Diam</string>
+    <string name="speed_state_driving">Berkendara</string>
+    <string name="soc_subtitle_usable">Daya yang dapat digunakan</string>
+    <string name="range_subtitle_projection">Proyeksi dinamis</string>
+    <string name="distance_subtitle_session">Sesi ini</string>
+    <string name="odometer_subtitle_lifetime">Jarak total</string>
+    <string name="discharge_subtitle_lifetime">Total energi keluar</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s tekanan</string>
 </resources>

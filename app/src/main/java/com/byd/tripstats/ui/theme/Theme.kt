@@ -112,6 +112,23 @@ private val LightColorScheme = lightColorScheme(
     scrim                  = Color(0xFF000000),
 )
 
+// ── Neon scheme — OLED-black variant of the dark theme (Pro, dark-only) ───────
+// Same accent hues as the dark scheme, but pure-black backgrounds and near-black
+// card surfaces so the accent colours and glowing power digits pop.
+private val NeonColorScheme = DarkColorScheme.copy(
+    background       = Color(0xFF000000),
+    surface          = Color(0xFF07090D),
+    surfaceVariant   = Color(0xFF0E1119),
+    primaryContainer = Color(0xFF090B10),   // card / top-bar container
+    outlineVariant   = Color(0xFF23262E),
+)
+
+/** True when the Pro Neon theme is active — CARDS tiles read this to enable glow. */
+private val LocalNeonEnabled = staticCompositionLocalOf { false }
+
+val MaterialTheme.isNeon: Boolean
+    @Composable get() = LocalNeonEnabled.current
+
 // ── Extended colors — semantic tokens not covered by Material3 ────────────────
 data class ExtendedColors(
     val slotA:    Color,   // Amber Gold        — reserved for future metric
@@ -136,21 +153,26 @@ val MaterialTheme.extendedColors: ExtendedColors
 @Composable
 fun BydTripStatsTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    neon: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = when {
+        neon      -> NeonColorScheme
+        darkTheme -> DarkColorScheme
+        else      -> LightColorScheme
+    }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
             // Status bar matches the deepest background layer for a seamless look
-            window.statusBarColor = if (darkTheme) {
-                BydStatusBar.toArgb()    // #0A0E14 — even darker than the background
-            } else {
-                BydAuroraWhite.toArgb()     // ← was BydOceanBlue (deep blue, wrong for light mode)
+            window.statusBarColor = when {
+                neon      -> Color(0xFF000000).toArgb()
+                darkTheme -> BydStatusBar.toArgb()    // #0A0E14 — even darker than the background
+                else      -> BydAuroraWhite.toArgb()
             }
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && !neon
         }
     }
 
@@ -170,7 +192,10 @@ fun BydTripStatsTheme(
         )
     }
 
-    CompositionLocalProvider(LocalExtendedColors provides extendedColors) {
+    CompositionLocalProvider(
+        LocalExtendedColors provides extendedColors,
+        LocalNeonEnabled provides neon,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography  = Typography,

@@ -41,7 +41,12 @@
     <string name="settings_tab_app">אפליקציה</string>
     <string name="settings_tab_connections">חיבורים</string>
     <string name="settings_tab_preferences">העדפות</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">אודות ושאלות נפוצות</string>
+    <string name="pro_cards_layout_title">פריסת לוח מחוונים בכרטיסים</string>
+    <string name="pro_cards_layout_info">לוח מחוונים גדול יותר וניתן להתאמה מלאה: אריחים גדולים ומרווחים היטב במקום הגרף המרכזי. הקישו על העיפרון כדי לסדר מחדש אריחים בגרירה, להציג או להסתיר את אלה שתרצו, והקישו על אריח הטווח כדי לפתוח את גרף התחזית בגודל מלא. בחרו זאת תחת העדפות ← פריסת לוח המחוונים לאחר השחרור.</string>
+    <string name="pro_neon_theme_title">ערכת נושא ניאון</string>
+    <string name="pro_neon_theme_info">ערכת נושא כהה בשחור מוחלט, ידידותית ל-OLED, שבה ספרות מדדי ההספק ופסי ההדגשה זוהרים כמו ניאון, עם קצה הדגשה עדין בכל כרטיס. בחרו אותה תחת העדפות ← ערכת נושא לאחר השחרור.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">סקירה</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">נתק בוט</string>
     <string name="auto_backup_label">גיבוי אוטומטי</string>
     <string name="backup_interval_label">תדירות גיבוי</string>
+    <string name="wifi_only_label">Wi-Fi בלבד</string>
+    <string name="wifi_only_desc">גיבויים אוטומטיים פועלים רק ב-Wi-Fi כדי לחסוך בנתונים סלולריים</string>
     <string name="last_auto_backup_label">גיבוי אוטומטי אחרון: %1$s</string>
     <string name="schedule_updated_msg">התזמון עודכן ל-%1$s. הגיבוי האוטומטי הבא יפעל לפי התדירות החדשה.</string>
     <string name="telegram_setup_info">לאחר חיבור, אפשר לשלוח גיבויים ידנית או לפי תזמון. כל גיבוי מגיע כקובץ .db לצ׳אט הפרטי שלכם, נגיש מכל מכשיר עם Telegram.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">מערכת</string>
     <string name="theme_light">בהיר</string>
     <string name="theme_dark">כהה</string>
+    <string name="theme_neon">ניאון</string>
     <string name="pref_language">שפה</string>
     <string name="language_desc">בחרו את שפת התצוגה של האפליקציה. בחירת שפה עוקפת את שפת המערכת של המכשיר עבור אפליקציה זו.</string>
     <string name="change_language_action">שנה שפה</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">פעיל — Pro שוחרר עבור רכב זה (לכל החיים).</string>
     <string name="remove_code_action">הסר קוד</string>
     <string name="remove_code_title">להסיר את קוד שחרור ה-Pro?</string>
-    <string name="remove_code_msg">זה מכבה את Pro ברכב זה ומשבית את תכונות ה-Pro (התראת חוסר איזון תאים, דו"ח בריאות סוללה, צילומי מסך, גיבוי לכרטיס SD). הקוד שלכם לא אבד — תוכלו להזין אותו שוב בכל עת כדי לשחרר מחדש.</string>
-    <string name="pro_unlock_desc">שחררו תכונות פרימיום כמו התראת חוסר איזון תאים וצילומי מסך של לוח המחוונים עם קוד חד-פעמי לרכב שלכם — 9.99 €, לכל החיים, רכב אחד. מאומת על המכשיר — שום דבר לא עוזב את הרכב.</string>
+    <string name="remove_code_msg">פעולה זו מכבה את Pro ברכב זה ומשביתה את תכונות ה-Pro (פריסת לוח מחוונים בכרטיסים, ערכת נושא ניאון, התראת חוסר איזון תאים, דוח בריאות סוללה, צילומי מסך, גיבוי לכרטיס SD). הקוד שלכם לא אובד — תוכלו להזין אותו שוב בכל עת כדי לשחרר מחדש.</string>
+    <string name="pro_unlock_desc">שחררו תכונות פרימיום כמו פריסת לוח מחוונים בכרטיסים, ערכת נושא ניאון, התראת חוסר איזון תאים וצילומי מסך של לוח המחוונים עם קוד חד-פעמי לרכב שלכם — 9.99 €, לכל החיים, רכב אחד. מאומת במכשיר — שום דבר לא עוזב את הרכב שלכם.</string>
     <string name="vehicle_id_section_label">מזהה הרכב הזה (שלחו אותו בעת רכישת רישיון):</string>
     <string name="vehicle_id_reading">קורא… התניעו את הרכב, ואז פתחו מחדש את ההגדרות</string>
     <string name="vehicle_id_copied_msg">מזהה הרכב הועתק</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">האם אני צריך אינטרנט או קליטה סלולרית?</string>
     <string name="faq_a_internet">לא לשימוש רגיל. נסיעות, מפגשי טעינה, גרפים והיסטוריה מקומית מוקלטים כולם על המכשיר.\n\nאינטרנט נדרש רק לתכונות אופציונליות כמו בדיקת עדכוני אפליקציה, פתיחת קישורים, שילוב MQTT / ABRP וגיבויי Telegram אם תפעילו אותם.</string>
     <string name="faq_q_pro">מה זה BYD Trip Stats Pro ומה הוא כולל?</string>
-    <string name="faq_a_pro">Pro הוא שחרור חד-פעמי אופציונלי לתוספות פרימיום — תודה קטנה שעוזרת לתמוך בפיתוח. המחיר 9.99 €, תשלום חד-פעמי, לכל אורך חיי רכב אחד (ללא מנוי). כל מה שהיה חינם נשאר חינם; Pro רק מוסיף תכונות חדשות:\n\n• התראת חוסר איזון תאים — קבלו התראה כשפיזור מתח התאים של הסוללה נשאר מעל גבול\n• דו"ח בריאות סוללה — ייצאו PDF/HTML להדפסה של מצב הבריאות, קצב הירידה והתאריך החזוי ל-80%%\n• צילומי מסך של לוח המחוונים — הקישו על הלוגו של BYD לשמירת המסך הנוכחי\n• גיבוי לכרטיס SD — שמרו את מסד הנתונים לתיקיית BydTripStats בכרטיס SD נשלף\n\nשחרור: הקוד קשור לרכב הספציפי שלכם. פתחו הגדרות ← העדפות ← BYD Trip Stats Pro, סרקו את קוד ה-QR עם הטלפון (או העתיקו את מזהה הרכב) כדי לבקש קוד, ואז הדביקו אותו חזרה. הכול מאומת על המכשיר — ללא חשבון, ללא התחברות, שום דבר לא עוזב את הרכב.</string>
+    <string name="faq_a_pro">Pro הוא שחרור חד-פעמי אופציונלי לתוספות פרימיום — תודה קטנה שעוזרת לתמוך בפיתוח. המחיר 9.99 €, תשלום חד-פעמי, לכל אורך חיי רכב אחד (ללא מנוי). כל מה שהיה חינם נשאר חינם; Pro רק מוסיף תכונות חדשות:\n\n• פריסת לוח מחוונים בכרטיסים — לוח מחוונים גדול יותר וניתן להתאמה מלאה, מאריחים גדולים שאפשר לסדר מחדש בגרירה, להציג או להסתיר\n• ערכת נושא ניאון — מראה שחור מוחלט, ידידותי ל-OLED, עם ספרות הספק זוהרות\n• התראת חוסר איזון תאים — קבלו התראה כשפיזור מתח התאים של הסוללה נשאר מעל גבול\n• דו"ח בריאות סוללה — ייצאו PDF/HTML להדפסה של מצב הבריאות, קצב הירידה והתאריך החזוי ל-80%%\n• צילומי מסך של לוח המחוונים — הקישו על הלוגו של BYD לשמירת המסך הנוכחי\n• גיבוי לכרטיס SD — שמרו את מסד הנתונים לתיקיית BydTripStats בכרטיס SD נשלף\n\nשחרור: הקוד קשור לרכב הספציפי שלכם. פתחו הגדרות ← Pro, סרקו את קוד ה-QR עם הטלפון (או העתיקו את מזהה הרכב) כדי לבקש קוד, ואז הדביקו אותו חזרה. הכול מאומת על המכשיר — ללא חשבון, ללא התחברות, שום דבר לא עוזב את הרכב.</string>
     <string name="faq_q_drive_modes">למה מוצג \'אוטו/לא ידוע\' במצבי נהיגה / ריקופרציה?</string>
     <string name="faq_a_drive_modes">האפליקציה קוראת מצבי נהיגה וריקופרציה ישירות מלוח המחוונים של הרכב, אך הרכב משדר ערך מצב רק כשאתם משנים אותו באופן פעיל — הוא לא מדווח על המצב הנוכחי בהפעלה.\n\nעד שתקישו על מצב בתצוגת הרכב, לאפליקציה אין ערך להציג והיא חוזרת ל\'אוטו\' (ריקופרציה) או \'לא ידוע\' (נהיגה). כדי לתקן זאת:\n\n1. עברו פעם אחת על כל רמת ריקופרציה במסך המגע של הרכב\n2. עברו פעם אחת על כל מצב נהיגה (Eco / Normal / Sport)\n\nהאפליקציה תקלוט מיד את שני הערכים ותתחיל להקליט אותם בכל נקודת נתונים של הנסיעה. צריך לעשות זאת רק פעם אחת.</string>
     <string name="faq_q_offline_trip">האם היעדר קישוריות רשת אומר שהנסיעה תיעדר מההיסטוריה?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">תיבת דו-שיח אמורה להופיע על המסך ולבקש לאפשר ניפוי USB. הקישו אפשר, ואז חזרו לכאן.\n\nזוהי פעולה חד-פעמית. עדכונים עתידיים אוטומטיים לחלוטין.</string>
     <string name="adb_granting_msg">מעניק הרשאות רקע…</string>
     <string name="authorize_action">הרשה</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">צמיגים</string>
+    <string name="close">סגור</string>
+    <string name="range_projection_title">תחזית דינמית</string>
+    <string name="dashboard_no_cards_hint">כל הכרטיסים מוסתרים. הקישו על העיפרון כדי להוסיף חלק בחזרה.</string>
+    <string name="reorder_card">גררו כדי לסדר מחדש</string>
+    <string name="pref_dashboard_layout">פריסת לוח המחוונים</string>
+    <string name="dashboard_layout_desc">בחרו כיצד לוח המחוונים מסודר. כרטיסים היא פריסה גדולה יותר וניתנת להתאמה — הקישו על העיפרון בלוח המחוונים כדי להציג, להסתיר ולסדר מחדש את האריחים.</string>
+    <string name="dashboard_layout_classic">קלאסי</string>
+    <string name="dashboard_layout_cards">כרטיסים</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">במנוחה</string>
+    <string name="power_state_accelerating">מאיץ</string>
+    <string name="power_state_decelerating">מאט</string>
+    <string name="power_state_charging">טוען</string>
+    <string name="speed_state_parked">נייח</string>
+    <string name="speed_state_driving">בנסיעה</string>
+    <string name="soc_subtitle_usable">טעינה זמינה</string>
+    <string name="range_subtitle_projection">תחזית דינמית</string>
+    <string name="distance_subtitle_session">מפגש זה</string>
+    <string name="odometer_subtitle_lifetime">מרחק כולל</string>
+    <string name="discharge_subtitle_lifetime">סך האנרגיה שנפרקה</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s לחץ</string>
 </resources>

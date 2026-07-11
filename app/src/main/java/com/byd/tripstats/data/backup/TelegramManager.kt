@@ -3,7 +3,9 @@ package com.byd.tripstats.data.backup
 import android.content.Context
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
@@ -52,6 +54,7 @@ class TelegramManager private constructor(private val context: Context) {
         private const val KEY_LAST_AUTO_BACKUP = "last_auto_backup"
         private const val KEY_SCHEDULE = "backup_schedule"
         private const val KEY_AUTO_ENABLED  = "auto_backup_enabled"
+        private const val KEY_WIFI_ONLY     = "auto_backup_wifi_only"
         private const val KEY_SENT_FILES      = "sent_files"        // JSON array of sent backup metadata
         private const val REGISTRY_FILE_NAME  = "telegram_registry.json"  // survives uninstalls
         private const val BASE_URL      = "https://api.telegram.org/bot"
@@ -120,6 +123,11 @@ class TelegramManager private constructor(private val context: Context) {
     // Auto-backup toggle as StateFlow
     private val _autoEnabled = MutableStateFlow(prefs.getBoolean(KEY_AUTO_ENABLED, true))
     val autoEnabled: StateFlow<Boolean> = _autoEnabled.asStateFlow()
+
+    // Wi-Fi-only toggle as StateFlow. Defaults to true so auto-backups don't quietly
+    // burn a limited mobile-data plan; the scheduled worker only runs on unmetered Wi-Fi.
+    private val _wifiOnly = MutableStateFlow(prefs.getBoolean(KEY_WIFI_ONLY, true))
+    val wifiOnly: StateFlow<Boolean> = _wifiOnly.asStateFlow()
 
     private val _telegramBackups = MutableStateFlow<List<TelegramBackupFile>>(loadSentFiles())
     val telegramBackups: StateFlow<List<TelegramBackupFile>> = _telegramBackups.asStateFlow()
@@ -252,6 +260,17 @@ class TelegramManager private constructor(private val context: Context) {
             cancelAutoBackup()
         }
         Log.i(TAG, "Auto backup ${if (enabled) "enabled" else "disabled"}")
+    }
+
+    fun setWifiOnly(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_WIFI_ONLY, enabled).apply()
+        _wifiOnly.value = enabled
+        _state.value = TelegramState.Idle   // clear any stale banner
+        // Re-enqueue so the new network constraint takes effect immediately.
+        if (_autoEnabled.value && _config.value != null) {
+            scheduleAutoBackup()
+        }
+        Log.i(TAG, "Auto backup Wi-Fi only ${if (enabled) "enabled" else "disabled"}")
     }
 
     // ── Send ──────────────────────────────────────────────────────────────────
@@ -584,18 +603,30 @@ class TelegramManager private constructor(private val context: Context) {
 
     fun scheduleAutoBackup() {
         val days = _schedule.value.days
+        // Wi-Fi-only backups stream the whole .db (up to 50 MB) over the network, so on a
+        // metered mobile connection they can eat a limited data plan. UNMETERED restricts the
+        // worker to unmetered networks (typically Wi-Fi); CONNECTED allows any connection.
+        val networkType = if (_wifiOnly.value) NetworkType.UNMETERED else NetworkType.CONNECTED
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(networkType)
+            .build()
         val request = PeriodicWorkRequestBuilder<TelegramBackupWorker>(days, TimeUnit.DAYS)
             // Without an initial delay, WorkManager fires the worker immediately on first
             // enqueue (and on every UPDATE re-enqueue). Delaying by the full period means
             // the first run happens after one interval, matching user expectations.
             .setInitialDelay(days, TimeUnit.DAYS)
+            .setConstraints(constraints)
             .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             TelegramBackupWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.UPDATE,
             request
         )
-        Log.i(TAG, "Auto backup scheduled every $days day(s), first run in $days day(s)")
+        Log.i(
+            TAG,
+            "Auto backup scheduled every $days day(s), first run in $days day(s), " +
+                "network=${if (_wifiOnly.value) "Wi-Fi only" else "any"}"
+        )
     }
 
     fun cancelAutoBackup() {

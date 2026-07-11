@@ -37,7 +37,12 @@
     <string name="settings_tab_app">Εφαρμογή</string>
     <string name="settings_tab_connections">Συνδέσεις</string>
     <string name="settings_tab_preferences">Προτιμήσεις</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Σχετικά &amp; Συχνές ερωτήσεις</string>
+    <string name="pro_cards_layout_title">Διάταξη πίνακα με κάρτες</string>
+    <string name="pro_cards_layout_info">Ένας μεγαλύτερος, πλήρως προσαρμόσιμος πίνακας: μεγάλα, καλά κατανεμημένα πλακίδια αντί για το κεντρικό γράφημα. Πατήστε το μολύβι για αναδιάταξη των πλακιδίων με σύρσιμο, εμφάνιση ή απόκρυψη όσων θέλετε, και πατήστε το πλακίδιο Αυτονομία για να ανοίξετε το γράφημα προβολής σε πλήρες μέγεθος. Επιλέξτε το στις Προτιμήσεις → Διάταξη πίνακα μόλις ξεκλειδωθεί.</string>
+    <string name="pro_neon_theme_title">Θέμα Neon</string>
+    <string name="pro_neon_theme_info">Ένα καθαρό μαύρο, φιλικό προς OLED σκούρο θέμα, του οποίου τα ψηφία των μετρήσεων ισχύος και οι λωρίδες τόνου λάμπουν σαν νέον, με μια διακριτική άκρη τόνου σε κάθε κάρτα. Επιλέξτε το στις Προτιμήσεις → Θέμα μόλις ξεκλειδωθεί.</string>
     <string name="tab_overview">Επισκόπηση</string>
     <string name="tab_charts">Γραφήματα</string>
     <string name="tab_heatmaps">Θερμικοί χάρτες</string>
@@ -416,6 +421,8 @@
     <string name="disconnect_bot_action">Αποσύνδεση bot</string>
     <string name="auto_backup_label">Αυτόματο αντίγραφο</string>
     <string name="backup_interval_label">Διάστημα αντιγράφων</string>
+    <string name="wifi_only_label">Μόνο Wi-Fi</string>
+    <string name="wifi_only_desc">Τα αυτόματα αντίγραφα ασφαλείας εκτελούνται μόνο σε Wi-Fi για εξοικονόμηση δεδομένων κινητής</string>
     <string name="last_auto_backup_label">Τελευταίο αυτόματο αντίγραφο: %1$s</string>
     <string name="schedule_updated_msg">Πρόγραμμα ενημερώθηκε σε %1$s. Το επόμενο αυτόματο αντίγραφο θα ακολουθήσει το νέο διάστημα.</string>
     <string name="telegram_setup_info">Μόλις συνδεθεί, τα αντίγραφα μπορούν να σταλούν χειροκίνητα ή βάσει χρονοδιαγράμματος. Κάθε αντίγραφο φτάνει ως αρχείο .db στην ιδιωτική σας συνομιλία.</string>
@@ -678,6 +685,7 @@
     <string name="theme_system">Σύστημα</string>
     <string name="theme_light">Ανοιχτό</string>
     <string name="theme_dark">Σκούρο</string>
+    <string name="theme_neon">Νέον</string>
     <string name="pref_language">Γλώσσα</string>
     <string name="language_desc">Επιλέξτε τη γλώσσα εμφάνισης της εφαρμογής. Η επιλογή γλώσσας παρακάμπτει τη γλώσσα συστήματος για αυτήν την εφαρμογή.</string>
     <string name="change_language_action">Αλλαγή γλώσσας</string>
@@ -763,8 +771,8 @@
     <string name="pro_active_label">Ενεργό — Pro ξεκλειδωμένο για αυτό το όχημα (δια βίου).</string>
     <string name="remove_code_action">Αφαίρεση κωδικού</string>
     <string name="remove_code_title">Αφαίρεση κωδικού ξεκλειδώματος Pro;</string>
-    <string name="remove_code_msg">Αυτό απενεργοποιεί το Pro σε αυτό το όχημα. Ο κωδικός σας δεν χάνεται — μπορείτε να τον εισάγετε ξανά ανά πάσα στιγμή.</string>
-    <string name="pro_unlock_desc">Ξεκλειδώστε premium λειτουργίες με έναν μοναδικό κωδικό για το όχημά σας — 9,99€, δια βίου, ένα αυτοκίνητο.</string>
+    <string name="remove_code_msg">Αυτό απενεργοποιεί το Pro σε αυτό το όχημα και απενεργοποιεί τις λειτουργίες Pro (Διάταξη πίνακα με κάρτες, Θέμα Neon, ειδοποίηση ανισορροπίας κελιών, αναφορά υγείας μπαταρίας, στιγμιότυπα οθόνης, αντίγραφο σε κάρτα SD). Ο κωδικός σας δεν χάνεται — μπορείτε να τον εισαγάγετε ξανά ανά πάσα στιγμή για να ξεκλειδώσετε ξανά.</string>
+    <string name="pro_unlock_desc">Ξεκλειδώστε premium λειτουργίες όπως τη Διάταξη πίνακα με κάρτες, το Θέμα Neon, την ειδοποίηση ανισορροπίας κελιών και τα στιγμιότυπα οθόνης του πίνακα με έναν εφάπαξ κωδικό για το όχημά σας — 9,99 €, εφ\' όρου ζωής, ένα αυτοκίνητο. Επαληθεύεται στη συσκευή — τίποτα δεν φεύγει από το αυτοκίνητό σας.</string>
     <string name="vehicle_id_section_label">ID αυτού του οχήματος (στείλτε κατά την αγορά άδειας):</string>
     <string name="vehicle_id_reading">Ανάγνωση… ξεκινήστε το αυτοκίνητο, μετά ανοίξτε ξανά τις Ρυθμίσεις</string>
     <string name="vehicle_id_copied_msg">ID οχήματος αντιγράφηκε</string>
@@ -887,7 +895,7 @@
     <string name="faq_q_internet">Χρειάζομαι internet ή σήμα κινητής τηλεφωνίας;</string>
     <string name="faq_a_internet">Όχι για κανονική χρήση. Οι διαδρομές, οι συνεδρίες φόρτισης, τα γραφήματα και το τοπικό ιστορικό αποθηκεύονται εξολοκλήρου στη συσκευή.\n\nΤο Internet χρειάζεται μόνο για προαιρετικές λειτουργίες.</string>
     <string name="faq_q_pro">Τι είναι το BYD Trip Stats Pro και τι περιλαμβάνει;</string>
-    <string name="faq_a_pro">Το Pro είναι προαιρετικό εφάπαξ ξεκλείδωμα για premium extras — ένα μικρό ευχαριστώ που στηρίζει την ανάπτυξη. Είναι 9,99€, εφάπαξ πληρωμή, για τη διάρκεια ζωής ενός οχήματος (χωρίς συνδρομή). Όλα τα δωρεάν παραμένουν δωρεάν· το Pro προσθέτει μόνο νέες λειτουργίες:\n\n• Ειδοποίηση ανισορροπίας κελιών — ειδοποιηθείτε όταν η διασπορά τάσης κελιών του πακέτου παραμένει πάνω από ένα όριο\n• Αναφορά υγείας μπαταρίας — εξαγωγή εκτυπώσιμου PDF/HTML με το State of Health, τον ρυθμό μείωσης και την προβλεπόμενη ημερομηνία για το 80%%\n• Στιγμιότυπα οθόνης πίνακα ελέγχου — πατήστε το λογότυπο BYD για αποθήκευση της τρέχουσας οθόνης\n• Δημιουργία αντιγράφου σε κάρτα SD — αποθήκευση της βάσης δεδομένων σε φάκελο BydTripStats σε αφαιρούμενη κάρτα SD\n\nΞεκλείδωμα: ο κωδικός συνδέεται με το συγκεκριμένο αυτοκίνητό σας. Ανοίξτε Ρυθμίσεις → Προτιμήσεις → BYD Trip Stats Pro, σαρώστε τον κωδικό QR με το κινητό σας (ή αντιγράψτε το Vehicle ID) για να ζητήσετε κωδικό και επικολλήστε τον. Η επαλήθευση γίνεται εξ ολοκλήρου στη συσκευή — χωρίς λογαριασμό, χωρίς σύνδεση, τίποτα δεν φεύγει από το αυτοκίνητό σας.</string>
+    <string name="faq_a_pro">Το Pro είναι προαιρετικό εφάπαξ ξεκλείδωμα για premium extras — ένα μικρό ευχαριστώ που στηρίζει την ανάπτυξη. Είναι 9,99€, εφάπαξ πληρωμή, για τη διάρκεια ζωής ενός οχήματος (χωρίς συνδρομή). Όλα τα δωρεάν παραμένουν δωρεάν· το Pro προσθέτει μόνο νέες λειτουργίες:\n\n• Διάταξη πίνακα με κάρτες — ένας μεγαλύτερος, πλήρως προσαρμόσιμος πίνακας με μεγάλα πλακίδια που μπορείτε να αναδιατάξετε με σύρσιμο, να εμφανίσετε ή να αποκρύψετε\n• Θέμα Neon — μια καθαρή μαύρη, φιλική προς OLED εμφάνιση με φωτεινά ψηφία ισχύος\n• Ειδοποίηση ανισορροπίας κελιών — ειδοποιηθείτε όταν η διασπορά τάσης κελιών του πακέτου παραμένει πάνω από ένα όριο\n• Αναφορά υγείας μπαταρίας — εξαγωγή εκτυπώσιμου PDF/HTML με το State of Health, τον ρυθμό μείωσης και την προβλεπόμενη ημερομηνία για το 80%%\n• Στιγμιότυπα οθόνης πίνακα ελέγχου — πατήστε το λογότυπο BYD για αποθήκευση της τρέχουσας οθόνης\n• Δημιουργία αντιγράφου σε κάρτα SD — αποθήκευση της βάσης δεδομένων σε φάκελο BydTripStats σε αφαιρούμενη κάρτα SD\n\nΞεκλείδωμα: ο κωδικός συνδέεται με το συγκεκριμένο αυτοκίνητό σας. Ανοίξτε Ρυθμίσεις → Pro, σαρώστε τον κωδικό QR με το κινητό σας (ή αντιγράψτε το Vehicle ID) για να ζητήσετε κωδικό και επικολλήστε τον. Η επαλήθευση γίνεται εξ ολοκλήρου στη συσκευή — χωρίς λογαριασμό, χωρίς σύνδεση, τίποτα δεν φεύγει από το αυτοκίνητό σας.</string>
     <string name="faq_q_drive_modes">Γιατί εμφανίζεται \'αυτόματο/άγνωστο\' για τις λειτουργίες οδήγησης/ανάκτησης;</string>
     <string name="faq_a_drive_modes">Η εφαρμογή διαβάζει τις λειτουργίες απευθείας από τον πίνακα ελέγχου, αλλά το αυτοκίνητο εκπέμπει τιμή λειτουργίας μόνο όταν την αλλάζετε ενεργά.\n\nΓια επίλυση:\n1. Περιηγηθείτε σε κάθε επίπεδο ανάκτησης μία φορά\n2. Περιηγηθείτε σε κάθε λειτουργία οδήγησης (Eco / Normal / Sport) μία φορά</string>
     <string name="faq_q_offline_trip">Η απουσία δικτύου σημαίνει ότι η διαδρομή θα λείπει από το ιστορικό;</string>
@@ -987,4 +995,29 @@
     <string name="core_telemetry_label">Κεντρική τηλεμετρία</string>
     <string name="waiting_live_msg">Αναμονή ζωντανής τηλεμετρίας.</string>
     <string name="core_section_label">Πυρήνας</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Ελαστικά</string>
+    <string name="close">Κλείσιμο</string>
+    <string name="range_projection_title">Δυναμική προβολή</string>
+    <string name="dashboard_no_cards_hint">Όλες οι κάρτες κρυμμένες. Πατήστε το μολύβι για να προσθέσετε ξανά κάποιες.</string>
+    <string name="reorder_card">Σύρετε για αναδιάταξη</string>
+    <string name="pref_dashboard_layout">Διάταξη πίνακα</string>
+    <string name="dashboard_layout_desc">Επιλέξτε πώς είναι διατεταγμένος ο πίνακας. Οι Κάρτες είναι μια μεγαλύτερη, προσαρμόσιμη διάταξη — πατήστε το μολύβι στον πίνακα για να εμφανίσετε, να αποκρύψετε και να αναδιατάξετε τα πλακίδια.</string>
+    <string name="dashboard_layout_classic">Κλασικό</string>
+    <string name="dashboard_layout_cards">Κάρτες</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Αδράνεια</string>
+    <string name="power_state_accelerating">Επιτάχυνση</string>
+    <string name="power_state_decelerating">Επιβράδυνση</string>
+    <string name="power_state_charging">Φόρτιση</string>
+    <string name="speed_state_parked">Στάσιμο</string>
+    <string name="speed_state_driving">Οδήγηση</string>
+    <string name="soc_subtitle_usable">Χρησιμοποιήσιμη φόρτιση</string>
+    <string name="range_subtitle_projection">Δυναμική προβολή</string>
+    <string name="distance_subtitle_session">Αυτή η συνεδρία</string>
+    <string name="odometer_subtitle_lifetime">Συνολική απόσταση</string>
+    <string name="discharge_subtitle_lifetime">Συνολική εκφόρτιση</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s πίεση</string>
 </resources>

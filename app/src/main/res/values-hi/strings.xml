@@ -37,7 +37,12 @@
     <string name="settings_tab_app">ऐप</string>
     <string name="settings_tab_connections">कनेक्शन</string>
     <string name="settings_tab_preferences">प्राथमिकताएं</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">के बारे में &amp; FAQ</string>
+    <string name="pro_cards_layout_title">कार्ड डैशबोर्ड लेआउट</string>
+    <string name="pro_cards_layout_info">एक बड़ा, पूरी तरह अनुकूलन योग्य डैशबोर्ड: केंद्रीय चार्ट के बजाय बड़ी, अच्छी तरह से दूरी वाली टाइलें। टाइल को खींचकर पुन: क्रमित करने, मनचाही टाइलें दिखाने या छिपाने के लिए पेंसिल टैप करें, और प्रक्षेपण चार्ट को पूर्ण आकार में खोलने के लिए रेंज टाइल टैप करें। अनलॉक होने पर इसे प्राथमिकताएं → डैशबोर्ड लेआउट के अंतर्गत चुनें।</string>
+    <string name="pro_neon_theme_title">नियॉन थीम</string>
+    <string name="pro_neon_theme_info">एक शुद्ध-काली, OLED-अनुकूल डार्क थीम जिसकी पावर-मेट्रिक अंक और एक्सेंट धारियां नियॉन की तरह चमकती हैं, हर कार्ड पर एक सूक्ष्म एक्सेंट किनारे के साथ। अनलॉक होने पर इसे प्राथमिकताएं → थीम के अंतर्गत चुनें।</string>
     <string name="tab_overview">अवलोकन</string>
     <string name="tab_charts">चार्ट</string>
     <string name="tab_heatmaps">हीटमैप</string>
@@ -416,6 +421,8 @@
     <string name="disconnect_bot_action">बॉट डिस्कनेक्ट करें</string>
     <string name="auto_backup_label">स्वचालित बैकअप</string>
     <string name="backup_interval_label">बैकअप अंतराल</string>
+    <string name="wifi_only_label">केवल Wi-Fi</string>
+    <string name="wifi_only_desc">मोबाइल डेटा बचाने के लिए ऑटो-बैकअप केवल Wi-Fi पर चलते हैं</string>
     <string name="last_auto_backup_label">अंतिम स्वचालित बैकअप: %1$s</string>
     <string name="schedule_updated_msg">शेड्यूल %1$s पर अपडेट किया गया। अगला स्वचालित बैकअप नए अंतराल का पालन करेगा।</string>
     <string name="telegram_setup_info">एक बार कनेक्ट होने के बाद, बैकअप मैन्युअल या शेड्यूल के अनुसार भेजे जा सकते हैं। प्रत्येक बैकअप आपकी निजी चैट में .db फ़ाइल के रूप में आता है।</string>
@@ -678,6 +685,7 @@
     <string name="theme_system">सिस्टम</string>
     <string name="theme_light">लाइट</string>
     <string name="theme_dark">डार्क</string>
+    <string name="theme_neon">नियॉन</string>
     <string name="pref_language">भाषा</string>
     <string name="language_desc">ऐप की प्रदर्शन भाषा चुनें। भाषा चयन इस ऐप के लिए सिस्टम भाषा को ओवरराइड करता है।</string>
     <string name="change_language_action">भाषा बदलें</string>
@@ -763,8 +771,8 @@
     <string name="pro_active_label">सक्रिय — इस वाहन के लिए Pro अनलॉक (आजीवन)</string>
     <string name="remove_code_action">कोड हटाएं</string>
     <string name="remove_code_title">Pro अनलॉक कोड हटाएं?</string>
-    <string name="remove_code_msg">यह इस वाहन पर Pro को अक्षम कर देगा। आपका कोड खोया नहीं जाएगा — आप इसे किसी भी समय फिर से दर्ज कर सकते हैं।</string>
-    <string name="pro_unlock_desc">आपकी कार के लिए एक विशिष्ट कोड के साथ प्रीमियम सुविधाएं अनलॉक करें — एक कार के लिए ₹या €9.99 आजीवन।</string>
+    <string name="remove_code_msg">यह इस वाहन पर Pro को बंद कर देता है और Pro सुविधाओं (कार्ड डैशबोर्ड लेआउट, नियॉन थीम, सेल असंतुलन अलर्ट, बैटरी हेल्थ रिपोर्ट, स्क्रीनशॉट, SD कार्ड बैकअप) को अक्षम कर देता है। आपका कोड नहीं खोता — आप इसे फिर से अनलॉक करने के लिए कभी भी दोबारा दर्ज कर सकते हैं।</string>
+    <string name="pro_unlock_desc">अपने वाहन के लिए एक-बार के कोड से कार्ड डैशबोर्ड लेआउट, नियॉन थीम, सेल असंतुलन अलर्ट और डैशबोर्ड स्क्रीनशॉट जैसी प्रीमियम सुविधाएं अनलॉक करें — €9.99, आजीवन, एक कार। डिवाइस पर सत्यापित — कुछ भी आपकी कार से बाहर नहीं जाता।</string>
     <string name="vehicle_id_section_label">इस वाहन की ID (लाइसेंस खरीदते समय भेजें):</string>
     <string name="vehicle_id_reading">पढ़ा जा रहा है… कार चालू करें और सेटिंग फिर से खोलें</string>
     <string name="vehicle_id_copied_msg">वाहन ID कॉपी की गई</string>
@@ -887,7 +895,7 @@
     <string name="faq_q_internet">क्या मुझे इंटरनेट या मोबाइल डेटा की आवश्यकता है?</string>
     <string name="faq_a_internet">सामान्य उपयोग के लिए नहीं। यात्राएं, चार्जिंग सत्र, चार्ट और स्थानीय इतिहास सभी डिवाइस पर संग्रहीत हैं।\n\nइंटरनेट केवल वैकल्पिक सुविधाओं के लिए आवश्यक है।</string>
     <string name="faq_q_pro">BYD Trip Stats Pro क्या है और इसमें क्या शामिल है?</string>
-    <string name="faq_a_pro">Pro प्रीमियम एक्स्ट्रा के लिए एक वैकल्पिक एक-बार का अनलॉक है — एक छोटा धन्यवाद जो विकास में मदद करता है। यह €9.99 है, एक बार भुगतान, एक वाहन के जीवनकाल के लिए (कोई सदस्यता नहीं)। जो मुफ्त था वह मुफ्त रहेगा; Pro केवल नई सुविधाएँ जोड़ता है:\n\n• सेल असंतुलन अलर्ट — जब पैक की सेल-वोल्टेज स्प्रेड सीमा से ऊपर बनी रहे तो सूचना पाएँ\n• बैटरी हेल्थ रिपोर्ट — State of Health, गिरावट दर और 80%% तक की अनुमानित तिथि का प्रिंट-योग्य PDF/HTML निर्यात करें\n• डैशबोर्ड स्क्रीनशॉट — वर्तमान स्क्रीन सहेजने के लिए BYD लोगो टैप करें\n• SD कार्ड बैकअप — डेटाबेस को हटाने योग्य SD कार्ड पर BydTripStats फ़ोल्डर में सहेजें\n\nअनलॉक करना: कोड आपकी विशिष्ट कार से जुड़ा होता है। सेटिंग्स → प्राथमिकताएँ → BYD Trip Stats Pro खोलें, कोड का अनुरोध करने के लिए अपने फ़ोन से QR कोड स्कैन करें (या अपना Vehicle ID कॉपी करें), फिर उसे वापस पेस्ट करें। सत्यापन पूरी तरह डिवाइस पर होता है — कोई खाता नहीं, कोई साइन-इन नहीं, कुछ भी आपकी कार से बाहर नहीं जाता।</string>
+    <string name="faq_a_pro">Pro प्रीमियम एक्स्ट्रा के लिए एक वैकल्पिक एक-बार का अनलॉक है — एक छोटा धन्यवाद जो विकास में मदद करता है। यह €9.99 है, एक बार भुगतान, एक वाहन के जीवनकाल के लिए (कोई सदस्यता नहीं)। जो मुफ्त था वह मुफ्त रहेगा; Pro केवल नई सुविधाएँ जोड़ता है:\n\n• कार्ड डैशबोर्ड लेआउट — बड़ी टाइलों वाला एक बड़ा, पूरी तरह अनुकूलन योग्य डैशबोर्ड जिन्हें आप खींचकर पुन: क्रमित, दिखा या छिपा सकते हैं\n• नियॉन थीम — चमकते पावर अंकों वाला एक शुद्ध-काला, OLED-अनुकूल रूप\n• सेल असंतुलन अलर्ट — जब पैक की सेल-वोल्टेज स्प्रेड सीमा से ऊपर बनी रहे तो सूचना पाएँ\n• बैटरी हेल्थ रिपोर्ट — State of Health, गिरावट दर और 80%% तक की अनुमानित तिथि का प्रिंट-योग्य PDF/HTML निर्यात करें\n• डैशबोर्ड स्क्रीनशॉट — वर्तमान स्क्रीन सहेजने के लिए BYD लोगो टैप करें\n• SD कार्ड बैकअप — डेटाबेस को हटाने योग्य SD कार्ड पर BydTripStats फ़ोल्डर में सहेजें\n\nअनलॉक करना: कोड आपकी विशिष्ट कार से जुड़ा होता है। सेटिंग्स → Pro खोलें, कोड का अनुरोध करने के लिए अपने फ़ोन से QR कोड स्कैन करें (या अपना Vehicle ID कॉपी करें), फिर उसे वापस पेस्ट करें। सत्यापन पूरी तरह डिवाइस पर होता है — कोई खाता नहीं, कोई साइन-इन नहीं, कुछ भी आपकी कार से बाहर नहीं जाता।</string>
     <string name="faq_q_drive_modes">ड्राइव/रीजेन मोड के लिए \'ऑटो/अज्ञात\' क्यों दिखाई देता है?</string>
     <string name="faq_a_drive_modes">ऐप मोड को सीधे डैशबोर्ड से पढ़ता है, लेकिन जब आप मोड बदलते हैं तभी कार मोड मूल्य प्रेषित करती है।\n\nसमाधान:\n1. एक बार प्रत्येक रीजेन स्तर से गुजरें\n2. एक बार प्रत्येक ड्राइव मोड (Eco / Normal / Sport) से गुजरें</string>
     <string name="faq_q_offline_trip">क्या कोई नेटवर्क नहीं होने का मतलब है कि यात्रा इतिहास में नहीं होगी?</string>
@@ -987,4 +995,29 @@
     <string name="core_telemetry_label">कोर टेलीमेट्री</string>
     <string name="waiting_live_msg">लाइव टेलीमेट्री की प्रतीक्षा</string>
     <string name="core_section_label">कोर</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">टायर</string>
+    <string name="close">बंद करें</string>
+    <string name="range_projection_title">गतिशील प्रक्षेपण</string>
+    <string name="dashboard_no_cards_hint">सभी कार्ड छिपे हैं। कुछ वापस जोड़ने के लिए पेंसिल टैप करें।</string>
+    <string name="reorder_card">पुन: क्रमित करने के लिए खींचें</string>
+    <string name="pref_dashboard_layout">डैशबोर्ड लेआउट</string>
+    <string name="dashboard_layout_desc">चुनें कि डैशबोर्ड कैसे व्यवस्थित है। कार्ड एक बड़ा, अनुकूलन योग्य लेआउट है — टाइल दिखाने, छिपाने और पुन: क्रमित करने के लिए डैशबोर्ड पर पेंसिल टैप करें।</string>
+    <string name="dashboard_layout_classic">क्लासिक</string>
+    <string name="dashboard_layout_cards">कार्ड</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">निष्क्रिय</string>
+    <string name="power_state_accelerating">तेज़ हो रहा है</string>
+    <string name="power_state_decelerating">धीमा हो रहा है</string>
+    <string name="power_state_charging">चार्ज हो रहा है</string>
+    <string name="speed_state_parked">स्थिर</string>
+    <string name="speed_state_driving">चल रहा है</string>
+    <string name="soc_subtitle_usable">उपयोग योग्य चार्ज</string>
+    <string name="range_subtitle_projection">गतिशील प्रक्षेपण</string>
+    <string name="distance_subtitle_session">यह सत्र</string>
+    <string name="odometer_subtitle_lifetime">कुल दूरी</string>
+    <string name="discharge_subtitle_lifetime">कुल निर्गत ऊर्जा</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s दबाव</string>
 </resources>

@@ -44,7 +44,12 @@
     <string name="settings_tab_app">アプリ</string>
     <string name="settings_tab_connections">接続</string>
     <string name="settings_tab_preferences">設定</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">概要 &amp; FAQ</string>
+    <string name="pro_cards_layout_title">カード式ダッシュボードレイアウト</string>
+    <string name="pro_cards_layout_info">より大きく、完全にカスタマイズ可能なダッシュボード：中央のグラフの代わりに、大きく間隔の空いたタイルを表示します。鉛筆をタップしてタイルをドラッグで並べ替え、必要なものを表示・非表示にできます。航続距離タイルをタップすると予測グラフを全画面で開けます。ロック解除後、設定 → ダッシュボードのレイアウトで選択してください。</string>
+    <string name="pro_neon_theme_title">ネオンテーマ</string>
+    <string name="pro_neon_theme_info">純黒でOLEDに優しいダークテーマで、電力メトリクスの数字とアクセントのストライプがネオンのように光り、各カードに繊細なアクセントの縁取りが付きます。ロック解除後、設定 → テーマで選択してください。</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">概要</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">ボットを切断</string>
     <string name="auto_backup_label">自動バックアップ</string>
     <string name="backup_interval_label">バックアップ間隔</string>
+    <string name="wifi_only_label">Wi-Fiのみ</string>
+    <string name="wifi_only_desc">モバイルデータを節約するため、自動バックアップはWi-Fiでのみ実行されます</string>
     <string name="last_auto_backup_label">最終自動バックアップ：%1$s</string>
     <string name="schedule_updated_msg">スケジュールが %1$s に更新されました。次の自動バックアップは新しい間隔に従います。</string>
     <string name="telegram_setup_info">接続後、バックアップを手動またはスケジュールで送信できます。各バックアップはプライベートチャットに.dbファイルとして届き、Telegramがある任意のデバイスからアクセスできます。</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">システム</string>
     <string name="theme_light">ライト</string>
     <string name="theme_dark">ダーク</string>
+    <string name="theme_neon">ネオン</string>
     <string name="pref_language">言語</string>
     <string name="language_desc">アプリの表示言語を選択します。言語を選択すると、このアプリのデバイスシステム言語が上書きされます。</string>
     <string name="change_language_action">言語を変更</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">有効 — この車両のProが生涯有効化されています。</string>
     <string name="remove_code_action">コードを削除</string>
     <string name="remove_code_title">Proロック解除コードを削除しますか？</string>
-    <string name="remove_code_msg">これにより、この車両のProがオフになり、Pro機能（セル不均衡アラート、バッテリー健康レポート、スクリーンショット、SDカードバックアップ）が無効になります。コードは失われません — いつでも再入力して再度ロック解除できます。</string>
-    <string name="pro_unlock_desc">バッテリーセル不均衡アラートやダッシュボードスクリーンショットなどのプレミアム機能を、お使いの車両の一回限りのコードでロック解除 — €9.99、生涯、1台の車。デバイス上で検証 — 車から何も送信されません。</string>
+    <string name="remove_code_msg">これにより、この車両のProがオフになり、Pro機能（カード式ダッシュボードレイアウト、ネオンテーマ、セル不均衡アラート、バッテリー健康レポート、スクリーンショット、SDカードバックアップ）が無効になります。コードは失われません — いつでも再入力して再度ロック解除できます。</string>
+    <string name="pro_unlock_desc">カード式ダッシュボードレイアウト、ネオンテーマ、セル不均衡アラート、ダッシュボードのスクリーンショットなどのプレミアム機能を、お使いの車専用の一回限りのコードでロック解除します — 9.99 €、生涯、車1台。デバイス上で検証 — 車から何も送信されません。</string>
     <string name="vehicle_id_section_label">この車両のID（ライセンス購入時にこれを送信）：</string>
     <string name="vehicle_id_reading">読み取り中… 車を起動してから設定を再度開いてください</string>
     <string name="vehicle_id_copied_msg">車両IDをコピーしました</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">インターネットやモバイル信号が必要ですか？</string>
     <string name="faq_a_internet">通常の使用では不要です。トリップ、充電セッション、チャート、ローカル履歴はすべてデバイス上で記録されます。\n\nインターネットは、アプリ更新確認、Webリンクを開く、MQTT / ABRP連携、Telegramバックアップなどのオプション機能にのみ必要です（有効にした場合）。</string>
     <string name="faq_q_pro">BYD Trip Stats Proとは何ですか、何が含まれますか？</string>
-    <string name="faq_a_pro">Proはプレミアム機能のためのオプションの一回限りのロック解除です — 開発をサポートするための小さな感謝の気持ちです。€9.99、一度だけ支払い、1台の車の生涯にわたって使用できます（サブスクリプションなし）。無料だったものはすべて無料のままです。Proは新機能のみを追加します：\n\n• セル不均衡アラート — パックのセル電圧ばらつきが上限を超えたときに通知\n• バッテリー健康レポート — 健康状態、低下率、80%%までの予測日を印刷可能なPDF/HTMLでエクスポート\n• ダッシュボードスクリーンショット — BYDロゴをタップして現在の画面を保存\n• SDカードバックアップ — 取り外し可能なSDカードのBydTripStatsフォルダにデータベースを保存\n\nロック解除：コードはお使いの特定の車に紐付けられています。設定 → 環境設定 → BYD Trip Stats Proを開き、スマートフォンでQRコードをスキャン（または車両IDをコピー）してコードをリクエストし、入力してください。デバイス上で完全に検証されます — アカウント不要、サインイン不要、車から何も送信されません。</string>
+    <string name="faq_a_pro">Proはプレミアム機能のためのオプションの一回限りのロック解除です — 開発をサポートするための小さな感謝の気持ちです。€9.99、一度だけ支払い、1台の車の生涯にわたって使用できます（サブスクリプションなし）。無料だったものはすべて無料のままです。Proは新機能のみを追加します：\n\n• カード式ダッシュボードレイアウト — ドラッグで並べ替え、表示・非表示ができる大きなタイルの、より大きく完全にカスタマイズ可能なダッシュボード\n• ネオンテーマ — 電力の数字が光る、純黒でOLEDに優しい外観\n• セル不均衡アラート — パックのセル電圧ばらつきが上限を超えたときに通知\n• バッテリー健康レポート — 健康状態、低下率、80%%までの予測日を印刷可能なPDF/HTMLでエクスポート\n• ダッシュボードスクリーンショット — BYDロゴをタップして現在の画面を保存\n• SDカードバックアップ — 取り外し可能なSDカードのBydTripStatsフォルダにデータベースを保存\n\nロック解除：コードはお使いの特定の車に紐付けられています。設定 → Proを開き、スマートフォンでQRコードをスキャン（または車両IDをコピー）してコードをリクエストし、入力してください。デバイス上で完全に検証されます — アカウント不要、サインイン不要、車から何も送信されません。</string>
     <string name="faq_q_drive_modes">走行/回生モードに「自動/不明」と表示されるのはなぜですか？</string>
     <string name="faq_a_drive_modes">アプリは車のインストルメントクラスターからドライブモードと回生モードを直接読み取りますが、車は能動的に変更したときのみモード値をブロードキャストします — 起動時の現在のモードは報告されません。\n\n車のディスプレイでモードをタップするまで、アプリには表示する値がなく、「自動」（回生）または「不明」（ドライブ）にフォールバックします。修正するには：\n\n1. 車のタッチスクリーンで各回生レベルを一度ずつ切り替え\n2. 各ドライブモード（エコ/ノーマル/スポーツ）を一度ずつ切り替え\n\nアプリは即座に両方の値を取得し、すべてのトリップデータポイントとともに記録を開始します。これは一度だけ行う必要があります。</string>
     <string name="faq_q_offline_trip">ネットワーク接続がないと、トリップが履歴から欠けますか？</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">USBデバッグを許可するダイアログが画面に表示されます。「許可」をタップしてここに戻ってください。\n\nこれは一回限りの操作です。将来の更新は完全に自動です。</string>
     <string name="adb_granting_msg">バックグラウンドアクセス許可を付与中…</string>
     <string name="authorize_action">認証</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">タイヤ</string>
+    <string name="close">閉じる</string>
+    <string name="range_projection_title">動的予測</string>
+    <string name="dashboard_no_cards_hint">すべてのカードが非表示です。鉛筆をタップして一部を戻します。</string>
+    <string name="reorder_card">ドラッグして並べ替え</string>
+    <string name="pref_dashboard_layout">ダッシュボードのレイアウト</string>
+    <string name="dashboard_layout_desc">ダッシュボードの配置方法を選択します。カードはより大きくカスタマイズ可能なレイアウトです — ダッシュボードの鉛筆をタップしてタイルの表示・非表示・並べ替えができます。</string>
+    <string name="dashboard_layout_classic">クラシック</string>
+    <string name="dashboard_layout_cards">カード</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">アイドル</string>
+    <string name="power_state_accelerating">加速中</string>
+    <string name="power_state_decelerating">減速中</string>
+    <string name="power_state_charging">充電中</string>
+    <string name="speed_state_parked">停止中</string>
+    <string name="speed_state_driving">走行中</string>
+    <string name="soc_subtitle_usable">使用可能な充電量</string>
+    <string name="range_subtitle_projection">動的予測</string>
+    <string name="distance_subtitle_session">このセッション</string>
+    <string name="odometer_subtitle_lifetime">総走行距離</string>
+    <string name="discharge_subtitle_lifetime">総放電エネルギー</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s 圧力</string>
 </resources>

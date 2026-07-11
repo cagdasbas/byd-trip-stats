@@ -17,6 +17,7 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -82,6 +83,21 @@ fun DashboardScreen(
     val dashboardIconsEnabled by prefs.dashboardAnimationsEnabled
         .collectAsState(initial = prefs.getCachedAnimationsEnabled())
     val socSource by prefs.socSource.collectAsState(initial = prefs.getCachedSocSource())
+
+    val isPro by com.byd.tripstats.data.entitlement.EntitlementManager.isPro.collectAsState()
+    val dashboardLayout by prefs.dashboardLayout.collectAsState(initial = prefs.getCachedDashboardLayout())
+    val useCardsLayout = isPro && dashboardLayout == com.byd.tripstats.data.preferences.DashboardLayout.CARDS
+    // Editing the CARDS grid is a full-screen action; in a narrow split-screen window the
+    // grid reflows to a compact read-only view, so the edit (pencil) affordance is hidden.
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isSplitNarrow = remember(configuration.screenWidthDp) {
+        val dmet = android.content.res.Resources.getSystem().displayMetrics
+        val fullDp = maxOf(dmet.widthPixels, dmet.heightPixels) / dmet.density
+        fullDp > 0f && configuration.screenWidthDp < fullDp * 0.72f
+    }
+    var cardsEditMode by remember { mutableStateOf(false) }
+    LaunchedEffect(useCardsLayout, isSplitNarrow) { if (!useCardsLayout || isSplitNarrow) cardsEditMode = false }
+
     val scope = rememberCoroutineScope()
     var showCarSelectionDialog by remember { mutableStateOf(false) }
     var showBattery12vDialog by remember { mutableStateOf(false) }
@@ -107,6 +123,7 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                modifier = Modifier.shadow(elevation = 6.dp),
                 title = {
                     selectedCar?.let { car ->
                         Text(
@@ -132,7 +149,11 @@ fun DashboardScreen(
                         }
                     }
 
-                    if (!dashboardIconsEnabled) {
+                    // The battery + consumption shortcuts normally live inside the
+                    // animated Classic diagram, so the top bar only shows them when
+                    // animations are off. The CARDS layout has no such host, so it must
+                    // always show them (except while editing cards).
+                    if ((!dashboardIconsEnabled || useCardsLayout) && !cardsEditMode) {
                         IconButton(onClick = onNavigateToCharging) {
                             CompactBattery(
                                 soc = (if (socSource == SocSource.PANEL) telemetry?.socPanel?.toFloat() else telemetry?.soc?.toFloat()) ?: 0f,
@@ -154,16 +175,31 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
 
-                    IconButton(onClick = onNavigateToHistory) {
-                        Icon(
-                            imageVector = Icons.Filled.History,
-                            contentDescription = "Trip History",
-                            tint = BatteryBlue,
-                            modifier = Modifier.size(28.dp)
-                        )
+                    if (!cardsEditMode) {
+                        IconButton(onClick = onNavigateToHistory) {
+                            Icon(
+                                imageVector = Icons.Filled.History,
+                                contentDescription = "Trip History",
+                                tint = BatteryBlue,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    if (useCardsLayout && !isSplitNarrow) {
+                        IconButton(onClick = { cardsEditMode = !cardsEditMode }) {
+                            Icon(
+                                imageVector = if (cardsEditMode) Icons.Filled.Done else Icons.Filled.Edit,
+                                contentDescription = if (cardsEditMode) "Done editing" else "Edit dashboard cards",
+                                tint = if (cardsEditMode) RegenGreen else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
 
                     BadgedBox(
                         modifier = Modifier.padding(end = 8.dp),
@@ -237,6 +273,8 @@ fun DashboardScreen(
                 liveOffStateMs = liveOffStateMs,
                 liveAccumulatedKwh = liveAccumulatedKwh,
                 activeRangeModel = activeRangeModel,
+                useCardsLayout = useCardsLayout,
+                cardsEditMode = cardsEditMode,
                 modifier = Modifier.padding(paddingValues)
             )
             if (currentTelemetry.speedGetterWedged) {
@@ -429,12 +467,65 @@ fun DashboardContent(
     liveOffStateMs: Long = 0L,
     liveAccumulatedKwh: Double = 0.0,
     activeRangeModel: DashboardViewModel.RangeModel = DashboardViewModel.RangeModel.BASELINE,
+    useCardsLayout: Boolean = false,
+    cardsEditMode: Boolean = false,
 ) {
     val context = LocalContext.current
     val prefs = remember { PreferencesManager(context.applicationContext) }
     val unitSystem by prefs.unitSystem.collectAsState(initial = prefs.getCachedUnitSystem())
 
     val styledModifier = modifier.background(MaterialTheme.colorScheme.background)
+
+    if (useCardsLayout) {
+        CardsDashboard(
+            telemetry = telemetry,
+            vehicleSnapshot = vehicleSnapshot,
+            tripDataPoints = tripDataPoints,
+            activeRangeModel = activeRangeModel,
+            socSource = socSource,
+            editMode = cardsEditMode,
+            sessionDistanceKm = sessionDistanceKm,
+            tripDistanceKm = tripDistanceKm,
+            tyreUnit = tyreUnit,
+            isInTrip = isInTrip,
+            autoTripDetection = autoTripDetection,
+            onStartTrip = onStartTrip,
+            onEndTrip = onEndTrip,
+            onToggleAutoDetection = onToggleAutoDetection,
+            liveSessionStartMs = liveSessionStartMs,
+            liveOffStateMs = liveOffStateMs,
+            liveOdometerDistanceKm = liveOdometerDistanceKm,
+            liveAccumulatedKwh = liveAccumulatedKwh,
+            unitSystem = unitSystem,
+            onNavigateToBatteryDegradation = onNavigateToBatteryDegradation,
+            onShowBattery12vHistory = onShowBattery12vHistory,
+            onShowTyreDialog = onShowTyreDialog,
+            modifier = styledModifier
+        )
+        // The CARDS layout has no EnergyFlow to host the consumption charts, so open
+        // them in a dialog when the top-bar icon is tapped.
+        if (consumptionExpanded) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = onConsumptionClose,
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.82f),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    com.byd.tripstats.ui.components.ConsumptionChartExpanded(
+                        weeklyData = weeklyEfficiency,
+                        monthlyData = monthlyEfficiency,
+                        yearlyData = yearlyEfficiency,
+                        onClose = onConsumptionClose,
+                        modifier = Modifier.fillMaxSize().padding(12.dp)
+                    )
+                }
+            }
+        }
+        return
+    }
 
     when (widthSizeClass) {
         WindowWidthSizeClass.Compact -> {

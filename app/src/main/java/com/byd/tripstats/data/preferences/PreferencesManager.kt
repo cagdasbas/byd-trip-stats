@@ -35,6 +35,11 @@ private val SOH_EXCLUSION_MODE           = stringPreferencesKey("soh_exclusion_m
 private val SOH_CUSTOM_CUTOFF_MS         = longPreferencesKey("soh_custom_cutoff_ms")
 private val UNIT_SYSTEM                  = stringPreferencesKey("unit_system")
 private val THEME_MODE                   = stringPreferencesKey("theme_mode")
+private val DASHBOARD_LAYOUT             = stringPreferencesKey("dashboard_layout")
+private val DASHBOARD_CARD_ORDER         = stringPreferencesKey("dashboard_card_order")
+private val DASHBOARD_HIDDEN_CARDS       = stringPreferencesKey("dashboard_hidden_cards")
+private val DASHBOARD_CHART_HIDDEN       = booleanPreferencesKey("dashboard_chart_hidden")
+private val DASHBOARD_POWER_ORDER        = stringPreferencesKey("dashboard_power_order")
 private val SOC_SOURCE                   = stringPreferencesKey("soc_source")
 private val CAR_OFF_TIMEOUT_MINUTES      = intPreferencesKey("car_off_timeout_minutes")
 private val CONFIRM_BEFORE_AUTO_STOP     = booleanPreferencesKey("confirm_before_auto_stop")
@@ -99,6 +104,83 @@ class PreferencesManager(private val context: Context) {
     suspend fun saveDashboardAnimationsEnabled(enabled: Boolean) {
         context.dataStore.edit { it[DASHBOARD_ANIMATIONS_ENABLED] = enabled }
         cache.edit().putBoolean("animations_enabled", enabled).apply()
+    }
+
+    // ── Dashboard layout (Pro) ────────────────────────────────────────────────
+    // CLASSIC is the chart-centric default for everyone; CARDS is the Pro-only
+    // customisable tile layout. Gating is enforced at the UI (EntitlementManager);
+    // this only persists the user's choice.
+
+    val dashboardLayout: Flow<DashboardLayout> = context.dataStore.data
+        .map {
+            it[DASHBOARD_LAYOUT]?.let { name -> runCatching { DashboardLayout.valueOf(name) }.getOrNull() }
+                ?: DashboardLayout.CLASSIC
+        }
+        .onEach { cache.edit().putString("dashboard_layout", it.name).apply() }
+
+    fun getCachedDashboardLayout(): DashboardLayout =
+        cache.getString("dashboard_layout", null)
+            ?.let { runCatching { DashboardLayout.valueOf(it) }.getOrNull() }
+            ?: DashboardLayout.CLASSIC
+
+    suspend fun saveDashboardLayout(layout: DashboardLayout) {
+        context.dataStore.edit { it[DASHBOARD_LAYOUT] = layout.name }
+        cache.edit().putString("dashboard_layout", layout.name).apply()
+    }
+
+    // All three are mirrored into the startup cache so the CARDS layout renders the
+    // saved order/visibility on the very first frame — no flash of the default order.
+
+    /** Ordered list of the customisable middle-section cards (CARDS layout). */
+    val dashboardCardOrder: Flow<List<DashboardCardId>> = context.dataStore.data
+        .map { DashboardCardId.parseOrder(it[DASHBOARD_CARD_ORDER]) }
+        .onEach { cache.edit().putString("dashboard_card_order", it.joinToString(",") { id -> id.name }).apply() }
+
+    fun getCachedDashboardCardOrder(): List<DashboardCardId> =
+        DashboardCardId.parseOrder(cache.getString("dashboard_card_order", null))
+
+    /** Cards the user has hidden in the CARDS layout. */
+    val dashboardHiddenCards: Flow<Set<DashboardCardId>> = context.dataStore.data
+        .map { DashboardCardId.parseHidden(it[DASHBOARD_HIDDEN_CARDS]) }
+        .onEach { cache.edit().putString("dashboard_hidden_cards", it.joinToString(",") { id -> id.name }).apply() }
+
+    fun getCachedDashboardHiddenCards(): Set<DashboardCardId> =
+        DashboardCardId.parseHidden(cache.getString("dashboard_hidden_cards", null))
+
+    suspend fun saveDashboardCardLayout(order: List<DashboardCardId>, hidden: Set<DashboardCardId>) {
+        val orderCsv = order.joinToString(",") { id -> id.name }
+        val hiddenCsv = hidden.joinToString(",") { id -> id.name }
+        context.dataStore.edit {
+            it[DASHBOARD_CARD_ORDER] = orderCsv
+            it[DASHBOARD_HIDDEN_CARDS] = hiddenCsv
+        }
+        cache.edit().putString("dashboard_card_order", orderCsv).putString("dashboard_hidden_cards", hiddenCsv).apply()
+    }
+
+    /** Order of the always-visible power-metric tiles (CARDS layout). */
+    val dashboardPowerOrder: Flow<List<PowerMetricId>> = context.dataStore.data
+        .map { PowerMetricId.parseOrder(it[DASHBOARD_POWER_ORDER]) }
+        .onEach { cache.edit().putString("dashboard_power_order", it.joinToString(",") { id -> id.name }).apply() }
+
+    fun getCachedDashboardPowerOrder(): List<PowerMetricId> =
+        PowerMetricId.parseOrder(cache.getString("dashboard_power_order", null))
+
+    suspend fun saveDashboardPowerOrder(order: List<PowerMetricId>) {
+        val csv = order.joinToString(",") { id -> id.name }
+        context.dataStore.edit { it[DASHBOARD_POWER_ORDER] = csv }
+        cache.edit().putString("dashboard_power_order", csv).apply()
+    }
+
+    /** Whether the pinned centre range-projection chart is hidden (CARDS layout). */
+    val dashboardChartHidden: Flow<Boolean> = context.dataStore.data
+        .map { it[DASHBOARD_CHART_HIDDEN] ?: false }
+        .onEach { cache.edit().putBoolean("dashboard_chart_hidden", it).apply() }
+
+    fun getCachedDashboardChartHidden(): Boolean = cache.getBoolean("dashboard_chart_hidden", false)
+
+    suspend fun saveDashboardChartHidden(hidden: Boolean) {
+        context.dataStore.edit { it[DASHBOARD_CHART_HIDDEN] = hidden }
+        cache.edit().putBoolean("dashboard_chart_hidden", hidden).apply()
     }
 
     // ── Keep service alive when off ───────────────────────────────────────────

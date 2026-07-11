@@ -44,7 +44,12 @@
     <string name="settings_tab_app">App</string>
     <string name="settings_tab_connections">Connections</string>
     <string name="settings_tab_preferences">Preferences</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">About &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Cards dashboard layout</string>
+    <string name="pro_cards_layout_info">A larger, fully customisable dashboard: big, well-spaced tiles instead of the central chart. Tap the pencil to drag-reorder tiles, show or hide the ones you want, and tap the Range tile to open the projection chart full-size. Choose it under Preferences → Dashboard Layout once unlocked.</string>
+    <string name="pro_neon_theme_title">Neon theme</string>
+    <string name="pro_neon_theme_info">A pure-black, OLED-friendly dark theme whose power-metric digits and accent stripes glow like neon, with a subtle accent edge on every card. Pick it under Preferences → Theme once unlocked.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Overview</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">Disconnect bot</string>
     <string name="auto_backup_label">Automatic backup</string>
     <string name="backup_interval_label">Backup interval</string>
+    <string name="wifi_only_label">Wi-Fi only</string>
+    <string name="wifi_only_desc">Auto-backups run only on Wi-Fi to save mobile data</string>
     <string name="last_auto_backup_label">Last auto-backup: %1$s</string>
     <string name="schedule_updated_msg">Schedule updated to %1$s. Next auto-backup will follow the new interval.</string>
     <string name="telegram_setup_info">Once connected, backups can be sent manually or on a schedule. Each backup lands as a .db file in your private chat, accessible from any device with Telegram.</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Language</string>
     <string name="language_desc">Choose the app display language. Selecting a language overrides the device system language for this app.</string>
     <string name="change_language_action">Change language</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">Active — Pro unlocked for this vehicle (lifetime).</string>
     <string name="remove_code_action">Remove code</string>
     <string name="remove_code_title">Remove Pro unlock code?</string>
-    <string name="remove_code_msg">This turns Pro off on this vehicle and disables the Pro features (cell imbalance alert, battery health report, screenshots, SD card backup). Your code isn\'t lost — you can re-enter it anytime to unlock again.</string>
-    <string name="pro_unlock_desc">Unlock premium features like the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle — €9.99, lifetime, one car. Verified on-device — nothing leaves your car.</string>
+    <string name="remove_code_msg">This turns Pro off on this vehicle and disables the Pro features (Cards dashboard layout, Neon theme, cell imbalance alert, battery health report, screenshots, SD card backup). Your code isn\'t lost — you can re-enter it anytime to unlock again.</string>
+    <string name="pro_unlock_desc">Unlock premium features like the Cards dashboard layout, the Neon theme, the battery cell imbalance alert and dashboard screenshots with a one-time code for your vehicle — €9.99, lifetime, one car. Verified on-device — nothing leaves your car.</string>
     <string name="vehicle_id_section_label">This vehicle\'s ID (send this when buying a licence):</string>
     <string name="vehicle_id_reading">Reading… start the car, then reopen Settings</string>
     <string name="vehicle_id_copied_msg">Vehicle ID copied</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">Do I need internet or mobile signal?</string>
     <string name="faq_a_internet">No for normal use. Trips, charging sessions, charts, and local history are recorded entirely on-device.\n\nInternet is only needed for optional features such as app update checks, opening web links, MQTT / ABRP integration and Telegram backups if you enable them.</string>
     <string name="faq_q_pro">What is BYD Trip Stats Pro and what does it include?</string>
-    <string name="faq_a_pro">Pro is an optional one-time unlock for premium extras — a small thank-you that helps support development. It\'s €9.99, paid once, for the lifetime of one vehicle (no subscription). Everything that was free stays free; Pro only adds new features:\n\n• Cell imbalance alert — get notified when the pack\'s cell-voltage spread stays above a limit\n• Battery health report — export a printable PDF/HTML of your State of Health, decline rate and projected date to 80%%\n• Dashboard screenshots — tap the BYD logo to save the current screen\n• SD card backup — save the database to a BydTripStats folder on a removable SD card\n\nUnlocking: the code is tied to your specific car. Open Settings → Preferences → BYD Trip Stats Pro, scan the QR code with your phone (or copy your Vehicle ID) to request a code, then paste it back in. It\'s verified entirely on-device — no account, no sign-in, nothing leaves your car.</string>
+    <string name="faq_a_pro">Pro is an optional one-time unlock for premium extras — a small thank-you that helps support development. It\'s €9.99, paid once, for the lifetime of one vehicle (no subscription). Everything that was free stays free; Pro only adds new features:\n\n• Cards dashboard layout — a larger, fully customisable dashboard of big tiles you can drag-reorder, show or hide\n• Neon theme — a pure-black, OLED-friendly look with glowing power digits\n• Cell imbalance alert — get notified when the pack\'s cell-voltage spread stays above a limit\n• Battery health report — export a printable PDF/HTML of your State of Health, decline rate and projected date to 80%%\n• Dashboard screenshots — tap the BYD logo to save the current screen\n• SD card backup — save the database to a BydTripStats folder on a removable SD card\n\nUnlocking: the code is tied to your specific car. Open Settings → Pro, scan the QR code with your phone (or copy your Vehicle ID) to request a code, then paste it back in. It\'s verified entirely on-device — no account, no sign-in, nothing leaves your car.</string>
     <string name="faq_q_drive_modes">Why is \'auto/unknown\' shown at driving / regen modes?</string>
     <string name="faq_a_drive_modes">The app reads drive and regen modes directly from the car\'s instrument cluster, but the car only broadcasts a mode value when you actively change it — it does not report the current mode on startup.\n\nUntil you tap a mode on the car display, the app has no value to show and falls back to \'Auto\' (regen) or \'Unknown\' (drive). To fix this:\n\n1. Cycle through each regen level on the car\'s touchscreen once\n2. Cycle through each drive mode (Eco / Normal / Sport) once\n\nThe app will immediately pick up both values and start recording them with every trip data point. You only need to do this once.</string>
     <string name="faq_q_offline_trip">No network connectivity means trip will be missing from the history?</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">A dialog should appear on screen asking to allow USB debugging. Tap Allow, then return here.\n\nThis is a one-time action. Future updates are fully automatic.</string>
     <string name="adb_granting_msg">Granting background permissions…</string>
     <string name="authorize_action">Authorize</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Tyres</string>
+    <string name="close">Close</string>
+    <string name="range_projection_title">Dynamic Projection</string>
+    <string name="dashboard_no_cards_hint">All cards hidden. Tap the pencil to add some back.</string>
+    <string name="reorder_card">Drag to reorder</string>
+    <string name="pref_dashboard_layout">Dashboard Layout</string>
+    <string name="dashboard_layout_desc">Choose how the dashboard is arranged. Cards is a larger, customisable layout — tap the pencil on the dashboard to show, hide and reorder tiles.</string>
+    <string name="dashboard_layout_classic">Classic</string>
+    <string name="dashboard_layout_cards">Cards</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Idle</string>
+    <string name="power_state_accelerating">Accelerating</string>
+    <string name="power_state_decelerating">Decelerating</string>
+    <string name="power_state_charging">Charging</string>
+    <string name="speed_state_parked">Stationary</string>
+    <string name="speed_state_driving">Driving</string>
+    <string name="soc_subtitle_usable">Usable charge</string>
+    <string name="range_subtitle_projection">Dynamic projection</string>
+    <string name="distance_subtitle_session">This session</string>
+    <string name="odometer_subtitle_lifetime">Lifetime distance</string>
+    <string name="discharge_subtitle_lifetime">Lifetime energy out</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s pressure</string>
 </resources>

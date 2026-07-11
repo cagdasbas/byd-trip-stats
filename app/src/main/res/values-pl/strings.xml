@@ -41,7 +41,12 @@
     <string name="settings_tab_app">Aplikacja</string>
     <string name="settings_tab_connections">Połączenia</string>
     <string name="settings_tab_preferences">Preferencje</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">O aplikacji i FAQ</string>
+    <string name="pro_cards_layout_title">Układ pulpitu z kartami</string>
+    <string name="pro_cards_layout_info">Większy, w pełni konfigurowalny pulpit: duże, dobrze rozmieszczone kafelki zamiast centralnego wykresu. Dotknij ołówka, aby zmieniać kolejność kafelków przez przeciąganie oraz pokazywać lub ukrywać wybrane, a dotknięcie kafelka Zasięg otwiera wykres projekcji na pełnym ekranie. Wybierz go w Preferencje → Układ pulpitu po odblokowaniu.</string>
+    <string name="pro_neon_theme_title">Motyw Neon</string>
+    <string name="pro_neon_theme_info">Czysto czarny, przyjazny dla OLED ciemny motyw, którego cyfry wskaźników mocy i paski akcentu świecą jak neon, z subtelną krawędzią akcentu na każdej karcie. Wybierz go w Preferencje → Motyw po odblokowaniu.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Przegląd</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">Odłącz bota</string>
     <string name="auto_backup_label">Automatyczna kopia zapasowa</string>
     <string name="backup_interval_label">Częstotliwość kopii</string>
+    <string name="wifi_only_label">Tylko Wi-Fi</string>
+    <string name="wifi_only_desc">Automatyczne kopie działają tylko przez Wi-Fi, aby oszczędzać dane mobilne</string>
     <string name="last_auto_backup_label">Ostatnia autokopia: %1$s</string>
     <string name="schedule_updated_msg">Harmonogram zmieniony na %1$s. Następna autokopia użyje nowego interwału.</string>
     <string name="telegram_setup_info">Po połączeniu kopie można wysyłać ręcznie lub według harmonogramu. Każda kopia trafia jako plik .db do Twojego prywatnego czatu, dostępnego z każdego urządzenia z Telegramem.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">Systemowy</string>
     <string name="theme_light">Jasny</string>
     <string name="theme_dark">Ciemny</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Język</string>
     <string name="language_desc">Wybierz język wyświetlania aplikacji. Wybór języka nadpisuje systemowy język urządzenia dla tej aplikacji.</string>
     <string name="change_language_action">Zmień język</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">Aktywne — Pro odblokowane dla tego pojazdu (dożywotnio).</string>
     <string name="remove_code_action">Usuń kod</string>
     <string name="remove_code_title">Usunąć kod odblokowujący Pro?</string>
-    <string name="remove_code_msg">To wyłącza Pro w tym pojeździe i dezaktywuje funkcje Pro (alert nierównowagi ogniw, raport kondycji baterii, zrzuty ekranu, kopia na kartę SD). Twój kod nie przepada — możesz go wpisać ponownie w każdej chwili, aby odblokować.</string>
-    <string name="pro_unlock_desc">Odblokuj funkcje premium, jak alert nierównowagi ogniw i zrzuty ekranu pulpitu, jednorazowym kodem dla Twojego pojazdu — 9,99 €, dożywotnio, jeden samochód. Weryfikacja na urządzeniu — nic nie opuszcza Twojego auta.</string>
+    <string name="remove_code_msg">Wyłącza to Pro w tym pojeździe i dezaktywuje funkcje Pro (układ pulpitu z kartami, motyw Neon, alert nierównowagi ogniw, raport kondycji baterii, zrzuty ekranu, kopia na kartę SD). Twój kod nie przepada — możesz wpisać go ponownie w każdej chwili, aby znów odblokować.</string>
+    <string name="pro_unlock_desc">Odblokuj funkcje premium, takie jak układ pulpitu z kartami, motyw Neon, alert nierównowagi ogniw i zrzuty ekranu pulpitu, jednorazowym kodem dla swojego pojazdu — 9,99 €, dożywotnio, jeden samochód. Weryfikacja na urządzeniu — nic nie opuszcza Twojego auta.</string>
     <string name="vehicle_id_section_label">ID tego pojazdu (wyślij je przy zakupie licencji):</string>
     <string name="vehicle_id_reading">Odczytywanie… uruchom samochód, potem otwórz Ustawienia ponownie</string>
     <string name="vehicle_id_copied_msg">Skopiowano ID pojazdu</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">Czy potrzebuję internetu lub sygnału komórkowego?</string>
     <string name="faq_a_internet">Nie do normalnego użytku. Podróże, sesje ładowania, wykresy i lokalna historia są rejestrowane w całości na urządzeniu.\n\nInternet jest potrzebny tylko do opcjonalnych funkcji, takich jak sprawdzanie aktualizacji, otwieranie linków, integracja MQTT / ABRP i kopie zapasowe Telegram, jeśli je włączysz.</string>
     <string name="faq_q_pro">Czym jest BYD Trip Stats Pro i co zawiera?</string>
-    <string name="faq_a_pro">Pro to opcjonalne jednorazowe odblokowanie dodatków premium — małe podziękowanie wspierające rozwój aplikacji. Kosztuje 9,99 €, płatne raz, na cały okres życia jednego pojazdu (bez subskrypcji). Wszystko, co było darmowe, pozostaje darmowe; Pro dodaje tylko nowe funkcje:\n\n• Alert nierównowagi ogniw — powiadomienie, gdy rozrzut napięć ogniw pakietu utrzymuje się powyżej limitu\n• Raport kondycji baterii — eksport gotowego do druku PDF/HTML z SoH, tempem spadku i prognozowaną datą osiągnięcia 80%%\n• Zrzuty ekranu pulpitu — dotknij logo BYD, aby zapisać bieżący ekran\n• Kopia na kartę SD — zapis bazy danych do folderu BydTripStats na wyjmowanej karcie SD\n\nOdblokowanie: kod jest powiązany z Twoim konkretnym samochodem. Otwórz Ustawienia → Preferencje → BYD Trip Stats Pro, zeskanuj kod QR telefonem (lub skopiuj swoje ID pojazdu), aby poprosić o kod, a potem wklej go z powrotem. Weryfikacja odbywa się w całości na urządzeniu — bez konta, bez logowania, nic nie opuszcza Twojego auta.</string>
+    <string name="faq_a_pro">Pro to opcjonalne jednorazowe odblokowanie dodatków premium — małe podziękowanie wspierające rozwój aplikacji. Kosztuje 9,99 €, płatne raz, na cały okres życia jednego pojazdu (bez subskrypcji). Wszystko, co było darmowe, pozostaje darmowe; Pro dodaje tylko nowe funkcje:\n\n• Układ pulpitu z kartami — większy, w pełni konfigurowalny pulpit z dużych kafelków, które możesz przeciągać, pokazywać lub ukrywać\n• Motyw Neon — czysto czarny, przyjazny dla OLED wygląd ze świecącymi cyframi mocy\n• Alert nierównowagi ogniw — powiadomienie, gdy rozrzut napięć ogniw pakietu utrzymuje się powyżej limitu\n• Raport kondycji baterii — eksport gotowego do druku PDF/HTML z SoH, tempem spadku i prognozowaną datą osiągnięcia 80%%\n• Zrzuty ekranu pulpitu — dotknij logo BYD, aby zapisać bieżący ekran\n• Kopia na kartę SD — zapis bazy danych do folderu BydTripStats na wyjmowanej karcie SD\n\nOdblokowanie: kod jest powiązany z Twoim konkretnym samochodem. Otwórz Ustawienia → Pro, zeskanuj kod QR telefonem (lub skopiuj swoje ID pojazdu), aby poprosić o kod, a potem wklej go z powrotem. Weryfikacja odbywa się w całości na urządzeniu — bez konta, bez logowania, nic nie opuszcza Twojego auta.</string>
     <string name="faq_q_drive_modes">Dlaczego przy trybach jazdy / rekuperacji widnieje \'auto/nieznany\'?</string>
     <string name="faq_a_drive_modes">Aplikacja odczytuje tryby jazdy i rekuperacji bezpośrednio z zestawu wskaźników samochodu, ale samochód rozgłasza wartość trybu tylko wtedy, gdy aktywnie go zmienisz — nie raportuje bieżącego trybu przy uruchomieniu.\n\nDopóki nie dotkniesz trybu na ekranie samochodu, aplikacja nie ma wartości do pokazania i wraca do \'Auto\' (rekuperacja) lub \'Nieznany\' (jazda). Aby to naprawić:\n\n1. Przełącz raz każdy poziom rekuperacji na ekranie dotykowym samochodu\n2. Przełącz raz każdy tryb jazdy (Eco / Normal / Sport)\n\nAplikacja natychmiast przechwyci obie wartości i zacznie zapisywać je z każdym punktem danych podróży. Wystarczy to zrobić raz.</string>
     <string name="faq_q_offline_trip">Czy brak łączności sieciowej oznacza, że podróży zabraknie w historii?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">Na ekranie powinno pojawić się okno z pytaniem o zezwolenie na debugowanie USB. Dotknij Zezwól, potem wróć tutaj.\n\nTo jednorazowa czynność. Przyszłe aktualizacje są w pełni automatyczne.</string>
     <string name="adb_granting_msg">Przyznawanie uprawnień w tle…</string>
     <string name="authorize_action">Autoryzuj</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Opony</string>
+    <string name="close">Zamknij</string>
+    <string name="range_projection_title">Projekcja dynamiczna</string>
+    <string name="dashboard_no_cards_hint">Wszystkie karty ukryte. Dotknij ołówka, aby dodać niektóre z powrotem.</string>
+    <string name="reorder_card">Przeciągnij, aby zmienić kolejność</string>
+    <string name="pref_dashboard_layout">Układ pulpitu</string>
+    <string name="dashboard_layout_desc">Wybierz sposób rozmieszczenia pulpitu. Karty to większy, konfigurowalny układ — dotknij ołówka na pulpicie, aby pokazywać, ukrywać i zmieniać kolejność kafelków.</string>
+    <string name="dashboard_layout_classic">Klasyczny</string>
+    <string name="dashboard_layout_cards">Karty</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Bezczynny</string>
+    <string name="power_state_accelerating">Przyspieszanie</string>
+    <string name="power_state_decelerating">Zwalnianie</string>
+    <string name="power_state_charging">Ładowanie</string>
+    <string name="speed_state_parked">Nieruchomo</string>
+    <string name="speed_state_driving">Jazda</string>
+    <string name="soc_subtitle_usable">Użyteczny ładunek</string>
+    <string name="range_subtitle_projection">Projekcja dynamiczna</string>
+    <string name="distance_subtitle_session">Ta sesja</string>
+    <string name="odometer_subtitle_lifetime">Całkowity dystans</string>
+    <string name="discharge_subtitle_lifetime">Całkowita oddana energia</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s ciśnienie</string>
 </resources>

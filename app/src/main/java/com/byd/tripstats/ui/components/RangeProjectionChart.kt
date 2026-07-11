@@ -110,6 +110,7 @@ fun RangeProjectionChart(
     liveSoc: Double = 100.0,
     liveElectricRangeKm: Int = 0,
     useImperial: Boolean = false,
+    compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // ── Config values ────────────────────────────────────────────────────────
@@ -232,7 +233,7 @@ fun RangeProjectionChart(
                 else                                          -> MaterialTheme.colorScheme.onSurfaceVariant
             }
 
-            Row(
+            if (!compact) Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -713,7 +714,7 @@ fun RangeProjectionChart(
             }
 
             // ── Legend ────────────────────────────────────────────────────────────
-            Row(
+            if (!compact) Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 2.dp),

@@ -41,7 +41,12 @@
     <string name="settings_tab_app">Aplicație</string>
     <string name="settings_tab_connections">Conexiuni</string>
     <string name="settings_tab_preferences">Preferințe</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Despre și FAQ</string>
+    <string name="pro_cards_layout_title">Aspect de bord cu carduri</string>
+    <string name="pro_cards_layout_info">Un bord mai mare, complet personalizabil: plăci mari, bine distanțate în locul graficului central. Atingeți creionul pentru a reordona plăcile prin glisare, a afișa sau ascunde cele dorite, și atingeți placa Autonomie pentru a deschide graficul de proiecție la dimensiune completă. Alegeți-l din Preferințe → Aspectul bordului după deblocare.</string>
+    <string name="pro_neon_theme_title">Temă Neon</string>
+    <string name="pro_neon_theme_info">O temă întunecată negru pur, prietenoasă cu OLED, ale cărei cifre ale indicatorilor de putere și dungi de accent strălucesc ca neonul, cu o margine de accent subtilă pe fiecare card. Alegeți-o din Preferințe → Temă după deblocare.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Prezentare</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">Deconectează botul</string>
     <string name="auto_backup_label">Backup automat</string>
     <string name="backup_interval_label">Interval de backup</string>
+    <string name="wifi_only_label">Doar Wi-Fi</string>
+    <string name="wifi_only_desc">Backupurile automate rulează doar pe Wi-Fi pentru a economisi date mobile</string>
     <string name="last_auto_backup_label">Ultimul backup automat: %1$s</string>
     <string name="schedule_updated_msg">Programare schimbată la %1$s. Următorul backup automat va urma noul interval.</string>
     <string name="telegram_setup_info">Odată conectat, backupurile pot fi trimise manual sau programat. Fiecare backup ajunge ca fișier .db în chatul dvs. privat, accesibil de pe orice dispozitiv cu Telegram.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">Sistem</string>
     <string name="theme_light">Luminos</string>
     <string name="theme_dark">Întunecat</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Limbă</string>
     <string name="language_desc">Alegeți limba de afișare a aplicației. Selectarea unei limbi suprascrie limba de sistem a dispozitivului pentru această aplicație.</string>
     <string name="change_language_action">Schimbă limba</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">Activ — Pro deblocat pentru acest vehicul (pe viață).</string>
     <string name="remove_code_action">Elimină codul</string>
     <string name="remove_code_title">Eliminați codul de deblocare Pro?</string>
-    <string name="remove_code_msg">Aceasta dezactivează Pro pe acest vehicul și oprește funcțiile Pro (alerta de dezechilibru al celulelor, raportul de sănătate a bateriei, capturile de ecran, backupul pe card SD). Codul dvs. nu se pierde — îl puteți reintroduce oricând pentru a debloca din nou.</string>
-    <string name="pro_unlock_desc">Deblocați funcții premium precum alerta de dezechilibru al celulelor și capturile de ecran ale bordului cu un cod unic pentru vehiculul dvs. — 9,99 €, pe viață, o mașină. Verificat pe dispozitiv — nimic nu părăsește mașina.</string>
+    <string name="remove_code_msg">Aceasta dezactivează Pro pe acest vehicul și dezactivează funcțiile Pro (aspect de bord cu carduri, temă Neon, alertă de dezechilibru al celulelor, raport de sănătate a bateriei, capturi de ecran, backup pe card SD). Codul dvs. nu se pierde — îl puteți reintroduce oricând pentru a debloca din nou.</string>
+    <string name="pro_unlock_desc">Deblocați funcții premium precum aspectul de bord cu carduri, tema Neon, alerta de dezechilibru al celulelor și capturile de ecran ale bordului cu un cod unic pentru vehiculul dvs. — 9,99 €, pe viață, o mașină. Verificat pe dispozitiv — nimic nu părăsește mașina.</string>
     <string name="vehicle_id_section_label">ID-ul acestui vehicul (trimiteți-l la cumpărarea licenței):</string>
     <string name="vehicle_id_reading">Se citește… porniți mașina, apoi redeschideți Setările</string>
     <string name="vehicle_id_copied_msg">ID vehicul copiat</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">Am nevoie de internet sau semnal mobil?</string>
     <string name="faq_a_internet">Nu pentru utilizarea normală. Călătoriile, sesiunile de încărcare, graficele și istoricul local se înregistrează integral pe dispozitiv.\n\nInternetul e necesar doar pentru funcții opționale precum verificarea actualizărilor, deschiderea linkurilor web, integrarea MQTT / ABRP și backupurile Telegram, dacă le activați.</string>
     <string name="faq_q_pro">Ce este BYD Trip Stats Pro și ce include?</string>
-    <string name="faq_a_pro">Pro este o deblocare unică opțională pentru extra-uri premium — o mică mulțumire care ajută la susținerea dezvoltării. Costă 9,99 €, plătiți o dată, pe toată durata de viață a unui vehicul (fără abonament). Tot ce era gratuit rămâne gratuit; Pro doar adaugă funcții noi:\n\n• Alertă dezechilibru celule — primiți notificare când dispersia tensiunii celulelor rămâne peste o limită\n• Raport sănătate baterie — exportați un PDF/HTML tipăribil cu SoH, rata de declin și data proiectată până la 80%%\n• Capturi de ecran ale bordului — atingeți sigla BYD pentru a salva ecranul curent\n• Backup pe card SD — salvați baza de date într-un folder BydTripStats pe un card SD detașabil\n\nDeblocarea: codul e legat de mașina dvs. anume. Deschideți Setări → Preferințe → BYD Trip Stats Pro, scanați codul QR cu telefonul (sau copiați ID-ul vehiculului) pentru a solicita un cod, apoi lipiți-l înapoi. Se verifică integral pe dispozitiv — fără cont, fără autentificare, nimic nu părăsește mașina.</string>
+    <string name="faq_a_pro">Pro este o deblocare unică opțională pentru extra-uri premium — o mică mulțumire care ajută la susținerea dezvoltării. Costă 9,99 €, plătiți o dată, pe toată durata de viață a unui vehicul (fără abonament). Tot ce era gratuit rămâne gratuit; Pro doar adaugă funcții noi:\n\n• Aspect de bord cu carduri — un bord mai mare, complet personalizabil, din plăci mari pe care le puteți reordona prin glisare, afișa sau ascunde\n• Temă Neon — un aspect negru pur, prietenos cu OLED, cu cifre de putere strălucitoare\n• Alertă dezechilibru celule — primiți notificare când dispersia tensiunii celulelor rămâne peste o limită\n• Raport sănătate baterie — exportați un PDF/HTML tipăribil cu SoH, rata de declin și data proiectată până la 80%%\n• Capturi de ecran ale bordului — atingeți sigla BYD pentru a salva ecranul curent\n• Backup pe card SD — salvați baza de date într-un folder BydTripStats pe un card SD detașabil\n\nDeblocarea: codul e legat de mașina dvs. anume. Deschideți Setări → Pro, scanați codul QR cu telefonul (sau copiați ID-ul vehiculului) pentru a solicita un cod, apoi lipiți-l înapoi. Se verifică integral pe dispozitiv — fără cont, fără autentificare, nimic nu părăsește mașina.</string>
     <string name="faq_q_drive_modes">De ce apare \'auto/necunoscut\' la modurile de condus / regenerare?</string>
     <string name="faq_a_drive_modes">Aplicația citește modurile de condus și regenerare direct din blocul de instrumente al mașinii, dar mașina transmite o valoare de mod doar când îl schimbați activ — nu raportează modul curent la pornire.\n\nPână când atingeți un mod pe ecranul mașinii, aplicația nu are ce afișa și revine la \'Auto\' (regenerare) sau \'Necunoscut\' (condus). Pentru a rezolva:\n\n1. Parcurgeți o dată fiecare nivel de regenerare pe ecranul tactil al mașinii\n2. Parcurgeți o dată fiecare mod de condus (Eco / Normal / Sport)\n\nAplicația va prelua imediat ambele valori și va începe să le înregistreze cu fiecare punct de date al călătoriei. Trebuie făcut o singură dată.</string>
     <string name="faq_q_offline_trip">Lipsa conectivității înseamnă că o călătorie va lipsi din istoric?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">Ar trebui să apară pe ecran un dialog care cere permiterea depanării USB. Atingeți Permite, apoi reveniți aici.\n\nEste o acțiune unică. Actualizările viitoare sunt complet automate.</string>
     <string name="adb_granting_msg">Se acordă permisiunile de fundal…</string>
     <string name="authorize_action">Autorizează</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Anvelope</string>
+    <string name="close">Închide</string>
+    <string name="range_projection_title">Proiecție dinamică</string>
+    <string name="dashboard_no_cards_hint">Toate cardurile sunt ascunse. Atingeți creionul pentru a adăuga câteva înapoi.</string>
+    <string name="reorder_card">Trageți pentru a reordona</string>
+    <string name="pref_dashboard_layout">Aspectul bordului</string>
+    <string name="dashboard_layout_desc">Alegeți cum este aranjat bordul. Carduri este un aspect mai mare, personalizabil — atingeți creionul de pe bord pentru a afișa, ascunde și reordona plăcile.</string>
+    <string name="dashboard_layout_classic">Clasic</string>
+    <string name="dashboard_layout_cards">Carduri</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Inactiv</string>
+    <string name="power_state_accelerating">Accelerare</string>
+    <string name="power_state_decelerating">Decelerare</string>
+    <string name="power_state_charging">Se încarcă</string>
+    <string name="speed_state_parked">Staționar</string>
+    <string name="speed_state_driving">În mers</string>
+    <string name="soc_subtitle_usable">Încărcare utilizabilă</string>
+    <string name="range_subtitle_projection">Proiecție dinamică</string>
+    <string name="distance_subtitle_session">Această sesiune</string>
+    <string name="odometer_subtitle_lifetime">Distanță totală</string>
+    <string name="discharge_subtitle_lifetime">Energie totală debitată</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s presiune</string>
 </resources>

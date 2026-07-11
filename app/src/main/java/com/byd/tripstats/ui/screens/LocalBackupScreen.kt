@@ -64,6 +64,7 @@ fun LocalBackupScreen(
     val telegramConfig by telegramManager.config.collectAsState()      // StateFlow — reactive
     val telegramSchedule by telegramManager.schedule.collectAsState()
     val telegramAuto by telegramManager.autoEnabled.collectAsState()
+    val telegramWifiOnly by telegramManager.wifiOnly.collectAsState()
 
     val telegramBackups by telegramManager.telegramBackups.collectAsState()
 
@@ -507,6 +508,45 @@ fun LocalBackupScreen(
                                 icon     = Icons.Filled.CheckCircle,
                                 iconTint = RegenGreen,
                                 onDismiss = { scheduleChanged = null }
+                            )
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // Wi-Fi-only toggle — restricts scheduled backups to unmetered
+                        // networks so they don't eat a limited mobile-data plan.
+                        Row(
+                            modifier          = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.wifi_only_label),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    stringResource(R.string.wifi_only_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked         = telegramWifiOnly,
+                                onCheckedChange = { telegramManager.setWifiOnly(it) },
+                                thumbContent = if (!telegramWifiOnly) {
+                                    {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .background(ToggleUncheckedTrack, CircleShape)
+                                        )
+                                    }
+                                } else null,
+                                colors = SwitchDefaults.colors(
+                                    uncheckedThumbColor  = Color.White,
+                                    uncheckedTrackColor  = ToggleUncheckedTrack,
+                                    uncheckedBorderColor = ToggleUncheckedTrack
+                                )
                             )
                         }
                     }

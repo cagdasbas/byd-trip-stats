@@ -64,6 +64,7 @@ fun TripHistoryScreen(
     var showApplyTagDialog      by remember { mutableStateOf(false) }
 
     val activeFilters = filterState.activeFilterCount
+    val isSplitScreen = com.byd.tripstats.ui.rememberIsSplitScreen()
     val onBackOrCancelSelection: () -> Unit = {
         if (selectionMode) {
             selectionMode = false
@@ -82,7 +83,8 @@ fun TripHistoryScreen(
                             stringResource(R.string.nav_trip_history), fontSize = 18.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable(onClick = onBackOrCancelSelection)
                         )
-                        if (!selectionMode) {
+                        // Subtitle hint is dropped in split-screen where there's no room.
+                        if (!selectionMode && !isSplitScreen) {
                             VerticalDivider(
                                 modifier = Modifier.height(14.dp),
                                 thickness = 1.dp,

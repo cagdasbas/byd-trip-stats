@@ -37,7 +37,12 @@
     <string name="settings_tab_app">แอป</string>
     <string name="settings_tab_connections">การเชื่อมต่อ</string>
     <string name="settings_tab_preferences">การตั้งค่า</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">เกี่ยวกับ &amp; FAQ</string>
+    <string name="pro_cards_layout_title">เค้าโครงแดชบอร์ดแบบการ์ด</string>
+    <string name="pro_cards_layout_info">แดชบอร์ดที่ใหญ่ขึ้นและปรับแต่งได้เต็มที่: ไทล์ขนาดใหญ่ที่เว้นระยะดีแทนกราฟกลาง แตะดินสอเพื่อจัดเรียงไทล์ใหม่ด้วยการลาก แสดงหรือซ่อนไทล์ที่ต้องการ และแตะไทล์ระยะทางเพื่อเปิดกราฟคาดการณ์แบบเต็มขนาด เลือกได้ที่ การตั้งค่า → เค้าโครงแดชบอร์ด เมื่อปลดล็อกแล้ว</string>
+    <string name="pro_neon_theme_title">ธีมนีออน</string>
+    <string name="pro_neon_theme_info">ธีมมืดสีดำสนิทที่เป็นมิตรกับ OLED โดยตัวเลขของค่าพลังงานและแถบเน้นเรืองแสงเหมือนนีออน พร้อมขอบเน้นบาง ๆ บนทุกการ์ด เลือกได้ที่ การตั้งค่า → ธีม เมื่อปลดล็อกแล้ว</string>
     <string name="tab_overview">ภาพรวม</string>
     <string name="tab_charts">กราฟ</string>
     <string name="tab_heatmaps">ฮีตแมป</string>
@@ -416,6 +421,8 @@
     <string name="disconnect_bot_action">ยกเลิกการเชื่อมต่อบอท</string>
     <string name="auto_backup_label">สำรองอัตโนมัติ</string>
     <string name="backup_interval_label">ช่วงเวลาการสำรอง</string>
+    <string name="wifi_only_label">เฉพาะ Wi-Fi</string>
+    <string name="wifi_only_desc">การสำรองข้อมูลอัตโนมัติทำงานเฉพาะบน Wi-Fi เพื่อประหยัดข้อมูลมือถือ</string>
     <string name="last_auto_backup_label">สำรองอัตโนมัติล่าสุด: %1$s</string>
     <string name="schedule_updated_msg">อัปเดตกำหนดการเป็น %1$s การสำรองอัตโนมัติถัดไปจะตามช่วงเวลาใหม่</string>
     <string name="telegram_setup_info">เมื่อเชื่อมต่อแล้ว สามารถส่งการสำรองด้วยตนเองหรือตามกำหนดการ การสำรองแต่ละครั้งจะมาถึงเป็นไฟล์ .db ในแชทส่วนตัวของคุณ</string>
@@ -678,6 +685,7 @@
     <string name="theme_system">ระบบ</string>
     <string name="theme_light">สว่าง</string>
     <string name="theme_dark">มืด</string>
+    <string name="theme_neon">นีออน</string>
     <string name="pref_language">ภาษา</string>
     <string name="language_desc">เลือกภาษาการแสดงผลของแอป การเลือกภาษาจะแทนที่ภาษาของระบบสำหรับแอปนี้</string>
     <string name="change_language_action">เปลี่ยนภาษา</string>
@@ -763,8 +771,8 @@
     <string name="pro_active_label">ใช้งานอยู่ — Pro ปลดล็อกสำหรับรถคันนี้ (ตลอดชีพ)</string>
     <string name="remove_code_action">ลบรหัส</string>
     <string name="remove_code_title">ลบรหัสปลดล็อก Pro?</string>
-    <string name="remove_code_msg">การดำเนินการนี้จะปิดใช้งาน Pro บนรถคันนี้ รหัสของคุณไม่หายไป — คุณสามารถป้อนใหม่ได้ตลอดเวลา</string>
-    <string name="pro_unlock_desc">ปลดล็อกฟีเจอร์พรีเมียมด้วยรหัสเฉพาะสำหรับรถของคุณ — 9.99€ ตลอดชีพ หนึ่งรถ</string>
+    <string name="remove_code_msg">การดำเนินการนี้จะปิด Pro บนรถคันนี้และปิดใช้งานฟีเจอร์ Pro (เค้าโครงแดชบอร์ดแบบการ์ด, ธีมนีออน, การแจ้งเตือนความไม่สมดุลของเซลล์, รายงานสุขภาพแบตเตอรี่, ภาพหน้าจอ, สำรองข้อมูลลงการ์ด SD) รหัสของคุณไม่หายไป — คุณสามารถป้อนใหม่ได้ตลอดเวลาเพื่อปลดล็อกอีกครั้ง</string>
+    <string name="pro_unlock_desc">ปลดล็อกฟีเจอร์พรีเมียม เช่น เค้าโครงแดชบอร์ดแบบการ์ด ธีมนีออน การแจ้งเตือนความไม่สมดุลของเซลล์ และภาพหน้าจอแดชบอร์ด ด้วยรหัสครั้งเดียวสำหรับรถของคุณ — 9.99 € ตลอดอายุการใช้งาน รถหนึ่งคัน ตรวจสอบบนอุปกรณ์ — ไม่มีอะไรออกจากรถของคุณ</string>
     <string name="vehicle_id_section_label">ID ของรถคันนี้ (ส่งเมื่อซื้อใบอนุญาต):</string>
     <string name="vehicle_id_reading">กำลังอ่าน… สตาร์ทรถแล้วเปิดการตั้งค่าอีกครั้ง</string>
     <string name="vehicle_id_copied_msg">คัดลอก ID รถแล้ว</string>
@@ -887,7 +895,7 @@
     <string name="faq_q_internet">ฉันต้องการอินเทอร์เน็ตหรือสัญญาณมือถือหรือไม่?</string>
     <string name="faq_a_internet">ไม่สำหรับการใช้งานปกติ การเดินทาง เซสชันการชาร์จ กราฟ และประวัติท้องถิ่นจะถูกเก็บบนอุปกรณ์ทั้งหมด\n\nอินเทอร์เน็ตจำเป็นสำหรับฟีเจอร์เสริมเท่านั้น</string>
     <string name="faq_q_pro">BYD Trip Stats Pro คืออะไรและรวมอะไรบ้าง?</string>
-    <string name="faq_a_pro">Pro เป็นการปลดล็อกแบบครั้งเดียว (ไม่บังคับ) สำหรับส่วนเสริมพรีเมียม — คำขอบคุณเล็ก ๆ ที่ช่วยสนับสนุนการพัฒนา ราคา 9.99€ จ่ายครั้งเดียวตลอดอายุการใช้งานของรถหนึ่งคัน (ไม่มีการสมัครสมาชิก) ทุกอย่างที่ฟรียังคงฟรี Pro เพิ่มเฉพาะฟีเจอร์ใหม่:\n\n• การแจ้งเตือนความไม่สมดุลของเซลล์ — รับการแจ้งเตือนเมื่อความต่างแรงดันเซลล์ของแพ็คสูงเกินขีดจำกัดต่อเนื่อง\n• รายงานสุขภาพแบตเตอรี่ — ส่งออก PDF/HTML พร้อมพิมพ์ของ State of Health อัตราการเสื่อม และวันที่คาดว่าจะถึง 80%%\n• ภาพหน้าจอแดชบอร์ด — แตะโลโก้ BYD เพื่อบันทึกหน้าจอปัจจุบัน\n• สำรองข้อมูลลงการ์ด SD — บันทึกฐานข้อมูลไปยังโฟลเดอร์ BydTripStats บนการ์ด SD แบบถอดได้\n\nการปลดล็อก: โค้ดผูกกับรถของคุณโดยเฉพาะ เปิด การตั้งค่า → การกำหนดลักษณะ → BYD Trip Stats Pro สแกนโค้ด QR ด้วยโทรศัพท์ (หรือคัดลอก Vehicle ID) เพื่อขอโค้ด แล้ววางกลับเข้าไป การตรวจสอบทำบนอุปกรณ์ทั้งหมด — ไม่มีบัญชี ไม่ต้องลงชื่อเข้าใช้ ไม่มีอะไรออกจากรถของคุณ</string>
+    <string name="faq_a_pro">Pro เป็นการปลดล็อกแบบครั้งเดียว (ไม่บังคับ) สำหรับส่วนเสริมพรีเมียม — คำขอบคุณเล็ก ๆ ที่ช่วยสนับสนุนการพัฒนา ราคา 9.99€ จ่ายครั้งเดียวตลอดอายุการใช้งานของรถหนึ่งคัน (ไม่มีการสมัครสมาชิก) ทุกอย่างที่ฟรียังคงฟรี Pro เพิ่มเฉพาะฟีเจอร์ใหม่:\n\n• เค้าโครงแดชบอร์ดแบบการ์ด — แดชบอร์ดที่ใหญ่ขึ้นและปรับแต่งได้เต็มที่ ประกอบด้วยไทล์ขนาดใหญ่ที่คุณลากจัดเรียง แสดง หรือซ่อนได้\n• ธีมนีออน — รูปลักษณ์สีดำสนิทที่เป็นมิตรกับ OLED พร้อมตัวเลขพลังงานเรืองแสง\n• การแจ้งเตือนความไม่สมดุลของเซลล์ — รับการแจ้งเตือนเมื่อความต่างแรงดันเซลล์ของแพ็คสูงเกินขีดจำกัดต่อเนื่อง\n• รายงานสุขภาพแบตเตอรี่ — ส่งออก PDF/HTML พร้อมพิมพ์ของ State of Health อัตราการเสื่อม และวันที่คาดว่าจะถึง 80%%\n• ภาพหน้าจอแดชบอร์ด — แตะโลโก้ BYD เพื่อบันทึกหน้าจอปัจจุบัน\n• สำรองข้อมูลลงการ์ด SD — บันทึกฐานข้อมูลไปยังโฟลเดอร์ BydTripStats บนการ์ด SD แบบถอดได้\n\nการปลดล็อก: โค้ดผูกกับรถของคุณโดยเฉพาะ เปิด การตั้งค่า → Pro สแกนโค้ด QR ด้วยโทรศัพท์ (หรือคัดลอก Vehicle ID) เพื่อขอโค้ด แล้ววางกลับเข้าไป การตรวจสอบทำบนอุปกรณ์ทั้งหมด — ไม่มีบัญชี ไม่ต้องลงชื่อเข้าใช้ ไม่มีอะไรออกจากรถของคุณ</string>
     <string name="faq_q_drive_modes">ทำไมถึงแสดง \'อัตโนมัติ/ไม่ทราบ\' สำหรับโหมดขับ/ชาร์จคืน?</string>
     <string name="faq_a_drive_modes">แอปอ่านโหมดโดยตรงจากแผงควบคุม แต่รถจะส่งค่าโหมดเฉพาะเมื่อคุณเปลี่ยนโหมดอย่างสม่ำเสมอ\n\nวิธีแก้:\n1. วนผ่านแต่ละระดับการชาร์จคืนหนึ่งครั้ง\n2. วนผ่านแต่ละโหมดขับ (Eco / Normal / Sport) หนึ่งครั้ง</string>
     <string name="faq_q_offline_trip">การไม่มีเครือข่ายหมายความว่าการเดินทางจะไม่อยู่ในประวัติหรือไม่?</string>
@@ -987,4 +995,29 @@
     <string name="core_telemetry_label">เทเลเมทรีหลัก</string>
     <string name="waiting_live_msg">รอเทเลเมทรีสด</string>
     <string name="core_section_label">แกนหลัก</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">ยาง</string>
+    <string name="close">ปิด</string>
+    <string name="range_projection_title">การคาดการณ์แบบไดนามิก</string>
+    <string name="dashboard_no_cards_hint">ซ่อนการ์ดทั้งหมดแล้ว แตะดินสอเพื่อเพิ่มกลับบางส่วน</string>
+    <string name="reorder_card">ลากเพื่อจัดเรียงใหม่</string>
+    <string name="pref_dashboard_layout">เค้าโครงแดชบอร์ด</string>
+    <string name="dashboard_layout_desc">เลือกวิธีจัดวางแดชบอร์ด การ์ดเป็นเค้าโครงที่ใหญ่ขึ้นและปรับแต่งได้ — แตะดินสอบนแดชบอร์ดเพื่อแสดง ซ่อน และจัดเรียงไทล์ใหม่</string>
+    <string name="dashboard_layout_classic">คลาสสิก</string>
+    <string name="dashboard_layout_cards">การ์ด</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">ว่าง</string>
+    <string name="power_state_accelerating">กำลังเร่ง</string>
+    <string name="power_state_decelerating">กำลังชะลอ</string>
+    <string name="power_state_charging">กำลังชาร์จ</string>
+    <string name="speed_state_parked">อยู่กับที่</string>
+    <string name="speed_state_driving">กำลังขับ</string>
+    <string name="soc_subtitle_usable">ประจุที่ใช้ได้</string>
+    <string name="range_subtitle_projection">การคาดการณ์แบบไดนามิก</string>
+    <string name="distance_subtitle_session">เซสชันนี้</string>
+    <string name="odometer_subtitle_lifetime">ระยะทางรวม</string>
+    <string name="discharge_subtitle_lifetime">พลังงานที่จ่ายออกรวม</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s ความดัน</string>
 </resources>

@@ -98,6 +98,7 @@ fun TripControls(
                 shape = RoundedCornerShape(14.dp)
             ),
         shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant

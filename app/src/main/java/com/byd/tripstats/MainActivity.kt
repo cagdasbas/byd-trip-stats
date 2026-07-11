@@ -115,12 +115,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             val prefs = remember { PreferencesManager(applicationContext) }
             val themeMode by prefs.themeMode.collectAsState(initial = prefs.getCachedThemeMode())
+            val isPro by com.byd.tripstats.data.entitlement.EntitlementManager.isPro.collectAsState()
+            // Neon is a Pro, dark-only theme; a non-Pro fallback renders as normal dark.
+            val neon = themeMode == ThemeMode.NEON && isPro
             val darkTheme = when (themeMode) {
                 ThemeMode.LIGHT  -> false
                 ThemeMode.DARK   -> true
+                ThemeMode.NEON   -> true
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
             }
-            BydTripStatsTheme(darkTheme = darkTheme) {
+            BydTripStatsTheme(darkTheme = darkTheme, neon = neon) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

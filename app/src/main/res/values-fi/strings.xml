@@ -44,7 +44,12 @@
     <string name="settings_tab_app">Sovellus</string>
     <string name="settings_tab_connections">Yhteydet</string>
     <string name="settings_tab_preferences">Asetukset</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Tietoja &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Korttikojelaudan asettelu</string>
+    <string name="pro_cards_layout_info">Suurempi, täysin mukautettava kojelauta: suuria, hyvin aseteltuja ruutuja keskuskaavion sijaan. Napauta kynää järjestelläksesi ruutuja vetämällä sekä näyttääksesi tai piilottaaksesi haluamasi, ja napauta Toimintasäde-ruutua avataksesi ennustekaavion täysikokoisena. Valitse se kohdasta Asetukset → Kojelaudan asettelu, kun se on avattu.</string>
+    <string name="pro_neon_theme_title">Neon-teema</string>
+    <string name="pro_neon_theme_info">Puhtaan musta, OLED-ystävällinen tumma teema, jonka tehomittarien numerot ja korostusraidat hehkuvat kuin neon, ja jokaisessa kortissa on hienovarainen korostusreuna. Valitse se kohdasta Asetukset → Teema, kun se on avattu.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Yleiskatsaus</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">Katkaise botin yhteys</string>
     <string name="auto_backup_label">Automaattinen varmuuskopio</string>
     <string name="backup_interval_label">Varmuuskopiointiväli</string>
+    <string name="wifi_only_label">Vain Wi-Fi</string>
+    <string name="wifi_only_desc">Automaattiset varmuuskopiot toimivat vain Wi-Fissä mobiilidatan säästämiseksi</string>
     <string name="last_auto_backup_label">Viimeisin automaattinen varmuuskopio: %1$s</string>
     <string name="schedule_updated_msg">Aikataulu päivitetty: %1$s. Seuraava automaattinen varmuuskopio noudattaa uutta väliä.</string>
     <string name="telegram_setup_info">Kun yhteys on muodostettu, varmuuskopioita voidaan lähettää manuaalisesti tai aikataulun mukaan. Jokainen varmuuskopio saapuu .db-tiedostona yksityiseen chattiisi, joka on käytettävissä mistä tahansa Telegram-laitteesta.</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">Järjestelmä</string>
     <string name="theme_light">Vaalea</string>
     <string name="theme_dark">Tumma</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Kieli</string>
     <string name="language_desc">Valitse sovelluksen näyttökieli. Kielen valitseminen ohittaa laitteen järjestelmäkielen tässä sovelluksessa.</string>
     <string name="change_language_action">Vaihda kieli</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">Aktiivinen — Pro avattu tälle ajoneuvolle (elinikäinen).</string>
     <string name="remove_code_action">Poista koodi</string>
     <string name="remove_code_title">Poistetaanko Pro-avauskoodi?</string>
-    <string name="remove_code_msg">Tämä poistaa Pro:n käytöstä tällä ajoneuvolla ja poistaa Pro-ominaisuudet käytöstä (kennon epätasapainohälytys, akun terveysraportti, kuvakaappaukset, SD-kortin varmuuskopio). Koodiasi ei menetetä — voit syöttää sen uudelleen milloin tahansa avataksesi uudelleen.</string>
-    <string name="pro_unlock_desc">Avaa premium-ominaisuudet kuten akkukennon epätasapainohälytys ja kojelaudan kuvakaappaukset kertaluonteisella koodilla ajoneuvollesi — €9,99, elinikäinen, yksi auto. Varmennettu laitteella — mikään ei poistu autostasi.</string>
+    <string name="remove_code_msg">Tämä poistaa Pron käytöstä tässä ajoneuvossa ja poistaa Pro-ominaisuudet käytöstä (korttikojelaudan asettelu, Neon-teema, kennojen epätasapainon hälytys, akun kuntoraportti, kuvakaappaukset, SD-korttivarmuuskopio). Koodisi ei katoa — voit syöttää sen uudelleen milloin tahansa avataksesi sen taas.</string>
+    <string name="pro_unlock_desc">Avaa premium-ominaisuuksia, kuten korttikojelaudan asettelu, Neon-teema, kennojen epätasapainon hälytys ja kojelaudan kuvakaappaukset, kertakoodilla ajoneuvollesi — 9,99 €, elinikäinen, yksi auto. Vahvistettu laitteessa — mikään ei poistu autostasi.</string>
     <string name="vehicle_id_section_label">Tämän ajoneuvon tunnus (lähetä tämä ostaessasi lisenssin):</string>
     <string name="vehicle_id_reading">Luetaan… käynnistä auto ja avaa Asetukset uudelleen</string>
     <string name="vehicle_id_copied_msg">Ajoneuvon tunnus kopioitu</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">Tarvitsenko internetin tai mobiilisignaalin?</string>
     <string name="faq_a_internet">Ei normaalikäyttöön. Matkat, latausistunnot, kaaviot ja paikallinen historia tallennetaan kokonaan laitteelle.\n\nInternet tarvitaan vain valinnaisille ominaisuuksille kuten sovelluspäivitystarkistuksille, weblinkkien avaamiselle, MQTT / ABRP -integraatiolle ja Telegram-varmuuskopioille jos otat ne käyttöön.</string>
     <string name="faq_q_pro">Mikä on BYD Trip Stats Pro ja mitä se sisältää?</string>
-    <string name="faq_a_pro">Pro on valinnainen kertaluonteinen avaus premium-lisäominaisuuksille — pieni kiitollisuudenosoitus joka auttaa tukemaan kehitystä. Se on €9,99, maksettu kerran, yhden ajoneuvon elinikäiseksi (ei tilausta). Kaikki mikä oli ilmaista pysyy ilmaisena; Pro lisää vain uusia ominaisuuksia:\n\n• Kennon epätasapainohälytys — saat ilmoituksen kun kennojännitteen hajonta pysyy rajan yläpuolella\n• Akun terveysraportti — vie tulostettava PDF/HTML terveyden tilastasi, rappeutumisnopeudesta ja ennustetusta 80%%:n päivämäärästä\n• Kojelaudan kuvakaappaukset — napauta BYD-logoa tallentaaksesi nykyisen näytön\n• SD-kortin varmuuskopio — tallenna tietokanta BydTripStats-kansioon irrotettavalle SD-kortille\n\nAvaus: koodi on sidottu sinun tiettyyn autoosi. Avaa Asetukset → Asetukset → BYD Trip Stats Pro, skannaa QR-koodi puhelimellasi (tai kopioi ajoneuvotunnuksesi) pyytääksesi koodia, sitten liitä se. Se varmennetaan kokonaan laitteella — ei tiliä, ei kirjautumista, mikään ei poistu autostasi.</string>
+    <string name="faq_a_pro">Pro on valinnainen kertaluonteinen avaus premium-lisäominaisuuksille — pieni kiitollisuudenosoitus joka auttaa tukemaan kehitystä. Se on €9,99, maksettu kerran, yhden ajoneuvon elinikäiseksi (ei tilausta). Kaikki mikä oli ilmaista pysyy ilmaisena; Pro lisää vain uusia ominaisuuksia:\n\n• Korttikojelaudan asettelu — suurempi, täysin mukautettava kojelauta suurista ruuduista, joita voit vetämällä järjestellä, näyttää tai piilottaa\n• Neon-teema — puhtaan musta, OLED-ystävällinen ulkoasu hehkuvin tehonumeroin\n• Kennon epätasapainohälytys — saat ilmoituksen kun kennojännitteen hajonta pysyy rajan yläpuolella\n• Akun terveysraportti — vie tulostettava PDF/HTML terveyden tilastasi, rappeutumisnopeudesta ja ennustetusta 80%%:n päivämäärästä\n• Kojelaudan kuvakaappaukset — napauta BYD-logoa tallentaaksesi nykyisen näytön\n• SD-kortin varmuuskopio — tallenna tietokanta BydTripStats-kansioon irrotettavalle SD-kortille\n\nAvaus: koodi on sidottu sinun tiettyyn autoosi. Avaa Asetukset → Pro, skannaa QR-koodi puhelimellasi (tai kopioi ajoneuvotunnuksesi) pyytääksesi koodia, sitten liitä se. Se varmennetaan kokonaan laitteella — ei tiliä, ei kirjautumista, mikään ei poistu autostasi.</string>
     <string name="faq_q_drive_modes">Miksi \'auto/tuntematon\' näytetään ajo-/regenerointitilassa?</string>
     <string name="faq_a_drive_modes">Sovellus lukee ajo- ja regenerointitilat suoraan auton mittaristosta, mutta auto lähettää tilaarvon vain kun muutat sitä aktiivisesti — se ei raportoi nykyistä tilaa käynnistyksen yhteydessä.\n\nKunnes napautat tilaa auton näytöllä, sovelluksella ei ole näytettävää arvoa ja se palautuu tilaan \'Auto\' (regen.) tai \'Tuntematon\' (ajo). Korjataksesi tämän:\n\n1. Selaa jokainen regenerointitaso auton kosketusnäytöllä kerran\n2. Selaa jokainen ajotila (Eco / Normal / Sport) kerran\n\nSovellus poimii välittömästi molemmat arvot ja alkaa tallentaa niitä jokaisen matkatietopisteen yhteydessä. Sinun tarvitsee tehdä tämä vain kerran.</string>
     <string name="faq_q_offline_trip">Tarkoittaako verkkoyhteyden puuttuminen että matka puuttuu historiasta?</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">Näytölle pitäisi ilmestyä valintaikkuna joka pyytää sallimaan USB-virheenkorjauksen. Napauta Salli, sitten palaa tänne.\n\nTämä on kertaluonteinen toimenpide. Tulevat päivitykset ovat täysin automaattisia.</string>
     <string name="adb_granting_msg">Myönnetään taustalupia…</string>
     <string name="authorize_action">Valtuuta</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Renkaat</string>
+    <string name="close">Sulje</string>
+    <string name="range_projection_title">Dynaaminen ennuste</string>
+    <string name="dashboard_no_cards_hint">Kaikki kortit piilotettu. Napauta kynää lisätäksesi joitakin takaisin.</string>
+    <string name="reorder_card">Vedä järjestääksesi uudelleen</string>
+    <string name="pref_dashboard_layout">Kojelaudan asettelu</string>
+    <string name="dashboard_layout_desc">Valitse, miten kojelauta on järjestetty. Kortit on suurempi, mukautettava asettelu — napauta kynää kojelaudalla näyttääksesi, piilottaaksesi ja järjestelläksesi ruutuja.</string>
+    <string name="dashboard_layout_classic">Klassinen</string>
+    <string name="dashboard_layout_cards">Kortit</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Joutilaana</string>
+    <string name="power_state_accelerating">Kiihdyttää</string>
+    <string name="power_state_decelerating">Hidastaa</string>
+    <string name="power_state_charging">Latautuu</string>
+    <string name="speed_state_parked">Paikallaan</string>
+    <string name="speed_state_driving">Ajaa</string>
+    <string name="soc_subtitle_usable">Käytettävissä oleva varaus</string>
+    <string name="range_subtitle_projection">Dynaaminen ennuste</string>
+    <string name="distance_subtitle_session">Tämä istunto</string>
+    <string name="odometer_subtitle_lifetime">Kokonaismatka</string>
+    <string name="discharge_subtitle_lifetime">Kokonaisenergia ulos</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s paine</string>
 </resources>

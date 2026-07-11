@@ -8,8 +8,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +49,8 @@ import kotlinx.coroutines.launch
 internal fun AppPreferencesTab(
     viewModel: DashboardViewModel,
     preferencesManager: PreferencesManager,
-    onNavigateToTripGoals: () -> Unit
+    onNavigateToTripGoals: () -> Unit,
+    onNavigateToProTab: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -65,14 +69,11 @@ internal fun AppPreferencesTab(
     val minTripDistanceKm by preferencesManager.minTripDistanceKm.collectAsState(
         initial = preferencesManager.getCachedMinTripDistanceKm()
     )
-    val cellImbalanceAlertEnabled by preferencesManager.cellImbalanceAlertEnabled.collectAsState(
-        initial = preferencesManager.getCachedCellImbalanceAlertEnabled()
-    )
-    val cellImbalanceThresholdV by preferencesManager.cellImbalanceThresholdV.collectAsState(
-        initial = preferencesManager.getCachedCellImbalanceThresholdV()
-    )
     val themeMode by preferencesManager.themeMode.collectAsState(
         initial = preferencesManager.getCachedThemeMode()
+    )
+    val dashboardLayout by preferencesManager.dashboardLayout.collectAsState(
+        initial = preferencesManager.getCachedDashboardLayout()
     )
     val socSource by preferencesManager.socSource.collectAsState(
         initial = preferencesManager.getCachedSocSource()
@@ -85,13 +86,9 @@ internal fun AppPreferencesTab(
     var showTariffDialog by remember { mutableStateOf(false) }
     var showCarOffTimeoutDialog by remember { mutableStateOf(false) }
     var showMinTripDistanceDialog by remember { mutableStateOf(false) }
-    var showCellImbalanceThresholdDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var currentLanguageTag by remember { mutableStateOf(LocaleHelper.getSelectedTag(context)) }
     val isPro by EntitlementManager.isPro.collectAsState()
-    val hasSavedCode by EntitlementManager.hasSavedCode.collectAsState()
-    val currentDeviceId by EntitlementManager.currentDeviceId.collectAsState()
-    var showLicenseDialog by remember { mutableStateOf(false) }
     var priceInput by remember(electricityPrice) {
         mutableStateOf(if (electricityPrice > 0.0) "%.4f".format(electricityPrice) else "")
     }
@@ -119,17 +116,6 @@ internal fun AppPreferencesTab(
     ) {
         SectionHeader(icon = Icons.Filled.Tune, title = stringResource(R.string.settings_tab_preferences))
 
-        // Locked → show the Pro upsell at the very top (prominent). Once unlocked it's just
-        // status + a rarely-used "Remove code", so it's rendered at the bottom of the page instead.
-        if (!isPro) {
-            ProUnlockCard(
-                isPro = isPro,
-                currentDeviceId = currentDeviceId,
-                hasSavedCode = hasSavedCode,
-                onEnterCode = { showLicenseDialog = true },
-            )
-        }
-
         SettingsGroupLabel(stringResource(R.string.section_general))
 
         Card(
@@ -154,26 +140,123 @@ internal fun AppPreferencesTab(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(
-                        ThemeMode.SYSTEM to stringResource(R.string.theme_system),
-                        ThemeMode.LIGHT  to stringResource(R.string.theme_light),
-                        ThemeMode.DARK   to stringResource(R.string.theme_dark),
-                    ).forEach { (mode, label) ->
+                    buildList {
+                        add(ThemeMode.SYSTEM to stringResource(R.string.theme_system))
+                        add(ThemeMode.LIGHT to stringResource(R.string.theme_light))
+                        add(ThemeMode.DARK to stringResource(R.string.theme_dark))
+                        // Neon is a Pro, dark-only theme — always shown, but locked until unlocked.
+                        add(ThemeMode.NEON to stringResource(R.string.theme_neon))
+                    }.forEach { (mode, label) ->
+                        val locked = mode == ThemeMode.NEON && !isPro
+                        val selected = themeMode == mode
                         Button(
-                            onClick = { scope.launch { preferencesManager.saveThemeMode(mode) } },
-                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (locked) onNavigateToProTab()
+                                else scope.launch { preferencesManager.saveThemeMode(mode) }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(if (locked) Modifier.alpha(0.55f) else Modifier),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (themeMode == mode)
+                                containerColor = if (selected)
                                     MaterialTheme.colorScheme.primary
                                 else
                                     MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = if (themeMode == mode)
+                                contentColor = if (selected)
                                     MaterialTheme.colorScheme.onPrimary
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         ) {
-                            Text(label, fontWeight = FontWeight.Bold)
+                            if (locked) {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            Text(label, fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.pref_dashboard_layout),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        ProBadge()
+                    }
+                    // Locked — tapping the lock opens the Pro tab (a preview lives there).
+                    if (!isPro) {
+                        IconButton(onClick = onNavigateToProTab) {
+                            Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.unlock_pro_action))
+                        }
+                    }
+                }
+                Text(
+                    stringResource(R.string.dashboard_layout_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        com.byd.tripstats.data.preferences.DashboardLayout.CLASSIC to stringResource(R.string.dashboard_layout_classic),
+                        com.byd.tripstats.data.preferences.DashboardLayout.CARDS to stringResource(R.string.dashboard_layout_cards),
+                    ).forEach { (layout, label) ->
+                        // Cards is a Pro layout — always shown, but locked until unlocked.
+                        val locked = layout == com.byd.tripstats.data.preferences.DashboardLayout.CARDS && !isPro
+                        val selected = dashboardLayout == layout
+                        Button(
+                            onClick = {
+                                if (locked) onNavigateToProTab()
+                                else scope.launch { preferencesManager.saveDashboardLayout(layout) }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(if (locked) Modifier.alpha(0.55f) else Modifier),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selected)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (selected)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        ) {
+                            if (locked) {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            Text(label, fontWeight = FontWeight.Bold, maxLines = 1)
                         }
                     }
                 }
@@ -555,96 +638,6 @@ internal fun AppPreferencesTab(
             }
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                stringResource(R.string.pref_cell_imbalance),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (!isPro) {
-                                Spacer(Modifier.width(8.dp))
-                                ProBadge()
-                            }
-                        }
-                        Text(
-                            stringResource(R.string.cell_imbalance_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (isPro) {
-                        Switch(
-                            checked = cellImbalanceAlertEnabled,
-                            onCheckedChange = {
-                                scope.launch { preferencesManager.saveCellImbalanceAlertEnabled(it) }
-                            },
-                            thumbContent = if (!cellImbalanceAlertEnabled) {
-                                {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .background(ToggleUncheckedTrack, CircleShape)
-                                    )
-                                }
-                            } else null,
-                            colors = SwitchDefaults.colors(
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = ToggleUncheckedTrack,
-                                uncheckedBorderColor = ToggleUncheckedTrack
-                            )
-                        )
-                    } else {
-                        // Locked — tapping the lock opens the unlock prompt.
-                        IconButton(onClick = { showLicenseDialog = true }) {
-                            Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.unlock_pro_action))
-                        }
-                    }
-                }
-                Text(
-                    stringResource(R.string.cell_imbalance_info),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (isPro && cellImbalanceAlertEnabled) {
-                    Text(
-                        stringResource(R.string.current_limit_value, "%.0f".format(cellImbalanceThresholdV * 1000)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(onClick = { showCellImbalanceThresholdDialog = true }) {
-                        Icon(Icons.Filled.BatteryAlert, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.change_limit_action))
-                    }
-                } else if (!isPro) {
-                    Text(
-                        stringResource(R.string.pro_feature_imbalance_msg),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(onClick = { showLicenseDialog = true }) {
-                        Icon(Icons.Filled.Lock, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.unlock_pro_action))
-                    }
-                }
-            }
-        }
-
         SettingsGroupLabel(stringResource(R.string.section_costs))
 
         Card(
@@ -796,16 +789,6 @@ internal fun AppPreferencesTab(
             }
         }
 
-        // Unlocked → Pro is just status + the rarely-used "Remove code", so it lives at the
-        // bottom of the page (out of the way) rather than up top where the upsell sits when locked.
-        if (isPro) {
-            ProUnlockCard(
-                isPro = isPro,
-                currentDeviceId = currentDeviceId,
-                hasSavedCode = hasSavedCode,
-                onEnterCode = { showLicenseDialog = true },
-            )
-        }
     }
 
     if (showTariffDialog) {
@@ -970,49 +953,6 @@ internal fun AppPreferencesTab(
         )
     }
 
-    if (showCellImbalanceThresholdDialog) {
-        // Edit in millivolts — friendlier than typing 0.05. Stored in volts.
-        var thresholdInput by remember(cellImbalanceThresholdV) {
-            mutableStateOf("%.0f".format(cellImbalanceThresholdV * 1000))
-        }
-        AlertDialog(
-            onDismissRequest = { showCellImbalanceThresholdDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text(stringResource(R.string.imbalance_dialog_title), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        stringResource(R.string.imbalance_input_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = thresholdInput,
-                        onValueChange = { thresholdInput = it },
-                        label = { Text(stringResource(R.string.limit_mv_label)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val mv = thresholdInput.replace(',', '.').toDoubleOrNull()
-                        if (mv != null) {
-                            scope.launch { preferencesManager.saveCellImbalanceThresholdV(mv / 1000.0) }
-                        }
-                        showCellImbalanceThresholdDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                ) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCellImbalanceThresholdDialog = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
-    }
-
     if (showLanguageDialog) {
         val activity = context as? Activity
         AlertDialog(
@@ -1064,62 +1004,5 @@ internal fun AppPreferencesTab(
         )
     }
 
-    if (showLicenseDialog) {
-        var codeInput by remember { mutableStateOf("") }
-        var errorMsg by remember { mutableStateOf<String?>(null) }
-        AlertDialog(
-            onDismissRequest = { showLicenseDialog = false },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            title = { Text("Unlock BYD Trip Stats Pro", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        "Enter the unlock code you received after purchase. It's a short, " +
-                            "vehicle-specific code, checked on-device — nothing leaves your car.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = codeInput,
-                        onValueChange = { codeInput = it; errorMsg = null },
-                        label = { Text("Unlock code") },
-                        singleLine = true,
-                        isError = errorMsg != null
-                    )
-                    if (errorMsg != null) {
-                        Text(
-                            errorMsg!!,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        when (EntitlementManager.redeem(codeInput)) {
-                            RedeemResult.SUCCESS -> {
-                                android.widget.Toast.makeText(
-                                    context, "Pro unlocked ✓", android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                                showLicenseDialog = false
-                            }
-                            RedeemResult.INVALID ->
-                                errorMsg = "That code isn't valid for this vehicle."
-                            RedeemResult.NO_VEHICLE_YET ->
-                                errorMsg = "Start the car so the app can read your Vehicle ID, then try again."
-                            RedeemResult.UNAVAILABLE ->
-                                errorMsg = "Pro verification is unavailable in this build."
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = BydElectricAzure)
-                ) { Text("Unlock") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLicenseDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
