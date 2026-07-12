@@ -1121,4 +1121,11 @@
     <string name="odometer_subtitle_lifetime">Distância total</string>
     <string name="discharge_subtitle_lifetime">Energia total fornecida</string>
     <string name="tyre_subtitle_pressure">°C · %1$s pressão</string>
+    <string name="d5_consent_title">Permitir acesso aos dados do veículo?</string>
+    <string name="d5_consent_body">Para ler dados em tempo real deste carro (bateria, autonomia, velocidade, pneus…), o BYD Trip Stats precisa de flexibilizar uma definição de sistema da unidade central (a restrição hidden-API), limitada às bibliotecas de veículos da BYD.\n\nEsta é uma definição de todo o dispositivo. É reposta ao reiniciar e a aplicação só a volta a aplicar quando necessário. Pode alterar isto mais tarde nas Definições.\n\nSem ela, a aplicação funciona mas não mostra dados do veículo.</string>
+    <string name="d5_consent_allow">Permitir</string>
+    <string name="d5_consent_not_now">Agora não</string>
+    <string name="d5_vehicle_access_section">Acesso aos dados do veículo</string>
+    <string name="d5_vehicle_access_title">Permitir a leitura dos dados do veículo</string>
+    <string name="d5_vehicle_access_desc">Flexibiliza uma definição de sistema da unidade central (hidden-API), limitada às bibliotecas de veículos da BYD, para que a aplicação possa ler bateria, autonomia, velocidade e pneus. Definição de todo o dispositivo; é reposta ao reiniciar e só é reaplicada quando necessário. Desligado = a aplicação funciona mas não mostra dados do veículo.</string>
 </resources>

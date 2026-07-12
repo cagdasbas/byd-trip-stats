@@ -1117,4 +1117,11 @@
     <string name="odometer_subtitle_lifetime">Celková vzdálenost</string>
     <string name="discharge_subtitle_lifetime">Celková vydaná energie</string>
     <string name="tyre_subtitle_pressure">°C · %1$s tlak</string>
+    <string name="d5_consent_title">Povolit přístup k datům vozidla?</string>
+    <string name="d5_consent_body">Aby aplikace BYD Trip Stats mohla číst živá data z tohoto vozidla (baterie, dojezd, rychlost, pneumatiky…), musí uvolnit jedno systémové nastavení hlavní jednotky (omezení hidden-API), omezené na knihovny vozidel BYD.\n\nJde o nastavení platné pro celé zařízení. Po restartu se vrátí a aplikace jej znovu použije jen v případě potřeby. Toto lze později změnit v Nastavení.\n\nBez něj aplikace běží, ale nezobrazuje žádná data vozidla.</string>
+    <string name="d5_consent_allow">Povolit</string>
+    <string name="d5_consent_not_now">Teď ne</string>
+    <string name="d5_vehicle_access_section">Přístup k datům vozidla</string>
+    <string name="d5_vehicle_access_title">Povolit čtení dat vozidla</string>
+    <string name="d5_vehicle_access_desc">Uvolní jedno systémové nastavení hlavní jednotky (hidden-API), omezené na knihovny vozidel BYD, aby aplikace mohla číst baterii, dojezd, rychlost a pneumatiky. Nastavení pro celé zařízení; po restartu se vrátí a znovu se použije jen v případě potřeby. Vypnuto = aplikace běží, ale nezobrazuje data vozidla.</string>
 </resources>

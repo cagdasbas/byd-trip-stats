@@ -797,7 +797,7 @@ internal fun AppPreferencesTab(
             var vehicleAccessOn by remember {
                 mutableStateOf(AdbPermissionManager.hasHiddenApiConsent(context))
             }
-            SettingsGroupLabel("Vehicle data access")
+            SettingsGroupLabel(stringResource(R.string.d5_vehicle_access_section))
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -816,15 +816,12 @@ internal fun AppPreferencesTab(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                "Allow reading vehicle data",
+                                stringResource(R.string.d5_vehicle_access_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                "Relaxes one head-unit system setting (hidden-API), scoped to the " +
-                                "BYD vehicle libraries, so the app can read battery, range, speed and " +
-                                "tyres. Device-wide setting; reverts on reboot and is re-applied only " +
-                                "when needed. Off = the app runs but shows no vehicle data.",
+                                stringResource(R.string.d5_vehicle_access_desc),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

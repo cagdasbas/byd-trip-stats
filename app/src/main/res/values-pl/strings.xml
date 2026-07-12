@@ -1117,4 +1117,11 @@
     <string name="odometer_subtitle_lifetime">Całkowity dystans</string>
     <string name="discharge_subtitle_lifetime">Całkowita oddana energia</string>
     <string name="tyre_subtitle_pressure">°C · %1$s ciśnienie</string>
+    <string name="d5_consent_title">Zezwolić na dostęp do danych pojazdu?</string>
+    <string name="d5_consent_body">Aby odczytywać dane na żywo z tego auta (akumulator, zasięg, prędkość, opony…), BYD Trip Stats musi poluzować jedno ustawienie systemowe jednostki głównej (ograniczenie hidden-API), ograniczone do bibliotek pojazdów BYD.\n\nTo ustawienie obejmuje całe urządzenie. Resetuje się po ponownym uruchomieniu, a aplikacja stosuje je ponownie tylko w razie potrzeby. Możesz to zmienić później w Ustawieniach.\n\nBez niego aplikacja działa, ale nie pokazuje danych pojazdu.</string>
+    <string name="d5_consent_allow">Zezwól</string>
+    <string name="d5_consent_not_now">Nie teraz</string>
+    <string name="d5_vehicle_access_section">Dostęp do danych pojazdu</string>
+    <string name="d5_vehicle_access_title">Zezwól na odczyt danych pojazdu</string>
+    <string name="d5_vehicle_access_desc">Poluzowuje jedno ustawienie systemowe jednostki głównej (hidden-API), ograniczone do bibliotek pojazdów BYD, aby aplikacja mogła odczytywać akumulator, zasięg, prędkość i opony. Ustawienie dla całego urządzenia; resetuje się po ponownym uruchomieniu i jest stosowane ponownie tylko w razie potrzeby. Wył. = aplikacja działa, ale nie pokazuje danych pojazdu.</string>
 </resources>

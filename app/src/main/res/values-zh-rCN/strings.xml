@@ -1121,4 +1121,11 @@
     <string name="odometer_subtitle_lifetime">总里程</string>
     <string name="discharge_subtitle_lifetime">总输出电量</string>
     <string name="tyre_subtitle_pressure">°C · %1$s 胎压</string>
+    <string name="d5_consent_title">允许访问车辆数据？</string>
+    <string name="d5_consent_body">为读取本车的实时数据（电池、续航、车速、轮胎…），BYD Trip Stats 需要放宽主机的一项系统设置（hidden-API 限制），仅限于 BYD 车辆库。\n\n这是设备级设置。重启后会重置，应用仅在需要时重新应用。你可以稍后在“设置”中更改。\n\n没有它，应用仍可运行，但不会显示车辆数据。</string>
+    <string name="d5_consent_allow">允许</string>
+    <string name="d5_consent_not_now">暂不</string>
+    <string name="d5_vehicle_access_section">车辆数据访问</string>
+    <string name="d5_vehicle_access_title">允许读取车辆数据</string>
+    <string name="d5_vehicle_access_desc">放宽主机的一项系统设置（hidden-API），仅限于 BYD 车辆库，以便应用读取电池、续航、车速和轮胎。设备级设置；重启后重置，仅在需要时重新应用。关闭 = 应用仍运行，但不显示车辆数据。</string>
 </resources>

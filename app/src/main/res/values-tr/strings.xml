@@ -1121,4 +1121,11 @@
     <string name="odometer_subtitle_lifetime">Toplam mesafe</string>
     <string name="discharge_subtitle_lifetime">Toplam verilen enerji</string>
     <string name="tyre_subtitle_pressure">°C · %1$s basınç</string>
+    <string name="d5_consent_title">Araç verilerine erişime izin verilsin mi?</string>
+    <string name="d5_consent_body">Bu aracın canlı verilerini (batarya, menzil, hız, lastikler…) okuyabilmek için BYD Trip Stats\'in ana ünitedeki bir sistem ayarını (hidden-API kısıtlamasını) gevşetmesi gerekir; bu yalnızca BYD araç kütüphaneleriyle sınırlıdır.\n\nBu, cihaz genelinde bir ayardır. Yeniden başlatmada sıfırlanır ve uygulama yalnızca gerektiğinde yeniden uygular. Bunu daha sonra Ayarlar\'dan değiştirebilirsiniz.\n\nBu olmadan uygulama çalışır ancak araç verisi göstermez.</string>
+    <string name="d5_consent_allow">İzin ver</string>
+    <string name="d5_consent_not_now">Şimdi değil</string>
+    <string name="d5_vehicle_access_section">Araç verisi erişimi</string>
+    <string name="d5_vehicle_access_title">Araç verisi okumaya izin ver</string>
+    <string name="d5_vehicle_access_desc">Ana ünitenin bir sistem ayarını (hidden-API) yalnızca BYD araç kütüphaneleriyle sınırlı olacak şekilde gevşetir; böylece uygulama batarya, menzil, hız ve lastikleri okuyabilir. Cihaz genelinde ayardır; yeniden başlatmada sıfırlanır ve yalnızca gerektiğinde yeniden uygulanır. Kapalı = uygulama çalışır ancak araç verisi göstermez.</string>
 </resources>

@@ -157,19 +157,8 @@ class MainActivity : ComponentActivity() {
                         AlertDialog(
                             onDismissRequest = { },
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            title = { Text("Allow vehicle data access?") },
-                            text = {
-                                Text(
-                                    "To read live data from this car (battery, range, speed, " +
-                                    "tyres…), BYD Trip Stats needs to relax one system setting on " +
-                                    "the head unit (the hidden-API restriction), scoped to the BYD " +
-                                    "vehicle libraries.\n\n" +
-                                    "This is a device-wide setting. It reverts on reboot and the app " +
-                                    "re-applies it only when needed. You can change this later in " +
-                                    "Settings.\n\n" +
-                                    "Without it the app runs but shows no vehicle data."
-                                )
-                            },
+                            title = { Text(stringResource(R.string.d5_consent_title)) },
+                            text = { Text(stringResource(R.string.d5_consent_body)) },
                             confirmButton = {
                                 TextButton(onClick = {
                                     AdbPermissionManager.setHiddenApiConsent(this@MainActivity, true)
@@ -178,13 +167,13 @@ class MainActivity : ComponentActivity() {
                                     lifecycleScope.launch {
                                         AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
                                     }
-                                }) { Text("Allow") }
+                                }) { Text(stringResource(R.string.d5_consent_allow)) }
                             },
                             dismissButton = {
                                 TextButton(onClick = {
                                     AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
                                     showHiddenApiConsent.value = false
-                                }) { Text("Not now") }
+                                }) { Text(stringResource(R.string.d5_consent_not_now)) }
                             }
                         )
                     }

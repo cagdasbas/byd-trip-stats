@@ -1121,4 +1121,11 @@
     <string name="odometer_subtitle_lifetime">Total distanse</string>
     <string name="discharge_subtitle_lifetime">Total avgitt energi</string>
     <string name="tyre_subtitle_pressure">°C · %1$s trykk</string>
+    <string name="d5_consent_title">Tillate tilgang til kjøretøydata?</string>
+    <string name="d5_consent_body">For å lese sanntidsdata fra denne bilen (batteri, rekkevidde, hastighet, dekk…) må BYD Trip Stats løsne én systeminnstilling på hovedenheten (hidden-API-begrensningen), avgrenset til BYD-kjøretøybibliotekene.\n\nDette er en enhetsomfattende innstilling. Den tilbakestilles ved omstart, og appen bruker den på nytt bare ved behov. Du kan endre dette senere i Innstillinger.\n\nUten den kjører appen, men viser ingen kjøretøydata.</string>
+    <string name="d5_consent_allow">Tillat</string>
+    <string name="d5_consent_not_now">Ikke nå</string>
+    <string name="d5_vehicle_access_section">Tilgang til kjøretøydata</string>
+    <string name="d5_vehicle_access_title">Tillat lesing av kjøretøydata</string>
+    <string name="d5_vehicle_access_desc">Løsner én systeminnstilling på hovedenheten (hidden-API), avgrenset til BYD-kjøretøybibliotekene, slik at appen kan lese batteri, rekkevidde, hastighet og dekk. Enhetsomfattende innstilling; tilbakestilles ved omstart og brukes på nytt bare ved behov. Av = appen kjører, men viser ingen kjøretøydata.</string>
 </resources>

@@ -1020,4 +1020,11 @@
     <string name="odometer_subtitle_lifetime">Distance totale</string>
     <string name="discharge_subtitle_lifetime">Énergie totale déchargée</string>
     <string name="tyre_subtitle_pressure">°C · %1$s pression</string>
+    <string name="d5_consent_title">Autoriser l\'accès aux données du véhicule ?</string>
+    <string name="d5_consent_body">Pour lire les données en direct de cette voiture (batterie, autonomie, vitesse, pneus…), BYD Trip Stats doit assouplir un réglage système de l\'unité centrale (la restriction hidden-API), limité aux bibliothèques véhicule de BYD.\n\nC\'est un réglage à l\'échelle de l\'appareil. Il se réinitialise au redémarrage et l\'application ne le réapplique qu\'au besoin. Vous pourrez modifier ceci plus tard dans les Réglages.\n\nSans lui, l\'application fonctionne mais n\'affiche aucune donnée du véhicule.</string>
+    <string name="d5_consent_allow">Autoriser</string>
+    <string name="d5_consent_not_now">Pas maintenant</string>
+    <string name="d5_vehicle_access_section">Accès aux données du véhicule</string>
+    <string name="d5_vehicle_access_title">Autoriser la lecture des données du véhicule</string>
+    <string name="d5_vehicle_access_desc">Assouplit un réglage système de l\'unité centrale (hidden-API), limité aux bibliothèques véhicule de BYD, pour que l\'application puisse lire la batterie, l\'autonomie, la vitesse et les pneus. Réglage à l\'échelle de l\'appareil ; se réinitialise au redémarrage et n\'est réappliqué qu\'au besoin. Désactivé = l\'application fonctionne mais n\'affiche aucune donnée du véhicule.</string>
 </resources>

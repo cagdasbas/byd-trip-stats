@@ -1117,4 +1117,11 @@
     <string name="odometer_subtitle_lifetime">Jarak total</string>
     <string name="discharge_subtitle_lifetime">Total energi keluar</string>
     <string name="tyre_subtitle_pressure">°C · %1$s tekanan</string>
+    <string name="d5_consent_title">Izinkan akses data kendaraan?</string>
+    <string name="d5_consent_body">Untuk membaca data langsung dari mobil ini (baterai, jangkauan, kecepatan, ban…), BYD Trip Stats perlu melonggarkan satu pengaturan sistem pada unit kepala (pembatasan hidden-API), terbatas pada pustaka kendaraan BYD.\n\nIni adalah pengaturan seluruh perangkat. Pengaturan ini akan disetel ulang saat mulai ulang dan aplikasi menerapkannya kembali hanya bila diperlukan. Anda dapat mengubahnya nanti di Pengaturan.\n\nTanpanya, aplikasi berjalan tetapi tidak menampilkan data kendaraan.</string>
+    <string name="d5_consent_allow">Izinkan</string>
+    <string name="d5_consent_not_now">Jangan sekarang</string>
+    <string name="d5_vehicle_access_section">Akses data kendaraan</string>
+    <string name="d5_vehicle_access_title">Izinkan membaca data kendaraan</string>
+    <string name="d5_vehicle_access_desc">Melonggarkan satu pengaturan sistem unit kepala (hidden-API), terbatas pada pustaka kendaraan BYD, agar aplikasi dapat membaca baterai, jangkauan, kecepatan, dan ban. Pengaturan seluruh perangkat; disetel ulang saat mulai ulang dan diterapkan kembali hanya bila diperlukan. Mati = aplikasi berjalan tetapi tidak menampilkan data kendaraan.</string>
 </resources>
