@@ -194,17 +194,50 @@ tasks.named("preBuild") {
     dependsOn("syncTripViewer")
 }
 
+// ── DiLink-5 bydauto compile stubs (built from SOURCE, not a committed jar) ──────────
+// The dilink5 flavor must compile src/main against the bydauto signatures, but those classes
+// must NOT land in the dex (the real OEM SDK is added runtimeOnly). So we compile our hand-written
+// signature-only stubs into a compileOnly jar at build time. Sources are tracked (src/dilink3/.../
+// bydauto = shared D3 signatures + dilink5-stubsrc/ = the D5 deltas); the jar is a build artifact.
+// This lets CI assemble the dilink5 flavor with no gitignored input.
+val bydautoStubsClasses = layout.buildDirectory.dir("bydauto-stubs/classes")
+val compileBydautoStubs = tasks.register<JavaCompile>("compileBydautoStubs") {
+    source(
+        fileTree("src/dilink3/java") { include("android/**/*.java") },
+        fileTree(rootProject.file("dilink5-stubsrc")) { include("android/**/*.java") },
+    )
+    // android.* (Context etc.) comes from the platform android.jar on the classpath; --release 17
+    // supplies the java.* platform. Signature-only bodies, so no other deps are needed.
+    classpath = files(android.bootClasspath)
+    options.release.set(17)
+    destinationDirectory.set(bydautoStubsClasses)
+}
+val bydautoStubsJar = tasks.register<Jar>("bydautoStubsJar") {
+    dependsOn(compileBydautoStubs)
+    from(bydautoStubsClasses)
+    archiveFileName.set("bydauto-stubs.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("bydauto-stubs"))
+}
+
 dependencies {
     // DiLink-5 flavor SDK wiring:
     //  - COMPILE against the thin bydauto stubs (D3 signatures) so the shared src/main compiles
     //    identically to dilink3 (the D3-shaped listener overrides simply won't fire on D5; the
-    //    real D5 data path is added separately in src/dilink5).  libs/bydauto-stubs.jar is OUR
-    //    stub (committed) compiled from src/dilink3/.../bydauto.
+    //    real D5 data path is added separately in src/dilink5). Stubs are built from source by the
+    //    bydautoStubsJar task above — no committed jar.
     //  - RUNTIME bundle the REAL DiLink-5 bydauto classes (libs/dilink5-sdk.jar, gitignored OEM;
     //    generate via tools/make-dilink5-sdk-jar.sh). runtimeOnly => in the dex, not on the
     //    compile classpath (avoids the double/float signature clash + duplicate classes).
-    "dilink5CompileOnly"(files("libs/bydauto-stubs.jar"))
-    "dilink5RuntimeOnly"(files("libs/dilink5-sdk.jar"))
+    "dilink5CompileOnly"(files(bydautoStubsJar.flatMap { it.archiveFile }))
+    // Real OEM SDK is gitignored (not redistributable). Add it to the runtime dex only when present,
+    // so CI can still assemble the dilink5 flavor from source alone. A dev/release build regenerates
+    // the jar (tools/make-dilink5-sdk-jar.sh) and gets the real classes bundled; a CI build without it
+    // produces a compile-verified APK whose bydauto classes are supplied by the platform at runtime.
+    if (file("libs/dilink5-sdk.jar").exists()) {
+        "dilink5RuntimeOnly"(files("libs/dilink5-sdk.jar"))
+    } else {
+        logger.warn("dilink5-sdk.jar absent — assembling dilink5 with compile stubs only (CI mode).")
+    }
 
     // Core Android
     implementation(kotlin("stdlib"))

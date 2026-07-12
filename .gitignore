@@ -18,6 +18,8 @@ app/src/main/assets/changelog.md
 # OEM DiLink-5 bydauto SDK (extracted from the car) — not for redistribution. Regenerate:
 # tools/make-dilink5-sdk-jar.sh
 app/libs/dilink5-sdk.jar
+# Compile-time bydauto stubs — built from source by the :app bydautoStubsJar task.
+app/libs/bydauto-stubs.jar
 # Cloud and local LLMs
 .claude
 .opencode
