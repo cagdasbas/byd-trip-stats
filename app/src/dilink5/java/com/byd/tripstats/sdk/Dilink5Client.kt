@@ -6,6 +6,7 @@ import android.util.Log
 import android.hardware.bydauto.statistic.AbsBYDAutoStatisticListener
 import android.hardware.bydauto.statistic.BYDAutoStatisticDevice
 import android.hardware.bydauto.tyre.AbsBYDAutoTyreListener
+import android.hardware.bydauto.collectdata.AbsBYDAutoCollectDataListener
 
 /**
  * DiLink-5 (Sealion 7) telemetry client — present ONLY in the `dilink5` flavor; loaded reflectively
@@ -34,6 +35,11 @@ class Dilink5Client {
     private var motorDev: Any? = null
     private var tyreDev: Any? = null
     private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
+    private var collectDataDev: Any? = null
+    private var collectDataListener: Any? = null
+    // Latest HV bus readings from collectdata events → real power = V·I (TICKET-016).
+    private var lastHvVolt: Int = 0
+    private var lastHvCurrent: Int? = null
 
     // derived-power state
     private var lastUsableKwh: Double = Double.NaN
@@ -77,6 +83,9 @@ class Dilink5Client {
         // Per-wheel tyre TEMPERATURE is event-only (getter returns an index-0 sentinel). Register a
         // typed listener; wheel 1=LF/2=RF/3=LR/4=RR, 0=sentinel (dropped in applyDilink5TyreTemp).
         tyreDev?.let { registerTyreListener(it, ds) }
+        // collectdata: HV voltage/current + motor RPM via EVENTS (getters dead). Real power = V·I.
+        collectDataDev = bind(ctx, "android.hardware.bydauto.collectdata.BYDAutoCollectDataDevice")
+        collectDataDev?.let { registerCollectData(it, ds) }
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -117,8 +126,10 @@ class Dilink5Client {
         try { statListener?.let { statDevice?.unregisterListener(it) } } catch (_: Throwable) {}
         statListener = null; statDevice = null
         try { tyreListener?.let { l -> tyreDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoTyreListener::class.java)?.invoke(tyreDev, l) } } catch (_: Throwable) {}
-        tyreListener = null
-        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null
+        // NOTE: collectdata uses "unRegisterListener" (capital R), unlike the others.
+        try { collectDataListener?.let { l -> collectDataDev?.javaClass?.getMethod("unRegisterListener", AbsBYDAutoCollectDataListener::class.java)?.invoke(collectDataDev, l) } } catch (_: Throwable) {}
+        tyreListener = null; collectDataListener = null
+        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null
         Log.i(tag, "stopped")
     }
 
@@ -194,6 +205,39 @@ class Dilink5Client {
             val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
             Log.w(tag, "tyre listener failed: ${c.javaClass.simpleName}: ${c.message}")
         }
+    }
+
+    // collectdata typed listener — HV bus V/I + motor RPM (event-only; getters dead). All callbacks
+    // are (int a, int b) where b = value, a = a constant signal tag (ignored). TICKET-016.
+    private fun registerCollectData(dev: Any, ds: BydVehicleDataSource) {
+        try {
+            val l = object : AbsBYDAutoCollectDataListener() {
+                override fun onMotorMCUGeneratrixVolt(a: Int, b: Int) {
+                    if (b in 100..1000) { lastHvVolt = b; ds.applyDilink5HvVoltage(b); pushPower(ds) }
+                }
+                override fun onMotorMCUGeneratrixCurrent(a: Int, b: Int) {
+                    if (b in -2000..2000) { lastHvCurrent = b; pushPower(ds) }  // signed A (regen negative)
+                }
+                override fun onDriverMotorSpeed(a: Int, b: Int) {
+                    if (b in 0..30_000) ds.applyDaemonTelemetry(speedKmh = null, gear = null, powerKw = null, rearRpm = b)
+                }
+            }
+            dev.javaClass.getMethod("registerListener", AbsBYDAutoCollectDataListener::class.java).invoke(dev, l)
+            collectDataListener = l
+            Log.i(tag, "collectdata listener registered")
+        } catch (t: Throwable) {
+            val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
+            Log.w(tag, "collectdata listener failed: ${c.javaClass.simpleName}: ${c.message}")
+        }
+    }
+
+    // Real driving power = HV volts × amps / 1000. Sign follows the current sign (regen negative).
+    // NOTE: verify sign convention on-car (drive should be positive); flip here if inverted.
+    private fun pushPower(ds: BydVehicleDataSource) {
+        val v = lastHvVolt; val i = lastHvCurrent ?: return
+        if (v <= 0) return
+        val kw = v * i / 1000.0
+        if (kotlin.math.abs(kw) <= 500.0) ds.applyDaemonTelemetry(speedKmh = null, gear = null, powerKw = kw)
     }
 
     private fun bind(ctx: Context, className: String): Any? = try {

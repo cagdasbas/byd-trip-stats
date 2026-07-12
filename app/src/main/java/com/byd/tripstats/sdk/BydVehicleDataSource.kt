@@ -5140,6 +5140,19 @@ class BydVehicleDataSource(context: Context) {
      * Wheel index: 1=LF, 2=RF, 3=LR, 4=RR; **0 = sentinel/aggregate — ignore** (the getter returns
      * that index-0 value regardless of area, which is why it read uniform/wrong on all wheels).
      */
+    /**
+     * DiLink-5 HV pack voltage from the collectdata event (onMotorMCUGeneratrixVolt). Getters return
+     * -1/dead; this is the real measured pack voltage (≈450–480 V). TICKET-016.
+     */
+    fun applyDilink5HvVoltage(volts: Int) {
+        if (volts !in 100..1000) return
+        // Write the snapshot field directly: publishSnapshot preserves batteryTotalVoltage from the
+        // snapshot (not the _batteryTotalVoltage StateFlow), so a StateFlow write wouldn't surface.
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(batteryTotalVoltage = volts)
+        _batteryTotalVoltage.value = volts   // keep the flow in sync for other readers
+        publishSnapshot()
+    }
+
     fun applyDilink5TyreTemp(wheel: Int, tempC: Int) {
         if (tempC !in -40..120) return
         when (wheel) {
