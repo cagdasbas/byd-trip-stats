@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.byd.tripstats.R
+import com.byd.tripstats.adb.AdbPermissionManager
+import com.byd.tripstats.sdk.DiLink5Platform
 import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.data.entitlement.RedeemResult
@@ -805,6 +807,61 @@ internal fun AppPreferencesTab(
                 hasSavedCode = hasSavedCode,
                 onEnterCode = { showLicenseDialog = true },
             )
+        }
+
+        // DiLink-5 only: opt-in for the global hidden-API exemption that lets the app read vehicle
+        // data. Lets a user who declined the first-run prompt enable it later (or turn it back off).
+        if (DiLink5Platform.isDiLink5) {
+            var vehicleAccessOn by remember {
+                mutableStateOf(AdbPermissionManager.hasHiddenApiConsent(context))
+            }
+            SettingsGroupLabel("Vehicle data access")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                "Allow reading vehicle data",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Relaxes one head-unit system setting (hidden-API), scoped to the " +
+                                "BYD vehicle libraries, so the app can read battery, range, speed and " +
+                                "tyres. Device-wide setting; reverts on reboot and is re-applied only " +
+                                "when needed. Off = the app runs but shows no vehicle data.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = vehicleAccessOn,
+                            onCheckedChange = { on ->
+                                vehicleAccessOn = on
+                                AdbPermissionManager.setHiddenApiConsent(context, on)
+                                AdbPermissionManager.markHiddenApiPrompted(context)
+                                if (on) scope.launch {
+                                    AdbPermissionManager.ensureVehicleApiAccess(context)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 

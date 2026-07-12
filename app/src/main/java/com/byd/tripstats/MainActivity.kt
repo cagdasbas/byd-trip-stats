@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
     // Shown once per app version update to remind the user to re-enable Autostart
     private val showAutostartReminder = mutableStateOf(false)
     private val showSetupRequired   = mutableStateOf(false)
+    private val showHiddenApiConsent = mutableStateOf(false)
 
     // ── Locale override ───────────────────────────────────────────────────────
 
@@ -145,6 +146,44 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // DiLink-5 hidden-API exemption — one-time opt-in (PR #8 item 2b). We change a
+                    // GLOBAL head-unit setting, so ask before doing it; a decline is remembered and
+                    // can be reversed later from Settings.
+                    if (showHiddenApiConsent.value) {
+                        AlertDialog(
+                            onDismissRequest = { },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            title = { Text("Allow vehicle data access?") },
+                            text = {
+                                Text(
+                                    "To read live data from this car (battery, range, speed, " +
+                                    "tyres…), BYD Trip Stats needs to relax one system setting on " +
+                                    "the head unit (the hidden-API restriction), scoped to the BYD " +
+                                    "vehicle libraries.\n\n" +
+                                    "This is a device-wide setting. It reverts on reboot and the app " +
+                                    "re-applies it only when needed. You can change this later in " +
+                                    "Settings.\n\n" +
+                                    "Without it the app runs but shows no vehicle data."
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    AdbPermissionManager.setHiddenApiConsent(this@MainActivity, true)
+                                    AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
+                                    showHiddenApiConsent.value = false
+                                    lifecycleScope.launch {
+                                        AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+                                    }
+                                }) { Text("Allow") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
+                                    showHiddenApiConsent.value = false
+                                }) { Text("Not now") }
+                            }
+                        )
+                    }
                     // ADB permission setup — driven by AdbPermissionManager.state
                     if (showSetupRequired.value) {
                         val adbState by AdbPermissionManager.state.collectAsState()
@@ -284,12 +323,18 @@ class MainActivity : ComponentActivity() {
         // exemptions to a device that doesn't need them. Gate the whole flow so D3 is unaffected.
         if (!DiLink5Platform.isDiLink5) return
 
-        // Idempotently re-assert DiLink-5 vehicle-API access on startup: the hidden-API exemption
-        // that lets the bydauto SDK bind can reset on reboot, and without it all telemetry reads 0.
-        // No-ops if adb isn't authorised yet (the setup flow below handles first-time authorisation,
-        // and applies the same tweaks once authorised).
+        // Idempotently re-assert DiLink-5 vehicle-API access on startup. This grants the bydauto
+        // *_COMMON perms (app-scoped, always) and — only if the user consented — re-applies the
+        // hidden-API exemption if it was reset (reboot). No-ops if adb isn't authorised yet.
         lifecycleScope.launch {
             AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+        }
+
+        // One-time opt-in for the hidden-API exemption (a global device change). Ask once; a decline
+        // is remembered so we don't nag, and can be reversed from Settings.
+        if (!AdbPermissionManager.hasHiddenApiConsent(this) &&
+            !AdbPermissionManager.hasBeenPromptedForHiddenApi(this)) {
+            showHiddenApiConsent.value = true
         }
         if (AdbPermissionManager.isSetupComplete(this)) return
         showSetupRequired.value = true

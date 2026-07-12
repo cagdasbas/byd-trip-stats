@@ -29,6 +29,15 @@ object AdbPermissionManager {
     private const val KEY_PUB_FILE = "adbkey.pub"
     private const val PREFS_NAME = "adb_permission_prefs"
     private const val PREF_PERMISSIONS_GRANTED = "permissions_granted_v1"
+    // Opt-in consent for the DiLink-5 hidden-API exemption. This is a GLOBAL device setting, so we
+    // only touch it after the user explicitly agrees (see MainActivity consent dialog / Settings).
+    private const val PREF_HIDDEN_API_CONSENT = "d5_hidden_api_consent_v1"
+    // Whether we've already shown the one-time consent prompt (so a decline doesn't nag every launch;
+    // the user can still opt in later from Settings).
+    private const val PREF_HIDDEN_API_PROMPTED = "d5_hidden_api_prompted_v1"
+    // The token we write into hidden_api_blacklist_exemptions; used to detect "already applied" so we
+    // don't silently re-write the global setting on every launch (only re-apply when missing/reset).
+    private const val EXEMPTION_TOKEN = "Lcom/ts/"
 
     // Permissions that require elevated user-approved grant flow.
     private val REQUIRED_PERMISSIONS = listOf(
@@ -84,6 +93,28 @@ object AdbPermissionManager {
 
     private val _state = MutableStateFlow<SetupState>(SetupState.Idle)
     val state: StateFlow<SetupState> = _state.asStateFlow()
+
+    // ── Hidden-API exemption consent (opt-in) ────────────────────────────────────
+    /** Whether the user has agreed to let us relax the head-unit's global hidden-API setting. */
+    fun hasHiddenApiConsent(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(PREF_HIDDEN_API_CONSENT, false)
+
+    /** Record (or revoke) that consent. Enabling later re-applies the exemption on the next ensure. */
+    fun setHiddenApiConsent(context: Context, granted: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(PREF_HIDDEN_API_CONSENT, granted).apply()
+    }
+
+    /** True once the one-time consent prompt has been shown (regardless of the answer). */
+    fun hasBeenPromptedForHiddenApi(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(PREF_HIDDEN_API_PROMPTED, false)
+
+    fun markHiddenApiPrompted(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(PREF_HIDDEN_API_PROMPTED, true).apply()
+    }
 
     /** True if all required permissions are already granted — skip setup entirely. */
     fun isSetupComplete(context: Context): Boolean {
@@ -240,19 +271,34 @@ object AdbPermissionManager {
      * exempt hidden APIs (so the bydauto SDK can bind) and grant the bydauto *_COMMON perms.
      * Best-effort — individual failures are logged, never fatal.
      */
-    private fun applyVehicleApiAccess(dadb: Dadb, pkg: String) {
-        VEHICLE_API_SETTINGS.forEach { cmd ->
-            runCatching {
-                val r = dadb.shell(cmd)
-                Log.i(TAG, "vehicle-api: $cmd -> exit ${r.exitCode}")
-            }.onFailure { Log.w(TAG, "vehicle-api '$cmd' failed: ${it.message}") }
-        }
+    private fun applyVehicleApiAccess(dadb: Dadb, pkg: String, hiddenApiConsent: Boolean) {
+        // bydauto *_COMMON grants only affect OUR app — always safe, no consent needed.
         BYDAUTO_COMMON_PERMISSIONS.forEach { perm ->
             runCatching {
                 val r = dadb.shell("pm grant $pkg $perm")
                 val ok = r.exitCode == 0 || r.allOutput.contains("Success", ignoreCase = true)
                 if (!ok && r.allOutput.isNotBlank()) Log.d(TAG, "grant $perm: ${r.allOutput.trim()}")
             }
+        }
+        // The hidden-API exemption is a GLOBAL device setting → only with explicit consent, and only
+        // when actually missing/reset (avoids a silent re-write on every launch — PR #8 item 2b).
+        if (hiddenApiConsent) applyHiddenApiExemptionIfNeeded(dadb)
+        else Log.i(TAG, "hidden-api exemption skipped (no consent)")
+    }
+
+    /** Apply the hidden-API exemption only if it isn't already in effect (reboot resets it). */
+    private fun applyHiddenApiExemptionIfNeeded(dadb: Dadb) {
+        val current = runCatching { dadb.shell("settings get global hidden_api_blacklist_exemptions").allOutput.trim() }
+            .getOrNull()
+        if (current != null && current.contains(EXEMPTION_TOKEN)) {
+            Log.i(TAG, "hidden-api exemption already set ('$current') — not re-asserting")
+            return
+        }
+        VEHICLE_API_SETTINGS.forEach { cmd ->
+            runCatching {
+                val r = dadb.shell(cmd)
+                Log.i(TAG, "vehicle-api: $cmd -> exit ${r.exitCode}")
+            }.onFailure { Log.w(TAG, "vehicle-api '$cmd' failed: ${it.message}") }
         }
     }
 
@@ -267,7 +313,7 @@ object AdbPermissionManager {
         val keyPair = getOrCreateKeyPair(context)
         val dadb = tryConnect(keyPair, timeoutMs = 2_000) ?: return@withContext false
         try {
-            applyVehicleApiAccess(dadb, context.packageName)
+            applyVehicleApiAccess(dadb, context.packageName, hasHiddenApiConsent(context))
             Log.i(TAG, "✅ DiLink-5 vehicle-API access ensured")
             true
         } catch (e: Exception) {
@@ -295,8 +341,9 @@ object AdbPermissionManager {
                 dadb.shell(command)
             }
 
-            // DiLink-5: also exempt hidden APIs + grant bydauto *_COMMON so telemetry binds.
-            applyVehicleApiAccess(dadb, pkg)
+            // DiLink-5: grant bydauto *_COMMON (always) + exempt hidden APIs (only if the user
+            // consented) so telemetry binds. Consent is captured before setup runs (MainActivity).
+            applyVehicleApiAccess(dadb, pkg, hasHiddenApiConsent(context))
 
             dadb.close()
 
