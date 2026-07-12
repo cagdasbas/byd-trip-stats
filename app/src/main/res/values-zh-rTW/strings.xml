@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">車輛資料存取</string>
     <string name="d5_vehicle_access_title">允許讀取車輛資料</string>
     <string name="d5_vehicle_access_desc">放寬主機的一項系統設定（hidden-API），僅限於 BYD 車輛程式庫，讓應用程式可讀取電池、續航、車速與輪胎。裝置層級設定；重新開機後重設，僅在需要時重新套用。關閉 = 應用程式仍執行，但不顯示車輛資料。</string>
+    <string name="d5_consent_decline_title">確定嗎？</string>
+    <string name="d5_consent_decline_body">沒有此權限，應用程式無法讀取任何車輛資料。你可以隨時在「設定」頁面授予。</string>
+    <string name="d5_consent_decline_confirm">是，略過</string>
+    <string name="d5_consent_decline_back">返回</string>
 </resources>

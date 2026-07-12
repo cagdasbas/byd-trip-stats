@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">Adgang til køretøjsdata</string>
     <string name="d5_vehicle_access_title">Tillad læsning af køretøjsdata</string>
     <string name="d5_vehicle_access_desc">Løsner én systemindstilling på hovedenheden (hidden-API), afgrænset til BYD-køretøjsbibliotekerne, så appen kan læse batteri, rækkevidde, hastighed og dæk. Enhedsdækkende indstilling; nulstilles ved genstart og anvendes kun igen ved behov. Fra = appen kører, men viser ingen køretøjsdata.</string>
+    <string name="d5_consent_decline_title">Er du sikker?</string>
+    <string name="d5_consent_decline_body">Uden denne tilladelse kan appen ikke læse nogen køretøjsdata. Du kan give den når som helst fra siden Indstillinger.</string>
+    <string name="d5_consent_decline_confirm">Ja, spring over</string>
+    <string name="d5_consent_decline_back">Tilbage</string>
 </resources>

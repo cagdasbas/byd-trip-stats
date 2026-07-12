@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">Acesso aos dados do veículo</string>
     <string name="d5_vehicle_access_title">Permitir a leitura dos dados do veículo</string>
     <string name="d5_vehicle_access_desc">Flexibiliza uma definição de sistema da unidade central (hidden-API), limitada às bibliotecas de veículos da BYD, para que a aplicação possa ler bateria, autonomia, velocidade e pneus. Definição de todo o dispositivo; é reposta ao reiniciar e só é reaplicada quando necessário. Desligado = a aplicação funciona mas não mostra dados do veículo.</string>
+    <string name="d5_consent_decline_title">Tem a certeza?</string>
+    <string name="d5_consent_decline_body">Sem esta permissão a aplicação não consegue ler quaisquer dados do veículo. Pode concedê-la a qualquer momento na página Definições.</string>
+    <string name="d5_consent_decline_confirm">Sim, ignorar</string>
+    <string name="d5_consent_decline_back">Voltar</string>
 </resources>

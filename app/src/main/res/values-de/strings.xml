@@ -1027,4 +1027,8 @@
     <string name="d5_vehicle_access_section">Fahrzeugdatenzugriff</string>
     <string name="d5_vehicle_access_title">Lesen von Fahrzeugdaten erlauben</string>
     <string name="d5_vehicle_access_desc">Lockert eine Systemeinstellung der Haupteinheit (Hidden-API), begrenzt auf die BYD-Fahrzeugbibliotheken, damit die App Batterie, Reichweite, Geschwindigkeit und Reifen lesen kann. Geräteweite Einstellung; wird bei Neustart zurückgesetzt und nur bei Bedarf erneut angewendet. Aus = die App läuft, zeigt aber keine Fahrzeugdaten.</string>
+    <string name="d5_consent_decline_title">Sind Sie sicher?</string>
+    <string name="d5_consent_decline_body">Ohne diese Berechtigung kann die App keine Fahrzeugdaten lesen. Sie können sie jederzeit auf der Seite Einstellungen erteilen.</string>
+    <string name="d5_consent_decline_confirm">Ja, überspringen</string>
+    <string name="d5_consent_decline_back">Zurück</string>
 </resources>

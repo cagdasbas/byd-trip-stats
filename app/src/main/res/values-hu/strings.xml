@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Járműadatokhoz való hozzáférés</string>
     <string name="d5_vehicle_access_title">Járműadatok olvasásának engedélyezése</string>
     <string name="d5_vehicle_access_desc">Lazít a fejegység egy rendszerbeállításán (hidden-API), a BYD járműkönyvtárakra korlátozva, hogy az alkalmazás olvashassa az akkumulátort, a hatótávot, a sebességet és a gumiabroncsokat. Eszközszintű beállítás; újraindításkor visszaáll, és csak szükség esetén alkalmazódik újra. Kikapcsolva = az alkalmazás fut, de nem mutat járműadatokat.</string>
+    <string name="d5_consent_decline_title">Biztos benne?</string>
+    <string name="d5_consent_decline_body">E jogosultság nélkül az alkalmazás nem tud járműadatokat olvasni. Bármikor megadhatja a Beállítások oldalon.</string>
+    <string name="d5_consent_decline_confirm">Igen, kihagyom</string>
+    <string name="d5_consent_decline_back">Vissza</string>
 </resources>

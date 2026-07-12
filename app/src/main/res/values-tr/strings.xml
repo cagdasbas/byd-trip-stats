@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">Araç verisi erişimi</string>
     <string name="d5_vehicle_access_title">Araç verisi okumaya izin ver</string>
     <string name="d5_vehicle_access_desc">Ana ünitenin bir sistem ayarını (hidden-API) yalnızca BYD araç kütüphaneleriyle sınırlı olacak şekilde gevşetir; böylece uygulama batarya, menzil, hız ve lastikleri okuyabilir. Cihaz genelinde ayardır; yeniden başlatmada sıfırlanır ve yalnızca gerektiğinde yeniden uygulanır. Kapalı = uygulama çalışır ancak araç verisi göstermez.</string>
+    <string name="d5_consent_decline_title">Emin misiniz?</string>
+    <string name="d5_consent_decline_body">Bu izin olmadan uygulama hiçbir araç verisini okuyamaz. Ayarlar sayfasından istediğiniz zaman verebilirsiniz.</string>
+    <string name="d5_consent_decline_confirm">Evet, atla</string>
+    <string name="d5_consent_decline_back">Geri</string>
 </resources>

@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Truy cập dữ liệu xe</string>
     <string name="d5_vehicle_access_title">Cho phép đọc dữ liệu xe</string>
     <string name="d5_vehicle_access_desc">Nới lỏng một cài đặt hệ thống của đầu máy (hidden-API), chỉ giới hạn ở các thư viện xe của BYD, để ứng dụng có thể đọc pin, quãng đường, tốc độ và lốp. Cài đặt toàn thiết bị; đặt lại khi khởi động lại và chỉ áp dụng lại khi cần. Tắt = ứng dụng vẫn chạy nhưng không hiển thị dữ liệu xe.</string>
+    <string name="d5_consent_decline_title">Bạn có chắc không?</string>
+    <string name="d5_consent_decline_body">Không có quyền này, ứng dụng không thể đọc bất kỳ dữ liệu xe nào. Bạn có thể cấp quyền bất cứ lúc nào từ trang Cài đặt.</string>
+    <string name="d5_consent_decline_confirm">Có, bỏ qua</string>
+    <string name="d5_consent_decline_back">Quay lại</string>
 </resources>

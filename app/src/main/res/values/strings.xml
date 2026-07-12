@@ -1129,4 +1129,8 @@
     <string name="d5_vehicle_access_section">Vehicle data access</string>
     <string name="d5_vehicle_access_title">Allow reading vehicle data</string>
     <string name="d5_vehicle_access_desc">Relaxes one head-unit system setting (hidden-API), scoped to the BYD vehicle libraries, so the app can read battery, range, speed and tyres. Device-wide setting; reverts on reboot and is re-applied only when needed. Off = the app runs but shows no vehicle data.</string>
+    <string name="d5_consent_decline_title">Are you sure?</string>
+    <string name="d5_consent_decline_body">Without this permission the app can\'t read any vehicle data. You can grant it anytime from the Settings page.</string>
+    <string name="d5_consent_decline_confirm">Yes, skip</string>
+    <string name="d5_consent_decline_back">Go back</string>
 </resources>

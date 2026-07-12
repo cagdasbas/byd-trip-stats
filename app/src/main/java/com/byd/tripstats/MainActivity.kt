@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
     private val showAutostartReminder = mutableStateOf(false)
     private val showSetupRequired   = mutableStateOf(false)
     private val showHiddenApiConsent = mutableStateOf(false)
+    private val showHiddenApiDeclineConfirm = mutableStateOf(false)
 
     // ── Locale override ───────────────────────────────────────────────────────
 
@@ -171,9 +172,34 @@ class MainActivity : ComponentActivity() {
                             },
                             dismissButton = {
                                 TextButton(onClick = {
-                                    AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
+                                    // Don't finalize yet — ask for confirmation first.
                                     showHiddenApiConsent.value = false
+                                    showHiddenApiDeclineConfirm.value = true
                                 }) { Text(stringResource(R.string.d5_consent_not_now)) }
+                            }
+                        )
+                    }
+                    // Confirm a decline: make sure the user knows the app shows no vehicle data
+                    // without it, and that it can be enabled later from Settings.
+                    if (showHiddenApiDeclineConfirm.value) {
+                        AlertDialog(
+                            onDismissRequest = { },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            title = { Text(stringResource(R.string.d5_consent_decline_title)) },
+                            text = { Text(stringResource(R.string.d5_consent_decline_body)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    // Still declining — remember it and close. Re-enable later in Settings.
+                                    AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
+                                    showHiddenApiDeclineConfirm.value = false
+                                }) { Text(stringResource(R.string.d5_consent_decline_confirm)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    // Reconsidered — go back to the consent prompt.
+                                    showHiddenApiDeclineConfirm.value = false
+                                    showHiddenApiConsent.value = true
+                                }) { Text(stringResource(R.string.d5_consent_decline_back)) }
                             }
                         )
                     }

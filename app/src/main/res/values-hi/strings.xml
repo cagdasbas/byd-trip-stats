@@ -1027,4 +1027,8 @@
     <string name="d5_vehicle_access_section">वाहन डेटा एक्सेस</string>
     <string name="d5_vehicle_access_title">वाहन डेटा पढ़ने की अनुमति दें</string>
     <string name="d5_vehicle_access_desc">हेड यूनिट की एक सिस्टम सेटिंग (hidden-API) को ढीला करता है, जो BYD वाहन लाइब्रेरीज़ तक सीमित है, ताकि ऐप बैटरी, रेंज, गति और टायर पढ़ सके. डिवाइस-व्यापी सेटिंग; रीबूट पर रीसेट होती है और केवल ज़रूरत पड़ने पर फिर लागू होती है. बंद = ऐप चलता है लेकिन वाहन डेटा नहीं दिखाता.</string>
+    <string name="d5_consent_decline_title">क्या आप निश्चित हैं?</string>
+    <string name="d5_consent_decline_body">इस अनुमति के बिना ऐप कोई वाहन डेटा नहीं पढ़ सकता. आप इसे कभी भी सेटिंग्स पेज से दे सकते हैं.</string>
+    <string name="d5_consent_decline_confirm">हाँ, छोड़ें</string>
+    <string name="d5_consent_decline_back">वापस</string>
 </resources>

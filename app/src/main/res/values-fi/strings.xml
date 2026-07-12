@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">Ajoneuvon tietojen käyttö</string>
     <string name="d5_vehicle_access_title">Salli ajoneuvon tietojen luku</string>
     <string name="d5_vehicle_access_desc">Löysää yhtä pääyksikön järjestelmäasetusta (hidden-API), rajattuna BYD:n ajoneuvokirjastoihin, jotta sovellus voi lukea akun, toimintamatkan, nopeuden ja renkaat. Koko laitteen asetus; palautuu uudelleenkäynnistyksessä ja otetaan uudelleen käyttöön vain tarvittaessa. Pois = sovellus toimii, mutta ei näytä ajoneuvon tietoja.</string>
+    <string name="d5_consent_decline_title">Oletko varma?</string>
+    <string name="d5_consent_decline_body">Ilman tätä lupaa sovellus ei voi lukea ajoneuvon tietoja. Voit myöntää sen milloin tahansa Asetukset-sivulta.</string>
+    <string name="d5_consent_decline_confirm">Kyllä, ohita</string>
+    <string name="d5_consent_decline_back">Takaisin</string>
 </resources>

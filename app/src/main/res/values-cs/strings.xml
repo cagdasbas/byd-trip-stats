@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Přístup k datům vozidla</string>
     <string name="d5_vehicle_access_title">Povolit čtení dat vozidla</string>
     <string name="d5_vehicle_access_desc">Uvolní jedno systémové nastavení hlavní jednotky (hidden-API), omezené na knihovny vozidel BYD, aby aplikace mohla číst baterii, dojezd, rychlost a pneumatiky. Nastavení pro celé zařízení; po restartu se vrátí a znovu se použije jen v případě potřeby. Vypnuto = aplikace běží, ale nezobrazuje data vozidla.</string>
+    <string name="d5_consent_decline_title">Opravdu?</string>
+    <string name="d5_consent_decline_body">Bez tohoto oprávnění aplikace nemůže číst žádná data vozidla. Můžete jej kdykoli udělit na stránce Nastavení.</string>
+    <string name="d5_consent_decline_confirm">Ano, přeskočit</string>
+    <string name="d5_consent_decline_back">Zpět</string>
 </resources>

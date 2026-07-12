@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Akses data kendaraan</string>
     <string name="d5_vehicle_access_title">Izinkan membaca data kendaraan</string>
     <string name="d5_vehicle_access_desc">Melonggarkan satu pengaturan sistem unit kepala (hidden-API), terbatas pada pustaka kendaraan BYD, agar aplikasi dapat membaca baterai, jangkauan, kecepatan, dan ban. Pengaturan seluruh perangkat; disetel ulang saat mulai ulang dan diterapkan kembali hanya bila diperlukan. Mati = aplikasi berjalan tetapi tidak menampilkan data kendaraan.</string>
+    <string name="d5_consent_decline_title">Anda yakin?</string>
+    <string name="d5_consent_decline_body">Tanpa izin ini aplikasi tidak dapat membaca data kendaraan apa pun. Anda dapat memberikannya kapan saja dari halaman Pengaturan.</string>
+    <string name="d5_consent_decline_confirm">Ya, lewati</string>
+    <string name="d5_consent_decline_back">Kembali</string>
 </resources>

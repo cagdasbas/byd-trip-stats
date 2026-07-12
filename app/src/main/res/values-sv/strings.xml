@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">Åtkomst till fordonsdata</string>
     <string name="d5_vehicle_access_title">Tillåt läsning av fordonsdata</string>
     <string name="d5_vehicle_access_desc">Mjukar upp en systeminställning på huvudenheten (hidden-API), begränsad till BYD:s fordonsbibliotek, så att appen kan läsa batteri, räckvidd, hastighet och däck. Enhetsomfattande inställning; återställs vid omstart och tillämpas igen endast vid behov. Av = appen fungerar men visar ingen fordonsdata.</string>
+    <string name="d5_consent_decline_title">Är du säker?</string>
+    <string name="d5_consent_decline_body">Utan detta tillstånd kan appen inte läsa någon fordonsdata. Du kan bevilja det när som helst från sidan Inställningar.</string>
+    <string name="d5_consent_decline_confirm">Ja, hoppa över</string>
+    <string name="d5_consent_decline_back">Tillbaka</string>
 </resources>

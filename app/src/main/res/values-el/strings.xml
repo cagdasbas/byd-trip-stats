@@ -1027,4 +1027,8 @@
     <string name="d5_vehicle_access_section">Πρόσβαση σε δεδομένα οχήματος</string>
     <string name="d5_vehicle_access_title">Να επιτρέπεται η ανάγνωση δεδομένων οχήματος</string>
     <string name="d5_vehicle_access_desc">Χαλαρώνει μία ρύθμιση συστήματος της κεντρικής μονάδας (hidden-API), περιορισμένη στις βιβλιοθήκες οχημάτων BYD, ώστε η εφαρμογή να διαβάζει μπαταρία, αυτονομία, ταχύτητα και ελαστικά. Ρύθμιση για όλη τη συσκευή· επαναφέρεται μετά την επανεκκίνηση και εφαρμόζεται ξανά μόνο όταν χρειάζεται. Ανενεργό = η εφαρμογή λειτουργεί αλλά δεν εμφανίζει δεδομένα οχήματος.</string>
+    <string name="d5_consent_decline_title">Είστε σίγουροι;</string>
+    <string name="d5_consent_decline_body">Χωρίς αυτή την άδεια η εφαρμογή δεν μπορεί να διαβάσει δεδομένα οχήματος. Μπορείτε να τη χορηγήσετε ανά πάσα στιγμή από τη σελίδα Ρυθμίσεις.</string>
+    <string name="d5_consent_decline_confirm">Ναι, παράλειψη</string>
+    <string name="d5_consent_decline_back">Πίσω</string>
 </resources>

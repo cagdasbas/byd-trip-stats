@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Acces la datele vehiculului</string>
     <string name="d5_vehicle_access_title">Permite citirea datelor vehiculului</string>
     <string name="d5_vehicle_access_desc">Relaxează o setare de sistem a unității centrale (hidden-API), limitată la bibliotecile de vehicule BYD, pentru ca aplicația să poată citi bateria, autonomia, viteza și anvelopele. Setare la nivelul dispozitivului; se resetează la repornire și se reaplică doar când este nevoie. Oprit = aplicația funcționează, dar nu afișează date despre vehicul.</string>
+    <string name="d5_consent_decline_title">Sigur?</string>
+    <string name="d5_consent_decline_body">Fără această permisiune aplicația nu poate citi date despre vehicul. O puteți acorda oricând din pagina Setări.</string>
+    <string name="d5_consent_decline_confirm">Da, omite</string>
+    <string name="d5_consent_decline_back">Înapoi</string>
 </resources>

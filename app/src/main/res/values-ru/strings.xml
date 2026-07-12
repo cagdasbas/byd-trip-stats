@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Доступ к данным автомобиля</string>
     <string name="d5_vehicle_access_title">Разрешить чтение данных автомобиля</string>
     <string name="d5_vehicle_access_desc">Ослабляет одну системную настройку головного устройства (hidden-API), только для библиотек автомобилей BYD, чтобы приложение могло читать батарею, запас хода, скорость и шины. Настройка на уровне устройства; сбрасывается при перезагрузке и применяется повторно только при необходимости. Выкл. = приложение работает, но не показывает данные автомобиля.</string>
+    <string name="d5_consent_decline_title">Вы уверены?</string>
+    <string name="d5_consent_decline_body">Без этого разрешения приложение не сможет читать данные автомобиля. Вы можете предоставить его в любое время на странице Настройки.</string>
+    <string name="d5_consent_decline_confirm">Да, пропустить</string>
+    <string name="d5_consent_decline_back">Назад</string>
 </resources>

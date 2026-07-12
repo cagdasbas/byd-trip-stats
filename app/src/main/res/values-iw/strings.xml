@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">גישה לנתוני הרכב</string>
     <string name="d5_vehicle_access_title">אפשר קריאת נתוני רכב</string>
     <string name="d5_vehicle_access_desc">מקל על הגדרת מערכת אחת של היחידה הראשית (hidden-API), מוגבלת לספריות הרכב של BYD, כדי שהאפליקציה תוכל לקרוא סוללה, טווח, מהירות וצמיגים. הגדרה ברמת המכשיר; מתאפסת באתחול ומוחלת מחדש רק בעת הצורך. כבוי = האפליקציה פועלת אך אינה מציגה נתוני רכב.</string>
+    <string name="d5_consent_decline_title">האם אתה בטוח?</string>
+    <string name="d5_consent_decline_body">ללא הרשאה זו האפליקציה אינה יכולה לקרוא נתוני רכב כלשהם. אפשר להעניק אותה בכל עת מדף ההגדרות.</string>
+    <string name="d5_consent_decline_confirm">כן, דלג</string>
+    <string name="d5_consent_decline_back">חזרה</string>
 </resources>

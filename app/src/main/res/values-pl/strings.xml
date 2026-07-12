@@ -1124,4 +1124,8 @@
     <string name="d5_vehicle_access_section">Dostęp do danych pojazdu</string>
     <string name="d5_vehicle_access_title">Zezwól na odczyt danych pojazdu</string>
     <string name="d5_vehicle_access_desc">Poluzowuje jedno ustawienie systemowe jednostki głównej (hidden-API), ograniczone do bibliotek pojazdów BYD, aby aplikacja mogła odczytywać akumulator, zasięg, prędkość i opony. Ustawienie dla całego urządzenia; resetuje się po ponownym uruchomieniu i jest stosowane ponownie tylko w razie potrzeby. Wył. = aplikacja działa, ale nie pokazuje danych pojazdu.</string>
+    <string name="d5_consent_decline_title">Na pewno?</string>
+    <string name="d5_consent_decline_body">Bez tego uprawnienia aplikacja nie może odczytać żadnych danych pojazdu. Możesz je przyznać w dowolnym momencie na stronie Ustawienia.</string>
+    <string name="d5_consent_decline_confirm">Tak, pomiń</string>
+    <string name="d5_consent_decline_back">Wstecz</string>
 </resources>

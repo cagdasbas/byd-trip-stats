@@ -1128,4 +1128,8 @@
     <string name="d5_vehicle_access_section">車両データへのアクセス</string>
     <string name="d5_vehicle_access_title">車両データの読み取りを許可</string>
     <string name="d5_vehicle_access_desc">ヘッドユニットの1つのシステム設定（hidden-API）を BYD の車両ライブラリに限定して緩和し、アプリがバッテリー・走行可能距離・速度・タイヤを読み取れるようにします。端末全体の設定で、再起動でリセットされ、必要なときのみ再適用されます。オフ＝アプリは動作しますが車両データは表示されません。</string>
+    <string name="d5_consent_decline_title">よろしいですか？</string>
+    <string name="d5_consent_decline_body">この権限がないとアプリは車両データを読み取れません。設定ページからいつでも許可できます。</string>
+    <string name="d5_consent_decline_confirm">はい、スキップ</string>
+    <string name="d5_consent_decline_back">戻る</string>
 </resources>
