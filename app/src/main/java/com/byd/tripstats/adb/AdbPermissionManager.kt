@@ -75,6 +75,7 @@ object AdbPermissionManager {
         "android.permission.BYDAUTO_MOTOR_COMMON",
         "android.permission.BYDAUTO_INSTRUMENT_COMMON",
         "android.permission.BYDAUTO_TYRE_COMMON",
+        "android.permission.BYDAUTO_AC_COMMON",
     )
 
     sealed class SetupState {
