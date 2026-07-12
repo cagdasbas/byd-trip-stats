@@ -1,3 +1,34 @@
+## [2.12.0] - 2026-Jul-11
+
+> **What's new in a nutshell**
+>
+> A big customisation-and-looks release, built around a brand-new **Cards dashboard layout (Pro)** — an alternative to the classic chart-centric dashboard that trades the large central graph for **big, well-spaced tiles with much larger fonts**. The top **power row** (Power / Speed / SoC / Range / Distance) and the bottom **Trip Tracking** bar stay put; the **two middle rows are fully yours** — tap the **pencil** in the top-right to enter edit mode, where every tile gently **wobbles** and you can **drag to reorder** them and **show/hide** the ones you don't care about, with the rest **growing to fill the freed space**. The range-projection **chart sits pinned in the centre**, spanning both rows, and **expands to a full-size window on tap** (or from the Range tile); hide it and the cards reclaim the whole width. Even the five **power tiles are reorderable** (they're always visible), and they gained **live subtitles** — Power reads *Idle / Accelerating / Decelerating / Charging*, Speed reads *Parked / Driving*. It also **adapts to split-screen**, reflowing to a single compact screen when the app runs side-by-side with another. There's also a new **Neon theme (Pro, dark only)** — a pure-black, OLED-friendly look whose **power digits and accent stripes glow like neon** and whose cards carry a soft accent-coloured edge. And across the board the dashboard is now **subtly 3-D**: cards, the top bar and the trip bar all cast a soft shadow so they lift off the background. The classic layout and every other theme are untouched — these are opt-in choices under **Settings → Preferences**.
+
+### Added
+
+- **Cards dashboard layout (Pro)** — a second dashboard style, chosen under **Settings → Preferences → Dashboard Layout** (Classic stays the default and is available to everyone). It drops the big central chart in favour of **large, separated tiles with noticeably bigger, more glanceable numbers**. The **power row** at the top and the **Trip Tracking** bar at the bottom are fixed; the **two middle rows** are a customisable grid:
+    - **Edit mode** — a **pencil** button in the top-right (it turns into a green check while editing, and the other top-bar icons step aside so it's clear you're customising). In edit mode the tiles **wobble** to signal they're rearrangeable.
+    - **Drag-to-reorder** — drag any tile to a new position; the others slide out of the way and the layout is saved instantly. The **five power tiles are reorderable too** — but they're **always visible** (never hideable).
+    - **Show / hide** — each middle card has a corner badge to hide it (it dims, then disappears on exit) or bring it back; hidden cards free up space and the **remaining cards resize to fill it**.
+    - **Centre range-projection chart** — the projection chart is **pinned in the middle**, spanning both rows, flanked by two cards on each side. **Tap it (or the Range power tile) to open a large full-screen view.** It's modular like the cards: hide it and the eight cards reflow to full width, after which it's reachable only from the Range tile.
+    - **Live power-tile subtitles** — **Power** shows *Idle · Accelerating · Decelerating · Charging* depending on what the car's doing, **Speed** shows *Parked · Driving*, and Range/Distance/SoC carry context labels.
+    - **Adapts to split-screen** — when the app is shown in a narrow multi-window (head-unit split view) the whole dashboard **reflows to fit one screen with no scrolling**: the power metrics condense to a single value-only row, the cards become compact single-line rows (title on the left, value on the right), and the range chart takes all the remaining height with its labels stripped so the plot itself is bigger. Tapping the Range tile still opens the full chart, and full-screen is completely unchanged. Editing is a full-screen action, so the pencil is hidden while split.
+- **Neon theme (Pro, dark only)** — a fourth theme option alongside System / Light / Dark. It paints the whole app **pure OLED black**, and in the dashboard the **power-metric digits and their left accent stripes glow** in their accent colour, while every card gets a subtle **accent-tinted edge** so it reads as a lit surface against the black. It works in both dashboard layouts. (The glow is rendered so it looks right on any head-unit Android version, not just the newest.)
+- **"Wi-Fi only" option for Telegram auto-backups** — a new toggle under **Backup &amp; Restore → Telegram** that restricts scheduled backups to **Wi-Fi (unmetered) connections**, so the weekly/daily upload of your database (up to 50 MB) won't quietly eat a limited mobile-data plan. It's **on by default**; turn it off to let auto-backups run on any connection. Manual backups are unaffected — tapping **Send** always uploads immediately, whatever the network.
+- **Atto 1 (Dynamic / Premium) added to the car picker** — the two China-spec Seagull variants now appear under **BYD Seagull / Dolphin Surf / Atto 1** with their correct **30.08 kWh (Dynamic)** and **38.88 kWh (Premium)** packs, 45 kW motor and WLTP ranges (230 / 300 km). These are a different battery family to the European Dolphin Surf, which stays as its own Active / Boost / Comfort variants in the same group.
+
+### Changed
+
+- **The whole dashboard is now gently 3-D** — dashboard cards, the top app bar and the Trip Tracking bar all cast a soft drop shadow, so they lift off the background instead of sitting flat. Applies in both the Classic and Cards layouts and in every theme.
+- **Pro-only options are now shown but locked, instead of hidden** — the **Cards** layout button (Dashboard Layout) and the **Neon** theme button now always appear in Settings, shown **dimmed with a padlock** when you're not on Pro, so you can see what Pro unlocks rather than not knowing it exists. They select normally once Pro is unlocked.
+- **Tidier top bars in split-screen, and a consistent back button on the HV/12V history** — Trip History, Charging History and the **HV/12V — Last 48 hours** view now hide their small subtitle hint when the window is too narrow to show it (it's kept in fullscreen). And the HV/12V history view's close control is now a **back arrow** like every other screen, instead of an **✕**.
+
+### Fixed
+
+- **Corrected Atto 1 tyre pressures** — the Atto 1 (Dynamic / Premium) now uses the door-sticker **2.7 bar front and rear** instead of the previous 2.5 / 2.5, matching the placard on the driver's door.
+
+---
+
 ## [2.11.0] - 2026-Jul-05
 
 > **What's new in a nutshell**

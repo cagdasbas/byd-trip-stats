@@ -44,7 +44,12 @@
     <string name="settings_tab_app">App</string>
     <string name="settings_tab_connections">Forbindelser</string>
     <string name="settings_tab_preferences">Præferencer</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Om &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Kort-dashboardlayout</string>
+    <string name="pro_cards_layout_info">Et større, fuldt tilpasseligt dashboard: store, godt fordelte felter i stedet for det centrale diagram. Tryk på blyanten for at omarrangere felter ved at trække, vise eller skjule dem, du vil, og tryk på feltet Rækkevidde for at åbne projektionsdiagrammet i fuld størrelse. Vælg det under Præferencer → Dashboardlayout, når det er låst op.</string>
+    <string name="pro_neon_theme_title">Neon-tema</string>
+    <string name="pro_neon_theme_info">Et helsort, OLED-venligt mørkt tema, hvis tal for effektmålinger og accentstriber lyser som neon, med en diskret accentkant på hvert kort. Vælg det under Præferencer → Tema, når det er låst op.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Oversigt</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">Afbryd bot</string>
     <string name="auto_backup_label">Automatisk sikkerhedskopi</string>
     <string name="backup_interval_label">Sikkerhedskopi-interval</string>
+    <string name="wifi_only_label">Kun Wi-Fi</string>
+    <string name="wifi_only_desc">Automatiske sikkerhedskopier kører kun på Wi-Fi for at spare mobildata</string>
     <string name="last_auto_backup_label">Seneste auto-sikkerhedskopi: %1$s</string>
     <string name="schedule_updated_msg">Tidsplan opdateret til %1$s. Næste auto-sikkerhedskopi følger det nye interval.</string>
     <string name="telegram_setup_info">Når tilsluttet, kan sikkerhedskopier sendes manuelt eller på en tidsplan. Hver sikkerhedskopi lander som en .db-fil i din private chat, tilgængelig fra enhver enhed med Telegram.</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Lys</string>
     <string name="theme_dark">Mørk</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Sprog</string>
     <string name="language_desc">Vælg appens visningssprog. Valg af et sprog tilsidesætter enhedens systemsprog for denne app.</string>
     <string name="change_language_action">Skift sprog</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">Aktiv — Pro låst op for dette køretøj (livstid).</string>
     <string name="remove_code_action">Fjern kode</string>
     <string name="remove_code_title">Fjern Pro-oplåsningskode?</string>
-    <string name="remove_code_msg">Dette slår Pro fra på dette køretøj og deaktiverer Pro-funktionerne (celleimbalancealarm, batterihelbredsrapport, skærmbilleder, SD-kort-sikkerhedskopi). Din kode er ikke tabt — du kan indtaste den igen når som helst for at låse op igen.</string>
-    <string name="pro_unlock_desc">Lås op for premiumfunktioner som battericelle-imbalancealarm og instrumentbrætskærmbilleder med en engangskode til dit køretøj — €9,99, livstid, én bil. Verificeret på enheden — intet forlader din bil.</string>
+    <string name="remove_code_msg">Dette slår Pro fra på dette køretøj og deaktiverer Pro-funktionerne (kort-dashboardlayout, Neon-tema, advarsel om celleubalance, batterisundhedsrapport, skærmbilleder, sikkerhedskopi på SD-kort). Din kode går ikke tabt — du kan indtaste den igen når som helst for at låse op igen.</string>
+    <string name="pro_unlock_desc">Lås op for premiumfunktioner som kort-dashboardlayoutet, Neon-temaet, advarslen om celleubalance og dashboard-skærmbilleder med en engangskode til dit køretøj — 9,99 €, livstid, én bil. Verificeret på enheden — intet forlader din bil.</string>
     <string name="vehicle_id_section_label">Dette køretøjs ID (send dette ved køb af licens):</string>
     <string name="vehicle_id_reading">Læser… start bilen, og åbn derefter Indstillinger igen</string>
     <string name="vehicle_id_copied_msg">Køretøjs-ID kopieret</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">Har jeg brug for internet eller mobilsignal?</string>
     <string name="faq_a_internet">Nej til normal brug. Ture, opladningssessioner, grafik og lokal historik registreres udelukkende på enheden.\n\nInternet er kun nødvendigt til valgfrie funktioner som app-opdateringstjek, åbning af weblinks, MQTT / ABRP-integration og Telegram-sikkerhedskopier, hvis du aktiverer dem.</string>
     <string name="faq_q_pro">Hvad er BYD Trip Stats Pro, og hvad inkluderer det?</string>
-    <string name="faq_a_pro">Pro er en valgfri engangslås op for premiumekstras — en lille tak, der hjælper med at støtte udviklingen. Det er €9,99, betalt én gang, for et køretøjs levetid (ingen abonnement). Alt, der var gratis, forbliver gratis; Pro tilføjer kun nye funktioner:\n\n• Celleimbalancealarm — bliv underrettet, når pakkens cellespændingsspredning forbliver over en grænse\n• Batterihelbredsrapport — eksportér en udskrivbar PDF/HTML af din State of Health, nedgangshastighed og projiceret dato til 80%%\n• Instrumentbrætskærmbilleder — tryk på BYD-logoet for at gemme den aktuelle skærm\n• SD-kort-sikkerhedskopi — gem databasen til en BydTripStats-mappe på et flytbart SD-kort\n\nOplåsning: koden er bundet til din specifikke bil. Åbn Indstillinger → Præferencer → BYD Trip Stats Pro, scan QR-koden med din telefon (eller kopiér dit Køretøjs-ID) for at anmode om en kode, og indsæt den derefter igen. Det verificeres udelukkende på enheden — ingen konto, ingen login, intet forlader din bil.</string>
+    <string name="faq_a_pro">Pro er en valgfri engangslås op for premiumekstras — en lille tak, der hjælper med at støtte udviklingen. Det er €9,99, betalt én gang, for et køretøjs levetid (ingen abonnement). Alt, der var gratis, forbliver gratis; Pro tilføjer kun nye funktioner:\n\n• Kort-dashboardlayout — et større, fuldt tilpasseligt dashboard af store felter, som du kan trække for at omarrangere, vise eller skjule\n• Neon-tema — et helsort, OLED-venligt look med lysende effekttal\n• Celleimbalancealarm — bliv underrettet, når pakkens cellespændingsspredning forbliver over en grænse\n• Batterihelbredsrapport — eksportér en udskrivbar PDF/HTML af din State of Health, nedgangshastighed og projiceret dato til 80%%\n• Instrumentbrætskærmbilleder — tryk på BYD-logoet for at gemme den aktuelle skærm\n• SD-kort-sikkerhedskopi — gem databasen til en BydTripStats-mappe på et flytbart SD-kort\n\nOplåsning: koden er bundet til din specifikke bil. Åbn Indstillinger → Pro, scan QR-koden med din telefon (eller kopiér dit Køretøjs-ID) for at anmode om en kode, og indsæt den derefter igen. Det verificeres udelukkende på enheden — ingen konto, ingen login, intet forlader din bil.</string>
     <string name="faq_q_drive_modes">Hvorfor vises \'auto/ukendt\' ved køre- / regentilstande?</string>
     <string name="faq_a_drive_modes">Appen læser køre- og regentilstande direkte fra bilens instrumentklynge, men bilen udsender kun en tilstandsværdi, når du aktivt ændrer den — den rapporterer ikke den aktuelle tilstand ved opstart.\n\nIndtil du trykker på en tilstand på bilens display, har appen ingen værdi at vise og falder tilbage til \'Auto\' (regen) eller \'Ukendt\' (kørsel). For at løse dette:\n\n1. Gennemgå hvert regeniveau på bilens touchskærm én gang\n2. Gennemgå hvert køretilstand (Eco / Normal / Sport) én gang\n\nAppen registrerer straks begge værdier og begynder at optage dem med hvert turdatapunkt. Du behøver kun gøre dette én gang.</string>
     <string name="faq_q_offline_trip">Intet netværksforbindelse betyder, at turen mangler fra historikken?</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">En dialog burde vises på skærmen med anmodning om at tillade USB-fejlfinding. Tryk Tillad, og vend derefter tilbage her.\n\nDette er en éngangshandling. Fremtidige opdateringer er fuldt automatiske.</string>
     <string name="adb_granting_msg">Tildeler baggrundstilladelser…</string>
     <string name="authorize_action">Autoriser</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Dæk</string>
+    <string name="close">Luk</string>
+    <string name="range_projection_title">Dynamisk projektion</string>
+    <string name="dashboard_no_cards_hint">Alle kort er skjult. Tryk på blyanten for at tilføje nogle igen.</string>
+    <string name="reorder_card">Træk for at omarrangere</string>
+    <string name="pref_dashboard_layout">Dashboardlayout</string>
+    <string name="dashboard_layout_desc">Vælg, hvordan dashboardet er arrangeret. Kort er et større, tilpasseligt layout — tryk på blyanten på dashboardet for at vise, skjule og omarrangere felter.</string>
+    <string name="dashboard_layout_classic">Klassisk</string>
+    <string name="dashboard_layout_cards">Kort</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Inaktiv</string>
+    <string name="power_state_accelerating">Accelererer</string>
+    <string name="power_state_decelerating">Decelererer</string>
+    <string name="power_state_charging">Oplader</string>
+    <string name="speed_state_parked">Stationær</string>
+    <string name="speed_state_driving">Kører</string>
+    <string name="soc_subtitle_usable">Brugbar opladning</string>
+    <string name="range_subtitle_projection">Dynamisk projektion</string>
+    <string name="distance_subtitle_session">Denne session</string>
+    <string name="odometer_subtitle_lifetime">Samlet distance</string>
+    <string name="discharge_subtitle_lifetime">Samlet afgivet energi</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s tryk</string>
 </resources>

@@ -128,7 +128,8 @@ fun EnergyFlowDiagram(
         modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         if (consumptionExpanded) {
             ConsumptionChartExpanded(

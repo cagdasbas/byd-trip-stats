@@ -44,7 +44,12 @@
     <string name="settings_tab_app">Aplicativo</string>
     <string name="settings_tab_connections">Conexões</string>
     <string name="settings_tab_preferences">Preferências</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Sobre &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Layout do painel em cartões</string>
+    <string name="pro_cards_layout_info">Um painel maior e totalmente personalizável: blocos grandes e bem espaçados em vez do gráfico central. Toque no lápis para reordenar os blocos arrastando, mostrar ou ocultar os que quiser, e toque no bloco Autonomia para abrir o gráfico de projeção em tamanho completo. Escolha-o em Preferências → Layout do painel depois de desbloqueado.</string>
+    <string name="pro_neon_theme_title">Tema Néon</string>
+    <string name="pro_neon_theme_info">Um tema escuro preto puro, compatível com OLED, cujos dígitos das métricas de potência e faixas de destaque brilham como néon, com uma sutil borda de destaque em cada cartão. Escolha-o em Preferências → Tema depois de desbloqueado.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Visão geral</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">Desconectar bot</string>
     <string name="auto_backup_label">Backup automático</string>
     <string name="backup_interval_label">Intervalo de backup</string>
+    <string name="wifi_only_label">Apenas Wi-Fi</string>
+    <string name="wifi_only_desc">Os backups automáticos são executados apenas no Wi-Fi para economizar dados móveis</string>
     <string name="last_auto_backup_label">Último backup automático: %1$s</string>
     <string name="schedule_updated_msg">Agenda atualizada para %1$s. O próximo backup automático seguirá o novo intervalo.</string>
     <string name="telegram_setup_info">Uma vez conectado, os backups podem ser enviados manualmente ou em uma agenda. Cada backup chega como um arquivo .db no seu chat privado, acessível de qualquer dispositivo com o Telegram.</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">Sistema</string>
     <string name="theme_light">Claro</string>
     <string name="theme_dark">Escuro</string>
+    <string name="theme_neon">Néon</string>
     <string name="pref_language">Idioma</string>
     <string name="language_desc">Escolha o idioma de exibição do aplicativo. Selecionar um idioma substitui o idioma do sistema do dispositivo para este aplicativo.</string>
     <string name="change_language_action">Alterar idioma</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">Ativo — Pro desbloqueado para este veículo (vitalício).</string>
     <string name="remove_code_action">Remover código</string>
     <string name="remove_code_title">Remover código de desbloqueio Pro?</string>
-    <string name="remove_code_msg">Isso desativa o Pro neste veículo e desabilita os recursos Pro (alerta de desequilíbrio de células, relatório de saúde da bateria, capturas de tela, backup em SD). Seu código não é perdido — você pode reinseri-lo a qualquer momento para desbloquear novamente.</string>
-    <string name="pro_unlock_desc">Desbloqueie recursos premium como o alerta de desequilíbrio de células da bateria e capturas de tela do painel com um código único para seu veículo — €9,99, vitalício, um carro. Verificado no dispositivo — nada sai do seu carro.</string>
+    <string name="remove_code_msg">Isso desativa o Pro neste veículo e desabilita os recursos Pro (layout do painel em cartões, tema Néon, alerta de desequilíbrio das células, relatório de saúde da bateria, capturas de tela, backup em cartão SD). Seu código não se perde — você pode inseri-lo novamente a qualquer momento para desbloquear de novo.</string>
+    <string name="pro_unlock_desc">Desbloqueie recursos premium como o layout do painel em cartões, o tema Néon, o alerta de desequilíbrio das células e as capturas de tela do painel com um código único para o seu veículo — 9,99 €, vitalício, um carro. Verificado no dispositivo — nada sai do seu carro.</string>
     <string name="vehicle_id_section_label">ID deste veículo (envie este ao comprar uma licença):</string>
     <string name="vehicle_id_reading">Lendo… ligue o carro e reabra as Configurações</string>
     <string name="vehicle_id_copied_msg">ID do veículo copiado</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">Preciso de internet ou sinal de celular?</string>
     <string name="faq_a_internet">Não para uso normal. Viagens, sessões de carregamento, gráficos e histórico local são gravados inteiramente no dispositivo.\n\nA internet só é necessária para recursos opcionais como verificações de atualização do aplicativo, abertura de links web, integração MQTT / ABRP e backups no Telegram se você os habilitar.</string>
     <string name="faq_q_pro">O que é o BYD Trip Stats Pro e o que inclui?</string>
-    <string name="faq_a_pro">O Pro é um desbloqueio único opcional para extras premium — um pequeno obrigado que ajuda a apoiar o desenvolvimento. São €9,99, pagos uma vez, para a vida útil de um veículo (sem assinatura). Tudo que era gratuito continua gratuito; o Pro apenas adiciona novos recursos:\n\n• Alerta de desequilíbrio de células — seja notificado quando a dispersão de tensão das células do conjunto ficar acima de um limite\n• Relatório de saúde da bateria — exporte um PDF/HTML imprimível do seu Estado de Saúde, taxa de declínio e data projetada para 80%%\n• Capturas de tela do painel — toque no logotipo BYD para salvar a tela atual\n• Backup em SD — salve o banco de dados em uma pasta BydTripStats em um cartão SD removível\n\nDesbloqueio: o código está vinculado ao seu carro específico. Abra Configurações → Preferências → BYD Trip Stats Pro, escaneie o código QR com seu celular (ou copie o ID do veículo) para solicitar um código, depois cole-o de volta. É verificado inteiramente no dispositivo — sem conta, sem login, nada sai do seu carro.</string>
+    <string name="faq_a_pro">O Pro é um desbloqueio único opcional para extras premium — um pequeno obrigado que ajuda a apoiar o desenvolvimento. São €9,99, pagos uma vez, para a vida útil de um veículo (sem assinatura). Tudo que era gratuito continua gratuito; o Pro apenas adiciona novos recursos:\n\n• Layout do painel em cartões — um painel maior e totalmente personalizável de blocos grandes que você pode reordenar arrastando, mostrar ou ocultar\n• Tema Néon — um visual preto puro, compatível com OLED, com dígitos de potência brilhantes\n• Alerta de desequilíbrio de células — seja notificado quando a dispersão de tensão das células do conjunto ficar acima de um limite\n• Relatório de saúde da bateria — exporte um PDF/HTML imprimível do seu Estado de Saúde, taxa de declínio e data projetada para 80%%\n• Capturas de tela do painel — toque no logotipo BYD para salvar a tela atual\n• Backup em SD — salve o banco de dados em uma pasta BydTripStats em um cartão SD removível\n\nDesbloqueio: o código está vinculado ao seu carro específico. Abra Configurações → Pro, escaneie o código QR com seu celular (ou copie o ID do veículo) para solicitar um código, depois cole-o de volta. É verificado inteiramente no dispositivo — sem conta, sem login, nada sai do seu carro.</string>
     <string name="faq_q_drive_modes">Por que aparece \'auto/desconhecido\' nos modos de condução / regeneração?</string>
     <string name="faq_a_drive_modes">O aplicativo lê os modos de condução e regeneração diretamente do painel de instrumentos do carro, mas o carro só transmite um valor de modo quando você o muda ativamente — ele não reporta o modo atual na inicialização.\n\nAté você tocar em um modo no display do carro, o aplicativo não tem valor para mostrar e recorre a \'Auto\' (regeneração) ou \'Desconhecido\' (condução). Para corrigir:\n\n1. Percorra cada nível de regeneração na tela sensível ao toque do carro uma vez\n2. Percorra cada modo de condução (Eco / Normal / Sport) uma vez\n\nO aplicativo captará imediatamente ambos os valores e começará a gravá-los com cada ponto de dados da viagem. Você só precisa fazer isso uma vez.</string>
     <string name="faq_q_offline_trip">A falta de conectividade de rede significa que a viagem ficará ausente do histórico?</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">Um diálogo deve aparecer na tela pedindo para permitir a depuração USB. Toque em Permitir, depois volte aqui.\n\nEsta é uma ação única. Atualizações futuras são totalmente automáticas.</string>
     <string name="adb_granting_msg">Concedendo permissões em segundo plano…</string>
     <string name="authorize_action">Autorizar</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Pneus</string>
+    <string name="close">Fechar</string>
+    <string name="range_projection_title">Projeção dinâmica</string>
+    <string name="dashboard_no_cards_hint">Todos os cartões ocultos. Toque no lápis para adicionar alguns de volta.</string>
+    <string name="reorder_card">Arraste para reordenar</string>
+    <string name="pref_dashboard_layout">Layout do painel</string>
+    <string name="dashboard_layout_desc">Escolha como o painel está organizado. Cartões é um layout maior e personalizável — toque no lápis no painel para mostrar, ocultar e reordenar os blocos.</string>
+    <string name="dashboard_layout_classic">Clássico</string>
+    <string name="dashboard_layout_cards">Cartões</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Inativo</string>
+    <string name="power_state_accelerating">Acelerando</string>
+    <string name="power_state_decelerating">Desacelerando</string>
+    <string name="power_state_charging">Carregando</string>
+    <string name="speed_state_parked">Parado</string>
+    <string name="speed_state_driving">Dirigindo</string>
+    <string name="soc_subtitle_usable">Carga utilizável</string>
+    <string name="range_subtitle_projection">Projeção dinâmica</string>
+    <string name="distance_subtitle_session">Esta sessão</string>
+    <string name="odometer_subtitle_lifetime">Distância total</string>
+    <string name="discharge_subtitle_lifetime">Energia total fornecida</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s pressão</string>
 </resources>

@@ -37,7 +37,12 @@
     <string name="settings_tab_app">App</string>
     <string name="settings_tab_connections">Connexions</string>
     <string name="settings_tab_preferences">Préférences</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">À propos &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Disposition du tableau de bord en cartes</string>
+    <string name="pro_cards_layout_info">Un tableau de bord plus grand et entièrement personnalisable : de grandes tuiles bien espacées au lieu du graphique central. Touchez le crayon pour réorganiser les tuiles par glisser-déposer, afficher ou masquer celles que vous voulez, et touchez la tuile Autonomie pour ouvrir le graphique de projection en plein écran. Choisissez-le sous Préférences → Disposition du tableau de bord une fois débloqué.</string>
+    <string name="pro_neon_theme_title">Thème Néon</string>
+    <string name="pro_neon_theme_info">Un thème sombre noir pur, compatible OLED, dont les chiffres des indicateurs de puissance et les bandes d\'accentuation brillent comme du néon, avec un liseré d\'accent subtil sur chaque carte. Choisissez-le sous Préférences → Thème une fois débloqué.</string>
     <string name="tab_overview">Vue d\'ensemble</string>
     <string name="tab_charts">Graphiques</string>
     <string name="tab_heatmaps">Cartes thermiques</string>
@@ -416,6 +421,8 @@
     <string name="disconnect_bot_action">Déconnecter le bot</string>
     <string name="auto_backup_label">Sauvegarde automatique</string>
     <string name="backup_interval_label">Intervalle de sauvegarde</string>
+    <string name="wifi_only_label">Wi-Fi uniquement</string>
+    <string name="wifi_only_desc">Les sauvegardes automatiques ne s\'exécutent qu\'en Wi-Fi pour économiser les données mobiles</string>
     <string name="last_auto_backup_label">Dernière sauvegarde auto: %1$s</string>
     <string name="schedule_updated_msg">Planification mise à jour à %1$s. La prochaine sauvegarde auto suivra le nouvel intervalle.</string>
     <string name="telegram_setup_info">Une fois connecté, les sauvegardes peuvent être envoyées manuellement ou selon un planning. Chaque sauvegarde arrive comme fichier .db dans votre conversation privée.</string>
@@ -678,6 +685,7 @@
     <string name="theme_system">Système</string>
     <string name="theme_light">Clair</string>
     <string name="theme_dark">Sombre</string>
+    <string name="theme_neon">Néon</string>
     <string name="pref_language">Langue</string>
     <string name="language_desc">Choisissez la langue d\'affichage de l\'app. La sélection d\'une langue remplace la langue du système pour cette app.</string>
     <string name="change_language_action">Changer la langue</string>
@@ -763,8 +771,8 @@
     <string name="pro_active_label">Actif — Pro déverrouillé pour ce véhicule (à vie).</string>
     <string name="remove_code_action">Supprimer le code</string>
     <string name="remove_code_title">Supprimer le code de déverrouillage Pro?</string>
-    <string name="remove_code_msg">Cela désactive Pro sur ce véhicule. Votre code n\'est pas perdu — vous pouvez le saisir à nouveau à tout moment.</string>
-    <string name="pro_unlock_desc">Déverrouillez des fonctionnalités premium avec un code unique pour votre véhicule — 9,99€, à vie, une voiture.</string>
+    <string name="remove_code_msg">Cela désactive Pro sur ce véhicule et désactive les fonctionnalités Pro (disposition du tableau de bord en cartes, thème Néon, alerte de déséquilibre des cellules, rapport de santé de la batterie, captures d\'écran, sauvegarde sur carte SD). Votre code n\'est pas perdu — vous pouvez le ressaisir à tout moment pour déverrouiller à nouveau.</string>
+    <string name="pro_unlock_desc">Débloquez des fonctionnalités premium comme la disposition du tableau de bord en cartes, le thème Néon, l\'alerte de déséquilibre des cellules et les captures d\'écran du tableau de bord avec un code unique pour votre véhicule — 9,99 €, à vie, une voiture. Vérifié sur l\'appareil — rien ne quitte votre voiture.</string>
     <string name="vehicle_id_section_label">ID de ce véhicule (à envoyer lors de l\'achat d\'une licence):</string>
     <string name="vehicle_id_reading">Lecture… démarrez la voiture, puis rouvrez les Paramètres</string>
     <string name="vehicle_id_copied_msg">ID véhicule copié</string>
@@ -887,7 +895,7 @@
     <string name="faq_q_internet">Ai-je besoin d\'internet ou d\'un signal mobile?</string>
     <string name="faq_a_internet">Non pour une utilisation normale. Les trajets, sessions de charge, graphiques et l\'historique local sont entièrement enregistrés sur l\'appareil.\n\nInternet n\'est nécessaire que pour les fonctionnalités optionnelles.</string>
     <string name="faq_q_pro">Qu\'est-ce que BYD Trip Stats Pro et qu\'est-ce qu\'il inclut?</string>
-    <string name="faq_a_pro">Pro est un déverrouillage unique optionnel pour des extras premium — un petit merci qui aide à soutenir le développement. C\'est 9,99€, payé une fois, pour la durée de vie d\'un véhicule (pas d\'abonnement). Tout ce qui était gratuit reste gratuit; Pro n\'ajoute que de nouvelles fonctionnalités:\n\n• Alerte déséquilibre cellulaire — soyez notifié quand la dispersion de tension des cellules du pack reste au-dessus d\'une limite\n• Rapport de santé de la batterie — exportez un PDF/HTML imprimable de votre State of Health, du taux de déclin et de la date projetée vers 80%%\n• Captures d\'écran du tableau de bord — touchez le logo BYD pour enregistrer l\'écran actuel\n• Sauvegarde sur carte SD — enregistrez la base de données dans un dossier BydTripStats sur une carte SD amovible\n\nDéverrouillage : le code est lié à votre voiture spécifique. Ouvrez Paramètres → Préférences → BYD Trip Stats Pro, scannez le code QR avec votre téléphone (ou copiez votre Vehicle ID) pour demander un code, puis collez-le. La vérification se fait entièrement sur l\'appareil — pas de compte, pas de connexion, rien ne quitte votre voiture.</string>
+    <string name="faq_a_pro">Pro est un déverrouillage unique optionnel pour des extras premium — un petit merci qui aide à soutenir le développement. C\'est 9,99€, payé une fois, pour la durée de vie d\'un véhicule (pas d\'abonnement). Tout ce qui était gratuit reste gratuit; Pro n\'ajoute que de nouvelles fonctionnalités:\n\n• Disposition du tableau de bord en cartes — un tableau de bord plus grand et entièrement personnalisable, composé de grandes tuiles que vous pouvez réorganiser par glisser-déposer, afficher ou masquer\n• Thème Néon — un look noir pur, compatible OLED, avec des chiffres de puissance lumineux\n• Alerte déséquilibre cellulaire — soyez notifié quand la dispersion de tension des cellules du pack reste au-dessus d\'une limite\n• Rapport de santé de la batterie — exportez un PDF/HTML imprimable de votre State of Health, du taux de déclin et de la date projetée vers 80%%\n• Captures d\'écran du tableau de bord — touchez le logo BYD pour enregistrer l\'écran actuel\n• Sauvegarde sur carte SD — enregistrez la base de données dans un dossier BydTripStats sur une carte SD amovible\n\nDéverrouillage : le code est lié à votre voiture spécifique. Ouvrez Paramètres → Pro, scannez le code QR avec votre téléphone (ou copiez votre Vehicle ID) pour demander un code, puis collez-le. La vérification se fait entièrement sur l\'appareil — pas de compte, pas de connexion, rien ne quitte votre voiture.</string>
     <string name="faq_q_drive_modes">Pourquoi \'auto/inconnu\' s\'affiche-t-il pour les modes de conduite/récupération?</string>
     <string name="faq_a_drive_modes">L\'app lit les modes directement depuis le tableau de bord, mais la voiture ne diffuse une valeur de mode que lorsque vous la changez activement.\n\nPour résoudre:\n1. Parcourez chaque niveau de récupération une fois\n2. Parcourez chaque mode de conduite (Eco / Normal / Sport) une fois</string>
     <string name="faq_q_offline_trip">L\'absence de réseau signifie-t-elle que le trajet sera absent de l\'historique?</string>
@@ -987,4 +995,29 @@
     <string name="core_telemetry_label">Télémétrie centrale</string>
     <string name="waiting_live_msg">En attente de la télémétrie en direct.</string>
     <string name="core_section_label">Noyau</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Pneus</string>
+    <string name="close">Fermer</string>
+    <string name="range_projection_title">Projection dynamique</string>
+    <string name="dashboard_no_cards_hint">Toutes les cartes sont masquées. Touchez le crayon pour en rajouter.</string>
+    <string name="reorder_card">Faire glisser pour réorganiser</string>
+    <string name="pref_dashboard_layout">Disposition du tableau de bord</string>
+    <string name="dashboard_layout_desc">Choisissez la disposition du tableau de bord. Cartes est une disposition plus grande et personnalisable — touchez le crayon sur le tableau de bord pour afficher, masquer et réorganiser les tuiles.</string>
+    <string name="dashboard_layout_classic">Classique</string>
+    <string name="dashboard_layout_cards">Cartes</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Au repos</string>
+    <string name="power_state_accelerating">Accélération</string>
+    <string name="power_state_decelerating">Décélération</string>
+    <string name="power_state_charging">Charge</string>
+    <string name="speed_state_parked">À l\'arrêt</string>
+    <string name="speed_state_driving">En conduite</string>
+    <string name="soc_subtitle_usable">Charge utilisable</string>
+    <string name="range_subtitle_projection">Projection dynamique</string>
+    <string name="distance_subtitle_session">Cette session</string>
+    <string name="odometer_subtitle_lifetime">Distance totale</string>
+    <string name="discharge_subtitle_lifetime">Énergie totale déchargée</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s pression</string>
 </resources>

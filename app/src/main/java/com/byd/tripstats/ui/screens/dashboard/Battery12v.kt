@@ -8,7 +8,7 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -79,6 +79,7 @@ internal fun Battery12vHistoryDialog(
         base.sortedBy { it.timestamp }
     }
 
+    val isSplitScreen = com.byd.tripstats.ui.rememberIsSplitScreen()
     val latest = mergedPoints.lastOrNull()
     val min12v = mergedPoints.minOfOrNull { it.battery12vVoltage }
     val max12v = mergedPoints.maxOfOrNull { it.battery12vVoltage }
@@ -102,22 +103,29 @@ internal fun Battery12vHistoryDialog(
                                 stringResource(R.string.hv_12v_history_title), fontSize = 18.sp, fontWeight = FontWeight.Bold,
                                 modifier = Modifier.clickable(onClick = onDismiss)
                             )
-                            VerticalDivider(
-                                modifier = Modifier.height(14.dp),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                stringResource(R.string.battery_history_subtitle),
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            // Subtitle hint is dropped in split-screen where there's no room.
+                            if (!isSplitScreen) {
+                                VerticalDivider(
+                                    modifier = Modifier.height(14.dp),
+                                    thickness = 1.dp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    stringResource(R.string.battery_history_subtitle),
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     },
                     navigationIcon = {
                         BrandNavigationBar {
                             IconButton(onClick = onDismiss) {
-                                Icon(Icons.Filled.Close, contentDescription = "Close", modifier = Modifier.size(32.dp))
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.back),
+                                    modifier = Modifier.size(32.dp)
+                                )
                             }
                         }
                     }

@@ -41,7 +41,12 @@
     <string name="settings_tab_app">Ứng dụng</string>
     <string name="settings_tab_connections">Kết nối</string>
     <string name="settings_tab_preferences">Tùy chọn</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Giới thiệu &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Bố cục bảng điều khiển dạng thẻ</string>
+    <string name="pro_cards_layout_info">Bảng điều khiển lớn hơn, tùy chỉnh hoàn toàn: các ô lớn, giãn cách hợp lý thay cho biểu đồ trung tâm. Chạm bút chì để sắp xếp lại ô bằng cách kéo, hiện hoặc ẩn các ô bạn muốn, và chạm ô Tầm hoạt động để mở biểu đồ dự báo ở kích thước đầy đủ. Chọn trong Tùy chọn → Bố cục bảng điều khiển sau khi mở khóa.</string>
+    <string name="pro_neon_theme_title">Giao diện Neon</string>
+    <string name="pro_neon_theme_info">Giao diện tối đen tuyền, thân thiện với OLED, có các chữ số chỉ số công suất và các dải nhấn phát sáng như đèn neon, với viền nhấn tinh tế trên mỗi thẻ. Chọn trong Tùy chọn → Giao diện sau khi mở khóa.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Tổng quan</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">Ngắt bot</string>
     <string name="auto_backup_label">Sao lưu tự động</string>
     <string name="backup_interval_label">Khoảng thời gian sao lưu</string>
+    <string name="wifi_only_label">Chỉ Wi-Fi</string>
+    <string name="wifi_only_desc">Sao lưu tự động chỉ chạy trên Wi-Fi để tiết kiệm dữ liệu di động</string>
     <string name="last_auto_backup_label">Sao lưu tự động lần cuối: %1$s</string>
     <string name="schedule_updated_msg">Đã cập nhật lịch thành %1$s. Sao lưu tự động tiếp theo sẽ theo khoảng mới.</string>
     <string name="telegram_setup_info">Sau khi kết nối, sao lưu có thể gửi thủ công hoặc theo lịch. Mỗi bản sao lưu đến dưới dạng tệp .db trong cuộc trò chuyện riêng của bạn, truy cập được từ mọi thiết bị có Telegram.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">Hệ thống</string>
     <string name="theme_light">Sáng</string>
     <string name="theme_dark">Tối</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Ngôn ngữ</string>
     <string name="language_desc">Chọn ngôn ngữ hiển thị của ứng dụng. Chọn ngôn ngữ sẽ ghi đè ngôn ngữ hệ thống của thiết bị cho ứng dụng này.</string>
     <string name="change_language_action">Đổi ngôn ngữ</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">Đang hoạt động — Pro đã mở khóa cho xe này (trọn đời).</string>
     <string name="remove_code_action">Xóa mã</string>
     <string name="remove_code_title">Xóa mã mở khóa Pro?</string>
-    <string name="remove_code_msg">Điều này tắt Pro trên xe này và vô hiệu hóa các tính năng Pro (cảnh báo mất cân bằng cell, báo cáo sức khỏe pin, ảnh chụp màn hình, sao lưu thẻ SD). Mã của bạn không bị mất — bạn có thể nhập lại bất cứ lúc nào để mở khóa lại.</string>
-    <string name="pro_unlock_desc">Mở khóa các tính năng cao cấp như cảnh báo mất cân bằng cell pin và ảnh chụp màn hình bảng điều khiển bằng mã dùng một lần cho xe của bạn — 9,99 €, trọn đời, một xe. Xác minh trên thiết bị — không gì rời khỏi xe của bạn.</string>
+    <string name="remove_code_msg">Thao tác này tắt Pro trên xe này và vô hiệu hóa các tính năng Pro (bố cục bảng điều khiển dạng thẻ, giao diện Neon, cảnh báo mất cân bằng cell, báo cáo sức khỏe pin, ảnh chụp màn hình, sao lưu thẻ SD). Mã của bạn không bị mất — bạn có thể nhập lại bất cứ lúc nào để mở khóa lại.</string>
+    <string name="pro_unlock_desc">Mở khóa các tính năng cao cấp như bố cục bảng điều khiển dạng thẻ, giao diện Neon, cảnh báo mất cân bằng cell và ảnh chụp màn hình bảng điều khiển bằng mã dùng một lần cho xe của bạn — 9,99 €, trọn đời, một xe. Xác minh trên thiết bị — không gì rời khỏi xe của bạn.</string>
     <string name="vehicle_id_section_label">ID xe này (gửi kèm khi mua giấy phép):</string>
     <string name="vehicle_id_reading">Đang đọc… khởi động xe, rồi mở lại Cài đặt</string>
     <string name="vehicle_id_copied_msg">Đã sao chép ID xe</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">Tôi có cần internet hoặc tín hiệu di động không?</string>
     <string name="faq_a_internet">Không, cho việc dùng thông thường. Chuyến đi, phiên sạc, biểu đồ và lịch sử cục bộ được ghi hoàn toàn trên thiết bị.\n\nInternet chỉ cần cho các tính năng tùy chọn như kiểm tra cập nhật ứng dụng, mở liên kết web, tích hợp MQTT / ABRP và sao lưu Telegram nếu bạn bật chúng.</string>
     <string name="faq_q_pro">BYD Trip Stats Pro là gì và bao gồm những gì?</string>
-    <string name="faq_a_pro">Pro là mở khóa một lần tùy chọn cho các tính năng cao cấp — một lời cảm ơn nhỏ giúp hỗ trợ phát triển. Giá 9,99 €, trả một lần, cho trọn đời một xe (không đăng ký định kỳ). Mọi thứ miễn phí vẫn miễn phí; Pro chỉ thêm tính năng mới:\n\n• Cảnh báo mất cân bằng cell — nhận thông báo khi chênh lệch điện áp cell của pin ở trên giới hạn\n• Báo cáo sức khỏe pin — xuất PDF/HTML sẵn sàng in về Tình trạng Sức khỏe, tốc độ suy giảm và ngày dự báo đến 80%%\n• Ảnh chụp màn hình bảng điều khiển — chạm logo BYD để lưu màn hình hiện tại\n• Sao lưu thẻ SD — lưu cơ sở dữ liệu vào thư mục BydTripStats trên thẻ SD tháo rời\n\nMở khóa: mã gắn với chiếc xe cụ thể của bạn. Mở Cài đặt → Tùy chọn → BYD Trip Stats Pro, quét mã QR bằng điện thoại của bạn (hoặc sao chép ID Xe của bạn) để yêu cầu mã, rồi dán lại. Được xác minh hoàn toàn trên thiết bị — không tài khoản, không đăng nhập, không gì rời khỏi xe của bạn.</string>
+    <string name="faq_a_pro">Pro là mở khóa một lần tùy chọn cho các tính năng cao cấp — một lời cảm ơn nhỏ giúp hỗ trợ phát triển. Giá 9,99 €, trả một lần, cho trọn đời một xe (không đăng ký định kỳ). Mọi thứ miễn phí vẫn miễn phí; Pro chỉ thêm tính năng mới:\n\n• Bố cục bảng điều khiển dạng thẻ — bảng điều khiển lớn hơn, tùy chỉnh hoàn toàn gồm các ô lớn mà bạn có thể kéo để sắp xếp lại, hiện hoặc ẩn\n• Giao diện Neon — vẻ ngoài đen tuyền, thân thiện với OLED với các chữ số công suất phát sáng\n• Cảnh báo mất cân bằng cell — nhận thông báo khi chênh lệch điện áp cell của pin ở trên giới hạn\n• Báo cáo sức khỏe pin — xuất PDF/HTML sẵn sàng in về Tình trạng Sức khỏe, tốc độ suy giảm và ngày dự báo đến 80%%\n• Ảnh chụp màn hình bảng điều khiển — chạm logo BYD để lưu màn hình hiện tại\n• Sao lưu thẻ SD — lưu cơ sở dữ liệu vào thư mục BydTripStats trên thẻ SD tháo rời\n\nMở khóa: mã gắn với chiếc xe cụ thể của bạn. Mở Cài đặt → Pro, quét mã QR bằng điện thoại của bạn (hoặc sao chép ID Xe của bạn) để yêu cầu mã, rồi dán lại. Được xác minh hoàn toàn trên thiết bị — không tài khoản, không đăng nhập, không gì rời khỏi xe của bạn.</string>
     <string name="faq_q_drive_modes">Tại sao \'tự động/không rõ\' hiển thị ở chế độ lái / tái tạo?</string>
     <string name="faq_a_drive_modes">Ứng dụng đọc chế độ lái và tái tạo trực tiếp từ cụm đồng hồ của xe, nhưng xe chỉ phát giá trị chế độ khi bạn chủ động thay đổi — nó không báo cáo chế độ hiện tại khi khởi động.\n\nCho đến khi bạn chạm một chế độ trên màn hình xe, ứng dụng không có giá trị để hiển thị và quay về \'Tự động\' (tái tạo) hoặc \'Không rõ\' (lái). Để khắc phục:\n\n1. Chuyển qua từng mức tái tạo trên màn hình cảm ứng của xe một lần\n2. Chuyển qua từng chế độ lái (Eco / Normal / Sport) một lần\n\nỨng dụng sẽ ngay lập tức nhận cả hai giá trị và bắt đầu ghi chúng với mỗi điểm dữ liệu chuyến đi. Bạn chỉ cần làm việc này một lần.</string>
     <string name="faq_q_offline_trip">Không có kết nối mạng nghĩa là chuyến đi sẽ vắng khỏi lịch sử?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">Một hộp thoại sẽ xuất hiện trên màn hình yêu cầu cho phép gỡ lỗi USB. Chạm Cho phép, rồi quay lại đây.\n\nĐây là hành động một lần. Các cập nhật tương lai hoàn toàn tự động.</string>
     <string name="adb_granting_msg">Đang cấp quyền nền…</string>
     <string name="authorize_action">Ủy quyền</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Lốp</string>
+    <string name="close">Đóng</string>
+    <string name="range_projection_title">Dự báo động</string>
+    <string name="dashboard_no_cards_hint">Đã ẩn tất cả thẻ. Chạm bút chì để thêm lại một số.</string>
+    <string name="reorder_card">Kéo để sắp xếp lại</string>
+    <string name="pref_dashboard_layout">Bố cục bảng điều khiển</string>
+    <string name="dashboard_layout_desc">Chọn cách sắp xếp bảng điều khiển. Thẻ là bố cục lớn hơn, tùy chỉnh được — chạm bút chì trên bảng điều khiển để hiện, ẩn và sắp xếp lại các ô.</string>
+    <string name="dashboard_layout_classic">Cổ điển</string>
+    <string name="dashboard_layout_cards">Thẻ</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Nhàn rỗi</string>
+    <string name="power_state_accelerating">Đang tăng tốc</string>
+    <string name="power_state_decelerating">Đang giảm tốc</string>
+    <string name="power_state_charging">Đang sạc</string>
+    <string name="speed_state_parked">Đứng yên</string>
+    <string name="speed_state_driving">Đang lái</string>
+    <string name="soc_subtitle_usable">Điện tích khả dụng</string>
+    <string name="range_subtitle_projection">Dự báo động</string>
+    <string name="distance_subtitle_session">Phiên này</string>
+    <string name="odometer_subtitle_lifetime">Tổng quãng đường</string>
+    <string name="discharge_subtitle_lifetime">Tổng năng lượng xả</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s áp suất</string>
 </resources>

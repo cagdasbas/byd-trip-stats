@@ -41,7 +41,12 @@
     <string name="settings_tab_app">Aplikace</string>
     <string name="settings_tab_connections">Připojení</string>
     <string name="settings_tab_preferences">Předvolby</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">O aplikaci a FAQ</string>
+    <string name="pro_cards_layout_title">Rozvržení přehledu s kartami</string>
+    <string name="pro_cards_layout_info">Větší, plně přizpůsobitelný přehled: velké, dobře rozmístěné dlaždice místo centrálního grafu. Klepnutím na tužku přeuspořádáte dlaždice tažením a zobrazíte nebo skryjete ty, které chcete; klepnutím na dlaždici Dojezd otevřete projekční graf na celou obrazovku. Po odemčení jej zvolte v Předvolby → Rozvržení přehledu.</string>
+    <string name="pro_neon_theme_title">Motiv Neon</string>
+    <string name="pro_neon_theme_info">Čistě černý, pro OLED přívětivý tmavý motiv, jehož číslice ukazatelů výkonu a akcentní pruhy září jako neon, s jemným akcentním okrajem na každé kartě. Po odemčení jej zvolte v Předvolby → Motiv.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Přehled</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">Odpojit bota</string>
     <string name="auto_backup_label">Automatická záloha</string>
     <string name="backup_interval_label">Interval zálohování</string>
+    <string name="wifi_only_label">Pouze Wi-Fi</string>
+    <string name="wifi_only_desc">Automatické zálohy běží pouze přes Wi-Fi kvůli úspoře mobilních dat</string>
     <string name="last_auto_backup_label">Poslední autozáloha: %1$s</string>
     <string name="schedule_updated_msg">Plán změněn na %1$s. Další autozáloha bude podle nového intervalu.</string>
     <string name="telegram_setup_info">Po připojení lze zálohy odesílat ručně nebo podle plánu. Každá záloha dorazí jako soubor .db do vašeho soukromého chatu, dostupného z každého zařízení s Telegramem.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">Systémový</string>
     <string name="theme_light">Světlý</string>
     <string name="theme_dark">Tmavý</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Jazyk</string>
     <string name="language_desc">Vyberte jazyk aplikace. Volba jazyka přepíše systémový jazyk zařízení pro tuto aplikaci.</string>
     <string name="change_language_action">Změnit jazyk</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">Aktivní — Pro odemčeno pro toto vozidlo (doživotně).</string>
     <string name="remove_code_action">Odebrat kód</string>
     <string name="remove_code_title">Odebrat odemykací kód Pro?</string>
-    <string name="remove_code_msg">Tím se Pro na tomto vozidle vypne a deaktivují se funkce Pro (upozornění na nerovnováhu článků, zpráva o zdraví baterie, snímky obrazovky, záloha na SD kartu). Váš kód se neztratí — můžete ho kdykoli znovu zadat a odemknout.</string>
-    <string name="pro_unlock_desc">Odemkněte prémiové funkce jako upozornění na nerovnováhu článků a snímky obrazovky přehledu jednorázovým kódem pro vaše vozidlo — 9,99 €, doživotně, jeden vůz. Ověřuje se na zařízení — nic neopouští váš vůz.</string>
+    <string name="remove_code_msg">Tím se Pro na tomto vozidle vypne a deaktivují se funkce Pro (rozvržení přehledu s kartami, motiv Neon, upozornění na nerovnováhu článků, zpráva o zdraví baterie, snímky obrazovky, záloha na SD kartu). Váš kód se neztratí — můžete jej kdykoli znovu zadat a odemknout.</string>
+    <string name="pro_unlock_desc">Odemkněte prémiové funkce, jako je rozvržení přehledu s kartami, motiv Neon, upozornění na nerovnováhu článků a snímky obrazovky přehledu, jednorázovým kódem pro vaše vozidlo — 9,99 €, doživotně, jedno auto. Ověřeno na zařízení — nic neopouští vaše auto.</string>
     <string name="vehicle_id_section_label">ID tohoto vozidla (pošlete při koupi licence):</string>
     <string name="vehicle_id_reading">Čtení… nastartujte vůz a znovu otevřete Nastavení</string>
     <string name="vehicle_id_copied_msg">ID vozidla zkopírováno</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">Potřebuji internet nebo mobilní signál?</string>
     <string name="faq_a_internet">Pro běžné použití ne. Jízdy, nabíjecí relace, grafy a lokální historie se nahrávají výhradně na zařízení.\n\nInternet je potřeba jen pro volitelné funkce, jako je kontrola aktualizací, otevírání odkazů, integrace MQTT / ABRP a zálohy na Telegram, pokud je zapnete.</string>
     <string name="faq_q_pro">Co je BYD Trip Stats Pro a co obsahuje?</string>
-    <string name="faq_a_pro">Pro je volitelné jednorázové odemčení prémiových doplňků — malé poděkování, které pomáhá podpořit vývoj. Stojí 9,99 €, platí se jednou, na celou životnost jednoho vozidla (bez předplatného). Vše, co bylo zdarma, zůstává zdarma; Pro jen přidává nové funkce:\n\n• Upozornění na nerovnováhu článků — dostanete oznámení, když rozptyl napětí článků paketu zůstává nad limitem\n• Zpráva o zdraví baterie — export tisknutelného PDF/HTML s vaším SoH, rychlostí poklesu a projektovaným datem 80%%\n• Snímky obrazovky přehledu — klepnutím na logo BYD uložíte aktuální obrazovku\n• Záloha na SD kartu — uložení databáze do složky BydTripStats na vyjímatelné SD kartě\n\nOdemčení: kód je vázaný na váš konkrétní vůz. Otevřete Nastavení → Předvolby → BYD Trip Stats Pro, naskenujte QR kód telefonem (nebo zkopírujte své ID vozidla) pro vyžádání kódu a pak ho vložte zpět. Ověřuje se výhradně na zařízení — žádný účet, žádné přihlášení, nic neopouští váš vůz.</string>
+    <string name="faq_a_pro">Pro je volitelné jednorázové odemčení prémiových doplňků — malé poděkování, které pomáhá podpořit vývoj. Stojí 9,99 €, platí se jednou, na celou životnost jednoho vozidla (bez předplatného). Vše, co bylo zdarma, zůstává zdarma; Pro jen přidává nové funkce:\n\n• Rozvržení přehledu s kartami — větší, plně přizpůsobitelný přehled z velkých dlaždic, které můžete tažením přeuspořádat, zobrazit nebo skrýt\n• Motiv Neon — čistě černý, pro OLED přívětivý vzhled se zářícími číslicemi výkonu\n• Upozornění na nerovnováhu článků — dostanete oznámení, když rozptyl napětí článků paketu zůstává nad limitem\n• Zpráva o zdraví baterie — export tisknutelného PDF/HTML s vaším SoH, rychlostí poklesu a projektovaným datem 80%%\n• Snímky obrazovky přehledu — klepnutím na logo BYD uložíte aktuální obrazovku\n• Záloha na SD kartu — uložení databáze do složky BydTripStats na vyjímatelné SD kartě\n\nOdemčení: kód je vázaný na váš konkrétní vůz. Otevřete Nastavení → Pro, naskenujte QR kód telefonem (nebo zkopírujte své ID vozidla) pro vyžádání kódu a pak ho vložte zpět. Ověřuje se výhradně na zařízení — žádný účet, žádné přihlášení, nic neopouští váš vůz.</string>
     <string name="faq_q_drive_modes">Proč se u jízdních / rekuperačních režimů zobrazuje \'auto/neznámý\'?</string>
     <string name="faq_a_drive_modes">Aplikace čte jízdní a rekuperační režimy přímo z přístrojového panelu vozu, ale vůz vysílá hodnotu režimu jen tehdy, když ho aktivně změníte — při startu aktuální režim nehlásí.\n\nDokud neklepnete na režim na displeji vozu, aplikace nemá co zobrazit a vrací se k \'Auto\' (rekuperace) nebo \'Neznámý\' (jízda). Náprava:\n\n1. Přepněte jednou každou úroveň rekuperace na dotykové obrazovce vozu\n2. Přepněte jednou každý jízdní režim (Eco / Normal / Sport)\n\nAplikace okamžitě zachytí obě hodnoty a začne je nahrávat s každým datovým bodem jízdy. Stačí to udělat jednou.</string>
     <string name="faq_q_offline_trip">Znamená výpadek sítě, že jízda bude v historii chybět?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">Na obrazovce by se měl objevit dialog s žádostí o povolení ladění USB. Klepněte na Povolit a vraťte se sem.\n\nToto je jednorázová akce. Budoucí aktualizace jsou plně automatické.</string>
     <string name="adb_granting_msg">Udělování oprávnění na pozadí…</string>
     <string name="authorize_action">Autorizovat</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Pneumatiky</string>
+    <string name="close">Zavřít</string>
+    <string name="range_projection_title">Dynamická projekce</string>
+    <string name="dashboard_no_cards_hint">Všechny karty skryté. Klepnutím na tužku některé znovu přidáte.</string>
+    <string name="reorder_card">Přetažením změníte pořadí</string>
+    <string name="pref_dashboard_layout">Rozvržení přehledu</string>
+    <string name="dashboard_layout_desc">Zvolte, jak je přehled uspořádán. Karty jsou větší, přizpůsobitelné rozvržení — klepnutím na tužku v přehledu zobrazíte, skryjete a přeuspořádáte dlaždice.</string>
+    <string name="dashboard_layout_classic">Klasické</string>
+    <string name="dashboard_layout_cards">Karty</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Nečinné</string>
+    <string name="power_state_accelerating">Zrychlování</string>
+    <string name="power_state_decelerating">Zpomalování</string>
+    <string name="power_state_charging">Nabíjení</string>
+    <string name="speed_state_parked">Stojící</string>
+    <string name="speed_state_driving">Jízda</string>
+    <string name="soc_subtitle_usable">Využitelná kapacita</string>
+    <string name="range_subtitle_projection">Dynamická projekce</string>
+    <string name="distance_subtitle_session">Tato relace</string>
+    <string name="odometer_subtitle_lifetime">Celková vzdálenost</string>
+    <string name="discharge_subtitle_lifetime">Celková vydaná energie</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s tlak</string>
 </resources>

@@ -41,7 +41,12 @@
     <string name="settings_tab_app">Alkalmazás</string>
     <string name="settings_tab_connections">Kapcsolatok</string>
     <string name="settings_tab_preferences">Beállítások</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Névjegy és GYIK</string>
+    <string name="pro_cards_layout_title">Kártyás műszerfal-elrendezés</string>
+    <string name="pro_cards_layout_info">Nagyobb, teljesen testreszabható műszerfal: nagy, jól elrendezett csempék a központi diagram helyett. Koppintson a ceruzára a csempék húzással történő átrendezéséhez, a kívántak megjelenítéséhez vagy elrejtéséhez, és koppintson a Hatótáv csempére a projekciós diagram teljes méretű megnyitásához. Feloldás után válassza a Beállítások → Műszerfal elrendezése alatt.</string>
+    <string name="pro_neon_theme_title">Neon téma</string>
+    <string name="pro_neon_theme_info">Tiszta fekete, OLED-barát sötét téma, amelynek teljesítménymérő számjegyei és kiemelő csíkjai neonként világítanak, minden kártyán finom kiemelő szegéllyel. Feloldás után válassza a Beállítások → Téma alatt.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Áttekintés</string>
@@ -460,6 +465,8 @@
     <string name="disconnect_bot_action">Bot leválasztása</string>
     <string name="auto_backup_label">Automatikus mentés</string>
     <string name="backup_interval_label">Mentési gyakoriság</string>
+    <string name="wifi_only_label">Csak Wi-Fi</string>
+    <string name="wifi_only_desc">Az automatikus mentések csak Wi-Fi-n futnak a mobiladat megtakarításához</string>
     <string name="last_auto_backup_label">Utolsó auto-mentés: %1$s</string>
     <string name="schedule_updated_msg">Ütemezés módosítva erre: %1$s. A következő auto-mentés az új gyakoriságot követi.</string>
     <string name="telegram_setup_info">Csatlakoztatás után a mentések kézzel vagy ütemezetten küldhetők. Minden mentés .db fájlként érkezik a privát csevegésébe, bármely Telegramos eszközről elérhetően.</string>
@@ -742,6 +749,7 @@
     <string name="theme_system">Rendszer</string>
     <string name="theme_light">Világos</string>
     <string name="theme_dark">Sötét</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Nyelv</string>
     <string name="language_desc">Válassza ki az alkalmazás nyelvét. A nyelv kiválasztása felülírja az eszköz rendszernyelvét ennél az alkalmazásnál.</string>
     <string name="change_language_action">Nyelv módosítása</string>
@@ -839,8 +847,8 @@
     <string name="pro_active_label">Aktív — Pro feloldva ehhez a járműhöz (élettartamra).</string>
     <string name="remove_code_action">Kód eltávolítása</string>
     <string name="remove_code_title">Eltávolítja a Pro feloldókódot?</string>
-    <string name="remove_code_msg">Ez kikapcsolja a Pro-t ezen a járművön, és letiltja a Pro funkciókat (cella-kiegyensúlyozatlansági riasztás, akku-állapotjelentés, képernyőképek, SD-kártyás mentés). A kódja nem vész el — bármikor újra beírhatja a feloldáshoz.</string>
-    <string name="pro_unlock_desc">Oldjon fel prémium funkciókat, mint a cella-kiegyensúlyozatlansági riasztás és a műszerfal-képernyőképek, a járművéhez tartozó egyszeri kóddal — 9,99 €, élettartamra, egy autó. Az ellenőrzés az eszközön történik — semmi sem hagyja el az autóját.</string>
+    <string name="remove_code_msg">Ez kikapcsolja a Pro-t ezen a járművön, és letiltja a Pro funkciókat (kártyás műszerfal-elrendezés, Neon téma, cella-kiegyensúlyozatlansági riasztás, akku-állapotjelentés, képernyőképek, SD-kártyás mentés). A kódja nem vész el — bármikor újra beírhatja a feloldáshoz.</string>
+    <string name="pro_unlock_desc">Oldjon fel prémium funkciókat, például a kártyás műszerfal-elrendezést, a Neon témát, a cella-kiegyensúlyozatlansági riasztást és a műszerfal-képernyőképeket egyszeri kóddal a járművéhez — 9,99 €, élettartamra, egy autó. Az eszközön ellenőrizve — semmi sem hagyja el az autóját.</string>
     <string name="vehicle_id_section_label">A jármű azonosítója (küldje el licencvásárláskor):</string>
     <string name="vehicle_id_reading">Olvasás… indítsa be az autót, majd nyissa meg újra a Beállításokat</string>
     <string name="vehicle_id_copied_msg">Járműazonosító másolva</string>
@@ -974,7 +982,7 @@
     <string name="faq_q_internet">Kell internet vagy mobiljel?</string>
     <string name="faq_a_internet">Normál használathoz nem. Az utak, töltési munkamenetek, grafikonok és a helyi előzmények teljes egészében az eszközön rögzülnek.\n\nInternet csak opcionális funkciókhoz kell, mint a frissítés-ellenőrzés, weblinkek megnyitása, MQTT / ABRP integráció és a Telegram-mentések, ha bekapcsolja őket.</string>
     <string name="faq_q_pro">Mi az a BYD Trip Stats Pro, és mit tartalmaz?</string>
-    <string name="faq_a_pro">A Pro egy opcionális, egyszeri feloldás prémium extrákhoz — kis köszönet, amely segíti a fejlesztést. Ára 9,99 €, egyszer fizetendő, egy jármű élettartamára (nincs előfizetés). Minden, ami ingyenes volt, ingyenes marad; a Pro csak új funkciókat ad hozzá:\n\n• Cella-kiegyensúlyozatlansági riasztás — értesítés, ha a pakk cellafeszültség-szórása határérték felett marad\n• Akku-állapotjelentés — nyomtatható PDF/HTML export a SoH-ról, csökkenési ütemről és a 80%-ig előrejelzett dátumról\n• Műszerfal-képernyőképek — koppintson a BYD logóra az aktuális képernyő mentéséhez\n• SD-kártyás mentés — az adatbázis mentése a cserélhető SD-kártya BydTripStats mappájába\n\nFeloldás: a kód az Ön konkrét autójához kötött. Nyissa meg: Beállítások → Beállítások → BYD Trip Stats Pro, szkennelje be a QR-kódot telefonjával (vagy másolja ki a járműazonosítót) a kód igényléséhez, majd illessze vissza. Az ellenőrzés teljes egészében az eszközön történik — nincs fiók, nincs bejelentkezés, semmi sem hagyja el az autóját.</string>
+    <string name="faq_a_pro">A Pro egy opcionális, egyszeri feloldás prémium extrákhoz — kis köszönet, amely segíti a fejlesztést. Ára 9,99 €, egyszer fizetendő, egy jármű élettartamára (nincs előfizetés). Minden, ami ingyenes volt, ingyenes marad; a Pro csak új funkciókat ad hozzá:\n\n• Kártyás műszerfal-elrendezés — nagyobb, teljesen testreszabható műszerfal nagy csempékből, amelyeket húzással átrendezhet, megjeleníthet vagy elrejthet\n• Neon téma — tiszta fekete, OLED-barát megjelenés világító teljesítményszámjegyekkel\n• Cella-kiegyensúlyozatlansági riasztás — értesítés, ha a pakk cellafeszültség-szórása határérték felett marad\n• Akku-állapotjelentés — nyomtatható PDF/HTML export a SoH-ról, csökkenési ütemről és a 80%-ig előrejelzett dátumról\n• Műszerfal-képernyőképek — koppintson a BYD logóra az aktuális képernyő mentéséhez\n• SD-kártyás mentés — az adatbázis mentése a cserélhető SD-kártya BydTripStats mappájába\n\nFeloldás: a kód az Ön konkrét autójához kötött. Nyissa meg: Beállítások → Pro, szkennelje be a QR-kódot telefonjával (vagy másolja ki a járműazonosítót) a kód igényléséhez, majd illessze vissza. Az ellenőrzés teljes egészében az eszközön történik — nincs fiók, nincs bejelentkezés, semmi sem hagyja el az autóját.</string>
     <string name="faq_q_drive_modes">Miért \'auto/ismeretlen\' jelenik meg a vezetési / rekuperációs módoknál?</string>
     <string name="faq_a_drive_modes">Az alkalmazás közvetlenül az autó műszeregységéből olvassa a vezetési és rekuperációs módokat, de az autó csak akkor sugároz módértéket, amikor aktívan váltja — induláskor nem jelenti az aktuális módot.\n\nAmíg nem koppint egy módra az autó kijelzőjén, az alkalmazásnak nincs mit mutatnia, és \'Auto\'-ra (rekuperáció) vagy \'Ismeretlen\'-re (vezetés) áll vissza. Megoldás:\n\n1. Lépkedjen végig egyszer minden rekuperációs szinten az autó érintőképernyőjén\n2. Lépkedjen végig egyszer minden vezetési módon (Eco / Normal / Sport)\n\nAz alkalmazás azonnal átveszi mindkét értéket, és minden útadatponttal rögzíteni kezdi őket. Ezt csak egyszer kell megtennie.</string>
     <string name="faq_q_offline_trip">A hálózat hiánya azt jelenti, hogy az út hiányozni fog az előzményekből?</string>
@@ -1084,4 +1092,29 @@
     <string name="adb_waiting_msg">A képernyőn párbeszédnek kell megjelennie az USB-hibakeresés engedélyezéséről. Koppintson az Engedélyezésre, majd térjen vissza ide.\n\nEz egyszeri művelet. A jövőbeli frissítések teljesen automatikusak.</string>
     <string name="adb_granting_msg">Háttérengedélyek megadása…</string>
     <string name="authorize_action">Engedélyezés</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Gumik</string>
+    <string name="close">Bezárás</string>
+    <string name="range_projection_title">Dinamikus előrejelzés</string>
+    <string name="dashboard_no_cards_hint">Minden kártya rejtve. Koppintson a ceruzára, hogy visszaadjon néhányat.</string>
+    <string name="reorder_card">Húzza az átrendezéshez</string>
+    <string name="pref_dashboard_layout">Műszerfal elrendezése</string>
+    <string name="dashboard_layout_desc">Válassza ki, hogyan legyen elrendezve a műszerfal. A Kártyák egy nagyobb, testreszabható elrendezés — koppintson a ceruzára a műszerfalon a csempék megjelenítéséhez, elrejtéséhez és átrendezéséhez.</string>
+    <string name="dashboard_layout_classic">Klasszikus</string>
+    <string name="dashboard_layout_cards">Kártyák</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Tétlen</string>
+    <string name="power_state_accelerating">Gyorsítás</string>
+    <string name="power_state_decelerating">Lassítás</string>
+    <string name="power_state_charging">Töltés</string>
+    <string name="speed_state_parked">Álló</string>
+    <string name="speed_state_driving">Vezetés</string>
+    <string name="soc_subtitle_usable">Használható töltés</string>
+    <string name="range_subtitle_projection">Dinamikus előrejelzés</string>
+    <string name="distance_subtitle_session">Ez a munkamenet</string>
+    <string name="odometer_subtitle_lifetime">Teljes távolság</string>
+    <string name="discharge_subtitle_lifetime">Teljes leadott energia</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s nyomás</string>
 </resources>

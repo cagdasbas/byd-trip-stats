@@ -42,6 +42,7 @@ fun ChargingHistoryScreen(
     var selectedSessions by remember { mutableStateOf(setOf<Long>()) }
     var selectionMode by remember { mutableStateOf(false) }
     var showDeleteSelectedDialog by remember { mutableStateOf(false) }
+    val isSplitScreen = com.byd.tripstats.ui.rememberIsSplitScreen()
     val onBackOrCancelSelection: () -> Unit = {
         if (selectionMode) {
             selectionMode = false
@@ -69,16 +70,19 @@ fun ChargingHistoryScreen(
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.clickable(onClick = onBackOrCancelSelection)
                             )
-                            VerticalDivider(
-                                modifier = Modifier.height(14.dp),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                stringResource(R.string.session_history_hint),
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            // Subtitle hint is dropped in split-screen where there's no room.
+                            if (!isSplitScreen) {
+                                VerticalDivider(
+                                    modifier = Modifier.height(14.dp),
+                                    thickness = 1.dp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    stringResource(R.string.session_history_hint),
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 },

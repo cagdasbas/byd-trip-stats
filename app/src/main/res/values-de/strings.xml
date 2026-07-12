@@ -37,7 +37,12 @@
     <string name="settings_tab_app">App</string>
     <string name="settings_tab_connections">Verbindungen</string>
     <string name="settings_tab_preferences">Einstellungen</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Über &amp; FAQ</string>
+    <string name="pro_cards_layout_title">Karten-Dashboard-Layout</string>
+    <string name="pro_cards_layout_info">Ein größeres, voll anpassbares Dashboard: große, gut verteilte Kacheln anstelle des zentralen Diagramms. Tippen Sie auf den Stift, um Kacheln per Ziehen neu anzuordnen und die gewünschten ein- oder auszublenden, und tippen Sie auf die Reichweite-Kachel, um das Projektionsdiagramm in voller Größe zu öffnen. Wählen Sie es nach dem Freischalten unter Einstellungen → Dashboard-Layout.</string>
+    <string name="pro_neon_theme_title">Neon-Design</string>
+    <string name="pro_neon_theme_info">Ein reinschwarzes, OLED-freundliches dunkles Design, dessen Leistungsanzeige-Ziffern und Akzentstreifen wie Neon leuchten, mit einer dezenten Akzentkante an jeder Karte. Wählen Sie es nach dem Freischalten unter Einstellungen → Design.</string>
     <string name="tab_overview">Übersicht</string>
     <string name="tab_charts">Diagramme</string>
     <string name="tab_heatmaps">Heatmaps</string>
@@ -416,6 +421,8 @@
     <string name="disconnect_bot_action">Bot trennen</string>
     <string name="auto_backup_label">Automatisches Backup</string>
     <string name="backup_interval_label">Backup-Intervall</string>
+    <string name="wifi_only_label">Nur WLAN</string>
+    <string name="wifi_only_desc">Automatische Backups laufen nur über WLAN, um mobile Daten zu sparen</string>
     <string name="last_auto_backup_label">Letztes Auto-Backup: %1$s</string>
     <string name="schedule_updated_msg">Zeitplan auf %1$s aktualisiert. Das nächste Auto-Backup folgt dem neuen Intervall.</string>
     <string name="telegram_setup_info">Nach der Verbindung können Backups manuell oder nach einem Zeitplan gesendet werden. Jedes Backup landet als .db-Datei in Ihrem privaten Chat, zugänglich von jedem Gerät mit Telegram.</string>
@@ -678,6 +685,7 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Hell</string>
     <string name="theme_dark">Dunkel</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Sprache</string>
     <string name="language_desc">Wählen Sie die App-Anzeigesprache. Die Auswahl einer Sprache überschreibt die Gerätesprache für diese App.</string>
     <string name="change_language_action">Sprache ändern</string>
@@ -763,8 +771,8 @@
     <string name="pro_active_label">Aktiv — Pro für dieses Fahrzeug freigeschaltet (lebenslang).</string>
     <string name="remove_code_action">Code entfernen</string>
     <string name="remove_code_title">Pro-Freischaltcode entfernen?</string>
-    <string name="remove_code_msg">Dadurch wird Pro für dieses Fahrzeug deaktiviert. Ihr Code geht nicht verloren — Sie können ihn jederzeit erneut eingeben.</string>
-    <string name="pro_unlock_desc">Schalten Sie Premium-Funktionen mit einem Einmalcode für Ihr Fahrzeug frei — €9,99, lebenslang, ein Auto.</string>
+    <string name="remove_code_msg">Dies schaltet Pro auf diesem Fahrzeug aus und deaktiviert die Pro-Funktionen (Karten-Dashboard-Layout, Neon-Design, Zellungleichgewicht-Alarm, Batteriegesundheitsbericht, Screenshots, SD-Karten-Backup). Ihr Code geht nicht verloren — Sie können ihn jederzeit erneut eingeben, um erneut freizuschalten.</string>
+    <string name="pro_unlock_desc">Schalten Sie Premium-Funktionen wie das Karten-Dashboard-Layout, das Neon-Design, den Zellungleichgewicht-Alarm und Dashboard-Screenshots mit einem einmaligen Code für Ihr Fahrzeug frei — 9,99 €, lebenslang, ein Auto. Auf dem Gerät verifiziert — nichts verlässt Ihr Auto.</string>
     <string name="vehicle_id_section_label">Fahrzeug-ID dieses Autos (beim Kauf einer Lizenz mitschicken):</string>
     <string name="vehicle_id_reading">Lesen… Auto starten, dann Einstellungen neu öffnen</string>
     <string name="vehicle_id_copied_msg">Fahrzeug-ID kopiert</string>
@@ -887,7 +895,7 @@
     <string name="faq_q_internet">Benötige ich Internet oder Mobilfunksignal?</string>
     <string name="faq_a_internet">Nein für normale Verwendung. Fahrten, Ladesitzungen, Diagramme und lokaler Verlauf werden vollständig auf dem Gerät aufgezeichnet.\n\nInternet wird nur für optionale Funktionen benötigt wie App-Update-Prüfungen, Öffnen von Web-Links, MQTT/ABRP-Integration und Telegram-Backups, wenn Sie diese aktivieren.</string>
     <string name="faq_q_pro">Was ist BYD Trip Stats Pro und was beinhaltet es?</string>
-    <string name="faq_a_pro">Pro ist eine optionale Einmal-Freischaltung für Premium-Extras — ein kleines Dankeschön, das die Entwicklung unterstützt. Es kostet €9,99, einmalig bezahlt, für die Lebensdauer eines Fahrzeugs (kein Abonnement). Alles, was kostenlos war, bleibt kostenlos; Pro fügt nur neue Funktionen hinzu:\n\n• Zellungleichgewicht-Alarm — Benachrichtigung, wenn die Zellspannungs-Streuung des Pakets über einem Grenzwert bleibt\n• Batteriegesundheitsbericht — druckfertiges PDF/HTML mit State of Health, Abnahmerate und prognostiziertem Datum bis 80%%\n• Dashboard-Screenshots — BYD-Logo antippen, um den aktuellen Bildschirm zu speichern\n• SD-Karten-Backup — Datenbank in einen BydTripStats-Ordner auf einer entnehmbaren SD-Karte sichern\n\nFreischaltung: Der Code ist an Ihr konkretes Fahrzeug gebunden. Öffnen Sie Einstellungen → Präferenzen → BYD Trip Stats Pro, scannen Sie den QR-Code mit Ihrem Handy (oder kopieren Sie Ihre Fahrzeug-ID), um einen Code anzufordern, und fügen Sie ihn dann ein. Die Prüfung erfolgt vollständig auf dem Gerät — kein Konto, keine Anmeldung, nichts verlässt Ihr Auto.</string>
+    <string name="faq_a_pro">Pro ist eine optionale Einmal-Freischaltung für Premium-Extras — ein kleines Dankeschön, das die Entwicklung unterstützt. Es kostet €9,99, einmalig bezahlt, für die Lebensdauer eines Fahrzeugs (kein Abonnement). Alles, was kostenlos war, bleibt kostenlos; Pro fügt nur neue Funktionen hinzu:\n\n• Karten-Dashboard-Layout — ein größeres, voll anpassbares Dashboard aus großen Kacheln, die Sie per Ziehen neu anordnen, ein- oder ausblenden können\n• Neon-Design — ein reinschwarzer, OLED-freundlicher Look mit leuchtenden Leistungsziffern\n• Zellungleichgewicht-Alarm — Benachrichtigung, wenn die Zellspannungs-Streuung des Pakets über einem Grenzwert bleibt\n• Batteriegesundheitsbericht — druckfertiges PDF/HTML mit State of Health, Abnahmerate und prognostiziertem Datum bis 80%%\n• Dashboard-Screenshots — BYD-Logo antippen, um den aktuellen Bildschirm zu speichern\n• SD-Karten-Backup — Datenbank in einen BydTripStats-Ordner auf einer entnehmbaren SD-Karte sichern\n\nFreischaltung: Der Code ist an Ihr konkretes Fahrzeug gebunden. Öffnen Sie Einstellungen → Pro, scannen Sie den QR-Code mit Ihrem Handy (oder kopieren Sie Ihre Fahrzeug-ID), um einen Code anzufordern, und fügen Sie ihn dann ein. Die Prüfung erfolgt vollständig auf dem Gerät — kein Konto, keine Anmeldung, nichts verlässt Ihr Auto.</string>
     <string name="faq_q_drive_modes">Warum wird \'auto/unbekannt\' bei Fahr-/Rekuperationsmodi angezeigt?</string>
     <string name="faq_a_drive_modes">Die App liest Fahr- und Rekuperationsmodi direkt aus dem Fahrzeuginstrumenten-Cluster, aber das Auto sendet nur dann einen Moduswert, wenn Sie ihn aktiv ändern.\n\nUm dies zu beheben:\n1. Jeden Rekuperationsgrad einmal am Touchscreen durchlaufen\n2. Jeden Fahrmodus (Eco / Normal / Sport) einmal durchlaufen</string>
     <string name="faq_q_offline_trip">Bedeutet kein Netzwerk, dass die Fahrt im Verlauf fehlt?</string>
@@ -987,4 +995,29 @@
     <string name="core_telemetry_label">Kern-Telemetrie</string>
     <string name="waiting_live_msg">Warte auf Live-Telemetrie.</string>
     <string name="core_section_label">Kern</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Reifen</string>
+    <string name="close">Schließen</string>
+    <string name="range_projection_title">Dynamische Projektion</string>
+    <string name="dashboard_no_cards_hint">Alle Karten ausgeblendet. Tippen Sie auf den Stift, um welche wieder hinzuzufügen.</string>
+    <string name="reorder_card">Zum Neuordnen ziehen</string>
+    <string name="pref_dashboard_layout">Dashboard-Layout</string>
+    <string name="dashboard_layout_desc">Wählen Sie, wie das Dashboard angeordnet ist. Karten ist ein größeres, anpassbares Layout — tippen Sie auf den Stift im Dashboard, um Kacheln ein-/auszublenden und neu anzuordnen.</string>
+    <string name="dashboard_layout_classic">Klassisch</string>
+    <string name="dashboard_layout_cards">Karten</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Leerlauf</string>
+    <string name="power_state_accelerating">Beschleunigen</string>
+    <string name="power_state_decelerating">Verzögern</string>
+    <string name="power_state_charging">Laden</string>
+    <string name="speed_state_parked">Stillstand</string>
+    <string name="speed_state_driving">Fahren</string>
+    <string name="soc_subtitle_usable">Nutzbare Ladung</string>
+    <string name="range_subtitle_projection">Dynamische Projektion</string>
+    <string name="distance_subtitle_session">Diese Sitzung</string>
+    <string name="odometer_subtitle_lifetime">Gesamtstrecke</string>
+    <string name="discharge_subtitle_lifetime">Gesamte abgegebene Energie</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s Druck</string>
 </resources>

@@ -30,6 +30,7 @@ import com.byd.tripstats.ui.theme.BatteryBlue
 import com.byd.tripstats.ui.theme.BydEcoTealDim
 import com.byd.tripstats.ui.theme.BydElectricBlue
 import com.byd.tripstats.ui.theme.RegenGreen
+import com.byd.tripstats.ui.theme.isNeon
 
 @Composable
 fun VehicleStats(
@@ -50,7 +51,9 @@ fun VehicleStats(
     val distanceUnit = unitSystem.distanceUnit
 
     val colModifier = if (fillHeight) modifier.fillMaxHeight() else modifier.verticalScroll(rememberScrollState())
-    val spacing     = if (fillHeight) 4.dp else 8.dp
+    // 8dp (not 4) so each card's drop shadow has room and the 3-D reads uniformly —
+    // at 4dp the next card covered the previous card's bottom shadow.
+    val spacing     = if (fillHeight) 8.dp else 8.dp
 
     Column(
         modifier = colModifier,
@@ -293,13 +296,14 @@ fun StatCard(
     val pad      = if (compact) 8.dp  else 12.dp
     val iconSize = if (compact) 22.dp else 32.dp
     val spacerW  = if (compact) 8.dp  else 12.dp
+    val neon     = MaterialTheme.isNeon
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant,
+                width = if (neon) 1.5.dp else 1.dp,
+                color = if (neon) color.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outlineVariant,
                 shape = RoundedCornerShape(12.dp)
             ),
         onClick  = onClick ?: {},
@@ -309,7 +313,10 @@ fun StatCard(
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
             disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        ),
+        // disabledElevation matters: cards without an onClick use the clickable-Card's
+        // `enabled = false` path, whose default disabled elevation is ~0 (they'd look flat).
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp, disabledElevation = 6.dp)
     ) {
         Row(
             modifier = Modifier

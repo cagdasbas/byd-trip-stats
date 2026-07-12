@@ -44,7 +44,12 @@
     <string name="settings_tab_app">Uygulama</string>
     <string name="settings_tab_connections">Bağlantılar</string>
     <string name="settings_tab_preferences">Tercihler</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">Hakkında &amp; SSS</string>
+    <string name="pro_cards_layout_title">Kartlı gösterge paneli düzeni</string>
+    <string name="pro_cards_layout_info">Daha büyük, tamamen özelleştirilebilir bir gösterge paneli: merkezi grafik yerine büyük, iyi aralıklı döşemeler. Döşemeleri sürükleyerek yeniden sıralamak, istediklerinizi göstermek veya gizlemek için kaleme dokunun; projeksiyon grafiğini tam boyutta açmak için Menzil döşemesine dokunun. Kilidi açıldıktan sonra Tercihler → Gösterge paneli düzeni altından seçin.</string>
+    <string name="pro_neon_theme_title">Neon teması</string>
+    <string name="pro_neon_theme_info">Güç ölçüm rakamları ve vurgu şeritleri neon gibi parlayan, her kartta ince bir vurgu kenarı olan saf siyah, OLED dostu koyu bir tema. Kilidi açıldıktan sonra Tercihler → Tema altından seçin.</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">Genel Bakış</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">Botu bağlantısını kes</string>
     <string name="auto_backup_label">Otomatik yedekleme</string>
     <string name="backup_interval_label">Yedekleme aralığı</string>
+    <string name="wifi_only_label">Yalnızca Wi-Fi</string>
+    <string name="wifi_only_desc">Otomatik yedeklemeler mobil veriden tasarruf için yalnızca Wi-Fi\'de çalışır</string>
     <string name="last_auto_backup_label">Son otomatik yedek: %1$s</string>
     <string name="schedule_updated_msg">Program %1$s olarak güncellendi. Sonraki otomatik yedek yeni aralığı takip edecek.</string>
     <string name="telegram_setup_info">Bağlandıktan sonra yedekler manuel olarak veya bir programa göre gönderilebilir. Her yedek, Telegram\'dan herhangi bir cihazda erişilebilen özel sohbetinizde .db dosyası olarak yer alır.</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">Sistem</string>
     <string name="theme_light">Açık</string>
     <string name="theme_dark">Koyu</string>
+    <string name="theme_neon">Neon</string>
     <string name="pref_language">Dil</string>
     <string name="language_desc">Uygulama görüntüleme dilini seçin. Bir dil seçmek, bu uygulama için cihaz sistem dilini geçersiz kılar.</string>
     <string name="change_language_action">Dili değiştir</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">Etkin — Pro bu araç için ömür boyu açıldı.</string>
     <string name="remove_code_action">Kodu kaldır</string>
     <string name="remove_code_title">Pro kilit açma kodu kaldırılsın mı?</string>
-    <string name="remove_code_msg">Bu, bu araçta Pro\'yu kapatır ve Pro özelliklerini devre dışı bırakır (hücre dengesizlik uyarısı, pil sağlığı raporu, ekran görüntüleri, SD kart yedekleme). Kodunuz kaybolmaz — yeniden açmak için istediğiniz zaman tekrar girebilirsiniz.</string>
-    <string name="pro_unlock_desc">Aracınız için bir kerelik kodla pil hücresi dengesizlik uyarısı ve gösterge paneli ekran görüntüleri gibi premium özellikleri açın — €9,99, ömür boyu, bir araç. Cihazda doğrulanır — araçınızdan hiçbir şey çıkmaz.</string>
+    <string name="remove_code_msg">Bu, bu araçta Pro\'yu kapatır ve Pro özelliklerini devre dışı bırakır (kartlı gösterge paneli düzeni, Neon teması, hücre dengesizliği uyarısı, batarya sağlık raporu, ekran görüntüleri, SD kart yedeği). Kodunuz kaybolmaz — tekrar kilidi açmak için istediğiniz zaman yeniden girebilirsiniz.</string>
+    <string name="pro_unlock_desc">Kartlı gösterge paneli düzeni, Neon teması, hücre dengesizliği uyarısı ve gösterge paneli ekran görüntüleri gibi premium özellikleri aracınıza özel tek seferlik bir kodla açın — 9,99 €, ömür boyu, tek araç. Cihazda doğrulanır — hiçbir şey aracınızdan çıkmaz.</string>
     <string name="vehicle_id_section_label">Bu aracın kimliği (lisans satın alırken bunu gönderin):</string>
     <string name="vehicle_id_reading">Okunuyor… aracı başlatın, ardından Ayarlar\'ı yeniden açın</string>
     <string name="vehicle_id_copied_msg">Araç kimliği kopyalandı</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">İnternet veya mobil sinyal gerekiyor mu?</string>
     <string name="faq_a_internet">Normal kullanım için hayır. Seyahatler, şarj oturumları, grafikler ve yerel geçmiş tamamen cihazda kaydedilir.\n\nİnternet yalnızca uygulama güncelleme kontrolleri, web bağlantılarını açma, MQTT / ABRP entegrasyonu ve etkinleştirdiğinizde Telegram yedeklemeleri gibi isteğe bağlı özellikler için gereklidir.</string>
     <string name="faq_q_pro">BYD Trip Stats Pro nedir ve ne içerir?</string>
-    <string name="faq_a_pro">Pro, premium ekstralar için isteğe bağlı bir kerelik açma — geliştirmeyi desteklemeye yardımcı olan küçük bir teşekkür. €9,99, bir kez ödenir, bir aracın ömrü boyunca geçerlidir (abonelik yok). Ücretsiz olan her şey ücretsiz kalır; Pro yalnızca yeni özellikler ekler:\n\n• Hücre dengesizlik uyarısı — paketteki hücre voltaj farkı bir sınırın üzerinde kaldığında bildirim alın\n• Pil sağlığı raporu — Sağlık Durumunuzu, bozunma hızınızı ve tahmini %%80 tarihini içeren yazdırılabilir PDF/HTML dışa aktarın\n• Gösterge paneli ekran görüntüleri — mevcut ekranı kaydetmek için BYD logosuna dokunun\n• SD kart yedekleme — veritabanını çıkarılabilir SD karttaki BydTripStats klasörüne kaydedin\n\nAçma: kod belirli aracınıza bağlıdır. Ayarlar → Tercihler → BYD Trip Stats Pro\'yu açın, telefonunuzla QR kodunu tarayın (veya Araç Kimliğinizi kopyalayın) kod talep edin, ardından geri yapıştırın. Tamamen cihazda doğrulanır — hesap yok, giriş yok, araçtan hiçbir şey çıkmaz.</string>
+    <string name="faq_a_pro">Pro, premium ekstralar için isteğe bağlı bir kerelik açma — geliştirmeyi desteklemeye yardımcı olan küçük bir teşekkür. €9,99, bir kez ödenir, bir aracın ömrü boyunca geçerlidir (abonelik yok). Ücretsiz olan her şey ücretsiz kalır; Pro yalnızca yeni özellikler ekler:\n\n• Kartlı gösterge paneli düzeni — sürükleyerek yeniden sıralayabileceğiniz, gösterebileceğiniz veya gizleyebileceğiniz büyük döşemelerden oluşan daha büyük, tamamen özelleştirilebilir bir gösterge paneli\n• Neon teması — parlayan güç rakamlarına sahip saf siyah, OLED dostu bir görünüm\n• Hücre dengesizlik uyarısı — paketteki hücre voltaj farkı bir sınırın üzerinde kaldığında bildirim alın\n• Pil sağlığı raporu — Sağlık Durumunuzu, bozunma hızınızı ve tahmini %%80 tarihini içeren yazdırılabilir PDF/HTML dışa aktarın\n• Gösterge paneli ekran görüntüleri — mevcut ekranı kaydetmek için BYD logosuna dokunun\n• SD kart yedekleme — veritabanını çıkarılabilir SD karttaki BydTripStats klasörüne kaydedin\n\nAçma: kod belirli aracınıza bağlıdır. Ayarlar → Pro\'yu açın, telefonunuzla QR kodunu tarayın (veya Araç Kimliğinizi kopyalayın) kod talep edin, ardından geri yapıştırın. Tamamen cihazda doğrulanır — hesap yok, giriş yok, araçtan hiçbir şey çıkmaz.</string>
     <string name="faq_q_drive_modes">Sürüş / rejenerasyon modlarında neden \'otomatik/bilinmiyor\' gösteriliyor?</string>
     <string name="faq_a_drive_modes">Uygulama sürüş ve rejenerasyon modlarını doğrudan aracın enstrüman panelinden okur, ancak araç yalnızca siz aktif olarak değiştirdiğinizde bir mod değeri yayınlar — başlangıçta mevcut modu bildirmez.\n\nAraç ekranında bir moda dokunana kadar uygulamanın gösterecek değeri yoktur ve \'Otomatik\' (rejenerasyon) veya \'Bilinmiyor\' (sürüş) değerine döner. Bunu düzeltmek için:\n\n1. Aracın dokunmatik ekranında her rejenerasyon seviyesini bir kez geçin\n2. Her sürüş modunu (Eco / Normal / Sport) bir kez geçin\n\nUygulama her iki değeri hemen alacak ve bunları her seyahat veri noktasıyla kaydetmeye başlayacak. Bunu yalnızca bir kez yapmanız yeterlidir.</string>
     <string name="faq_q_offline_trip">Ağ bağlantısı olmaması seyahatin geçmişte eksik olacağı anlamına mı gelir?</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">Ekranda USB hata ayıklamaya izin vermek isteyen bir iletişim kutusu görünmeli. İzin Ver\'e dokunun, ardından buraya dönün.\n\nBu tek seferlik bir işlemdir. Gelecekteki güncellemeler tamamen otomatiktir.</string>
     <string name="adb_granting_msg">Arka plan izinleri veriliyor…</string>
     <string name="authorize_action">Yetkilendir</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">Lastikler</string>
+    <string name="close">Kapat</string>
+    <string name="range_projection_title">Dinamik tahmin</string>
+    <string name="dashboard_no_cards_hint">Tüm kartlar gizli. Bazılarını geri eklemek için kaleme dokunun.</string>
+    <string name="reorder_card">Yeniden sıralamak için sürükleyin</string>
+    <string name="pref_dashboard_layout">Gösterge paneli düzeni</string>
+    <string name="dashboard_layout_desc">Gösterge panelinin nasıl düzenleneceğini seçin. Kartlar daha büyük, özelleştirilebilir bir düzendir — döşemeleri göstermek, gizlemek ve yeniden sıralamak için gösterge panelindeki kaleme dokunun.</string>
+    <string name="dashboard_layout_classic">Klasik</string>
+    <string name="dashboard_layout_cards">Kartlar</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">Boşta</string>
+    <string name="power_state_accelerating">Hızlanıyor</string>
+    <string name="power_state_decelerating">Yavaşlıyor</string>
+    <string name="power_state_charging">Şarj oluyor</string>
+    <string name="speed_state_parked">Duruyor</string>
+    <string name="speed_state_driving">Sürüyor</string>
+    <string name="soc_subtitle_usable">Kullanılabilir şarj</string>
+    <string name="range_subtitle_projection">Dinamik tahmin</string>
+    <string name="distance_subtitle_session">Bu oturum</string>
+    <string name="odometer_subtitle_lifetime">Toplam mesafe</string>
+    <string name="discharge_subtitle_lifetime">Toplam verilen enerji</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s basınç</string>
 </resources>

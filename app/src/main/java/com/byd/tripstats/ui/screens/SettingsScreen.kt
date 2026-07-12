@@ -22,6 +22,7 @@ import com.byd.tripstats.ui.screens.settings.AboutTab
 import com.byd.tripstats.ui.screens.settings.AppManagementTab
 import com.byd.tripstats.ui.screens.settings.AppPreferencesTab
 import com.byd.tripstats.ui.screens.settings.ConnectionsTab
+import com.byd.tripstats.ui.screens.settings.ProTab
 import com.byd.tripstats.ui.theme.AccelerationOrange
 import com.byd.tripstats.ui.viewmodel.DashboardViewModel
 
@@ -43,8 +44,11 @@ fun SettingsScreen(
         stringResource(R.string.settings_tab_app),
         stringResource(R.string.settings_tab_connections),
         stringResource(R.string.settings_tab_preferences),
+        stringResource(R.string.settings_tab_pro),
         stringResource(R.string.settings_tab_about)
     )
+    val proTabIndex = 3
+    val aboutTabIndex = 4
 
     val updateInfo by viewModel.updateInfo.collectAsState()
 
@@ -82,7 +86,7 @@ fun SettingsScreen(
                         selected = selectedTab == index,
                         onClick  = { selectedTab = index },
                         text = {
-                            if (index == 3 && updateInfo != null) {
+                            if (index == aboutTabIndex && updateInfo != null) {
                                 BadgedBox(
                                     badge = {
                                         Badge(
@@ -128,9 +132,11 @@ fun SettingsScreen(
                     2 -> AppPreferencesTab(
                         viewModel = viewModel,
                         preferencesManager = preferencesManager,
-                        onNavigateToTripGoals = onNavigateToTripGoals
+                        onNavigateToTripGoals = onNavigateToTripGoals,
+                        onNavigateToProTab = { selectedTab = proTabIndex }
                     )
-                    3 -> AboutTab(viewModel = viewModel)
+                    3 -> ProTab(preferencesManager = preferencesManager)
+                    4 -> AboutTab(viewModel = viewModel)
                 }
             }
         }

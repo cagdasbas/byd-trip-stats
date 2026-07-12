@@ -37,7 +37,12 @@
     <string name="settings_tab_app">앱</string>
     <string name="settings_tab_connections">연결</string>
     <string name="settings_tab_preferences">환경설정</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">정보 &amp; FAQ</string>
+    <string name="pro_cards_layout_title">카드 대시보드 레이아웃</string>
+    <string name="pro_cards_layout_info">더 크고 완전히 사용자 지정 가능한 대시보드: 중앙 차트 대신 크고 여백이 넉넉한 타일을 표시합니다. 연필을 탭하여 타일을 드래그로 재정렬하고 원하는 타일을 표시하거나 숨기며, 주행 거리 타일을 탭하면 예측 차트를 전체 크기로 엽니다. 잠금 해제 후 환경설정 → 대시보드 레이아웃에서 선택하세요.</string>
+    <string name="pro_neon_theme_title">네온 테마</string>
+    <string name="pro_neon_theme_info">순수한 검정의 OLED 친화적 다크 테마로, 전력 지표 숫자와 강조 줄무늬가 네온처럼 빛나며 모든 카드에 은은한 강조 테두리가 있습니다. 잠금 해제 후 환경설정 → 테마에서 선택하세요.</string>
     <string name="tab_overview">개요</string>
     <string name="tab_charts">차트</string>
     <string name="tab_heatmaps">히트맵</string>
@@ -416,6 +421,8 @@
     <string name="disconnect_bot_action">봇 연결 해제</string>
     <string name="auto_backup_label">자동 백업</string>
     <string name="backup_interval_label">백업 간격</string>
+    <string name="wifi_only_label">Wi-Fi 전용</string>
+    <string name="wifi_only_desc">모바일 데이터를 절약하기 위해 자동 백업은 Wi-Fi에서만 실행됩니다</string>
     <string name="last_auto_backup_label">마지막 자동 백업: %1$s</string>
     <string name="schedule_updated_msg">%1$s로 일정이 업데이트되었습니다. 다음 자동 백업은 새 간격을 따릅니다.</string>
     <string name="telegram_setup_info">연결되면 수동으로 또는 예약에 따라 백업을 전송할 수 있습니다. 각 백업은 개인 채팅에 .db 파일로 도착합니다.</string>
@@ -678,6 +685,7 @@
     <string name="theme_system">시스템</string>
     <string name="theme_light">밝게</string>
     <string name="theme_dark">어둡게</string>
+    <string name="theme_neon">네온</string>
     <string name="pref_language">언어</string>
     <string name="language_desc">앱 표시 언어를 선택하세요. 언어를 선택하면 이 앱에서 시스템 언어가 재정의됩니다.</string>
     <string name="change_language_action">언어 변경</string>
@@ -763,8 +771,8 @@
     <string name="pro_active_label">활성 — 이 차량에서 Pro가 잠금 해제됨 (평생).</string>
     <string name="remove_code_action">코드 제거</string>
     <string name="remove_code_title">Pro 잠금 해제 코드를 제거할까요?</string>
-    <string name="remove_code_msg">이 차량에서 Pro가 비활성화됩니다. 코드는 유실되지 않으며 언제든지 다시 입력할 수 있습니다.</string>
-    <string name="pro_unlock_desc">차량별 일회성 코드로 배터리 셀 불균형 경고, 대시보드 스크린샷 같은 프리미엄 기능을 잠금 해제하세요 — 9.99€, 평생, 차량 1대. 온디바이스에서 확인되며 아무것도 차량을 떠나지 않습니다.</string>
+    <string name="remove_code_msg">이 차량에서 Pro가 꺼지고 Pro 기능(카드 대시보드 레이아웃, 네온 테마, 셀 불균형 경고, 배터리 상태 보고서, 스크린샷, SD 카드 백업)이 비활성화됩니다. 코드는 사라지지 않습니다 — 언제든지 다시 입력하여 잠금을 해제할 수 있습니다.</string>
+    <string name="pro_unlock_desc">카드 대시보드 레이아웃, 네온 테마, 셀 불균형 경고, 대시보드 스크린샷 같은 프리미엄 기능을 차량 전용 일회성 코드로 잠금 해제하세요 — 9.99 €, 평생, 차량 1대. 기기에서 확인 — 아무것도 차량을 떠나지 않습니다.</string>
     <string name="vehicle_id_section_label">이 차량의 ID (라이선스 구매 시 전송):</string>
     <string name="vehicle_id_reading">읽는 중… 차를 시작하고 설정을 다시 여세요</string>
     <string name="vehicle_id_copied_msg">차량 ID가 복사되었습니다</string>
@@ -887,7 +895,7 @@
     <string name="faq_q_internet">인터넷이나 모바일 신호가 필요한가요?</string>
     <string name="faq_a_internet">일반 사용에는 필요하지 않습니다. 주행, 충전 세션, 차트, 로컬 기록은 모두 기기에 저장됩니다.\n\n인터넷은 선택적 기능에만 필요합니다.</string>
     <string name="faq_q_pro">BYD Trip Stats Pro란 무엇이며 무엇을 포함하나요?</string>
-    <string name="faq_a_pro">Pro는 프리미엄 추가 기능을 위한 선택적 일회성 잠금 해제입니다 — 개발을 지원하는 작은 감사 표시입니다. 9.99€, 차량 1대 평생(구독 없음). 무료였던 것은 무료로 유지됩니다. Pro는 새 기능만 추가합니다:\n\n• 셀 불균형 경고 — 팩의 셀 전압 스프레드가 한계를 초과하면 알림\n• 배터리 상태 보고서 — 상태, 감소율 및 80%% 예상 날짜를 PDF/HTML로 내보내기\n• 대시보드 스크린샷 — BYD 로고 탭하여 현재 화면 저장\n• SD 카드 백업 — 탈착식 SD 카드의 BydTripStats 폴더에 데이터베이스 저장\n\n잠금 해제: 코드는 특정 차량에 연결됩니다. 설정 → 환경설정 → BYD Trip Stats Pro를 열고 전화기로 QR 코드를 스캔(또는 차량 ID 복사)하여 코드를 요청한 다음 붙여넣으세요. 온디바이스에서만 확인됩니다 — 계정, 로그인 없음, 아무것도 차량을 떠나지 않습니다.</string>
+    <string name="faq_a_pro">Pro는 프리미엄 추가 기능을 위한 선택적 일회성 잠금 해제입니다 — 개발을 지원하는 작은 감사 표시입니다. 9.99€, 차량 1대 평생(구독 없음). 무료였던 것은 무료로 유지됩니다. Pro는 새 기능만 추가합니다:\n\n• 카드 대시보드 레이아웃 — 드래그로 재정렬하고 표시하거나 숨길 수 있는 큰 타일로 구성된, 더 크고 완전히 사용자 지정 가능한 대시보드\n• 네온 테마 — 전력 숫자가 빛나는 순수한 검정의 OLED 친화적 외관\n• 셀 불균형 경고 — 팩의 셀 전압 스프레드가 한계를 초과하면 알림\n• 배터리 상태 보고서 — 상태, 감소율 및 80%% 예상 날짜를 PDF/HTML로 내보내기\n• 대시보드 스크린샷 — BYD 로고 탭하여 현재 화면 저장\n• SD 카드 백업 — 탈착식 SD 카드의 BydTripStats 폴더에 데이터베이스 저장\n\n잠금 해제: 코드는 특정 차량에 연결됩니다. 설정 → Pro를 열고 전화기로 QR 코드를 스캔(또는 차량 ID 복사)하여 코드를 요청한 다음 붙여넣으세요. 온디바이스에서만 확인됩니다 — 계정, 로그인 없음, 아무것도 차량을 떠나지 않습니다.</string>
     <string name="faq_q_drive_modes">주행/회생 모드에 \'자동/알 수 없음\'이 표시되는 이유는 무엇인가요?</string>
     <string name="faq_a_drive_modes">앱이 계기판에서 직접 주행 및 회생 모드를 읽지만 차량은 모드를 활성적으로 변경할 때만 모드 값을 방송합니다 — 시작 시 현재 모드를 보고하지 않습니다.\n\n차량 디스플레이에서 모드를 탭하기 전까지 앱에는 표시할 값이 없어 \'Auto\'(회생) 또는 \'Unknown\'(주행)으로 표시됩니다. 해결 방법:\n\n1. 차량 터치스크린에서 각 회생 수준을 한 번씩 순환\n2. 각 주행 모드(에코/일반/스포츠)를 한 번씩 순환\n\n앱이 즉시 두 값을 감지하고 모든 주행 데이터 포인트에 기록하기 시작합니다. 이 작업은 한 번만 수행하면 됩니다.</string>
     <string name="faq_q_offline_trip">네트워크 없음이 주행이 기록에 없다는 의미인가요?</string>
@@ -987,4 +995,29 @@
     <string name="core_telemetry_label">핵심 텔레메트리</string>
     <string name="waiting_live_msg">실시간 텔레메트리 대기 중.</string>
     <string name="core_section_label">코어</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">타이어</string>
+    <string name="close">닫기</string>
+    <string name="range_projection_title">동적 예측</string>
+    <string name="dashboard_no_cards_hint">모든 카드가 숨겨졌습니다. 연필을 탭하여 일부를 다시 추가하세요.</string>
+    <string name="reorder_card">드래그하여 재정렬</string>
+    <string name="pref_dashboard_layout">대시보드 레이아웃</string>
+    <string name="dashboard_layout_desc">대시보드 배치 방식을 선택하세요. 카드는 더 크고 사용자 지정 가능한 레이아웃입니다 — 대시보드의 연필을 탭하여 타일을 표시, 숨기기 및 재정렬하세요.</string>
+    <string name="dashboard_layout_classic">클래식</string>
+    <string name="dashboard_layout_cards">카드</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">대기</string>
+    <string name="power_state_accelerating">가속 중</string>
+    <string name="power_state_decelerating">감속 중</string>
+    <string name="power_state_charging">충전 중</string>
+    <string name="speed_state_parked">정지</string>
+    <string name="speed_state_driving">주행 중</string>
+    <string name="soc_subtitle_usable">사용 가능한 충전량</string>
+    <string name="range_subtitle_projection">동적 예측</string>
+    <string name="distance_subtitle_session">이 세션</string>
+    <string name="odometer_subtitle_lifetime">총 주행 거리</string>
+    <string name="discharge_subtitle_lifetime">총 방전 에너지</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s 압력</string>
 </resources>

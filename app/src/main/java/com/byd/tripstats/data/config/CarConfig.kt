@@ -111,32 +111,36 @@ object CarCatalog {
         cdA = 0.682       // Cd 0.29 × A 2.35 m²
     )
 
+    // Atto 1 = export name (Asia-Pacific / LatAm) of the Seagull with the
+    // China-spec battery packs (30.08 / 38.88 kWh) and Dynamic / Premium trims.
+    // Distinct from the European Dolphin Surf, which uses 30.0 / 43.2 kWh packs.
+    // Specs per the official BYD Atto 1 spec sheet.
     val BYD_SEAGULL_ACTIVE = CarConfig(
         id = "BYD_SEAGULL_ACTIVE",
-        displayName = "Seagull / Atto 1 Active",
+        displayName = "Atto 1 Dynamic",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 30.08,
-        estimatedKerbMassKg = 1160.0,
-        wltpKm = 190,
+        estimatedKerbMassKg = 1225.0,
+        wltpKm = 230,
         referenceConsumptionKwhPer100km = 15.8,
-        frontTyrePressureBar = 2.5,
-        rearTyrePressureBar = 2.5,
-        frontMotorRatedKw = 55,
+        frontTyrePressureBar = 2.7,  // door-sticker (185/55 R16)
+        rearTyrePressureBar = 2.7,   // door-sticker (185/55 R16)
+        frontMotorRatedKw = 45,
         cellCount = 94,   // 30.08 kWh @ ~300V -> 94S LFP
         cdA = 0.653
     )
 
     val BYD_SEAGULL_FLYING = CarConfig(
         id = "BYD_SEAGULL_FLYING",
-        displayName = "Seagull / Atto 1 Flying",
+        displayName = "Atto 1 Premium",
         drivetrain = Drivetrain.FWD,
         batteryKwh = 38.88,
-        estimatedKerbMassKg = 1240.0,
-        wltpKm = 245,
+        estimatedKerbMassKg = 1280.0,
+        wltpKm = 300,
         referenceConsumptionKwhPer100km = 15.8,
-        frontTyrePressureBar = 2.5,
-        rearTyrePressureBar = 2.5,
-        frontMotorRatedKw = 55,
+        frontTyrePressureBar = 2.7,  // door-sticker (185/55 R16)
+        rearTyrePressureBar = 2.7,   // door-sticker (185/55 R16)
+        frontMotorRatedKw = 45,
         cellCount = 120,  // 38.88 kWh @ ~384V -> 120S LFP
         cdA = 0.653
     )
@@ -622,6 +626,8 @@ object CarCatalog {
         BYD_ATTO_3,
         BYD_SEAL_U_COMFORT,
         BYD_SEAL_U_DESIGN,
+        BYD_SEAGULL_ACTIVE,
+        BYD_SEAGULL_FLYING,
         BYD_DOLPHIN_SURF_ACTIVE,
         BYD_DOLPHIN_SURF_BOOST,
         BYD_DOLPHIN_SURF_COMFORT,
@@ -663,7 +669,7 @@ object CarCatalog {
         "BYD Atto 2" to listOf(BYD_ATTO_2_ACTIVE, BYD_ATTO_2_BOOST, BYD_ATTO_2_COMFORT),
         "BYD Atto 3" to listOf(BYD_ATTO_3),
         "BYD Seal U" to listOf(BYD_SEAL_U_COMFORT, BYD_SEAL_U_DESIGN),
-        "BYD Seagull / Dolphin Surf" to listOf(BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),
+        "BYD Seagull / Dolphin Surf / Atto 1" to listOf(BYD_SEAGULL_ACTIVE, BYD_SEAGULL_FLYING, BYD_DOLPHIN_SURF_ACTIVE, BYD_DOLPHIN_SURF_BOOST, BYD_DOLPHIN_SURF_COMFORT),
         "BYD M6" to listOf(BYD_M6_STANDARD_120KW, BYD_M6_SUPERIOR_100KW, BYD_M6_SUPERIOR_150KW),
         "BYD Seal 6" to listOf(BYD_SEAL_6_PREMIUM_95KW, BYD_SEAL_6_PREMIUM_160KW),
         "BYD Sealion 6" to listOf(BYD_SEALION_6_EV_STANDARD, BYD_SEALION_6_EV_EXTENDED),

@@ -37,7 +37,7 @@ android {
     // A stable release always has a higher versionCode than any beta of the same
     // version, so beta testers automatically receive the stable upgrade via sideload.
     val versionMajor    = 2
-    val versionMinor    = 11
+    val versionMinor    = 12
     val versionPatch    = 0
     val versionPre      = 99 // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
 
@@ -89,7 +89,15 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            // Sign debug with the release key when a keystore is configured (env or
+            // local.properties) so debug/release stay a single install identity on the
+            // dev's car — flipping between them upgrades in place and preserves the DB.
+            // Fall back to the default debug keystore when no keystore is present so
+            // contributors can build without any local.properties / env setup.
+            signingConfig = if (signingConfigs.getByName("release").storeFile != null)
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
             buildConfigField("Boolean", "SENSITIVE_DIAGNOSTICS_ENABLED", "true")
         }
         release {

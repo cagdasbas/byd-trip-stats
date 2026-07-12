@@ -20,6 +20,7 @@ import com.byd.tripstats.ui.theme.AccelerationOrange
 import com.byd.tripstats.ui.theme.BydElectricBlue
 import com.byd.tripstats.ui.theme.BydErrorRed
 import com.byd.tripstats.ui.theme.RegenGreen
+import com.byd.tripstats.ui.theme.isNeon
 
 enum class TyrePressureUnit { BAR, PSI, KPA }
 
@@ -31,7 +32,7 @@ private fun Double.toDisplayPressure(unit: TyrePressureUnit): Double = when (uni
 
 internal fun Double.toBarFromPsi(): Double = this / 14.5038
 
-private fun TyrePressureUnit.label(): String = when (this) {
+internal fun TyrePressureUnit.label(): String = when (this) {
     TyrePressureUnit.BAR -> "bar"
     TyrePressureUnit.PSI -> "psi"
     TyrePressureUnit.KPA -> "kPa"
@@ -131,16 +132,23 @@ internal fun TyreStatCard(
     val selectedCar by prefs.selectedCarConfig.collectAsState(initial = null)
     val frontBar = selectedCar?.frontTyrePressureBar
     val rearBar = selectedCar?.rearTyrePressureBar
+    val neon = MaterialTheme.isNeon
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
+            .border(
+                width = if (neon) 1.5.dp else 1.dp,
+                color = if (neon) BydElectricBlue.copy(alpha = 0.45f)
+                else androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(12.dp)
+            ),
         onClick = onClick,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Row(
             modifier = Modifier
@@ -177,13 +185,15 @@ internal fun TyreStatCard(
 }
 
 @Composable
-private fun TyreCell(
+internal fun TyreCell(
     label: String,
     tempC: Int?,
     pressurePsi: Double,
     unit: TyrePressureUnit,
     recommendedBar: Double?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    large: Boolean = false,
+    compact: Boolean = false
 ) {
     val status = recommendedBar?.let { tyrePressureStatus(pressurePsi, it) }
     val pressureColor = when (status) {
@@ -194,6 +204,10 @@ private fun TyreCell(
     }
     val isAlarm = status == TyrePressureStatus.LOW || status == TyrePressureStatus.HIGH
 
+    val labelSize = if (large) (if (compact) 12.sp else 14.sp) else 10.sp
+    val tempSize = if (large) (if (compact) 14.sp else 16.sp) else 11.sp
+    val pressureSize = if (large) (if (compact) 13.sp else 16.sp) else 10.sp
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(8.dp),
@@ -202,20 +216,20 @@ private fun TyreCell(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 5.dp),
+                .padding(horizontal = if (large) (if (compact) 6.dp else 10.dp) else 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = label,
-                fontSize = 10.sp,
+                fontSize = labelSize,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
             if (tempC != null) {
                 Text(
                     text = "${tempC}°",
-                    fontSize = 11.sp,
+                    fontSize = tempSize,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
@@ -223,7 +237,7 @@ private fun TyreCell(
             }
             Text(
                 text = unit.formatValue(pressurePsi),
-                fontSize = 10.sp,
+                fontSize = pressureSize,
                 fontWeight = if (isAlarm) FontWeight.Bold else FontWeight.Normal,
                 color = pressureColor,
                 maxLines = 1,

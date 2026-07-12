@@ -44,7 +44,12 @@
     <string name="settings_tab_app">应用</string>
     <string name="settings_tab_connections">连接</string>
     <string name="settings_tab_preferences">偏好设置</string>
+    <string name="settings_tab_pro">Pro</string>
     <string name="settings_tab_about">关于 &amp; 常见问题</string>
+    <string name="pro_cards_layout_title">卡片式仪表板布局</string>
+    <string name="pro_cards_layout_info">更大、可完全自定义的仪表板：以大而间距合理的磁贴取代中央图表。点击铅笔可拖动重新排序磁贴、显示或隐藏所需磁贴，点击续航磁贴可全屏打开预测图表。解锁后在 偏好设置 → 仪表板布局 中选择。</string>
+    <string name="pro_neon_theme_title">霓虹主题</string>
+    <string name="pro_neon_theme_info">纯黑、适合 OLED 的深色主题，其功率指标数字和强调条纹如霓虹般发光，每张卡片都有细微的强调边缘。解锁后在 偏好设置 → 主题 中选择。</string>
 
     <!-- Detail tabs -->
     <string name="tab_overview">概览</string>
@@ -463,6 +468,8 @@
     <string name="disconnect_bot_action">断开机器人连接</string>
     <string name="auto_backup_label">自动备份</string>
     <string name="backup_interval_label">备份间隔</string>
+    <string name="wifi_only_label">仅 Wi-Fi</string>
+    <string name="wifi_only_desc">自动备份仅在 Wi-Fi 下运行以节省移动数据</string>
     <string name="last_auto_backup_label">上次自动备份：%1$s</string>
     <string name="schedule_updated_msg">计划已更新为 %1$s。下次自动备份将按新间隔执行。</string>
     <string name="telegram_setup_info">连接后，可手动或按计划发送备份。每次备份以 .db 文件形式保存在私聊中，可在任何设备的 Telegram 上访问。</string>
@@ -745,6 +752,7 @@
     <string name="theme_system">系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
+    <string name="theme_neon">霓虹</string>
     <string name="pref_language">语言</string>
     <string name="language_desc">选择应用显示语言。选择语言后，将覆盖本应用的设备系统语言。</string>
     <string name="change_language_action">更改语言</string>
@@ -842,8 +850,8 @@
     <string name="pro_active_label">已激活 — 本车辆 Pro 已终身解锁。</string>
     <string name="remove_code_action">移除激活码</string>
     <string name="remove_code_title">移除 Pro 激活码？</string>
-    <string name="remove_code_msg">这将在本车辆上关闭 Pro 并禁用 Pro 功能（电芯不平衡提醒、电池健康报告、仪表盘截图、SD 卡备份）。您的激活码不会丢失 — 随时可以重新输入以再次解锁。</string>
-    <string name="pro_unlock_desc">使用一次性激活码为您的车辆解锁电池电芯不平衡提醒和仪表盘截图等高级功能 — €9.99，终身有效，适用于一辆车。在设备上验证 — 无任何数据离开您的车辆。</string>
+    <string name="remove_code_msg">这将关闭此车辆的 Pro 并停用 Pro 功能（卡片式仪表板布局、霓虹主题、电芯不平衡提醒、电池健康报告、截图、SD 卡备份）。您的代码不会丢失 — 可随时重新输入以再次解锁。</string>
+    <string name="pro_unlock_desc">使用您车辆专属的一次性代码解锁卡片式仪表板布局、霓虹主题、电芯不平衡提醒和仪表板截图等高级功能 — 9.99 €，终身，一辆车。在设备上验证 — 无任何数据离开您的车辆。</string>
     <string name="vehicle_id_section_label">本车辆 ID（购买许可时请发送此 ID）：</string>
     <string name="vehicle_id_reading">读取中… 请启动车辆，然后重新打开设置</string>
     <string name="vehicle_id_copied_msg">车辆 ID 已复制</string>
@@ -978,7 +986,7 @@
     <string name="faq_q_internet">我需要互联网或移动信号吗？</string>
     <string name="faq_a_internet">正常使用不需要。行程、充电记录、图表和本地历史记录完全在设备上存储。\n\n仅在启用应用更新检查、打开网页链接、MQTT / ABRP 集成和 Telegram 备份等可选功能时才需要互联网。</string>
     <string name="faq_q_pro">BYD Trip Stats Pro 是什么，包含哪些内容？</string>
-    <string name="faq_a_pro">Pro 是一次性解锁高级额外功能的可选付费项目 — 一份支持开发的小小心意。€9.99，一次付费，终身适用于一辆车（无订阅）。原本免费的功能仍然免费；Pro 仅添加新功能：\n\n• 电芯不平衡提醒 — 当电池组电芯电压差持续超过限制时收到通知\n• 电池健康报告 — 导出可打印的 PDF/HTML，包含您的健康状态、衰减速率和预计达到 80%% 的日期\n• 仪表盘截图 — 点击比亚迪 Logo 保存当前屏幕\n• SD 卡备份 — 将数据库保存到可移动 SD 卡上的 BydTripStats 文件夹\n\n解锁方式：激活码与您的特定车辆绑定。打开 设置 → 偏好设置 → BYD Trip Stats Pro，用手机扫描二维码（或复制您的车辆 ID）申请激活码，然后粘贴回来。完全在设备上验证 — 无账号、无登录、无任何数据离开您的车辆。</string>
+    <string name="faq_a_pro">Pro 是一次性解锁高级额外功能的可选付费项目 — 一份支持开发的小小心意。€9.99，一次付费，终身适用于一辆车（无订阅）。原本免费的功能仍然免费；Pro 仅添加新功能：\n\n• 卡片式仪表板布局 — 由大磁贴组成的更大、可完全自定义的仪表板，可拖动重新排序、显示或隐藏\n• 霓虹主题 — 纯黑、适合 OLED 的外观，功率数字发光\n• 电芯不平衡提醒 — 当电池组电芯电压差持续超过限制时收到通知\n• 电池健康报告 — 导出可打印的 PDF/HTML，包含您的健康状态、衰减速率和预计达到 80%% 的日期\n• 仪表盘截图 — 点击比亚迪 Logo 保存当前屏幕\n• SD 卡备份 — 将数据库保存到可移动 SD 卡上的 BydTripStats 文件夹\n\n解锁方式：激活码与您的特定车辆绑定。打开 设置 → Pro，用手机扫描二维码（或复制您的车辆 ID）申请激活码，然后粘贴回来。完全在设备上验证 — 无账号、无登录、无任何数据离开您的车辆。</string>
     <string name="faq_q_drive_modes">为什么驾驶/回收模式显示为"自动/未知"？</string>
     <string name="faq_a_drive_modes">应用直接从车辆仪表盘读取驾驶和回收模式，但车辆仅在您主动更改时才广播模式值 — 启动时不上报当前模式。\n\n在您点击车载屏幕上的模式之前，应用没有可显示的值，因此退回到"自动"（回收）或"未知"（驾驶）。解决方法：\n\n1. 在车载触摸屏上逐一切换每个回收等级\n2. 逐一切换每个驾驶模式（经济 / 正常 / 运动）\n\n应用将立即获取两个值，并在每个行程数据点中记录它们。只需操作一次即可。</string>
     <string name="faq_q_offline_trip">无网络连接意味着行程将在历史记录中缺失？</string>
@@ -1088,4 +1096,29 @@
     <string name="adb_waiting_msg">屏幕上应出现允许 USB 调试的对话框。点击允许，然后返回此处。\n\n这是一次性操作，后续更新完全自动化。</string>
     <string name="adb_granting_msg">正在授予后台权限…</string>
     <string name="authorize_action">授权</string>
+
+    <!-- Dashboard CARDS layout (Pro) -->
+    <string name="stat_tyres">轮胎</string>
+    <string name="close">关闭</string>
+    <string name="range_projection_title">动态预测</string>
+    <string name="dashboard_no_cards_hint">所有卡片已隐藏。点击铅笔重新添加一些。</string>
+    <string name="reorder_card">拖动以重新排序</string>
+    <string name="pref_dashboard_layout">仪表板布局</string>
+    <string name="dashboard_layout_desc">选择仪表板的排列方式。卡片是更大、可自定义的布局 — 点击仪表板上的铅笔可显示、隐藏和重新排序磁贴。</string>
+    <string name="dashboard_layout_classic">经典</string>
+    <string name="dashboard_layout_cards">卡片</string>
+
+    <!-- CARDS layout power-metric subtitles -->
+    <string name="power_state_idle">空闲</string>
+    <string name="power_state_accelerating">加速中</string>
+    <string name="power_state_decelerating">减速中</string>
+    <string name="power_state_charging">充电中</string>
+    <string name="speed_state_parked">静止</string>
+    <string name="speed_state_driving">行驶中</string>
+    <string name="soc_subtitle_usable">可用电量</string>
+    <string name="range_subtitle_projection">动态预测</string>
+    <string name="distance_subtitle_session">本次记录</string>
+    <string name="odometer_subtitle_lifetime">总里程</string>
+    <string name="discharge_subtitle_lifetime">总输出电量</string>
+    <string name="tyre_subtitle_pressure">°C · %1$s 胎压</string>
 </resources>
