@@ -37,6 +37,7 @@ class Dilink5Client {
     private var tyreDev: Any? = null
     private var instrumentDev: Any? = null   // drive mode + ambient temp — TICKET-009
     private var instrumentListener: Any? = null   // event-driven mode/ambient (D3 parity, no poll lag)
+    private var otaDev: Any? = null   // 12V aux voltage via getBatteryVoltage(0) — TICKET-017
     private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
     private var collectDataDev: Any? = null
     private var collectDataListener: Any? = null
@@ -94,6 +95,9 @@ class Dilink5Client {
         // are only an initial-value / missed-event backstop.
         instrumentDev = bind(ctx, "android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
         instrumentDev?.let { registerInstrumentListener(it, ds) }
+        // ota: 12V aux voltage. getBatteryVoltage(0) == 13 V on-car (TICKET-017); the no-arg
+        // getBatteryPowerVoltage is dead (-1). Arg-indexed → polled on the slow tick.
+        otaDev = bind(ctx, "android.hardware.bydauto.ota.BYDAutoOtaDevice")
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -138,7 +142,7 @@ class Dilink5Client {
         try { collectDataListener?.let { l -> collectDataDev?.javaClass?.getMethod("unRegisterListener", AbsBYDAutoCollectDataListener::class.java)?.invoke(collectDataDev, l) } } catch (_: Throwable) {}
         try { instrumentListener?.let { l -> instrumentDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoInstrumentListener::class.java)?.invoke(instrumentDev, l) } } catch (_: Throwable) {}
         tyreListener = null; collectDataListener = null; instrumentListener = null
-        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null
+        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null; otaDev = null
         Log.i(tag, "stopped")
     }
 
@@ -183,6 +187,8 @@ class Dilink5Client {
         // app canonical (1=Eco/2=Sport/3=Normal/4=Snow); getOutCarTemperature is plain °C.
         reflGetInt(instrumentDev, "getSportModeState")?.let { ds.applyDilink5DriveMode(it) }
         reflGetInt(instrumentDev, "getOutCarTemperature")?.let { ds.applyDilink5AmbientTemp(it) }
+        // TICKET-017: 12V aux voltage via ota.getBatteryVoltage(0) (arg-indexed; confirmed 13 V).
+        reflGetIntArg(otaDev, "getBatteryVoltage", 0)?.let { ds.applyDilink5AuxVoltage(it) }
     }
 
     // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.

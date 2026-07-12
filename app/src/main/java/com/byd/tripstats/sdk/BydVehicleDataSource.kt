@@ -5165,6 +5165,15 @@ class BydVehicleDataSource(context: Context) {
     // TICKET-009 follow-up: ambient / outside-air temperature from instrument.getOutCarTemperature
     // (or its event). Written to the snapshot directly because publishSnapshot preserves
     // instrumentOutCarTemperature from the snapshot itself (not a StateFlow).
+    // TICKET-017: 12V aux battery voltage from ota.getBatteryVoltage(0) (confirmed on-car = 13 V).
+    // publishSnapshot reads _battery12vVoltage first, so write the StateFlow (+ snapshot for parity).
+    fun applyDilink5AuxVoltage(volts: Int) {
+        if (volts !in 6..17) return   // SDK BATTERY_VOLTAGE range; drops the -1 sentinel
+        _battery12vVoltage.value = volts.toDouble()
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(battery12vVoltage = volts.toDouble())
+        publishSnapshot()
+    }
+
     fun applyDilink5AmbientTemp(tempC: Int) {
         if (tempC !in -50..60) return   // plausible outside-air range; drop sensor sentinels
         _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = tempC)
