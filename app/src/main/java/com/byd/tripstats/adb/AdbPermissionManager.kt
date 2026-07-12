@@ -45,8 +45,14 @@ object AdbPermissionManager {
     // can be re-initialised on reboot, so we re-assert it (idempotently) on every startup
     // via the same dadb channel. Single-quote the '*' so the device shell doesn't glob it.
     private val VEHICLE_API_SETTINGS = listOf(
+        // Narrowed 2026-07-12 (on-car): exempting only the OEM SDK namespace `Lcom/ts/` is
+        // sufficient — telemetry binds identically to the old device-wide `'*'`. Verified after a
+        // full reboot: enforcement resets to default (getInstance blacklisted → denied), and this
+        // narrow list restores binding with 0 denials for both trip-stats and byd-probe. All the
+        // blocked hidden members live under com.ts.* (CarAdapterManager.getInstance,
+        // CarPowerManager.getInstance, OtaSdkManager, ota listener stubs). `'*'` was overkill.
         "settings put global hidden_api_policy 1",
-        "settings put global hidden_api_blacklist_exemptions '*'",
+        "settings put global hidden_api_blacklist_exemptions 'Lcom/ts/'",
     )
 
     // The runtime-gated bydauto permissions (getInstance enforces *_COMMON server-side).
