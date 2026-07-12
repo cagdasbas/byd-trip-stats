@@ -5153,6 +5153,15 @@ class BydVehicleDataSource(context: Context) {
         publishSnapshot()
     }
 
+    // TICKET-009: DiLink-5 drive mode from instrument.getSportModeState. Its raw value matches the
+    // app's canonical driveMode encoding directly (1=Eco 2=Sport 3=Normal 4=Snow; 5=Mud 6=Sand),
+    // confirmed on-car 2026-07-12 — no remap needed. Treated as a strong/confirmed source.
+    fun applyDilink5DriveMode(raw: Int) {
+        if (raw !in 1..6) return
+        updateDriveModeCandidate(raw, strong = true, source = "d5-sportmode")
+        publishSnapshot()
+    }
+
     fun applyDilink5TyreTemp(wheel: Int, tempC: Int) {
         if (tempC !in -40..120) return
         when (wheel) {

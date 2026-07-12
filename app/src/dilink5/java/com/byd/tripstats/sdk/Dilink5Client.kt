@@ -34,6 +34,7 @@ class Dilink5Client {
     private var healthDev: Any? = null
     private var motorDev: Any? = null
     private var tyreDev: Any? = null
+    private var instrumentDev: Any? = null   // drive mode (getSportModeState) — TICKET-009
     private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
     private var collectDataDev: Any? = null
     private var collectDataListener: Any? = null
@@ -86,6 +87,9 @@ class Dilink5Client {
         // collectdata: HV voltage/current + motor RPM via EVENTS (getters dead). Real power = V·I.
         collectDataDev = bind(ctx, "android.hardware.bydauto.collectdata.BYDAutoCollectDataDevice")
         collectDataDev?.let { registerCollectData(it, ds) }
+        // Instrument: drive mode via getSportModeState (raw == app canonical, TICKET-009). Needs
+        // BYDAUTO_INSTRUMENT_COMMON (already granted). Polled on the slow tick.
+        instrumentDev = bind(ctx, "android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -129,7 +133,7 @@ class Dilink5Client {
         // NOTE: collectdata uses "unRegisterListener" (capital R), unlike the others.
         try { collectDataListener?.let { l -> collectDataDev?.javaClass?.getMethod("unRegisterListener", AbsBYDAutoCollectDataListener::class.java)?.invoke(collectDataDev, l) } } catch (_: Throwable) {}
         tyreListener = null; collectDataListener = null
-        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null
+        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null
         Log.i(tag, "stopped")
     }
 
@@ -169,6 +173,9 @@ class Dilink5Client {
                 reflGetIntArg(t, "getTyrePressureState", 3), reflGetIntArg(t, "getTyrePressureState", 4),
             )
         }
+        // TICKET-009: drive mode. getSportModeState raw == app canonical (1=Eco/2=Sport/3=Normal/
+        // 4=Snow); applyDilink5DriveMode validates 1..6 and ignores anything else.
+        reflGetInt(instrumentDev, "getSportModeState")?.let { ds.applyDilink5DriveMode(it) }
     }
 
     // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.
