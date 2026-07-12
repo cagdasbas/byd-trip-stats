@@ -40,7 +40,10 @@ private fun TyrePressureUnit.label(): String = when (this) {
 internal fun TyrePressureUnit.formatValue(psi: Double): String {
     if (psi < 0.1) return "--"
     return when (this) {
-        TyrePressureUnit.BAR -> String.format("%.1f", psi.toDisplayPressure(this))
+        // 2 decimals for bar: 1 psi ≈ 0.069 bar, so "%.1f" collapses distinct wheels (42.0/43.5/43.0
+        // psi = 2.90/3.00/2.96 bar) into a flat "2.9/3.0/3.0" and mis-rounds. "%.2f" preserves the
+        // per-wheel spread and matches the cluster's psi granularity.
+        TyrePressureUnit.BAR -> String.format("%.2f", psi.toDisplayPressure(this))
         TyrePressureUnit.PSI -> String.format("%.1f", psi.toDisplayPressure(this))
         TyrePressureUnit.KPA -> String.format("%.0f", psi.toDisplayPressure(this))
     }

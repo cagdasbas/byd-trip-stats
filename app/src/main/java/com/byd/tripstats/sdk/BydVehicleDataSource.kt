@@ -5137,8 +5137,9 @@ class BydVehicleDataSource(context: Context) {
 
     /**
      * Per-wheel tyre temperature from the DiLink-5 tyre listener (onTyreTemperatureValueChanged).
-     * Wheel index: 1=LF, 2=RF, 3=LR, 4=RR; **0 = sentinel/aggregate — ignore** (the getter returns
-     * that index-0 value regardless of area, which is why it read uniform/wrong on all wheels).
+     * Wheel index is 0-based: 0=LF, 1=RF, 2=LR, 3=RR (= getter area − 1). The polling getter
+     * getTyreTemperatureValue is area-blind (uniform value on all wheels) — real per-wheel temp is
+     * event-only. See applyDilink5TyreTemp for the on-car index confirmation.
      */
     /**
      * DiLink-5 HV pack voltage from the collectdata event (onMotorMCUGeneratrixVolt). Getters return
@@ -5185,12 +5186,16 @@ class BydVehicleDataSource(context: Context) {
 
     fun applyDilink5TyreTemp(wheel: Int, tempC: Int) {
         if (tempC !in -40..120) return
+        // Tyre EVENT wheel index is 0-based (= getter area − 1): 0=LF, 1=RF, 2=LR, 3=RR. Confirmed
+        // on-car 2026-07-12 by matching press-event kPa per index against the per-area byType getter
+        // (event 0≈LF pressure, 1≈RF, 2≈LR, 3≈RR). NOTE: earlier assumed 1-based with 0=sentinel —
+        // that was wrong; it dropped LF and shifted every wheel by one (RR never populated).
         when (wheel) {
-            1 -> _tyreTempLF.value = tempC
-            2 -> _tyreTempRF.value = tempC
-            3 -> _tyreTempLR.value = tempC
-            4 -> _tyreTempRR.value = tempC
-            else -> return   // 0 sentinel / out of range
+            0 -> _tyreTempLF.value = tempC
+            1 -> _tyreTempRF.value = tempC
+            2 -> _tyreTempLR.value = tempC
+            3 -> _tyreTempRR.value = tempC
+            else -> return   // out of range
         }
         publishSnapshot()
     }
