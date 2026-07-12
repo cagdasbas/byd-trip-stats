@@ -19,8 +19,9 @@ import android.hardware.bydauto.instrument.AbsBYDAutoInstrumentListener
  * — no compile dependency on their D5 types). All values are pushed into the shared snapshot via
  * BydVehicleDataSource.applyDilink5Telemetry(...) / applyDaemonTelemetry(...).
  *
- * Confirmed field map (see byd-apps DILINK5-PORT.md): soc, total-mileage, elec-range, usable-kWh,
- * SOH, charge-power are available; driving power has no direct getter → derived from Δ(usable kWh).
+ * Confirmed field map: soc, total-mileage, elec-range, usable-kWh, SOH, charge-power via the
+ * statistic listener; HV V/I, motor RPM/temp/torque via the collectdata events (real power = V·I);
+ * drive mode + ambient temp + 12V via the instrument/ac/ota devices.
  */
 class Dilink5Client {
     private val tag = "Dilink5Client"
@@ -35,14 +36,14 @@ class Dilink5Client {
     private var healthDev: Any? = null
     private var motorDev: Any? = null
     private var tyreDev: Any? = null
-    private var instrumentDev: Any? = null   // drive mode + ambient temp — TICKET-009
+    private var instrumentDev: Any? = null   // drive mode + ambient temp
     private var instrumentListener: Any? = null   // event-driven mode/ambient (D3 parity, no poll lag)
-    private var otaDev: Any? = null   // 12V aux voltage via getBatteryVoltage(0) — TICKET-017
-    private var acDev: Any? = null    // ambient temp via getTemprature(4=AC_TEMPERATURE_OUT) — TICKET-009
+    private var otaDev: Any? = null   // 12V aux voltage via getBatteryVoltage(0)
+    private var acDev: Any? = null    // ambient temp via getTemprature(4=AC_TEMPERATURE_OUT)
     private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
     private var collectDataDev: Any? = null
     private var collectDataListener: Any? = null
-    // Latest HV bus readings from collectdata events → real power = V·I (TICKET-016).
+    // Latest HV bus readings from collectdata events → real power = V·I.
     private var lastHvVolt: Int = 0
     private var lastHvCurrent: Int? = null
 
@@ -85,18 +86,18 @@ class Dilink5Client {
         motorDev    = bind(ctx, "android.hardware.bydauto.motor.BYDAutoMotorDevice")
         // Tyre: per-wheel pressure via getTyrePressureValueByType(area). Needs BYDAUTO_TYRE_COMMON.
         tyreDev     = bind(ctx, "android.hardware.bydauto.tyre.BYDAutoTyreDevice")
-        // Per-wheel tyre TEMPERATURE is event-only (getter returns an index-0 sentinel). Register a
-        // typed listener; wheel 1=LF/2=RF/3=LR/4=RR, 0=sentinel (dropped in applyDilink5TyreTemp).
+        // Per-wheel tyre TEMPERATURE: register a typed listener for the events (wheel index 0-based:
+        // 0=LF/1=RF/2=LR/3=RR); also polled via instrument.getWheelTemperature in pollOnce.
         tyreDev?.let { registerTyreListener(it, ds) }
         // collectdata: HV voltage/current + motor RPM via EVENTS (getters dead). Real power = V·I.
         collectDataDev = bind(ctx, "android.hardware.bydauto.collectdata.BYDAutoCollectDataDevice")
         collectDataDev?.let { registerCollectData(it, ds) }
-        // Instrument: drive mode + ambient temp (TICKET-009). Needs BYDAUTO_INSTRUMENT_COMMON
+        // Instrument: drive mode + ambient temp. Needs BYDAUTO_INSTRUMENT_COMMON
         // (already granted). Event-driven via the listener (instant, D3 parity); the slow-tick getters
         // are only an initial-value / missed-event backstop.
         instrumentDev = bind(ctx, "android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
         instrumentDev?.let { registerInstrumentListener(it, ds) }
-        // ota: 12V aux voltage. getBatteryVoltage(0) == 13 V on-car (TICKET-017); the no-arg
+        // ota: 12V aux voltage. getBatteryVoltage(0) == 13 V on-car; the no-arg
         // getBatteryPowerVoltage is dead (-1). Arg-indexed → polled on the slow tick.
         otaDev = bind(ctx, "android.hardware.bydauto.ota.BYDAutoOtaDevice")
         // ac: ambient/outside-air temp via getTemprature(4) (4 = AC_TEMPERATURE_OUT; SDK range
@@ -174,7 +175,7 @@ class Dilink5Client {
         }
         reflGetInt(healthDev, "getBatteryHealthStatus")?.takeIf { it in 50..110 }
             ?.let { ds.applyDilink5Telemetry(sohPct = it.toDouble()) }
-        // TICKET-003: per-wheel tyre PRESSURE via getTyrePressureValueByType(area) — area LF=1/RF=2/
+        // per-wheel tyre PRESSURE via getTyrePressureValueByType(area) — area LF=1/RF=2/
         // LR=3/RR=4, tenths of psi (respects area). Slow tick. TEMPERATURE is NOT polled: the getter
         // returns an index-0 sentinel (uniform/wrong) — real per-wheel temp comes from the tyre
         // listener (registerTyre → applyDilink5TyreTemp).
@@ -186,17 +187,17 @@ class Dilink5Client {
                 reflGetIntArg(t, "getTyrePressureState", 3), reflGetIntArg(t, "getTyrePressureState", 4),
             )
         }
-        // TICKET-009: drive mode + ambient temp. Primary path is the instrument LISTENER (instant);
+        // drive mode + ambient temp. Primary path is the instrument LISTENER (instant);
         // these getters are just an initial-value / missed-event backstop. getSportModeState raw ==
         // app canonical (1=Eco/2=Sport/3=Normal/4=Snow); getOutCarTemperature is plain °C.
         reflGetInt(instrumentDev, "getSportModeState")?.let { ds.applyDilink5DriveMode(it) }
         reflGetInt(instrumentDev, "getOutCarTemperature")?.let { ds.applyDilink5AmbientTemp(it) }
-        // TICKET-017: 12V aux voltage via ota.getBatteryVoltage(0) (arg-indexed; confirmed 13 V).
+        // 12V aux voltage via ota.getBatteryVoltage(0) (arg-indexed; confirmed 13 V).
         reflGetIntArg(otaDev, "getBatteryVoltage", 0)?.let { ds.applyDilink5AuxVoltage(it) }
-        // TICKET-009: ambient temp via ac.getTemprature(4=AC_TEMPERATURE_OUT). instrument getter is
+        // ambient temp via ac.getTemprature(4=AC_TEMPERATURE_OUT). instrument getter is
         // dead; this arg-indexed AC getter is the live source (its event still updates it too).
         reflGetIntArg(acDev, "getTemprature", 4)?.let { ds.applyDilink5AmbientTemp(it) }
-        // TICKET-003: per-wheel tyre TEMP via instrument.getWheelTemperature(int) — a POLLABLE source
+        // per-wheel tyre TEMP via instrument.getWheelTemperature(int) — a POLLABLE source
         // (0-based 0=LF..3=RR, matching the tyre event index). Complements the sparse tyre-temp events.
         // Returns 0 when the TPMS sensors sleep (parked); applyDilink5TyreTemp drops 0 so the last
         // known temp is retained rather than blanked.
@@ -242,7 +243,7 @@ class Dilink5Client {
     }
 
     // collectdata typed listener — HV bus V/I + motor RPM (event-only; getters dead). All callbacks
-    // are (int a, int b) where b = value, a = a constant signal tag (ignored). TICKET-016.
+    // are (int a, int b) where b = value, a = a constant signal tag (ignored).
     private fun registerCollectData(dev: Any, ds: BydVehicleDataSource) {
         try {
             val l = object : AbsBYDAutoCollectDataListener() {
@@ -267,7 +268,7 @@ class Dilink5Client {
 
     // Instrument typed listener — drive mode + ambient temp via EVENTS (instant, matches the D3
     // gearbox-listener approach; no 30 s poll lag). getSportModeState raw == app canonical; ambient
-    // is plain °C. TICKET-009.
+    // is plain °C.
     private fun registerInstrumentListener(dev: Any, ds: BydVehicleDataSource) {
         try {
             val l = object : AbsBYDAutoInstrumentListener() {

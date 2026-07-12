@@ -113,7 +113,7 @@ class AbrpConnectionManager(context: Context) {
         payload.put("odometer", telemetry.odometer)
         // Car's OEM estimated remaining range (statisticElecDrivingRangeValue, confirmed accurate
         // vs the cluster). Without this ABRP keeps showing the last range from another source
-        // (e.g. a removed Enode link), so send it whenever valid. See byd-apps TICKET-007.
+        // (e.g. a removed Enode link), so send it whenever valid.
         telemetry.electricDrivingRangeKm.takeIf { it > 0 }?.let { payload.put("est_battery_range", it) }
         telemetry.soh.takeIf { it > 0 }?.let { payload.put("soh", it) }
         val capacity = carConfig?.batteryKwh?.takeIf { it > 0.0 }

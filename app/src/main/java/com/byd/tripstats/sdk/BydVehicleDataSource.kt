@@ -5102,7 +5102,7 @@ class BydVehicleDataSource(context: Context) {
     }
 
     /**
-     * DiLink-5 tyre data (TICKET-003). Source: BYDAutoTyreDevice.getTyrePressureValueByType(area)
+     * DiLink-5 tyre data. Source: BYDAutoTyreDevice.getTyrePressureValueByType(area)
      * for area LF=1/RF=2/LR=3/RR=4. Confirmed on-car: that getter returns the per-wheel pressure in
      * TENTHS OF PSI (e.g. 401 → 40.1 psi → 2.77 bar; rear > front, matching the Sealion 7 spec). The
      * plain getTyrePressureValue ignores the area arg, so we use ByType. Temps are direct °C; state
@@ -5143,7 +5143,7 @@ class BydVehicleDataSource(context: Context) {
      */
     /**
      * DiLink-5 HV pack voltage from the collectdata event (onMotorMCUGeneratrixVolt). Getters return
-     * -1/dead; this is the real measured pack voltage (≈450–480 V). TICKET-016.
+     * -1/dead; this is the real measured pack voltage (≈450–480 V).
      */
     fun applyDilink5HvVoltage(volts: Int) {
         if (volts !in 100..1000) return
@@ -5154,7 +5154,7 @@ class BydVehicleDataSource(context: Context) {
         publishSnapshot()
     }
 
-    // TICKET-009: DiLink-5 drive mode from instrument.getSportModeState. Its raw value matches the
+    // DiLink-5 drive mode from instrument.getSportModeState. Its raw value matches the
     // app's canonical driveMode encoding directly (1=Eco 2=Sport 3=Normal 4=Snow; 5=Mud 6=Sand),
     // confirmed on-car 2026-07-12 — no remap needed. Treated as a strong/confirmed source.
     fun applyDilink5DriveMode(raw: Int) {
@@ -5163,10 +5163,10 @@ class BydVehicleDataSource(context: Context) {
         publishSnapshot()
     }
 
-    // TICKET-009 follow-up: ambient / outside-air temperature from instrument.getOutCarTemperature
+    // Follow-up: ambient / outside-air temperature from instrument.getOutCarTemperature
     // (or its event). Written to the snapshot directly because publishSnapshot preserves
     // instrumentOutCarTemperature from the snapshot itself (not a StateFlow).
-    // TICKET-017: 12V aux battery voltage from ota.getBatteryVoltage(0) (confirmed on-car = 13 V).
+    // 12V aux battery voltage from ota.getBatteryVoltage(0) (confirmed on-car = 13 V).
     // publishSnapshot reads _battery12vVoltage first, so write the StateFlow (+ snapshot for parity).
     fun applyDilink5AuxVoltage(volts: Int) {
         if (volts !in 6..17) return   // SDK BATTERY_VOLTAGE range; drops the -1 sentinel
