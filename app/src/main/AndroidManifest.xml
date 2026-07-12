@@ -42,6 +42,7 @@
     <uses-permission android:name="android.permission.BYDAUTO_ENERGY_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_INSTRUMENT_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_INSTRUMENT_COMMON" />
+    <uses-permission android:name="android.permission.BYDAUTO_AC_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_AC_COMMON" />
     <uses-permission android:name="android.permission.BYDAUTO_CHARGING_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_BIGDATA_GET" />
