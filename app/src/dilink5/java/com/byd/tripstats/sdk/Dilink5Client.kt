@@ -196,6 +196,13 @@ class Dilink5Client {
         // TICKET-009: ambient temp via ac.getTemprature(4=AC_TEMPERATURE_OUT). instrument getter is
         // dead; this arg-indexed AC getter is the live source (its event still updates it too).
         reflGetIntArg(acDev, "getTemprature", 4)?.let { ds.applyDilink5AmbientTemp(it) }
+        // TICKET-003: per-wheel tyre TEMP via instrument.getWheelTemperature(int) — a POLLABLE source
+        // (0-based 0=LF..3=RR, matching the tyre event index). Complements the sparse tyre-temp events.
+        // Returns 0 when the TPMS sensors sleep (parked); applyDilink5TyreTemp drops 0 so the last
+        // known temp is retained rather than blanked.
+        instrumentDev?.let { d ->
+            for (w in 0..3) reflGetIntArg(d, "getWheelTemperature", w)?.let { ds.applyDilink5TyreTemp(w, it) }
+        }
     }
 
     // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.

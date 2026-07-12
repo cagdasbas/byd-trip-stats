@@ -5185,7 +5185,10 @@ class BydVehicleDataSource(context: Context) {
     }
 
     fun applyDilink5TyreTemp(wheel: Int, tempC: Int) {
-        if (tempC !in -40..120) return
+        // Drop 0/out-of-range: 0 is the sleep/no-data sentinel (TPMS temp sensors sleep when parked;
+        // getWheelTemperature and the events both return 0 then). Dropping it keeps the last real
+        // temp on screen instead of blanking each wheel back to "no data".
+        if (tempC <= 0 || tempC > 120) return
         // Tyre EVENT wheel index is 0-based (= getter area − 1): 0=LF, 1=RF, 2=LR, 3=RR. Confirmed
         // on-car 2026-07-12 by matching press-event kPa per index against the per-area byType getter
         // (event 0≈LF pressure, 1≈RF, 2≈LR, 3≈RR). NOTE: earlier assumed 1-based with 0=sentinel —
