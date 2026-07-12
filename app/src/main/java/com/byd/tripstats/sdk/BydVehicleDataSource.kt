@@ -5162,6 +5162,15 @@ class BydVehicleDataSource(context: Context) {
         publishSnapshot()
     }
 
+    // TICKET-009 follow-up: ambient / outside-air temperature from instrument.getOutCarTemperature
+    // (or its event). Written to the snapshot directly because publishSnapshot preserves
+    // instrumentOutCarTemperature from the snapshot itself (not a StateFlow).
+    fun applyDilink5AmbientTemp(tempC: Int) {
+        if (tempC !in -50..60) return   // plausible outside-air range; drop sensor sentinels
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = tempC)
+        publishSnapshot()
+    }
+
     fun applyDilink5TyreTemp(wheel: Int, tempC: Int) {
         if (tempC !in -40..120) return
         when (wheel) {

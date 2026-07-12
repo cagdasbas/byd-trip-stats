@@ -7,6 +7,7 @@ import android.hardware.bydauto.statistic.AbsBYDAutoStatisticListener
 import android.hardware.bydauto.statistic.BYDAutoStatisticDevice
 import android.hardware.bydauto.tyre.AbsBYDAutoTyreListener
 import android.hardware.bydauto.collectdata.AbsBYDAutoCollectDataListener
+import android.hardware.bydauto.instrument.AbsBYDAutoInstrumentListener
 
 /**
  * DiLink-5 (Sealion 7) telemetry client — present ONLY in the `dilink5` flavor; loaded reflectively
@@ -34,7 +35,8 @@ class Dilink5Client {
     private var healthDev: Any? = null
     private var motorDev: Any? = null
     private var tyreDev: Any? = null
-    private var instrumentDev: Any? = null   // drive mode (getSportModeState) — TICKET-009
+    private var instrumentDev: Any? = null   // drive mode + ambient temp — TICKET-009
+    private var instrumentListener: Any? = null   // event-driven mode/ambient (D3 parity, no poll lag)
     private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
     private var collectDataDev: Any? = null
     private var collectDataListener: Any? = null
@@ -87,9 +89,11 @@ class Dilink5Client {
         // collectdata: HV voltage/current + motor RPM via EVENTS (getters dead). Real power = V·I.
         collectDataDev = bind(ctx, "android.hardware.bydauto.collectdata.BYDAutoCollectDataDevice")
         collectDataDev?.let { registerCollectData(it, ds) }
-        // Instrument: drive mode via getSportModeState (raw == app canonical, TICKET-009). Needs
-        // BYDAUTO_INSTRUMENT_COMMON (already granted). Polled on the slow tick.
+        // Instrument: drive mode + ambient temp (TICKET-009). Needs BYDAUTO_INSTRUMENT_COMMON
+        // (already granted). Event-driven via the listener (instant, D3 parity); the slow-tick getters
+        // are only an initial-value / missed-event backstop.
         instrumentDev = bind(ctx, "android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
+        instrumentDev?.let { registerInstrumentListener(it, ds) }
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -132,7 +136,8 @@ class Dilink5Client {
         try { tyreListener?.let { l -> tyreDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoTyreListener::class.java)?.invoke(tyreDev, l) } } catch (_: Throwable) {}
         // NOTE: collectdata uses "unRegisterListener" (capital R), unlike the others.
         try { collectDataListener?.let { l -> collectDataDev?.javaClass?.getMethod("unRegisterListener", AbsBYDAutoCollectDataListener::class.java)?.invoke(collectDataDev, l) } } catch (_: Throwable) {}
-        tyreListener = null; collectDataListener = null
+        try { instrumentListener?.let { l -> instrumentDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoInstrumentListener::class.java)?.invoke(instrumentDev, l) } } catch (_: Throwable) {}
+        tyreListener = null; collectDataListener = null; instrumentListener = null
         chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null
         Log.i(tag, "stopped")
     }
@@ -173,9 +178,11 @@ class Dilink5Client {
                 reflGetIntArg(t, "getTyrePressureState", 3), reflGetIntArg(t, "getTyrePressureState", 4),
             )
         }
-        // TICKET-009: drive mode. getSportModeState raw == app canonical (1=Eco/2=Sport/3=Normal/
-        // 4=Snow); applyDilink5DriveMode validates 1..6 and ignores anything else.
+        // TICKET-009: drive mode + ambient temp. Primary path is the instrument LISTENER (instant);
+        // these getters are just an initial-value / missed-event backstop. getSportModeState raw ==
+        // app canonical (1=Eco/2=Sport/3=Normal/4=Snow); getOutCarTemperature is plain °C.
         reflGetInt(instrumentDev, "getSportModeState")?.let { ds.applyDilink5DriveMode(it) }
+        reflGetInt(instrumentDev, "getOutCarTemperature")?.let { ds.applyDilink5AmbientTemp(it) }
     }
 
     // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.
@@ -235,6 +242,24 @@ class Dilink5Client {
         } catch (t: Throwable) {
             val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
             Log.w(tag, "collectdata listener failed: ${c.javaClass.simpleName}: ${c.message}")
+        }
+    }
+
+    // Instrument typed listener — drive mode + ambient temp via EVENTS (instant, matches the D3
+    // gearbox-listener approach; no 30 s poll lag). getSportModeState raw == app canonical; ambient
+    // is plain °C. TICKET-009.
+    private fun registerInstrumentListener(dev: Any, ds: BydVehicleDataSource) {
+        try {
+            val l = object : AbsBYDAutoInstrumentListener() {
+                override fun onSportModeStateChanged(state: Int) { ds.applyDilink5DriveMode(state) }
+                override fun onOutCarTemperatureChanged(tempC: Int) { ds.applyDilink5AmbientTemp(tempC) }
+            }
+            dev.javaClass.getMethod("registerListener", AbsBYDAutoInstrumentListener::class.java).invoke(dev, l)
+            instrumentListener = l
+            Log.i(tag, "instrument listener registered")
+        } catch (t: Throwable) {
+            val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
+            Log.w(tag, "instrument listener failed: ${c.javaClass.simpleName}: ${c.message}")
         }
     }
 
