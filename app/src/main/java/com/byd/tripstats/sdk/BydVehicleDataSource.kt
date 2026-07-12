@@ -5175,7 +5175,10 @@ class BydVehicleDataSource(context: Context) {
     }
 
     fun applyDilink5AmbientTemp(tempC: Int) {
-        if (tempC !in -50..60) return   // plausible outside-air range; drop sensor sentinels
+        // 0 = the AC getter's no-data sentinel (ac.getTemprature(4) reads real outside temp only while
+        // the climate system is powered; returns 0 otherwise). Drop it so the UI shows "—" not "0°C".
+        // Real 0 °C is indistinguishable here, but a false 0 in warm weather is the worse failure.
+        if (tempC == 0 || tempC !in -50..60) return   // range guard also drops the 255 sentinel
         _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = tempC)
         publishSnapshot()
     }

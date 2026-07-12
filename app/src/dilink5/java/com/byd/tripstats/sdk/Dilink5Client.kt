@@ -195,7 +195,9 @@ class Dilink5Client {
         reflGetIntArg(otaDev, "getBatteryVoltage", 0)?.let { ds.applyDilink5AuxVoltage(it) }
         // TICKET-009: ambient temp via ac.getTemprature(4=AC_TEMPERATURE_OUT). instrument getter is
         // dead; this arg-indexed AC getter is the live source (its event still updates it too).
-        reflGetIntArg(acDev, "getTemprature", 4)?.let { ds.applyDilink5AmbientTemp(it) }
+        val ambientRaw = reflGetIntArg(acDev, "getTemprature", 4)
+        Log.w(tag, "DIAG ambient getTemprature(4)=$ambientRaw acDev=${acDev != null}")
+        ambientRaw?.let { ds.applyDilink5AmbientTemp(it) }
     }
 
     // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.
