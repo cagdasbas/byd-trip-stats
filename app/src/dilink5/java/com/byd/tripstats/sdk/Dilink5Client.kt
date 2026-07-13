@@ -40,7 +40,6 @@ class Dilink5Client {
     private var instrumentListener: Any? = null   // event-driven mode/ambient (D3 parity, no poll lag)
     private var otaDev: Any? = null   // 12V aux voltage via getBatteryVoltage(0)
     private var acDev: Any? = null    // ambient temp via getTemprature(4=AC_TEMPERATURE_OUT)
-    private var bodyworkDev: Any? = null   // VIN via getRealAutoVIN (entitlement/Pro device id)
     private var tyreListener: Any? = null   // typed tyre listener (per-wheel temp events)
     private var collectDataDev: Any? = null
     private var collectDataListener: Any? = null
@@ -104,10 +103,6 @@ class Dilink5Client {
         // ac: ambient/outside-air temp via getTemprature(4) (4 = AC_TEMPERATURE_OUT; SDK range
         // -40..50 °C). The instrument getOutCarTemperature getter is dead; this is the live source.
         acDev = bind(ctx, "android.hardware.bydauto.ac.BYDAutoAcDevice")
-        // bodywork: VIN for the entitlement/Pro device id. queryAutoVIN() primes the async read;
-        // getRealAutoVIN() is then polled on the slow tick. Needs BYDAUTO_BODYWORK_COMMON.
-        bodyworkDev = bind(ctx, "android.hardware.bydauto.bodywork.BYDAutoBodyworkDevice")
-        bodyworkDev?.let { runCatching { it.javaClass.getMethod("queryAutoVIN").invoke(it) } }
 
         // 3) adaptive poll — fast ONLY while driving / DC-charging; backs off to 30s when parked so
         //    we don't wake the head unit at 1 Hz on a parked car (the statistic LISTENER still pushes
@@ -152,7 +147,7 @@ class Dilink5Client {
         try { collectDataListener?.let { l -> collectDataDev?.javaClass?.getMethod("unRegisterListener", AbsBYDAutoCollectDataListener::class.java)?.invoke(collectDataDev, l) } } catch (_: Throwable) {}
         try { instrumentListener?.let { l -> instrumentDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoInstrumentListener::class.java)?.invoke(instrumentDev, l) } } catch (_: Throwable) {}
         tyreListener = null; collectDataListener = null; instrumentListener = null
-        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null; otaDev = null; acDev = null; bodyworkDev = null
+        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null; otaDev = null; acDev = null
         Log.i(tag, "stopped")
     }
 
@@ -209,9 +204,9 @@ class Dilink5Client {
         instrumentDev?.let { d ->
             for (w in 0..3) reflGetIntArg(d, "getWheelTemperature", w)?.let { ds.applyDilink5TyreTemp(w, it) }
         }
-        // VIN for the entitlement/Pro device id (bodywork). Prefer the real VIN getter.
-        (reflGetString(bodyworkDev, "getRealAutoVIN") ?: reflGetString(bodyworkDev, "getAutoVIN"))
-            ?.let { ds.applyDilink5Vin(it) }
+        // T-Box serial (ota) — the non-PII license device id. Reads with OTA_GET alone (ota device
+        // already bound for 12V). The VIN is intentionally NOT read on DiLink-5 (privacy).
+        reflGetString(otaDev, "getTBoxSerialNumber")?.let { ds.applyDilink5TboxSerial(it) }
     }
 
     // Derived driving power: -Δ(usable kWh)/Δt, EMA-smoothed; pushed only while discharging.

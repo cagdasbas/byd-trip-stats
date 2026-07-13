@@ -190,6 +190,7 @@ data class VehicleTelemetrySnapshot(
     val bodyworkBatteryVoltageLevel: Int? = null,
     val bodyworkPowerLevel: Int? = null,
     val bodyworkAutoVin: String? = null,
+    val tboxSerialNumber: String? = null,   // non-PII license device id (DiLink-5), replaces VIN
     val powerBatteryRemainPowerEV: Double? = null,
     val powerMcuStatus: Int? = null,
     val sensorTemperatureValue: Double? = null,
@@ -514,6 +515,7 @@ data class VehicleTelemetrySnapshot(
             bodyworkBatteryVoltageLevel = bodyworkBatteryVoltageLevel,
             bodyworkPowerLevel = bodyworkPowerLevel,
             bodyworkAutoVin = bodyworkAutoVin,
+            tboxSerialNumber = tboxSerialNumber,
             powerBatteryRemainPowerEV = powerBatteryRemainPowerEV,
             sensorTemperatureValue = sensorTemperatureValue,
             statisticBatteryCurrent = statisticBatteryCurrent,
@@ -5157,13 +5159,13 @@ class BydVehicleDataSource(context: Context) {
     }
 
     /**
-     * DiLink-5 vehicle VIN from the bodywork device (getRealAutoVIN). Populates bodyworkAutoVin so the
-     * entitlement/Pro flow can key on it (VehicleTelemetryService → EntitlementManager.onDeviceIdObserved).
+     * DiLink-5 T-Box serial number (ota.getTBoxSerialNumber) — the non-PII license device id used
+     * instead of the VIN. Fed to EntitlementManager via VehicleTelemetryService.
      */
-    fun applyDilink5Vin(vin: String) {
-        val v = vin.trim()
-        if (v.length !in 8..32 || v.equals(_vehicleSnapshot.value.bodyworkAutoVin, ignoreCase = true)) return
-        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(bodyworkAutoVin = v)
+    fun applyDilink5TboxSerial(serial: String) {
+        val s = serial.trim()
+        if (s.length !in 4..64 || s.equals(_vehicleSnapshot.value.tboxSerialNumber, ignoreCase = true)) return
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(tboxSerialNumber = s)
         publishSnapshot()
     }
 

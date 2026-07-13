@@ -98,6 +98,7 @@ data class VehicleTelemetry(
         @SerialName("bodywork_battery_voltage_level") val bodyworkBatteryVoltageLevel: Int? = null,
         @SerialName("bodywork_power_level") val bodyworkPowerLevel: Int? = null,
         @SerialName("bodywork_auto_vin") val bodyworkAutoVin: String? = null,
+        @SerialName("tbox_serial_number") val tboxSerialNumber: String? = null,
         @SerialName("power_battery_remain_power_ev") val powerBatteryRemainPowerEV: Double? = null,
         @SerialName("sensor_temperature_value") val sensorTemperatureValue: Double? = null,
         // ── PHEV engine/fuel fields (null on pure BEV) ─────────────────────────────
