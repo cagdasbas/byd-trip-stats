@@ -834,7 +834,10 @@ internal fun AppPreferencesTab(
                                 AdbPermissionManager.setHiddenApiConsent(context, on)
                                 AdbPermissionManager.markHiddenApiPrompted(context)
                                 if (on) scope.launch {
-                                    AdbPermissionManager.ensureVehicleApiAccess(context)
+                                    // Apply the exemption, then restart so the SDK binds on a fresh
+                                    // fork (same fork-latch as the first-run consent dialog).
+                                    val applied = AdbPermissionManager.ensureVehicleApiAccess(context)
+                                    if (applied) AdbPermissionManager.restartApp(context)
                                 }
                             }
                         )

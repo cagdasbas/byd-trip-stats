@@ -166,7 +166,12 @@ class MainActivity : ComponentActivity() {
                                     AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
                                     showHiddenApiConsent.value = false
                                     lifecycleScope.launch {
-                                        AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+                                        // Apply the exemption, then restart our own process: the
+                                        // hidden-API enforcement is latched at process fork, so the
+                                        // SDK only binds after a fresh start (else the user must
+                                        // manually force-stop + reopen).
+                                        val applied = AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+                                        if (applied) restartAppProcess()
                                     }
                                 }) { Text(stringResource(R.string.d5_consent_allow)) }
                             },
@@ -361,6 +366,14 @@ class MainActivity : ComponentActivity() {
             AdbPermissionManager.runSetup(this@MainActivity)
         }
     }
+
+    /**
+     * Restart our own process. The DiLink-5 hidden-API exemption is captured at process fork, so the
+     * bydauto SDK only binds after a fresh start. Schedule a relaunch of the launcher activity a moment
+     * out, then hard-exit so the process re-forks with the exemption in effect. Safe to call after the
+     * consent is persisted — the consent dialog won't re-show, so there's no restart loop.
+     */
+    private fun restartAppProcess() = AdbPermissionManager.restartApp(this)
 
     override fun onStart() {
         super.onStart()

@@ -5157,6 +5157,17 @@ class BydVehicleDataSource(context: Context) {
     }
 
     /**
+     * DiLink-5 vehicle VIN from the bodywork device (getRealAutoVIN). Populates bodyworkAutoVin so the
+     * entitlement/Pro flow can key on it (VehicleTelemetryService → EntitlementManager.onDeviceIdObserved).
+     */
+    fun applyDilink5Vin(vin: String) {
+        val v = vin.trim()
+        if (v.length !in 8..32 || v.equals(_vehicleSnapshot.value.bodyworkAutoVin, ignoreCase = true)) return
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(bodyworkAutoVin = v)
+        publishSnapshot()
+    }
+
+    /**
      * DiLink-5 HV pack current from the collectdata event (onMotorMCUGeneratrixCurrent). Signed amps:
      * positive = discharge, negative = regen/charging. Written to the snapshot directly (publishSnapshot
      * preserves unlisted snapshot fields).

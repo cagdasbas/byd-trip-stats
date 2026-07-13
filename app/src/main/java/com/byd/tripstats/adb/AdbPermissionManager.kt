@@ -76,6 +76,7 @@ object AdbPermissionManager {
         "android.permission.BYDAUTO_INSTRUMENT_COMMON",
         "android.permission.BYDAUTO_TYRE_COMMON",
         "android.permission.BYDAUTO_AC_COMMON",
+        "android.permission.BYDAUTO_BODYWORK_COMMON",
     )
 
     sealed class SetupState {
@@ -94,6 +95,25 @@ object AdbPermissionManager {
 
     private val _state = MutableStateFlow<SetupState>(SetupState.Idle)
     val state: StateFlow<SetupState> = _state.asStateFlow()
+
+    /**
+     * Restart the app's own process. The DiLink-5 hidden-API exemption is captured at process fork,
+     * so the bydauto SDK only binds after a fresh start — call this once the exemption is applied
+     * (e.g. right after the user grants consent) so telemetry starts without a manual force-stop.
+     * Schedules a relaunch of the launcher activity a moment out, then hard-exits.
+     */
+    fun restartApp(context: Context) {
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        } ?: return
+        val pending = android.app.PendingIntent.getActivity(
+            context, 0, launch,
+            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_CANCEL_CURRENT
+        )
+        context.getSystemService(android.app.AlarmManager::class.java)
+            ?.set(android.app.AlarmManager.RTC, System.currentTimeMillis() + 400L, pending)
+        Runtime.getRuntime().exit(0)
+    }
 
     // ── Hidden-API exemption consent (opt-in) ────────────────────────────────────
     /** Whether the user has agreed to let us relax the head-unit's global hidden-API setting. */
