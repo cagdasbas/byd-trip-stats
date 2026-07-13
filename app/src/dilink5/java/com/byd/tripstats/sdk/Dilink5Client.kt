@@ -251,7 +251,7 @@ class Dilink5Client {
                     if (b in 100..1000) { lastHvVolt = b; ds.applyDilink5HvVoltage(b); pushPower(ds) }
                 }
                 override fun onMotorMCUGeneratrixCurrent(a: Int, b: Int) {
-                    if (b in -2000..2000) { lastHvCurrent = b; pushPower(ds) }  // signed A (regen negative)
+                    if (b in -2000..2000) { lastHvCurrent = b; ds.applyDilink5HvCurrent(b); pushPower(ds) }  // signed A (regen negative)
                 }
                 override fun onDriverMotorSpeed(a: Int, b: Int) {
                     if (b in 0..30_000) ds.applyDaemonTelemetry(speedKmh = null, gear = null, powerKw = null, rearRpm = b)

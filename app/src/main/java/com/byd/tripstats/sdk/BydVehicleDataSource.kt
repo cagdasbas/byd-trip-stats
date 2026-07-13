@@ -215,6 +215,7 @@ data class VehicleTelemetrySnapshot(
     // ── Battery device fields ───────────────────────────────────────────────────
     val batterySoh: Int? = null,
     val batteryTotalVoltage: Int? = null,
+    val batteryTotalCurrent: Double? = null,
     val battery12vVoltage: Double? = null,
     val batteryPackTemp: Double? = null,
     val batteryCellTempMax: Int? = null,
@@ -466,6 +467,7 @@ data class VehicleTelemetrySnapshot(
             wifiSsid = wifiSsid,
             // Derive HV from live cell voltage × cell count if Battery Device is silent
             batteryTotalVoltage = inferredPackVoltage ?: 0,
+            batteryTotalCurrent = batteryTotalCurrent,
             electricDrivingRangeKm = statisticElecDrivingRangeValue ?: 0,
             // Prefer the direct power-state source when it exists; keep MCU status as a fallback only.
             carOn = derivedCarOn,
@@ -5151,6 +5153,17 @@ class BydVehicleDataSource(context: Context) {
         // snapshot (not the _batteryTotalVoltage StateFlow), so a StateFlow write wouldn't surface.
         _vehicleSnapshot.value = _vehicleSnapshot.value.copy(batteryTotalVoltage = volts)
         _batteryTotalVoltage.value = volts   // keep the flow in sync for other readers
+        publishSnapshot()
+    }
+
+    /**
+     * DiLink-5 HV pack current from the collectdata event (onMotorMCUGeneratrixCurrent). Signed amps:
+     * positive = discharge, negative = regen/charging. Written to the snapshot directly (publishSnapshot
+     * preserves unlisted snapshot fields).
+     */
+    fun applyDilink5HvCurrent(amps: Int) {
+        if (amps !in -2000..2000) return
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(batteryTotalCurrent = amps.toDouble())
         publishSnapshot()
     }
 
