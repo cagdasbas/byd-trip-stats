@@ -76,6 +76,7 @@ object AdbPermissionManager {
         "android.permission.BYDAUTO_INSTRUMENT_COMMON",
         "android.permission.BYDAUTO_TYRE_COMMON",
         "android.permission.BYDAUTO_AC_COMMON",
+        "android.permission.BYDAUTO_OTA_COMMON",   // getTBoxSerialNumber (license device id) is COMMON-gated
     )
 
     sealed class SetupState {

@@ -204,8 +204,8 @@ class Dilink5Client {
         instrumentDev?.let { d ->
             for (w in 0..3) reflGetIntArg(d, "getWheelTemperature", w)?.let { ds.applyDilink5TyreTemp(w, it) }
         }
-        // T-Box serial (ota) — the non-PII license device id. Reads with OTA_GET alone (ota device
-        // already bound for 12V). The VIN is intentionally NOT read on DiLink-5 (privacy).
+        // T-Box serial (ota) — hashed into the non-PII license device id (raw serial never persists).
+        // The VIN is intentionally NOT read on DiLink-5 (privacy).
         reflGetString(otaDev, "getTBoxSerialNumber")?.let { ds.applyDilink5TboxSerial(it) }
     }
 

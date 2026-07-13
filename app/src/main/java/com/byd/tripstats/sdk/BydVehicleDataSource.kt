@@ -5159,8 +5159,9 @@ class BydVehicleDataSource(context: Context) {
     }
 
     /**
-     * DiLink-5 T-Box serial number (ota.getTBoxSerialNumber) — the non-PII license device id used
-     * instead of the VIN. Fed to EntitlementManager via VehicleTelemetryService.
+     * DiLink-5 license device id = the T-Box serial (ota.getTBoxSerialNumber), used raw exactly like
+     * DiLink-3 uses the raw VIN: fed to EntitlementManager, which normalize()s it (lowercase/trim);
+     * the HMAC lives only in ProLicenseBridge for the code, not the id itself. No app-side hashing.
      */
     fun applyDilink5TboxSerial(serial: String) {
         val s = serial.trim()
@@ -5415,6 +5416,7 @@ class BydVehicleDataSource(context: Context) {
             bodyworkBatteryVoltageLevel = _vehicleSnapshot.value.bodyworkBatteryVoltageLevel,
             bodyworkPowerLevel = _vehicleSnapshot.value.bodyworkPowerLevel,
             bodyworkAutoVin = _vehicleSnapshot.value.bodyworkAutoVin,
+            tboxSerialNumber = _vehicleSnapshot.value.tboxSerialNumber,
             powerBatteryRemainPowerEV = _vehicleSnapshot.value.powerBatteryRemainPowerEV,
             sensorTemperatureValue = _vehicleSnapshot.value.sensorTemperatureValue,
             cabinTemperature = _vehicleSnapshot.value.cabinTemperature,
@@ -5437,6 +5439,7 @@ class BydVehicleDataSource(context: Context) {
             engineSpeedRear = _vehicleSnapshot.value.engineSpeedRear,
             batterySoh = _vehicleSnapshot.value.batterySoh,
             batteryTotalVoltage = _vehicleSnapshot.value.batteryTotalVoltage,
+            batteryTotalCurrent = _vehicleSnapshot.value.batteryTotalCurrent,
             battery12vVoltage = _battery12vVoltage.value
                 ?: _vehicleSnapshot.value.battery12vVoltage,
             batteryPackTemp = validatePackTemp(_vehicleSnapshot.value.batteryPackTemp),

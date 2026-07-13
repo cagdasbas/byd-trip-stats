@@ -56,6 +56,7 @@
     <uses-permission android:name="android.permission.BYDAUTO_LIGHT_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_ENGINE_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_OTA_GET" />
+    <uses-permission android:name="android.permission.BYDAUTO_OTA_COMMON" />
     <uses-permission android:name="android.permission.BYDAUTO_DTC_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_TYRE_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_TYRE_COMMON" />
