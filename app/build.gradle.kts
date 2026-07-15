@@ -69,11 +69,12 @@ android {
 
     // ── SDK flavor split (DiLink-3 vs DiLink-5) ──────────────────────────────────
     // One APK cannot serve both: bydauto SDK signatures drift (getTotalMileageValue is int on
-    // D3, float on D5) and on D5 the classes are NOT on the boot classpath (must be bundled).
+    // D3, float on D5) and on D5 the classes are NOT on the boot classpath.
     //   dilink3 — current behavior, DEFAULT. Thin bydauto stubs in src/dilink3/ are shadowed at
     //             runtime by the D3 boot-classpath classes (as before).
-    //   dilink5 — bundles the REAL DiLink-5 bydauto SDK (libs/dilink5-sdk.jar, gitignored OEM
-    //             artifact; generate via tools/make-dilink5-sdk-jar.sh). D5 code in src/dilink5/.
+    //   dilink5 — resolves the REAL DiLink-5 bydauto SDK at runtime via Dilink5SdkInjector
+    //             (injects the already-installed com.byd.data.collect apk into this app's own
+    //             classloader — no OEM binary ever bundled). D5 code in src/dilink5/.
     // NOTE: flavors rename tasks: assembleRelease -> assembleDilink3Release / assembleDilink5Release.
     flavorDimensions += "sdk"
     productFlavors {
@@ -220,24 +221,14 @@ val bydautoStubsJar = tasks.register<Jar>("bydautoStubsJar") {
 }
 
 dependencies {
-    // DiLink-5 flavor SDK wiring:
-    //  - COMPILE against the thin bydauto stubs (D3 signatures) so the shared src/main compiles
-    //    identically to dilink3 (the D3-shaped listener overrides simply won't fire on D5; the
-    //    real D5 data path is added separately in src/dilink5). Stubs are built from source by the
-    //    bydautoStubsJar task above — no committed jar.
-    //  - RUNTIME bundle the REAL DiLink-5 bydauto classes (libs/dilink5-sdk.jar, gitignored OEM;
-    //    generate via tools/make-dilink5-sdk-jar.sh). runtimeOnly => in the dex, not on the
-    //    compile classpath (avoids the double/float signature clash + duplicate classes).
+    // DiLink-5 flavor SDK wiring: COMPILE against the thin bydauto stubs (D3 signatures) so the
+    // shared src/main compiles identically to dilink3 (the D3-shaped listener overrides simply
+    // won't fire on D5; the real D5 data path is added separately in src/dilink5). Stubs are built
+    // from source by the bydautoStubsJar task above — no committed jar. There is no runtimeOnly
+    // OEM dependency: the real classes are resolved at RUNTIME by Dilink5SdkInjector, which injects
+    // the already-installed com.byd.data.collect apk into the app's own classloader (see
+    // BydVehicleDataSource.start()). Nothing OEM is ever bundled into the APK.
     "dilink5CompileOnly"(files(bydautoStubsJar.flatMap { it.archiveFile }))
-    // Real OEM SDK is gitignored (not redistributable). Add it to the runtime dex only when present,
-    // so CI can still assemble the dilink5 flavor from source alone. A dev/release build regenerates
-    // the jar (tools/make-dilink5-sdk-jar.sh) and gets the real classes bundled; a CI build without it
-    // produces a compile-verified APK whose bydauto classes are supplied by the platform at runtime.
-    if (file("libs/dilink5-sdk.jar").exists()) {
-        "dilink5RuntimeOnly"(files("libs/dilink5-sdk.jar"))
-    } else {
-        logger.warn("dilink5-sdk.jar absent — assembling dilink5 with compile stubs only (CI mode).")
-    }
 
     // Core Android
     implementation(kotlin("stdlib"))

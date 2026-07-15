@@ -219,6 +219,8 @@ derive power, omit SOH), not the architecture.
 `dilink5Implementation files("app/libs/dilink5-sdk.jar")` (gitignored; `tools/make-dilink5-sdk-jar.sh`);
 `DiLink5Platform.isDiLink5`. Not build-verified locally (offline Compose build) — verify with
 `./gradlew assembleDilink3Debug` (must be unchanged) and `assembleDilink5Debug` (needs the jar).
+> **Superseded:** the jar/script approach above was later replaced by runtime classloader
+> injection (`Dilink5SdkInjector`) — no jar or script needed anymore. See `docs/DILINK5.md`.
 
 Build tasks renamed by flavors: `assembleDilink3{Debug,Release}` / `assembleDilink5{Debug,Release}`
 — update CI/release scripts.
