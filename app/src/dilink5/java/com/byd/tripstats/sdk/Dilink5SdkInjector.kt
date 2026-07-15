@@ -63,14 +63,21 @@ object Dilink5SdkInjector {
                 ?: return false.also { Log.w(TAG, "makePathElements/makeDexElements not found") }
             suppressed.forEach { Log.w(TAG, "suppressed: $it") }
 
-            // PREPEND (not append): dex elements are searched in order, first match wins. Putting the
-            // OEM elements first means the real classes win even in the (should-never-happen) case
-            // that a bydauto stub ever leaks into our own dex — defense in depth on top of the
-            // compileOnly wiring that's supposed to keep stubs out of the apk entirely.
+            // APPEND (reverted from an earlier prepend attempt — confirmed crashing on-car). Dex
+            // elements are searched in order, first match wins. com.byd.data.collect bundles its OWN
+            // (R8-minified) copy of AndroidX Lifecycle etc., whose short obfuscated class names (e.g.
+            // androidx.lifecycle.o) can collide with our own app's real classes of the same name.
+            // Prepending meant data.collect's incompatible copy won those collisions, which crashed
+            // MainActivity.onCreate with NoSuchMethodError whenever the classloader mutation happened
+            // to run (via the service, racing an abrupt process restart) before our own copy of that
+            // class had been resolved/cached. Appending means OUR classes are always checked first
+            // for ANY name collision, independent of that race — bydauto/* is the only thing OEM
+            // actually needs to supply, and compileOnly + dexdump verification (see PR discussion)
+            // already confirm no bydauto class exists in our own apk to be shadowed by this ordering.
             val comp = old.javaClass.componentType
             val combined = java.lang.reflect.Array.newInstance(comp, old.size + newEls.size)
-            System.arraycopy(newEls, 0, combined, 0, newEls.size)
-            System.arraycopy(old, 0, combined, newEls.size, old.size)
+            System.arraycopy(old, 0, combined, 0, old.size)
+            System.arraycopy(newEls, 0, combined, old.size, newEls.size)
             dexElementsF.set(pathList, combined)
 
             val ok = loadable(loader)
