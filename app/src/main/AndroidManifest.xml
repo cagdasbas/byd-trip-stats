@@ -82,6 +82,12 @@
      <!-- Permissions for autoupdates -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- DiLink-5 SDK injection prototype: needed to query com.byd.data.collect's apk path
+         (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.byd.data.collect" />
+    </queries>
+
     <application
         android:name=".BydStatsApplication"
         android:allowBackup="true"

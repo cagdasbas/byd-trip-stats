@@ -37,7 +37,7 @@ object AdbPermissionManager {
     private const val PREF_HIDDEN_API_PROMPTED = "d5_hidden_api_prompted_v1"
     // The token we write into hidden_api_blacklist_exemptions; used to detect "already applied" so we
     // don't silently re-write the global setting on every launch (only re-apply when missing/reset).
-    private const val EXEMPTION_TOKEN = "Lcom/ts/"
+    private val EXEMPTION_TOKENS = listOf("Lcom/ts/", "Ldalvik/system/")
 
     // Permissions that require elevated user-approved grant flow.
     private val REQUIRED_PERMISSIONS = listOf(
@@ -61,7 +61,9 @@ object AdbPermissionManager {
         // blocked hidden members live under com.ts.* (CarAdapterManager.getInstance,
         // CarPowerManager.getInstance, OtaSdkManager, ota listener stubs). `'*'` was overkill.
         "settings put global hidden_api_policy 1",
-        "settings put global hidden_api_blacklist_exemptions 'Lcom/ts/'",
+        // `Ldalvik/system/` added for the SDK-injection prototype (BaseDexClassLoader.pathList /
+        // DexPathList.makePathElements are hidden). Drop it if injection is abandoned.
+        "settings put global hidden_api_blacklist_exemptions 'Lcom/ts/,Ldalvik/system/'",
     )
 
     // The runtime-gated bydauto permissions (getInstance enforces *_COMMON server-side).
@@ -311,7 +313,7 @@ object AdbPermissionManager {
     private fun applyHiddenApiExemptionIfNeeded(dadb: Dadb) {
         val current = runCatching { dadb.shell("settings get global hidden_api_blacklist_exemptions").allOutput.trim() }
             .getOrNull()
-        if (current != null && current.contains(EXEMPTION_TOKEN)) {
+        if (current != null && EXEMPTION_TOKENS.all { current.contains(it) }) {
             Log.i(TAG, "hidden-api exemption already set ('$current') — not re-asserting")
             return
         }

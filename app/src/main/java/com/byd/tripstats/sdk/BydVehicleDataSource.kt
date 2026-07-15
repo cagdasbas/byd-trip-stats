@@ -1106,7 +1106,11 @@ class BydVehicleDataSource(context: Context) {
     private var pollingJob: Job? = null
     private var readLogsMonitorJob: Job? = null
     private var lastChargingPowerRawElapsedMs = 0L
-    private val chargingListener = object : AbsBYDAutoChargingListener() {
+    // lazy: on DiLink-5 without a bundled jar, constructing this touches OEM types that may not be
+    // resolvable yet (before consent+injection). Deferring to first access means any failure happens
+    // inside the tryDevice{} block in start() (which already catches Throwable/LinkageError), not
+    // during this class's own construction (which would crash the service — see Dilink5SdkInjector).
+    private val chargingListener by lazy { object : AbsBYDAutoChargingListener() {
         override fun onChargingPowerChanged(power: Double) {
             if (ENABLE_VERBOSE_RAW_EVENT_LOGS) {
                 Log.d(TAG, "🔋 chargingPower callback(raw)=$power kW")
@@ -1195,9 +1199,11 @@ class BydVehicleDataSource(context: Context) {
         override fun onError(code: Int, msg: String) {
             Log.w(TAG, "ChargingListener error $code: $msg")
         }
-    }
+    } }
 
-    private val gearboxListener = object : AbsBYDAutoGearboxListener() {
+    // lazy: see chargingListener comment above (already dormant on D5 firmware even with the bundled
+    // jar — GearboxDevice never registers — so this only matters for D3).
+    private val gearboxListener by lazy { object : AbsBYDAutoGearboxListener() {
         override fun onCurrentGearChanged(gear: Int) {
             val label = mapGearValue(gear)
             _currentGearRaw.value = gear
@@ -1250,9 +1256,10 @@ class BydVehicleDataSource(context: Context) {
         override fun onError(code: Int, msg: String) {
             Log.w(TAG, "GearboxListener error $code: $msg")
         }
-    }
+    } }
 
-    private val tyreListener = object : AbsBYDAutoTyreListener() {
+    // lazy: see chargingListener comment above.
+    private val tyreListener by lazy { object : AbsBYDAutoTyreListener() {
         /**
          * BYD delivers 5 wheel slots (0-4).
          * Slot 0 is a generic/dummy entry that always returns 0.0.
@@ -1345,9 +1352,22 @@ class BydVehicleDataSource(context: Context) {
         override fun onError(code: Int, msg: String) {
             Log.w(TAG, "TyreListener error $code: $msg")
         }
-    }
+    } }
 
     fun start() {
+        // PROTOTYPE: on DiLink-5, try to make the OEM bydauto classes resolvable on our own
+        // classloader (injecting the installed com.byd.data.collect apk) before anything below
+        // touches those types (chargingListener/gearboxListener/tyreListener are lazy; the tryDevice{}
+        // blocks below already tolerate the classes being unavailable). Reflective + no-op if the
+        // class isn't present (dilink3 build, or dilink5-sdk.jar already bundled) or injection fails.
+        if (DiLink5Platform.isDiLink5) {
+            runCatching {
+                val inj = Class.forName("com.byd.tripstats.sdk.Dilink5SdkInjector")
+                val instance = inj.getField("INSTANCE").get(null)
+                val ok = inj.getMethod("ensure", Context::class.java).invoke(instance, ctx) as? Boolean
+                Log.i(TAG, "DiLink-5 SDK injector: bydauto available=$ok")
+            }.onFailure { Log.w(TAG, "DiLink-5 SDK injector failed: ${it.message}") }
+        }
         try {
             appContext.contentResolver.delete(
                 android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,

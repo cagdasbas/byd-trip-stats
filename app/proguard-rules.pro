@@ -106,6 +106,10 @@
 # (Rule is harmless for the dilink3 flavor, where the class simply doesn't exist.)
 -keep class com.byd.tripstats.sdk.Dilink5Client { *; }
 
+# Same reasoning: loaded reflectively by exact FQN from BydVehicleDataSource.start()
+# (Class.forName + getMethod("ensure")), only in the dilink5 flavor.
+-keep class com.byd.tripstats.sdk.Dilink5SdkInjector { *; }
+
 # App services declared in AndroidManifest — must keep exact class names
 # so Android can instantiate them by name at runtime
 -keep class com.byd.tripstats.service.** { *; }
