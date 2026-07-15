@@ -28,17 +28,25 @@ object Dilink5SdkInjector {
     private const val PROBE_CLASS = "android.hardware.bydauto.statistic.BYDAutoStatisticDevice"
     private const val OEM_PKG = "com.byd.data.collect"
 
-    @Volatile private var attempted = false
+    // Only latches (skips future attempts within this process) once we're CONFIDENT retrying won't
+    // help — i.e. the OEM package genuinely isn't installed. A reflection/permission failure during
+    // the actual injection attempt is usually transient (e.g. ensure() ran before the hidden-API
+    // exemption took effect on a pre-consent first launch) and is allowed to retry on the next call.
+    @Volatile private var permanentlyUnavailable = false
 
     /** True if the bydauto classes are available on this app's classloader (already, or after inject). */
+    @Synchronized
     fun ensure(context: Context): Boolean {
         val loader = context.classLoader
-        if (loadable(loader)) return true          // already present (e.g. bundled jar)
-        if (attempted) return false                // don't retry every call; re-attempted next process start
-        attempted = true
+        if (loadable(loader)) return true             // already present (e.g. bundled jar)
+        if (permanentlyUnavailable) return false
 
         val apkPaths = oemApkPaths(context)
-        if (apkPaths.isEmpty()) { Log.w(TAG, "$OEM_PKG not found / no apk path"); return false }
+        if (apkPaths.isEmpty()) {
+            Log.w(TAG, "$OEM_PKG not found / no apk path")
+            permanentlyUnavailable = true              // won't change without a fresh install; stop retrying
+            return false
+        }
 
         return try {
             val baseCl = Class.forName("dalvik.system.BaseDexClassLoader")
@@ -55,15 +63,22 @@ object Dilink5SdkInjector {
                 ?: return false.also { Log.w(TAG, "makePathElements/makeDexElements not found") }
             suppressed.forEach { Log.w(TAG, "suppressed: $it") }
 
+            // PREPEND (not append): dex elements are searched in order, first match wins. Putting the
+            // OEM elements first means the real classes win even in the (should-never-happen) case
+            // that a bydauto stub ever leaks into our own dex — defense in depth on top of the
+            // compileOnly wiring that's supposed to keep stubs out of the apk entirely.
             val comp = old.javaClass.componentType
             val combined = java.lang.reflect.Array.newInstance(comp, old.size + newEls.size)
-            System.arraycopy(old, 0, combined, 0, old.size)
-            System.arraycopy(newEls, 0, combined, old.size, newEls.size)
+            System.arraycopy(newEls, 0, combined, 0, newEls.size)
+            System.arraycopy(old, 0, combined, newEls.size, old.size)
             dexElementsF.set(pathList, combined)
 
             val ok = loadable(loader)
             Log.i(TAG, "injected ${files.size} apk(s); bydauto loadable=$ok")
             ok
+            // NOT latched here even on failure: a thrown SecurityException/NoSuchFieldException etc.
+            // usually means the hidden-API exemption isn't active yet, which can resolve without a
+            // fresh process (e.g. a later ensure() call after consent lands mid-session).
         } catch (t: Throwable) {
             Log.w(TAG, "inject failed: ${t.javaClass.name}: ${t.message}")
             false
