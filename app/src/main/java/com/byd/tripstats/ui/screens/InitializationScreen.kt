@@ -97,11 +97,15 @@ fun InitializationScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Text(
-                text = stringResource(R.string.dilink3_only_notice),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
+            // DiLink-5 (Sealion 7) is supported via the dilink5 flavor, so only show the
+            // "DiLink 3 only" notice when we're NOT running on DiLink-5.
+            if (!com.byd.tripstats.sdk.DiLink5Platform.isDiLink5) {
+                Text(
+                    text = stringResource(R.string.dilink3_only_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

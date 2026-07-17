@@ -494,9 +494,10 @@ class VehicleTelemetryService : Service() {
                         abrpConnectionManager?.onTelemetry(telemetry, carConfig, serviceScope)
                         mqttConnectionManager?.onTelemetry(telemetry, serviceScope)
                         cellImbalanceMonitor?.onTelemetry(telemetry)
-                        // Feed the vehicle id (BYD SDK "VIN") to the Pro entitlement gate so
-                        // a vehicle-bound license can confirm it's running on the right car.
-                        EntitlementManager.onDeviceIdObserved(snapshot.bodyworkAutoVin)
+                        // Feed the vehicle id to the Pro entitlement gate so a vehicle-bound license
+                        // can confirm it's running on the right car. Prefer the non-PII T-Box serial
+                        // (DiLink-5); fall back to the VIN on DiLink-3, where the serial isn't read.
+                        EntitlementManager.onDeviceIdObserved(snapshot.tboxSerialNumber ?: snapshot.bodyworkAutoVin)
 
                         // Keep WiFi alive while the car is off and a charger gun is present
                         // or the charger is actively working. Without this, the MCU cuts WiFi

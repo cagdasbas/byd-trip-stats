@@ -15,6 +15,8 @@ private-telemetry-*.aar
 MD
 # Auto-generated from root CHANGELOG.md by the syncChangelog Gradle task
 app/src/main/assets/changelog.md
+# Compile-time bydauto stubs — built from source by the :app bydautoStubsJar task.
+app/libs/bydauto-stubs.jar
 # Cloud and local LLMs
 .claude
 .opencode

@@ -1121,4 +1121,15 @@
     <string name="odometer_subtitle_lifetime">総走行距離</string>
     <string name="discharge_subtitle_lifetime">総放電エネルギー</string>
     <string name="tyre_subtitle_pressure">°C · %1$s 圧力</string>
+    <string name="d5_consent_title">車両データへのアクセスを許可しますか？</string>
+    <string name="d5_consent_body">この車のライブデータ（バッテリー、走行可能距離、速度、タイヤ…）を読み取るため、BYD Trip Stats はヘッドユニットの1つのシステム設定（hidden-API 制限）を緩和する必要があります。対象は BYD の車両ライブラリに限定されます。\n\nこれは端末全体の設定です。再起動でリセットされ、アプリは必要なときのみ再適用します。後で設定から変更できます。\n\nこれがないとアプリは動作しますが車両データは表示されません。</string>
+    <string name="d5_consent_allow">許可</string>
+    <string name="d5_consent_not_now">後で</string>
+    <string name="d5_vehicle_access_section">車両データへのアクセス</string>
+    <string name="d5_vehicle_access_title">車両データの読み取りを許可</string>
+    <string name="d5_vehicle_access_desc">ヘッドユニットの1つのシステム設定（hidden-API）を BYD の車両ライブラリに限定して緩和し、アプリがバッテリー・走行可能距離・速度・タイヤを読み取れるようにします。端末全体の設定で、再起動でリセットされ、必要なときのみ再適用されます。オフ＝アプリは動作しますが車両データは表示されません。</string>
+    <string name="d5_consent_decline_title">よろしいですか？</string>
+    <string name="d5_consent_decline_body">この権限がないとアプリは車両データを読み取れません。設定ページからいつでも許可できます。</string>
+    <string name="d5_consent_decline_confirm">はい、スキップ</string>
+    <string name="d5_consent_decline_back">戻る</string>
 </resources>

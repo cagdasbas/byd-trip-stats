@@ -1020,4 +1020,15 @@
     <string name="odometer_subtitle_lifetime">कुल दूरी</string>
     <string name="discharge_subtitle_lifetime">कुल निर्गत ऊर्जा</string>
     <string name="tyre_subtitle_pressure">°C · %1$s दबाव</string>
+    <string name="d5_consent_title">वाहन डेटा एक्सेस की अनुमति दें?</string>
+    <string name="d5_consent_body">इस कार का लाइव डेटा (बैटरी, रेंज, गति, टायर…) पढ़ने के लिए, BYD Trip Stats को हेड यूनिट की एक सिस्टम सेटिंग (hidden-API प्रतिबंध) को ढीला करना होगा, जो BYD वाहन लाइब्रेरीज़ तक सीमित है.\n\nयह डिवाइस-व्यापी सेटिंग है. रीबूट पर यह रीसेट हो जाती है और ऐप इसे केवल ज़रूरत पड़ने पर फिर से लागू करता है. आप इसे बाद में सेटिंग्स में बदल सकते हैं.\n\nइसके बिना ऐप चलता है लेकिन कोई वाहन डेटा नहीं दिखाता.</string>
+    <string name="d5_consent_allow">अनुमति दें</string>
+    <string name="d5_consent_not_now">अभी नहीं</string>
+    <string name="d5_vehicle_access_section">वाहन डेटा एक्सेस</string>
+    <string name="d5_vehicle_access_title">वाहन डेटा पढ़ने की अनुमति दें</string>
+    <string name="d5_vehicle_access_desc">हेड यूनिट की एक सिस्टम सेटिंग (hidden-API) को ढीला करता है, जो BYD वाहन लाइब्रेरीज़ तक सीमित है, ताकि ऐप बैटरी, रेंज, गति और टायर पढ़ सके. डिवाइस-व्यापी सेटिंग; रीबूट पर रीसेट होती है और केवल ज़रूरत पड़ने पर फिर लागू होती है. बंद = ऐप चलता है लेकिन वाहन डेटा नहीं दिखाता.</string>
+    <string name="d5_consent_decline_title">क्या आप निश्चित हैं?</string>
+    <string name="d5_consent_decline_body">इस अनुमति के बिना ऐप कोई वाहन डेटा नहीं पढ़ सकता. आप इसे कभी भी सेटिंग्स पेज से दे सकते हैं.</string>
+    <string name="d5_consent_decline_confirm">हाँ, छोड़ें</string>
+    <string name="d5_consent_decline_back">वापस</string>
 </resources>

@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.byd.tripstats.R
+import com.byd.tripstats.adb.AdbPermissionManager
+import com.byd.tripstats.sdk.DiLink5Platform
 import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.entitlement.EntitlementManager
 import com.byd.tripstats.data.entitlement.RedeemResult
@@ -789,6 +791,60 @@ internal fun AppPreferencesTab(
             }
         }
 
+        // DiLink-5 only: opt-in for the global hidden-API exemption that lets the app read vehicle
+        // data. Lets a user who declined the first-run prompt enable it later (or turn it back off).
+        if (DiLink5Platform.isDiLink5) {
+            var vehicleAccessOn by remember {
+                mutableStateOf(AdbPermissionManager.hasHiddenApiConsent(context))
+            }
+            SettingsGroupLabel(stringResource(R.string.d5_vehicle_access_section))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                stringResource(R.string.d5_vehicle_access_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                stringResource(R.string.d5_vehicle_access_desc),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = vehicleAccessOn,
+                            onCheckedChange = { on ->
+                                vehicleAccessOn = on
+                                AdbPermissionManager.setHiddenApiConsent(context, on)
+                                AdbPermissionManager.markHiddenApiPrompted(context)
+                                if (on) scope.launch {
+                                    // Apply the exemption, then restart so the SDK binds on a fresh
+                                    // fork (same fork-latch as the first-run consent dialog).
+                                    val applied = AdbPermissionManager.ensureVehicleApiAccess(context)
+                                    if (applied) AdbPermissionManager.restartApp(context)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 
     if (showTariffDialog) {

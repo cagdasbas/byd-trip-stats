@@ -48,6 +48,7 @@ import com.byd.tripstats.adb.AdbPermissionManager
 import com.byd.tripstats.util.LocaleHelper
 import com.byd.tripstats.data.preferences.PreferencesManager
 import com.byd.tripstats.data.preferences.ThemeMode
+import com.byd.tripstats.sdk.DiLink5Platform
 import com.byd.tripstats.service.VehicleTelemetryService
 import com.byd.tripstats.ui.components.ScreenshotFlashOverlay
 import com.byd.tripstats.ui.navigation.AppNavigation
@@ -67,6 +68,8 @@ class MainActivity : ComponentActivity() {
     // Shown once per app version update to remind the user to re-enable Autostart
     private val showAutostartReminder = mutableStateOf(false)
     private val showSetupRequired   = mutableStateOf(false)
+    private val showHiddenApiConsent = mutableStateOf(false)
+    private val showHiddenApiDeclineConfirm = mutableStateOf(false)
 
     // ── Locale override ───────────────────────────────────────────────────────
 
@@ -148,6 +151,63 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // DiLink-5 hidden-API exemption — one-time opt-in (PR #8 item 2b). We change a
+                    // GLOBAL head-unit setting, so ask before doing it; a decline is remembered and
+                    // can be reversed later from Settings.
+                    if (showHiddenApiConsent.value) {
+                        AlertDialog(
+                            onDismissRequest = { },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            title = { Text(stringResource(R.string.d5_consent_title)) },
+                            text = { Text(stringResource(R.string.d5_consent_body)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    AdbPermissionManager.setHiddenApiConsent(this@MainActivity, true)
+                                    AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
+                                    showHiddenApiConsent.value = false
+                                    lifecycleScope.launch {
+                                        // Apply the exemption, then restart our own process: the
+                                        // hidden-API enforcement is latched at process fork, so the
+                                        // SDK only binds after a fresh start (else the user must
+                                        // manually force-stop + reopen).
+                                        val applied = AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+                                        if (applied) restartAppProcess()
+                                    }
+                                }) { Text(stringResource(R.string.d5_consent_allow)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    // Don't finalize yet — ask for confirmation first.
+                                    showHiddenApiConsent.value = false
+                                    showHiddenApiDeclineConfirm.value = true
+                                }) { Text(stringResource(R.string.d5_consent_not_now)) }
+                            }
+                        )
+                    }
+                    // Confirm a decline: make sure the user knows the app shows no vehicle data
+                    // without it, and that it can be enabled later from Settings.
+                    if (showHiddenApiDeclineConfirm.value) {
+                        AlertDialog(
+                            onDismissRequest = { },
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            title = { Text(stringResource(R.string.d5_consent_decline_title)) },
+                            text = { Text(stringResource(R.string.d5_consent_decline_body)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    // Still declining — remember it and close. Re-enable later in Settings.
+                                    AdbPermissionManager.markHiddenApiPrompted(this@MainActivity)
+                                    showHiddenApiDeclineConfirm.value = false
+                                }) { Text(stringResource(R.string.d5_consent_decline_confirm)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = {
+                                    // Reconsidered — go back to the consent prompt.
+                                    showHiddenApiDeclineConfirm.value = false
+                                    showHiddenApiConsent.value = true
+                                }) { Text(stringResource(R.string.d5_consent_decline_back)) }
+                            }
+                        )
+                    }
                     // ADB permission setup — driven by AdbPermissionManager.state
                     if (showSetupRequired.value) {
                         val adbState by AdbPermissionManager.state.collectAsState()
@@ -281,12 +341,39 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkSetupRequired() {
+        // DiLink-5 ONLY. The adb setup + hidden-API exemption exist solely so the DiLink-5 bydauto
+        // SDK can bind. On DiLink-3 none of it is needed, and running it would (a) prompt existing
+        // D3 users for an adb setup they don't need and (b) silently apply hidden_api_policy/
+        // exemptions to a device that doesn't need them. Gate the whole flow so D3 is unaffected.
+        if (!DiLink5Platform.isDiLink5) return
+
+        // Idempotently re-assert DiLink-5 vehicle-API access on startup. This grants the bydauto
+        // *_COMMON perms (app-scoped, always) and — only if the user consented — re-applies the
+        // hidden-API exemption if it was reset (reboot). No-ops if adb isn't authorised yet.
+        lifecycleScope.launch {
+            AdbPermissionManager.ensureVehicleApiAccess(this@MainActivity)
+        }
+
+        // One-time opt-in for the hidden-API exemption (a global device change). Ask once; a decline
+        // is remembered so we don't nag, and can be reversed from Settings.
+        if (!AdbPermissionManager.hasHiddenApiConsent(this) &&
+            !AdbPermissionManager.hasBeenPromptedForHiddenApi(this)) {
+            showHiddenApiConsent.value = true
+        }
         if (AdbPermissionManager.isSetupComplete(this)) return
         showSetupRequired.value = true
         lifecycleScope.launch {
             AdbPermissionManager.runSetup(this@MainActivity)
         }
     }
+
+    /**
+     * Restart our own process. The DiLink-5 hidden-API exemption is captured at process fork, so the
+     * bydauto SDK only binds after a fresh start. Schedule a relaunch of the launcher activity a moment
+     * out, then hard-exit so the process re-forks with the exemption in effect. Safe to call after the
+     * consent is persisted — the consent dialog won't re-show, so there's no restart loop.
+     */
+    private fun restartAppProcess() = AdbPermissionManager.restartApp(this)
 
     override fun onStart() {
         super.onStart()

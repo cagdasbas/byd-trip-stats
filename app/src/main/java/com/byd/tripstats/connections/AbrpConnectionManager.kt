@@ -108,9 +108,17 @@ class AbrpConnectionManager(context: Context) {
         telemetry.locationAltitude.takeIf { it > 0.0 }?.let { payload.put("elevation", it) }
         telemetry.locationOrientation?.takeIf { it.isFinite() }?.let { payload.put("heading", it) }
         telemetry.instrumentOutCarTemperature?.let { payload.put("ext_temp", it) }
+        // HV pack voltage + signed current (positive = discharge, negative = regen/charge) — matches
+        // ABRP's convention. Available on DiLink-5 via the collectdata events.
+        telemetry.batteryTotalVoltage.takeIf { it > 0 }?.let { payload.put("voltage", it) }
+        telemetry.batteryTotalCurrent?.let { payload.put("current", it) }
         payload.put("is_charging", if (telemetry.isCharging) 1 else 0)
         payload.put("is_parked", if (telemetry.gear == "P") 1 else 0)
         payload.put("odometer", telemetry.odometer)
+        // Car's OEM estimated remaining range (statisticElecDrivingRangeValue, confirmed accurate
+        // vs the cluster). Without this ABRP keeps showing the last range from another source
+        // (e.g. a removed Enode link), so send it whenever valid.
+        telemetry.electricDrivingRangeKm.takeIf { it > 0 }?.let { payload.put("est_battery_range", it) }
         telemetry.soh.takeIf { it > 0 }?.let { payload.put("soh", it) }
         val capacity = carConfig?.batteryKwh?.takeIf { it > 0.0 }
             ?: run {

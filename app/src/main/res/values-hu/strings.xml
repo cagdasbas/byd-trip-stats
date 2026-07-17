@@ -1117,4 +1117,15 @@
     <string name="odometer_subtitle_lifetime">Teljes távolság</string>
     <string name="discharge_subtitle_lifetime">Teljes leadott energia</string>
     <string name="tyre_subtitle_pressure">°C · %1$s nyomás</string>
+    <string name="d5_consent_title">Engedélyezi a járműadatokhoz való hozzáférést?</string>
+    <string name="d5_consent_body">Az autó élő adatainak olvasásához (akkumulátor, hatótáv, sebesség, gumiabroncsok…) a BYD Trip Statsnak lazítania kell a fejegység egy rendszerbeállításán (a hidden-API-korlátozáson), a BYD járműkönyvtárakra korlátozva.\n\nEz eszközszintű beállítás. Újraindításkor visszaáll, és az alkalmazás csak szükség esetén alkalmazza újra. Ezt később a Beállításokban módosíthatja.\n\nNélküle az alkalmazás fut, de nem jelenít meg járműadatokat.</string>
+    <string name="d5_consent_allow">Engedélyezés</string>
+    <string name="d5_consent_not_now">Most nem</string>
+    <string name="d5_vehicle_access_section">Járműadatokhoz való hozzáférés</string>
+    <string name="d5_vehicle_access_title">Járműadatok olvasásának engedélyezése</string>
+    <string name="d5_vehicle_access_desc">Lazít a fejegység egy rendszerbeállításán (hidden-API), a BYD járműkönyvtárakra korlátozva, hogy az alkalmazás olvashassa az akkumulátort, a hatótávot, a sebességet és a gumiabroncsokat. Eszközszintű beállítás; újraindításkor visszaáll, és csak szükség esetén alkalmazódik újra. Kikapcsolva = az alkalmazás fut, de nem mutat járműadatokat.</string>
+    <string name="d5_consent_decline_title">Biztos benne?</string>
+    <string name="d5_consent_decline_body">E jogosultság nélkül az alkalmazás nem tud járműadatokat olvasni. Bármikor megadhatja a Beállítások oldalon.</string>
+    <string name="d5_consent_decline_confirm">Igen, kihagyom</string>
+    <string name="d5_consent_decline_back">Vissza</string>
 </resources>
