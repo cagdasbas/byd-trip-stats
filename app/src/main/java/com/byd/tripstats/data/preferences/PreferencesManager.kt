@@ -30,6 +30,12 @@ private val KEEP_SERVICE_ALIVE_WHEN_OFF  = booleanPreferencesKey("keep_service_a
 private val OFF_STATE_MODE               = stringPreferencesKey("off_state_mode")
 private val ELECTRICITY_PRICE            = doublePreferencesKey("electricity_price_per_kwh")
 private val CURRENCY_SYMBOL              = stringPreferencesKey("currency_symbol")
+// ISO currency code → the symbol used in the tariff currency picker (PreferencesTab.currencyOptions).
+// Used only to pre-select a sensible default from the device locale on a fresh install.
+private val LOCALE_CURRENCY_SYMBOLS = mapOf(
+    "EUR" to "€", "GBP" to "£", "USD" to "$", "AUD" to "A$",
+    "THB" to "฿", "BRL" to "R$", "MYR" to "RM",
+)
 private val SOH_BASELINE_EPOCH_MS        = longPreferencesKey("soh_baseline_epoch_ms") // legacy; migrated
 private val SOH_EXCLUSION_MODE           = stringPreferencesKey("soh_exclusion_mode")   // AUTO|CUSTOM|OFF
 private val SOH_CUSTOM_CUTOFF_MS         = longPreferencesKey("soh_custom_cutoff_ms")
@@ -245,10 +251,22 @@ class PreferencesManager(private val context: Context) {
         cache.getFloat("electricity_price", 0f).toDouble()
 
     val currencySymbol: Flow<String> = context.dataStore.data
-        .map { it[CURRENCY_SYMBOL] ?: "€" }
+        .map { it[CURRENCY_SYMBOL] ?: localeDefaultCurrencySymbol() }
         .onEach { cache.edit().putString("currency_symbol", it).apply() }
 
-    fun getCachedCurrencySymbol(): String = cache.getString("currency_symbol", "€") ?: "€"
+    fun getCachedCurrencySymbol(): String =
+        cache.getString("currency_symbol", localeDefaultCurrencySymbol()) ?: localeDefaultCurrencySymbol()
+
+    /**
+     * Currency symbol to pre-select on a fresh install, derived from the device's locale
+     * (e.g. RM for Malaysia, ฿ for Thailand, $ for the US). Falls back to € for any locale
+     * whose currency the app doesn't offer, or when the locale has no country. Only used as
+     * the default — once the user saves a currency, that saved value wins.
+     */
+    private fun localeDefaultCurrencySymbol(): String = runCatching {
+        val code = java.util.Currency.getInstance(java.util.Locale.getDefault()).currencyCode
+        LOCALE_CURRENCY_SYMBOLS[code]
+    }.getOrNull() ?: "€"
 
     suspend fun saveElectricityPrice(price: Double, symbol: String) {
         context.dataStore.edit {
