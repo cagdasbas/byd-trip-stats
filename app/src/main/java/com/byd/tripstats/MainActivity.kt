@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import com.byd.tripstats.BuildConfig
 import com.byd.tripstats.R
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -145,6 +146,31 @@ class MainActivity : ComponentActivity() {
                             text = { Text(stringResource(R.string.autostart_dialog_msg)) },
                             confirmButton = {
                                 TextButton(onClick = { openAutostartManagementDialog() }) {
+                                    Text(stringResource(R.string.autostart_got_it))
+                                }
+                            }
+                        )
+                    }
+
+                    // Wrong-build warning: only a DiLink-5 car running a non-dilink5 build is broken
+                    // (no D5 SDK path → no telemetry). The reverse (dilink5 build on a D3 car) works
+                    // via the reflective bridge, so it's intentionally not flagged. Detection only —
+                    // dismissible per session, re-warns each launch until the correct build is installed.
+                    val flavorWarnOpen = remember { mutableStateOf(DiLink5Platform.isBuildUnsupportedForHardware) }
+                    if (flavorWarnOpen.value) {
+                        AlertDialog(
+                            onDismissRequest = { flavorWarnOpen.value = false },
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            title = { Text(stringResource(R.string.flavor_mismatch_title)) },
+                            text = {
+                                Text(stringResource(
+                                    R.string.flavor_mismatch_msg,
+                                    DiLink5Platform.flavorLabel(BuildConfig.FLAVOR),
+                                    DiLink5Platform.flavorLabel(DiLink5Platform.expectedFlavor),
+                                ))
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { flavorWarnOpen.value = false }) {
                                     Text(stringResource(R.string.autostart_got_it))
                                 }
                             }

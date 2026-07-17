@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Action Required — Autostart</string>
     <string name="autostart_dialog_msg">A new version was installed. You need to toggle-off disable autostart for this app, which enables foreground / background services to run.\nA one-time reboot of the car is needed and only when you first install the app and after you toggle-off disable autostart. If you are updating from an older version, you don\'t have to reboot</string>
     <string name="autostart_got_it">Got it</string>
+    <string name="flavor_mismatch_title">⚠️ Wrong build for this car</string>
+    <string name="flavor_mismatch_msg">You installed the %1$s build, but this car is %2$s. Vehicle telemetry may not work correctly. Please install the %2$s build for this vehicle.</string>
     <string name="adb_connecting_title">Connecting…</string>
     <string name="adb_waiting_auth_title">Waiting for authorization</string>
     <string name="adb_granting_title">Granting permissions…</string>
