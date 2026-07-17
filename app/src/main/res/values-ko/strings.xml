@@ -1020,4 +1020,15 @@
     <string name="odometer_subtitle_lifetime">총 주행 거리</string>
     <string name="discharge_subtitle_lifetime">총 방전 에너지</string>
     <string name="tyre_subtitle_pressure">°C · %1$s 압력</string>
+    <string name="d5_consent_title">차량 데이터 접근을 허용하시겠습니까?</string>
+    <string name="d5_consent_body">이 차량의 실시간 데이터(배터리, 주행 가능 거리, 속도, 타이어…)를 읽으려면 BYD Trip Stats가 헤드 유닛의 시스템 설정 하나(hidden-API 제한)를 완화해야 하며, 이는 BYD 차량 라이브러리로 한정됩니다.\n\n이는 기기 전체 설정입니다. 재부팅 시 초기화되며 앱은 필요할 때만 다시 적용합니다. 나중에 설정에서 변경할 수 있습니다.\n\n이 설정이 없으면 앱은 실행되지만 차량 데이터는 표시되지 않습니다.</string>
+    <string name="d5_consent_allow">허용</string>
+    <string name="d5_consent_not_now">나중에</string>
+    <string name="d5_vehicle_access_section">차량 데이터 접근</string>
+    <string name="d5_vehicle_access_title">차량 데이터 읽기 허용</string>
+    <string name="d5_vehicle_access_desc">헤드 유닛의 시스템 설정 하나(hidden-API)를 BYD 차량 라이브러리로 한정하여 완화해 앱이 배터리, 주행 가능 거리, 속도, 타이어를 읽을 수 있게 합니다. 기기 전체 설정이며, 재부팅 시 초기화되고 필요할 때만 다시 적용됩니다. 끔 = 앱은 실행되지만 차량 데이터는 표시되지 않습니다.</string>
+    <string name="d5_consent_decline_title">정말입니까?</string>
+    <string name="d5_consent_decline_body">이 권한이 없으면 앱은 차량 데이터를 읽을 수 없습니다. 설정 페이지에서 언제든지 허용할 수 있습니다.</string>
+    <string name="d5_consent_decline_confirm">예, 건너뛰기</string>
+    <string name="d5_consent_decline_back">뒤로</string>
 </resources>

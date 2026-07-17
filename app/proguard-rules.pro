@@ -98,6 +98,18 @@
 -keep class org.jctools.** { *; }
 -keepclassmembers class org.jctools.** { *; }
 
+# DiLink-5 telemetry client — present ONLY in the dilink5 flavor. src/main loads it
+# reflectively by exact FQN (BydVehicleDataSource.startDilink5Client → Class.forName
+# + getMethod("start"/"stop")), so R8 has no static reference and would strip/rename it.
+# The loader catches ClassNotFoundException as "client not present", so a stripped class
+# means D5 telemetry silently dies in release with NO crash. Keep the class and members.
+# (Rule is harmless for the dilink3 flavor, where the class simply doesn't exist.)
+-keep class com.byd.tripstats.sdk.Dilink5Client { *; }
+
+# Same reasoning: loaded reflectively by exact FQN from BydVehicleDataSource.start()
+# (Class.forName + getMethod("ensure")), only in the dilink5 flavor.
+-keep class com.byd.tripstats.sdk.Dilink5SdkInjector { *; }
+
 # App services declared in AndroidManifest — must keep exact class names
 # so Android can instantiate them by name at runtime
 -keep class com.byd.tripstats.service.** { *; }
@@ -122,6 +134,25 @@
 -keep class android.hardware.bydauto.** { *; }
 -keep class android.hardware.IBYDAutoListener { *; }
 -keep class android.hardware.IBYDAutoEvent { *; }
+
+# The real DiLink-5 bydauto SDK (libs/dilink5-sdk.jar, dilink5 flavor only) references TS
+# framework classes (com.ts.ota.otasdkmgr.*, com.ts.qnxmanager.*, caradapter, etc.) that are
+# provided by the head unit's platform classloader at runtime and are NOT bundled in our jar.
+# R8 treats these as missing-class ERRORS — suppress them; they resolve on-device.
+-dontwarn com.ts.**
+
+# The OEM SDK's tsimpl managers (audio/radio/time/phone/etc.) also reference HIDDEN Android
+# platform APIs not in android.jar — present on the head unit's system classpath at runtime.
+# We never touch these managers (only statistic/charging/speed/vehiclehealth), but R8 still
+# scans the whole jar and errors on the missing refs. Suppress (generated via
+# build/outputs/mapping/dilink5Release/missing_rules.txt).
+-dontwarn android.app.timedetector.**
+-dontwarn android.app.timezonedetector.**
+-dontwarn android.bluetooth.BluetoothHeadsetClientCall
+-dontwarn android.car.**
+-dontwarn android.hardware.radio.**
+-dontwarn android.media.AudioFocusInfo
+-dontwarn android.os.SystemProperties
 
 # Keep all classes Android instantiates by name
 -keep public class * extends android.app.Service

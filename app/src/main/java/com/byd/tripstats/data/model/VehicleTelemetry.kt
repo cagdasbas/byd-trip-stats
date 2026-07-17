@@ -47,6 +47,7 @@ data class VehicleTelemetry(
         @SerialName("engine_speed_rear") val engineSpeedRear: Int = 0, // absent on FWD
         @SerialName("wifi_ssid") val wifiSsid: String = "",
         @SerialName("battery_total_voltage") val batteryTotalVoltage: Int = 0,
+        @SerialName("battery_total_current") val batteryTotalCurrent: Double? = null,
         @SerialName("electric_driving_range_km") val electricDrivingRangeKm: Int = 0,
         /** BYD car power state. 0 = off, 1 = awake/accessory, 2 = ready to drive. */
         @SerialName("car_on") val carOn: Int = 0,
@@ -97,6 +98,7 @@ data class VehicleTelemetry(
         @SerialName("bodywork_battery_voltage_level") val bodyworkBatteryVoltageLevel: Int? = null,
         @SerialName("bodywork_power_level") val bodyworkPowerLevel: Int? = null,
         @SerialName("bodywork_auto_vin") val bodyworkAutoVin: String? = null,
+        @SerialName("tbox_serial_number") val tboxSerialNumber: String? = null,
         @SerialName("power_battery_remain_power_ev") val powerBatteryRemainPowerEV: Double? = null,
         @SerialName("sensor_temperature_value") val sensorTemperatureValue: Double? = null,
         // ── PHEV engine/fuel fields (null on pure BEV) ─────────────────────────────

@@ -67,6 +67,26 @@ android {
         }
     }
 
+    // ── SDK flavor split (DiLink-3 vs DiLink-5) ──────────────────────────────────
+    // One APK cannot serve both: bydauto SDK signatures drift (getTotalMileageValue is int on
+    // D3, float on D5) and on D5 the classes are NOT on the boot classpath.
+    //   dilink3 — current behavior, DEFAULT. Thin bydauto stubs in src/dilink3/ are shadowed at
+    //             runtime by the D3 boot-classpath classes (as before).
+    //   dilink5 — resolves the REAL DiLink-5 bydauto SDK at runtime via Dilink5SdkInjector
+    //             (injects the already-installed com.byd.data.collect apk into this app's own
+    //             classloader — no OEM binary ever bundled). D5 code in src/dilink5/.
+    // NOTE: flavors rename tasks: assembleRelease -> assembleDilink3Release / assembleDilink5Release.
+    flavorDimensions += "sdk"
+    productFlavors {
+        create("dilink3") {
+            dimension = "sdk"
+            isDefault = true
+        }
+        create("dilink5") {
+            dimension = "sdk"
+        }
+    }
+
     buildTypes {
         debug {
             // Sign debug with the release key when a keystore is configured (env or
@@ -96,11 +116,12 @@ android {
         disable += "ExpiredTargetSdkVersion"
     }
 
-    // Custom APK naming: byd-trip-stats-VERSION.apk
+    // Custom APK naming: byd-trip-stats-FLAVOR-VERSION.apk
     applicationVariants.all {
+        val flavor = flavorName
         outputs.all {
             if (this is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
-                outputFileName = "byd-trip-stats-${versionName}.apk"
+                outputFileName = "byd-trip-stats-$flavor-${versionName}.apk"
             }
         }
     }
@@ -174,7 +195,41 @@ tasks.named("preBuild") {
     dependsOn("syncTripViewer")
 }
 
+// ── DiLink-5 bydauto compile stubs (built from SOURCE, not a committed jar) ──────────
+// The dilink5 flavor must compile src/main against the bydauto signatures, but those classes
+// must NOT land in the dex (the real OEM SDK is added runtimeOnly). So we compile our hand-written
+// signature-only stubs into a compileOnly jar at build time. Sources are tracked (src/dilink3/.../
+// bydauto = shared D3 signatures + dilink5-stubsrc/ = the D5 deltas); the jar is a build artifact.
+// This lets CI assemble the dilink5 flavor with no gitignored input.
+val bydautoStubsClasses = layout.buildDirectory.dir("bydauto-stubs/classes")
+val compileBydautoStubs = tasks.register<JavaCompile>("compileBydautoStubs") {
+    source(
+        fileTree("src/dilink3/java") { include("android/**/*.java") },
+        fileTree(rootProject.file("dilink5-stubsrc")) { include("android/**/*.java") },
+    )
+    // android.* (Context etc.) comes from the platform android.jar on the classpath; --release 17
+    // supplies the java.* platform. Signature-only bodies, so no other deps are needed.
+    classpath = files(android.bootClasspath)
+    options.release.set(17)
+    destinationDirectory.set(bydautoStubsClasses)
+}
+val bydautoStubsJar = tasks.register<Jar>("bydautoStubsJar") {
+    dependsOn(compileBydautoStubs)
+    from(bydautoStubsClasses)
+    archiveFileName.set("bydauto-stubs.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("bydauto-stubs"))
+}
+
 dependencies {
+    // DiLink-5 flavor SDK wiring: COMPILE against the thin bydauto stubs (D3 signatures) so the
+    // shared src/main compiles identically to dilink3 (the D3-shaped listener overrides simply
+    // won't fire on D5; the real D5 data path is added separately in src/dilink5). Stubs are built
+    // from source by the bydautoStubsJar task above — no committed jar. There is no runtimeOnly
+    // OEM dependency: the real classes are resolved at RUNTIME by Dilink5SdkInjector, which injects
+    // the already-installed com.byd.data.collect apk into the app's own classloader (see
+    // BydVehicleDataSource.start()). Nothing OEM is ever bundled into the APK.
+    "dilink5CompileOnly"(files(bydautoStubsJar.flatMap { it.archiveFile }))
+
     // Core Android
     implementation(kotlin("stdlib"))
     implementation(libs.androidx.core.ktx)

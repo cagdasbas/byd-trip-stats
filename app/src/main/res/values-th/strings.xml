@@ -1020,4 +1020,15 @@
     <string name="odometer_subtitle_lifetime">ระยะทางรวม</string>
     <string name="discharge_subtitle_lifetime">พลังงานที่จ่ายออกรวม</string>
     <string name="tyre_subtitle_pressure">°C · %1$s ความดัน</string>
+    <string name="d5_consent_title">อนุญาตการเข้าถึงข้อมูลรถหรือไม่?</string>
+    <string name="d5_consent_body">เพื่ออ่านข้อมูลสดจากรถคันนี้ (แบตเตอรี่ ระยะทาง ความเร็ว ยาง…) BYD Trip Stats ต้องผ่อนคลายการตั้งค่าระบบหนึ่งรายการบนหน่วยหลัก (ข้อจำกัด hidden-API) โดยจำกัดเฉพาะไลบรารียานพาหนะของ BYD\n\nนี่เป็นการตั้งค่าทั้งอุปกรณ์ ค่าจะถูกรีเซ็ตเมื่อรีบูตและแอปจะใช้ซ้ำเฉพาะเมื่อจำเป็น คุณสามารถเปลี่ยนได้ภายหลังในการตั้งค่า\n\nหากไม่มี แอปจะทำงานแต่จะไม่แสดงข้อมูลรถ</string>
+    <string name="d5_consent_allow">อนุญาต</string>
+    <string name="d5_consent_not_now">ไว้ทีหลัง</string>
+    <string name="d5_vehicle_access_section">การเข้าถึงข้อมูลรถ</string>
+    <string name="d5_vehicle_access_title">อนุญาตให้อ่านข้อมูลรถ</string>
+    <string name="d5_vehicle_access_desc">ผ่อนคลายการตั้งค่าระบบหนึ่งรายการของหน่วยหลัก (hidden-API) โดยจำกัดเฉพาะไลบรารียานพาหนะของ BYD เพื่อให้แอปอ่านแบตเตอรี่ ระยะทาง ความเร็ว และยางได้ เป็นการตั้งค่าทั้งอุปกรณ์ จะรีเซ็ตเมื่อรีบูตและใช้ซ้ำเฉพาะเมื่อจำเป็น ปิด = แอปทำงานแต่ไม่แสดงข้อมูลรถ</string>
+    <string name="d5_consent_decline_title">แน่ใจหรือไม่?</string>
+    <string name="d5_consent_decline_body">หากไม่มีสิทธิ์นี้ แอปจะไม่สามารถอ่านข้อมูลรถได้ คุณสามารถให้สิทธิ์เมื่อใดก็ได้จากหน้าการตั้งค่า</string>
+    <string name="d5_consent_decline_confirm">ใช่ ข้ามไป</string>
+    <string name="d5_consent_decline_back">ย้อนกลับ</string>
 </resources>

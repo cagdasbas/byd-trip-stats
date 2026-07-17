@@ -1121,4 +1121,15 @@
     <string name="odometer_subtitle_lifetime">Distancia total</string>
     <string name="discharge_subtitle_lifetime">Energía total entregada</string>
     <string name="tyre_subtitle_pressure">°C · %1$s presión</string>
+    <string name="d5_consent_title">¿Permitir el acceso a los datos del vehículo?</string>
+    <string name="d5_consent_body">Para leer datos en vivo de este coche (batería, autonomía, velocidad, neumáticos…), BYD Trip Stats necesita relajar un ajuste del sistema en la unidad central (la restricción de hidden-API), limitado a las bibliotecas de vehículos de BYD.\n\nEs un ajuste de todo el dispositivo. Se restablece al reiniciar y la app solo lo vuelve a aplicar cuando es necesario. Puedes cambiar esto más tarde en Ajustes.\n\nSin él, la app funciona pero no muestra datos del vehículo.</string>
+    <string name="d5_consent_allow">Permitir</string>
+    <string name="d5_consent_not_now">Ahora no</string>
+    <string name="d5_vehicle_access_section">Acceso a datos del vehículo</string>
+    <string name="d5_vehicle_access_title">Permitir la lectura de datos del vehículo</string>
+    <string name="d5_vehicle_access_desc">Relaja un ajuste del sistema de la unidad central (hidden-API), limitado a las bibliotecas de vehículos de BYD, para que la app pueda leer batería, autonomía, velocidad y neumáticos. Ajuste de todo el dispositivo; se restablece al reiniciar y solo se vuelve a aplicar cuando es necesario. Desactivado = la app funciona pero no muestra datos del vehículo.</string>
+    <string name="d5_consent_decline_title">¿Estás seguro?</string>
+    <string name="d5_consent_decline_body">Sin este permiso la app no puede leer datos del vehículo. Puedes concederlo en cualquier momento desde la página de Ajustes.</string>
+    <string name="d5_consent_decline_confirm">Sí, omitir</string>
+    <string name="d5_consent_decline_back">Atrás</string>
 </resources>

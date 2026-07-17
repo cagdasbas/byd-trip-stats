@@ -565,6 +565,64 @@ object CarCatalog {
         cdA = 0.774             // Cd 0.29 × A 2.67 m²
     )
 
+    // BYD Sealion 7 — DiLink 5 (Android 11) BEV. Supported only by the `dilink5` flavor.
+    // Three regional/trim battery variants (nominal pack size, matching how Sealion 6 EV models
+    // Standard/Extended above): 71.8 kWh in China/Turkey, 82.5 kWh in most other markets — both
+    // single rear-motor RWD — and 91.3 kWh shared everywhere as the long-range Performance trim,
+    // which is dual-motor AWD (confirmed), not RWD like the two Standard variants. Chassis specs
+    // (tyre pressures, cdA) are assumed shared across variants pending confirmation otherwise —
+    // other specs are estimates — VERIFY: wltp/refConsumption/mass/motor/cdA per variant.
+    // id kept as "BYD_SEALION_7" (not renamed) so existing installs that already selected this car
+    // aren't orphaned by the split.
+    val BYD_SEALION_7 = CarConfig(
+        id = "BYD_SEALION_7",
+        displayName = "Sealion 7 Standard (71.8 kWh)",
+        drivetrain = Drivetrain.RWD,
+        batteryKwh = 71.8,           // nominal pack — confirmed China/Turkey Standard spec
+        estimatedKerbMassKg = 2160.0,// confirmed kerb mass
+        wltpKm = 460,                // estimate for the 71.8 kWh RWD variant — verify
+        referenceConsumptionKwhPer100km = 18.7, // confirmed mixed-use figure
+        frontTyrePressureBar = 2.90, // confirmed datasheet spec: 42 psi, same front/rear
+        rearTyrePressureBar = 2.90,  // confirmed datasheet spec: 42 psi, same front/rear
+        rearMotorRatedKw = 160,      // confirmed datasheet spec (single RWD motor)
+        cdA = 0.78                   // Cd ~0.29 × A ~2.7 m² — estimate
+    )
+
+    val BYD_SEALION_7_STANDARD = CarConfig(
+        id = "BYD_SEALION_7_STANDARD",
+        displayName = "Sealion 7 Standard (82.5 kWh)",
+        drivetrain = Drivetrain.RWD,
+        batteryKwh = 82.5,           // nominal pack — most markets outside China/Turkey
+        estimatedKerbMassKg = 2311.0,// interpolated between confirmed 71.8kWh(2160kg)/91.3kWh(2435kg) — not independently confirmed
+        wltpKm = 502,                // estimate — verify
+        referenceConsumptionKwhPer100km = 20.5, // interpolated between confirmed 71.8kWh(18.7)/91.3kWh(21.9) — not independently confirmed
+        frontTyrePressureBar = 2.90, // confirmed datasheet spec: 42 psi, same front/rear across the lineup
+        rearTyrePressureBar = 2.90,  // confirmed datasheet spec: 42 psi, same front/rear across the lineup
+        rearMotorRatedKw = 230,      // confirmed via ev-database (single RWD motor)
+        cdA = 0.78                   // assumed shared — verify
+    )
+
+    val BYD_SEALION_7_PERFORMANCE = CarConfig(
+        id = "BYD_SEALION_7_PERFORMANCE",
+        displayName = "Sealion 7 Performance AWD (91.3 kWh)",
+        drivetrain = Drivetrain.AWD, // confirmed — dual motor, unlike the single-rear-motor Standard trims
+        batteryKwh = 91.3,           // nominal pack — shared long-range/AWD trim across all markets
+        estimatedKerbMassKg = 2435.0,// confirmed kerb mass
+        wltpKm = 540,                // estimate — verify
+        referenceConsumptionKwhPer100km = 21.9, // confirmed mixed-use figure
+        frontTyrePressureBar = 2.90, // confirmed datasheet spec: 42 psi, same front/rear across the lineup
+        rearTyrePressureBar = 2.90,  // confirmed datasheet spec: 42 psi, same front/rear across the lineup
+        // Combined 390 kW system power is confirmed; the front/rear split is not independently
+        // confirmed but inferred with high confidence: 160+230 exactly matches the datasheet total,
+        // matches BYD_SEAL_EXCELLENCE's identical 160/230 AWD split on the same e-Platform 3.0
+        // architecture, and matches our own two single-motor Sealion 7 RWD variants' individual
+        // ratings (160 kW on the 71.8 kWh car, 230 kW on the 82.5 kWh car) — strongly suggesting BYD
+        // reuses those same two motors combined for the AWD Performance trim.
+        frontMotorRatedKw = 160,
+        rearMotorRatedKw = 230,
+        cdA = 0.78                   // assumed shared — verify
+    )
+
     val BYD_SEALION_5_DMI_COMFORT = CarConfig(
         id = "BYD_SEALION_5_DMI_COMFORT",
         displayName = "Seal 5 / Sealion 5 DM-i Comfort",
@@ -634,6 +692,9 @@ object CarCatalog {
         BYD_SEALION_6_DMI_PERFORMANCE,
         BYD_SEALION_6_EV_STANDARD,
         BYD_SEALION_6_EV_EXTENDED,
+        BYD_SEALION_7,
+        BYD_SEALION_7_STANDARD,
+        BYD_SEALION_7_PERFORMANCE,
     )
 
     fun fromId(id: String?): CarConfig? {
@@ -643,7 +704,7 @@ object CarCatalog {
     /**
      * Cars grouped for display in selection screens.
      * Two top-level categories (BEV / PHEV), each with named model groups.
-     * Only DiLink 3 vehicles are listed — DiLink 4/5 are unsupported.
+     * Mostly DiLink 3 vehicles; the Sealion 7 (DiLink 5) is supported by the `dilink5` flavor.
      */
     val groupedBev: LinkedHashMap<String, List<CarConfig>> = linkedMapOf(
         "BYD Seal" to listOf(BYD_SEAL_DYNAMIC_RWD, BYD_SEAL_PREMIUM_RWD, BYD_SEAL_EXCELLENCE),
@@ -655,6 +716,7 @@ object CarCatalog {
         "BYD M6" to listOf(BYD_M6_STANDARD_120KW, BYD_M6_SUPERIOR_100KW, BYD_M6_SUPERIOR_150KW),
         "BYD Seal 6" to listOf(BYD_SEAL_6_PREMIUM_95KW, BYD_SEAL_6_PREMIUM_160KW),
         "BYD Sealion 6" to listOf(BYD_SEALION_6_EV_STANDARD, BYD_SEALION_6_EV_EXTENDED),
+        "BYD Sealion 7 (DiLink 5)" to listOf(BYD_SEALION_7, BYD_SEALION_7_STANDARD, BYD_SEALION_7_PERFORMANCE),
         "BYD Han" to listOf(BYD_HAN_EV, BYD_HAN_EV_AWD),
         "BYD Tang" to listOf(BYD_TANG_EV),
     )

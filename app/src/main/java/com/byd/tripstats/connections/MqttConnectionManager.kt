@@ -289,6 +289,7 @@ class MqttConnectionManager(context: Context) {
             SensorDef("soc_panel", "SOC (Panel)", "%", "battery", "measurement"),
             SensorDef("battery_12v_voltage", "Battery 12V Voltage", "V", "voltage", null),
             SensorDef("battery_total_voltage", "Battery Total Voltage", "V", "voltage", null),
+            SensorDef("battery_total_current", "Battery Total Current", "A", "current", "measurement"),
             SensorDef("electric_driving_range_km", "Driving Range", "km", null, "measurement"),
             SensorDef("total_discharge", "Total Discharge", "kWh", null, "measurement"),
             SensorDef("speed", "Speed", "km/h", "speed", null),
@@ -394,6 +395,7 @@ class MqttConnectionManager(context: Context) {
         payload.put("soc_panel", telemetry.socPanel)
         payload.put("battery_12v_voltage", telemetry.battery12vVoltage)
         payload.put("battery_total_voltage", telemetry.batteryTotalVoltage)
+        telemetry.batteryTotalCurrent?.let { payload.put("battery_total_current", it) }
         payload.put("electric_driving_range_km", telemetry.electricDrivingRangeKm)
         payload.put("total_discharge", telemetry.totalDischarge)
         payload.put("speed", telemetry.locationGpsSpeed?.takeIf { it > 0.1 } ?: telemetry.speed)

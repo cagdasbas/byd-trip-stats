@@ -190,6 +190,7 @@ data class VehicleTelemetrySnapshot(
     val bodyworkBatteryVoltageLevel: Int? = null,
     val bodyworkPowerLevel: Int? = null,
     val bodyworkAutoVin: String? = null,
+    val tboxSerialNumber: String? = null,   // non-PII license device id (DiLink-5), replaces VIN
     val powerBatteryRemainPowerEV: Double? = null,
     val powerMcuStatus: Int? = null,
     val sensorTemperatureValue: Double? = null,
@@ -215,6 +216,7 @@ data class VehicleTelemetrySnapshot(
     // ── Battery device fields ───────────────────────────────────────────────────
     val batterySoh: Int? = null,
     val batteryTotalVoltage: Int? = null,
+    val batteryTotalCurrent: Double? = null,
     val battery12vVoltage: Double? = null,
     val batteryPackTemp: Double? = null,
     val batteryCellTempMax: Int? = null,
@@ -466,6 +468,7 @@ data class VehicleTelemetrySnapshot(
             wifiSsid = wifiSsid,
             // Derive HV from live cell voltage × cell count if Battery Device is silent
             batteryTotalVoltage = inferredPackVoltage ?: 0,
+            batteryTotalCurrent = batteryTotalCurrent,
             electricDrivingRangeKm = statisticElecDrivingRangeValue ?: 0,
             // Prefer the direct power-state source when it exists; keep MCU status as a fallback only.
             carOn = derivedCarOn,
@@ -512,6 +515,7 @@ data class VehicleTelemetrySnapshot(
             bodyworkBatteryVoltageLevel = bodyworkBatteryVoltageLevel,
             bodyworkPowerLevel = bodyworkPowerLevel,
             bodyworkAutoVin = bodyworkAutoVin,
+            tboxSerialNumber = tboxSerialNumber,
             powerBatteryRemainPowerEV = powerBatteryRemainPowerEV,
             sensorTemperatureValue = sensorTemperatureValue,
             statisticBatteryCurrent = statisticBatteryCurrent,
@@ -1102,7 +1106,11 @@ class BydVehicleDataSource(context: Context) {
     private var pollingJob: Job? = null
     private var readLogsMonitorJob: Job? = null
     private var lastChargingPowerRawElapsedMs = 0L
-    private val chargingListener = object : AbsBYDAutoChargingListener() {
+    // lazy: on DiLink-5 without a bundled jar, constructing this touches OEM types that may not be
+    // resolvable yet (before consent+injection). Deferring to first access means any failure happens
+    // inside the tryDevice{} block in start() (which already catches Throwable/LinkageError), not
+    // during this class's own construction (which would crash the service — see Dilink5SdkInjector).
+    private val chargingListener by lazy { object : AbsBYDAutoChargingListener() {
         override fun onChargingPowerChanged(power: Double) {
             if (ENABLE_VERBOSE_RAW_EVENT_LOGS) {
                 Log.d(TAG, "🔋 chargingPower callback(raw)=$power kW")
@@ -1191,9 +1199,11 @@ class BydVehicleDataSource(context: Context) {
         override fun onError(code: Int, msg: String) {
             Log.w(TAG, "ChargingListener error $code: $msg")
         }
-    }
+    } }
 
-    private val gearboxListener = object : AbsBYDAutoGearboxListener() {
+    // lazy: see chargingListener comment above (already dormant on D5 firmware even with the bundled
+    // jar — GearboxDevice never registers — so this only matters for D3).
+    private val gearboxListener by lazy { object : AbsBYDAutoGearboxListener() {
         override fun onCurrentGearChanged(gear: Int) {
             val label = mapGearValue(gear)
             _currentGearRaw.value = gear
@@ -1246,9 +1256,10 @@ class BydVehicleDataSource(context: Context) {
         override fun onError(code: Int, msg: String) {
             Log.w(TAG, "GearboxListener error $code: $msg")
         }
-    }
+    } }
 
-    private val tyreListener = object : AbsBYDAutoTyreListener() {
+    // lazy: see chargingListener comment above.
+    private val tyreListener by lazy { object : AbsBYDAutoTyreListener() {
         /**
          * BYD delivers 5 wheel slots (0-4).
          * Slot 0 is a generic/dummy entry that always returns 0.0.
@@ -1341,9 +1352,22 @@ class BydVehicleDataSource(context: Context) {
         override fun onError(code: Int, msg: String) {
             Log.w(TAG, "TyreListener error $code: $msg")
         }
-    }
+    } }
 
     fun start() {
+        // PROTOTYPE: on DiLink-5, try to make the OEM bydauto classes resolvable on our own
+        // classloader (injecting the installed com.byd.data.collect apk) before anything below
+        // touches those types (chargingListener/gearboxListener/tyreListener are lazy; the tryDevice{}
+        // blocks below already tolerate the classes being unavailable). Reflective + no-op if the
+        // class isn't present (dilink3 build, or dilink5-sdk.jar already bundled) or injection fails.
+        if (DiLink5Platform.isDiLink5) {
+            runCatching {
+                val inj = Class.forName("com.byd.tripstats.sdk.Dilink5SdkInjector")
+                val instance = inj.getField("INSTANCE").get(null)
+                val ok = inj.getMethod("ensure", Context::class.java).invoke(instance, ctx) as? Boolean
+                Log.i(TAG, "DiLink-5 SDK injector: bydauto available=$ok")
+            }.onFailure { Log.w(TAG, "DiLink-5 SDK injector failed: ${it.message}") }
+        }
         try {
             appContext.contentResolver.delete(
                 android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
@@ -1358,6 +1382,9 @@ class BydVehicleDataSource(context: Context) {
         }
         restorePersistedStatisticState()
         daemonClient.start()
+        // DiLink-5: start the typed-listener client (present only in the dilink5 flavor; reflective
+        // so the dilink3 build, which lacks the class, simply no-ops). It pushes via applyDilink5Telemetry.
+        if (DiLink5Platform.isDiLink5) startDilink5Client()
         publishSnapshot()
         if (RuntimeExtensionBridge.isAvailable) {
             startReadLogsMonitor()
@@ -1876,7 +1903,7 @@ class BydVehicleDataSource(context: Context) {
                     delay(2_000L)
                 } else {
                     tryDevice("poll") { pollAndUpdateCellFeatures(dev) }
-                    delay(2_000L)
+                    delay(idlePollMs(2_000L))   // 2s active; backs off to 60s when parked/idle
                 }
             }
         }
@@ -1900,10 +1927,27 @@ class BydVehicleDataSource(context: Context) {
                 if (dev != null) {
                     tryDevice("hvac poll") { pollHvacState(dev) }
                 }
-                delay(3_000L)
+                delay(idlePollMs(3_000L))   // 3s active; backs off to 60s when parked/idle (HVAC off)
             }
         }
     }
+
+    /**
+     * Battery: true when the car is parked/idle — not charging, not moving, and the SDK has been
+     * silent for >60s (no events). Used to back off background polls and drop the GPS fallback;
+     * the polled values don't change while parked, so nothing is missed.
+     */
+    private fun isParkedIdle(): Boolean {
+        val s = _vehicleSnapshot.value
+        val charging = s.isChargingActive || s.chargingPower > 0.0
+        val moving = (s.directSpeedKmh ?: 0.0) > 2.0
+        val sdkSilent = lastFeatureEventElapsedMs > 0L &&
+            (android.os.SystemClock.elapsedRealtime() - lastFeatureEventElapsedMs) > 60_000L
+        return !charging && !moving && sdkSilent
+    }
+
+    /** [activeMs] while driving/charging/awake; 60s when parked-idle. */
+    private fun idlePollMs(activeMs: Long): Long = if (isParkedIdle()) 60_000L else activeMs
 
     /**
      * Called right before an in-app update commits the install. An update force-kills this process
@@ -1930,6 +1974,7 @@ class BydVehicleDataSource(context: Context) {
     fun stop() {
         RuntimeExtensionBridge.onDataSourceStopped()
         daemonClient.stop()
+        stopDilink5Client()
         pollingJob?.cancel()
         pollingJob = null
         readLogsMonitorJob?.cancel()
@@ -2084,6 +2129,14 @@ class BydVehicleDataSource(context: Context) {
             Log.w(TAG, "⚠️ $name SecurityException: ${e.message}")
         } catch (e: Exception) {
             Log.w(TAG, "⚠️ $name failed: ${e.javaClass.simpleName}: ${e.message}")
+        } catch (e: Throwable) {
+            // MUST catch Throwable, not just Exception: on DiLink-5 the bundled OEM bydauto SDK
+            // makes getInstance() execute real code, and a firmware/SDK version skew throws a
+            // LinkageError (e.g. NoSuchMethodError: CarAdapterManager.getInstance(Context) — the
+            // OEM TsManagerImpl expects a ts-framework.jar API this head unit doesn't expose).
+            // That is an Error, not an Exception, so without this it escaped onCreate and crashed
+            // the whole service on launch. Degrade gracefully: this device just doesn't bind.
+            Log.w(TAG, "⚠️ $name link/error: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -2771,6 +2824,16 @@ class BydVehicleDataSource(context: Context) {
 
     private fun refreshSystemLocationFallback() {
         if (!hasLocationPermission() || hasDirectLocationSignal) return
+
+        // Battery: when parked/idle, drop the 1 Hz GPS fallback entirely (turns the GPS radio off).
+        // It re-registers automatically below on the next call once the car is active again — the
+        // main loop polls at 1s when the car is on, so GPS is back well before a trip starts.
+        if (systemLocationUpdatesRegistered && isParkedIdle()) {
+            runCatching { locationManager?.removeUpdates(systemLocationListener) }
+            systemLocationUpdatesRegistered = false
+            Log.i(TAG, "🔋 GPS fallback paused (parked/idle)")
+            return
+        }
 
         val manager = locationManager
             ?: (appContext.getSystemService(Context.LOCATION_SERVICE) as? LocationManager)?.also {
@@ -5024,6 +5087,191 @@ class BydVehicleDataSource(context: Context) {
     private var lastDaemonDiagMs = 0L
 
     /**
+     * Apply DiLink-5 statistic/charging telemetry pushed by the DiLink-5 client (dilink5 flavor
+     * only; started reflectively from start()). Mirrors applyDaemonTelemetry: writes the raw
+     * snapshot fields the existing toTelemetry()/ABRP path already reads, then publishes once.
+     * Speed and derived driving-power go through applyDaemonTelemetry; this handles
+     * soc / total-mileage / elec-range / usable-kWh / SOH / charge-power. Pure Kotlin (no bydauto
+     * types) so it compiles in both flavors. All inputs nullable + range-guarded.
+     */
+    fun applyDilink5Telemetry(
+        socPct: Double? = null,
+        totalMileageKm: Double? = null,
+        elecRangeKm: Int? = null,
+        usableKwh: Double? = null,
+        sohPct: Double? = null,
+        chargingPowerKw: Double? = null,
+    ) {
+        var changed = false
+        var snap = _vehicleSnapshot.value
+        if (socPct != null && socPct in 0.0..100.0) {
+            snap = snap.copy(statisticElecPercentageValue = socPct); changed = true
+        }
+        if (totalMileageKm != null && totalMileageKm in 1.0..9_999_999.0) {
+            snap = snap.copy(statisticTotalMileageDecimal = totalMileageKm,
+                             statisticTotalMileageValue = totalMileageKm.toInt()); changed = true
+        }
+        if (elecRangeKm != null && elecRangeKm in 0..2000) {
+            snap = snap.copy(statisticElecDrivingRangeValue = elecRangeKm); changed = true
+        }
+        if (usableKwh != null && usableKwh in 0.0..200.0) {
+            snap = snap.copy(powerBatteryRemainPowerEV = usableKwh); changed = true
+        }
+        if (changed) _vehicleSnapshot.value = snap
+        if (sohPct != null && sohPct in 50.0..110.0) { _statisticBatterySoh.value = sohPct; changed = true }
+        if (chargingPowerKw != null && chargingPowerKw in 0.0..250.0) {
+            _chargingPowerKw.value = chargingPowerKw; _chargingPowerRaw.value = chargingPowerKw; changed = true
+        }
+        if (changed) publishSnapshot()
+    }
+
+    /**
+     * DiLink-5 tyre data. Source: BYDAutoTyreDevice.getTyrePressureValueByType(area)
+     * for area LF=1/RF=2/LR=3/RR=4. Confirmed on-car: that getter returns the per-wheel pressure in
+     * TENTHS OF PSI (e.g. 401 → 40.1 psi → 2.77 bar; rear > front, matching the Sealion 7 spec). The
+     * plain getTyrePressureValue ignores the area arg, so we use ByType. Temps are direct °C; state
+     * is 0=normal/1=over/2=under. Raw psi×10 guarded to a sane 10–90 psi to reject garbage.
+     */
+    fun applyDilink5Tyre(
+        lfRaw: Int?, rfRaw: Int?, lrRaw: Int?, rrRaw: Int?,
+        lfState: Int?, rfState: Int?, lrState: Int?, rrState: Int?,
+    ) {
+        fun psi(raw: Int?): Double? = raw?.takeIf { it in 100..900 }?.let { it / 10.0 }
+        fun state(s: Int?): Int? = s?.takeIf { it in 0..3 }
+        val psiToBar = 0.0689476
+        val lfP = psi(lfRaw); val rfP = psi(rfRaw); val lrP = psi(lrRaw); val rrP = psi(rrRaw)
+        if (lfP == null && rfP == null && lrP == null && rrP == null) return  // nothing usable
+        // IMPORTANT: write the _tyrePressure* StateFlows, NOT the snapshot fields directly.
+        // publishSnapshot() rebuilds the snapshot from these StateFlows, so a direct snapshot.copy()
+        // here is immediately clobbered (that's why RR — whose D3 StateFlow stayed 0 — showed grey
+        // NO_DATA while the others happened to carry values).
+        // Pressure = getTyrePressureValueByType(1..4) via poll (respects area, confirmed correct).
+        // Temperature is NOT set here — the getter returns the index-0 sentinel (uniform/wrong); real
+        // per-wheel temp arrives via the tyre listener → applyDilink5TyreTemp().
+        lfP?.let { _tyrePressureLF.value = it; _tyrePressureLFBar.value = it * psiToBar }
+        rfP?.let { _tyrePressureRF.value = it; _tyrePressureRFBar.value = it * psiToBar }
+        lrP?.let { _tyrePressureLR.value = it; _tyrePressureLRBar.value = it * psiToBar }
+        rrP?.let { _tyrePressureRR.value = it; _tyrePressureRRBar.value = it * psiToBar }
+        state(lfState)?.let { _tyrePressureLFState.value = it }
+        state(rfState)?.let { _tyrePressureRFState.value = it }
+        state(lrState)?.let { _tyrePressureLRState.value = it }
+        state(rrState)?.let { _tyrePressureRRState.value = it }
+        publishSnapshot()
+    }
+
+    /**
+     * Per-wheel tyre temperature from the DiLink-5 tyre listener (onTyreTemperatureValueChanged).
+     * Wheel index is 0-based: 0=LF, 1=RF, 2=LR, 3=RR (= getter area − 1). The polling getter
+     * getTyreTemperatureValue is area-blind (uniform value on all wheels) — real per-wheel temp is
+     * event-only. See applyDilink5TyreTemp for the on-car index confirmation.
+     */
+    /**
+     * DiLink-5 HV pack voltage from the collectdata event (onMotorMCUGeneratrixVolt). Getters return
+     * -1/dead; this is the real measured pack voltage (≈450–480 V).
+     */
+    fun applyDilink5HvVoltage(volts: Int) {
+        if (volts !in 100..1000) return
+        // Write the snapshot field directly: publishSnapshot preserves batteryTotalVoltage from the
+        // snapshot (not the _batteryTotalVoltage StateFlow), so a StateFlow write wouldn't surface.
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(batteryTotalVoltage = volts)
+        _batteryTotalVoltage.value = volts   // keep the flow in sync for other readers
+        publishSnapshot()
+    }
+
+    /**
+     * DiLink-5 license device id = the T-Box serial (ota.getTBoxSerialNumber), used raw exactly like
+     * DiLink-3 uses the raw VIN: fed to EntitlementManager, which normalize()s it (lowercase/trim);
+     * the HMAC lives only in ProLicenseBridge for the code, not the id itself. No app-side hashing.
+     */
+    fun applyDilink5TboxSerial(serial: String) {
+        val s = serial.trim()
+        if (s.length !in 4..64 || s.equals(_vehicleSnapshot.value.tboxSerialNumber, ignoreCase = true)) return
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(tboxSerialNumber = s)
+        publishSnapshot()
+    }
+
+    /**
+     * DiLink-5 HV pack current from the collectdata event (onMotorMCUGeneratrixCurrent). Signed amps:
+     * positive = discharge, negative = regen/charging. Written to the snapshot directly (publishSnapshot
+     * preserves unlisted snapshot fields).
+     */
+    fun applyDilink5HvCurrent(amps: Int) {
+        if (amps !in -2000..2000) return
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(batteryTotalCurrent = amps.toDouble())
+        publishSnapshot()
+    }
+
+    // DiLink-5 drive mode from instrument.getSportModeState. Its raw value matches the
+    // app's canonical driveMode encoding directly (1=Eco 2=Sport 3=Normal 4=Snow; 5=Mud 6=Sand),
+    // confirmed on-car 2026-07-12 — no remap needed. Treated as a strong/confirmed source.
+    fun applyDilink5DriveMode(raw: Int) {
+        if (raw !in 1..6) return
+        updateDriveModeCandidate(raw, strong = true, source = "d5-sportmode")
+        publishSnapshot()
+    }
+
+    // Follow-up: ambient / outside-air temperature from instrument.getOutCarTemperature
+    // (or its event). Written to the snapshot directly because publishSnapshot preserves
+    // instrumentOutCarTemperature from the snapshot itself (not a StateFlow).
+    // 12V aux battery voltage from ota.getBatteryVoltage(0) (confirmed on-car = 13 V).
+    // publishSnapshot reads _battery12vVoltage first, so write the StateFlow (+ snapshot for parity).
+    fun applyDilink5AuxVoltage(volts: Int) {
+        if (volts !in 6..17) return   // SDK BATTERY_VOLTAGE range; drops the -1 sentinel
+        _battery12vVoltage.value = volts.toDouble()
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(battery12vVoltage = volts.toDouble())
+        publishSnapshot()
+    }
+
+    fun applyDilink5AmbientTemp(tempC: Int) {
+        // 0 = the AC getter's no-data sentinel (ac.getTemprature(4) reads real outside temp only while
+        // the climate system is powered; returns 0 otherwise). Drop it so the UI shows "—" not "0°C".
+        // Real 0 °C is indistinguishable here, but a false 0 in warm weather is the worse failure.
+        if (tempC == 0 || tempC !in -50..60) return   // range guard also drops the 255 sentinel
+        _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = tempC)
+        publishSnapshot()
+    }
+
+    fun applyDilink5TyreTemp(wheel: Int, tempC: Int) {
+        // Drop 0/out-of-range: 0 is the sleep/no-data sentinel (TPMS temp sensors sleep when parked;
+        // getWheelTemperature and the events both return 0 then). Dropping it keeps the last real
+        // temp on screen instead of blanking each wheel back to "no data".
+        if (tempC <= 0 || tempC > 120) return
+        // Tyre EVENT wheel index is 0-based (= getter area − 1): 0=LF, 1=RF, 2=LR, 3=RR. Confirmed
+        // on-car 2026-07-12 by matching press-event kPa per index against the per-area byType getter
+        // (event 0≈LF pressure, 1≈RF, 2≈LR, 3≈RR). NOTE: earlier assumed 1-based with 0=sentinel —
+        // that was wrong; it dropped LF and shifted every wheel by one (RR never populated).
+        when (wheel) {
+            0 -> _tyreTempLF.value = tempC
+            1 -> _tyreTempRF.value = tempC
+            2 -> _tyreTempLR.value = tempC
+            3 -> _tyreTempRR.value = tempC
+            else -> return   // out of range
+        }
+        publishSnapshot()
+    }
+
+    // DiLink-5 client (dilink5 flavor only) — loaded reflectively so src/main stays flavor-agnostic.
+    private var dilink5Client: Any? = null
+    private fun startDilink5Client() {
+        try {
+            val cls = Class.forName("com.byd.tripstats.sdk.Dilink5Client")
+            val client = cls.getDeclaredConstructor().newInstance()
+            cls.getMethod("start", Context::class.java, BydVehicleDataSource::class.java)
+                .invoke(client, ctx, this)
+            dilink5Client = client
+            Log.i(TAG, "✅ DiLink-5 client started")
+        } catch (e: ClassNotFoundException) {
+            Log.w(TAG, "DiLink-5 client not present in this build")
+        } catch (t: Throwable) {
+            Log.w(TAG, "DiLink-5 client start failed: ${t.javaClass.simpleName}: ${t.message}")
+        }
+    }
+    private fun stopDilink5Client() {
+        dilink5Client?.let { c -> try { c.javaClass.getMethod("stop").invoke(c) } catch (_: Throwable) {} }
+        dilink5Client = null
+    }
+
+    /**
      * Recover a wedged SDK event-callback channel. On this firmware the BYD SDK occasionally stops
      * delivering pushed callbacks (speed/gear/etc.) while synchronous getters keep working — events
      * silently stall and only resume after the listeners are re-registered (empirically, a full
@@ -5188,6 +5436,7 @@ class BydVehicleDataSource(context: Context) {
             bodyworkBatteryVoltageLevel = _vehicleSnapshot.value.bodyworkBatteryVoltageLevel,
             bodyworkPowerLevel = _vehicleSnapshot.value.bodyworkPowerLevel,
             bodyworkAutoVin = _vehicleSnapshot.value.bodyworkAutoVin,
+            tboxSerialNumber = _vehicleSnapshot.value.tboxSerialNumber,
             powerBatteryRemainPowerEV = _vehicleSnapshot.value.powerBatteryRemainPowerEV,
             sensorTemperatureValue = _vehicleSnapshot.value.sensorTemperatureValue,
             cabinTemperature = _vehicleSnapshot.value.cabinTemperature,
@@ -5210,6 +5459,7 @@ class BydVehicleDataSource(context: Context) {
             engineSpeedRear = _vehicleSnapshot.value.engineSpeedRear,
             batterySoh = _vehicleSnapshot.value.batterySoh,
             batteryTotalVoltage = _vehicleSnapshot.value.batteryTotalVoltage,
+            batteryTotalCurrent = _vehicleSnapshot.value.batteryTotalCurrent,
             battery12vVoltage = _battery12vVoltage.value
                 ?: _vehicleSnapshot.value.battery12vVoltage,
             batteryPackTemp = validatePackTemp(_vehicleSnapshot.value.batteryPackTemp),

@@ -1121,4 +1121,15 @@
     <string name="odometer_subtitle_lifetime">Totale afstand</string>
     <string name="discharge_subtitle_lifetime">Totale afgegeven energie</string>
     <string name="tyre_subtitle_pressure">°C · %1$s druk</string>
+    <string name="d5_consent_title">Toegang tot voertuiggegevens toestaan?</string>
+    <string name="d5_consent_body">Om live gegevens van deze auto te lezen (accu, actieradius, snelheid, banden…), moet BYD Trip Stats één systeeminstelling op de hoofdunit versoepelen (de hidden-API-beperking), beperkt tot de BYD-voertuigbibliotheken.\n\nDit is een apparaatbrede instelling. Ze wordt hersteld na een herstart en de app past ze alleen opnieuw toe wanneer nodig. Je kunt dit later wijzigen in Instellingen.\n\nZonder deze werkt de app wel, maar toont ze geen voertuiggegevens.</string>
+    <string name="d5_consent_allow">Toestaan</string>
+    <string name="d5_consent_not_now">Niet nu</string>
+    <string name="d5_vehicle_access_section">Toegang tot voertuiggegevens</string>
+    <string name="d5_vehicle_access_title">Lezen van voertuiggegevens toestaan</string>
+    <string name="d5_vehicle_access_desc">Versoepelt één systeeminstelling van de hoofdunit (hidden-API), beperkt tot de BYD-voertuigbibliotheken, zodat de app accu, actieradius, snelheid en banden kan lezen. Apparaatbrede instelling; wordt hersteld na herstart en alleen opnieuw toegepast wanneer nodig. Uit = de app werkt, maar toont geen voertuiggegevens.</string>
+    <string name="d5_consent_decline_title">Weet je het zeker?</string>
+    <string name="d5_consent_decline_body">Zonder deze toestemming kan de app geen voertuiggegevens lezen. Je kunt deze op elk moment verlenen op de pagina Instellingen.</string>
+    <string name="d5_consent_decline_confirm">Ja, overslaan</string>
+    <string name="d5_consent_decline_back">Terug</string>
 </resources>
