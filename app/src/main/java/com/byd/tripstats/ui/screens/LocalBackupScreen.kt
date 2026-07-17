@@ -76,18 +76,25 @@ fun LocalBackupScreen(
     var restoreTarget by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
     var deleteTarget  by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
     var pendingDeleteAfterPermission by remember { mutableStateOf<LocalBackupManager.BackupFile?>(null) }
+    var pendingSdBackupAfterPermission by remember { mutableStateOf(false) }
     var telegramRestoreTarget by remember { mutableStateOf<TelegramManager.TelegramBackupFile?>(null) }
 
-    // Request WRITE_EXTERNAL_STORAGE at runtime for Android 10 (declared in manifest
-    // with maxSdkVersion=29). Without it, File.delete() fails for filesystem-only
-    // backups created by previous installations that lost MediaStore ownership.
+    // WRITE_EXTERNAL_STORAGE is needed for direct-file writes to shared storage: deleting a
+    // filesystem backup, and writing an SD-card backup. On a fresh install it isn't granted (and
+    // on API 30–32 it's only grantable because the manifest cap was raised to 32), so request it
+    // on demand and run the pending action on grant.
     val writePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        val pending = pendingDeleteAfterPermission
+        val pendingDelete = pendingDeleteAfterPermission
+        val pendingSd = pendingSdBackupAfterPermission
         pendingDeleteAfterPermission = null
-        if (granted && pending != null) {
-            scope.launch { manager.deleteBackup(pending) }
+        pendingSdBackupAfterPermission = false
+        if (granted && pendingDelete != null) {
+            scope.launch { manager.deleteBackup(pendingDelete) }
+        }
+        if (granted && pendingSd) {
+            scope.launch { manager.backupDatabaseToSdCard() }
         }
     }
     // Hoisted out of item{} so it survives LazyColumn recycling
@@ -303,7 +310,14 @@ fun LocalBackupScreen(
                             Button(
                                 onClick = {
                                     manager.resetState()
-                                    scope.launch { manager.backupDatabaseToSdCard() }
+                                    if (Build.VERSION.SDK_INT <= 32 &&
+                                        ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                            != PackageManager.PERMISSION_GRANTED) {
+                                        pendingSdBackupAfterPermission = true
+                                        writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                                    } else {
+                                        scope.launch { manager.backupDatabaseToSdCard() }
+                                    }
                                 },
                                 enabled = !isBusy && sdAvailable,
                                 modifier = Modifier.fillMaxWidth()
