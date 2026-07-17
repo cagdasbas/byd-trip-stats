@@ -1,3 +1,12 @@
+## [2.13.0] - Unreleased
+
+### Added
+
+- **Malaysian Ringgit (RM / MYR)** added to the electricity-tariff currency options (Settings → Preferences → Electricity tariff), alongside €, £, $, A$, ฿ and R$.
+- **Currency now defaults to your device locale** — on a fresh install, the electricity-tariff currency is pre-selected from the head unit's system locale (e.g. RM for Malaysia, ฿ for Thailand, $ for the US) instead of always starting at €. Existing users with a saved currency are unaffected.
+
+---
+
 ## [2.12.0] - 2026-Jul-11
 
 > **What's new in a nutshell**

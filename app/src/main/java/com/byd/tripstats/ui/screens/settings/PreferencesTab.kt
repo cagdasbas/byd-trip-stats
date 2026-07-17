@@ -101,7 +101,8 @@ internal fun AppPreferencesTab(
             "$" to "USD",
             "A$" to "AUD",
             "฿" to "THB",
-            "R$" to "BRL"
+            "R$" to "BRL",
+            "RM" to "MYR"
         )
     }
     var currencyMenuExpanded by remember { mutableStateOf(false) }
