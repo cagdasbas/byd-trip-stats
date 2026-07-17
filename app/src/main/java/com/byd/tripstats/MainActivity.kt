@@ -367,11 +367,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkSetupRequired() {
-        // DiLink-5 ONLY. The adb setup + hidden-API exemption exist solely so the DiLink-5 bydauto
-        // SDK can bind. On DiLink-3 none of it is needed, and running it would (a) prompt existing
-        // D3 users for an adb setup they don't need and (b) silently apply hidden_api_policy/
-        // exemptions to a device that doesn't need them. Gate the whole flow so D3 is unaffected.
-        if (!DiLink5Platform.isDiLink5) return
+        // DiLink-5 build on DiLink-5 hardware ONLY. The adb setup + hidden-API exemption exist solely
+        // so the DiLink-5 bydauto SDK (present only in the dilink5 flavor) can bind. Skip it when:
+        //  - not DiLink-5 hardware (D3 needs none of it), OR
+        //  - not the dilink5 build — a dilink3 APK on a D5 car has no D5 code to exempt, so running
+        //    the setup is pointless and would stack a consent dialog on top of the wrong-build warning.
+        if (!DiLink5Platform.isDiLink5 || BuildConfig.FLAVOR != "dilink5") return
 
         // Idempotently re-assert DiLink-5 vehicle-API access on startup. This grants the bydauto
         // *_COMMON perms (app-scoped, always) and — only if the user consented — re-applies the
