@@ -22,6 +22,7 @@ import base64
 import hashlib
 import hmac
 import pathlib
+import re
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -60,7 +61,11 @@ def main() -> None:
                  "(and embed the same value in ProLicenseHooks.SECRET_B64)")
 
     secret = base64.b64decode(SECRET_FILE.read_text().strip())
-    vehicle_id = args.vehicle_id.strip().lower()
+    # Canonicalise to [A-Za-z0-9] then lowercase — must stay byte-for-byte in sync with
+    # ProLicenseHooks.expectedCode(). Dropping all non-alphanumerics (not just trimming)
+    # makes the id robust to NUL/control padding on hardware serials (e.g. the DiLink-5
+    # T-Box serial) that would otherwise differ between device and generator.
+    vehicle_id = re.sub(r'[^A-Za-z0-9]', '', args.vehicle_id).lower()
     if not vehicle_id:
         sys.exit("vehicle id is empty")
 

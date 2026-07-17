@@ -37,9 +37,9 @@ android {
     // A stable release always has a higher versionCode than any beta of the same
     // version, so beta testers automatically receive the stable upgrade via sideload.
     val versionMajor    = 2
-    val versionMinor    = 12
+    val versionMinor    = 13
     val versionPatch    = 0
-    val versionPre      = 99 // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
+    val versionPre      = 2 // 99 = stable; 1–98 = beta (e.g. 1 → "beta01")
 
     val computedVersionCode = versionMajor * 1_000_000 +
                               versionMinor *    10_000 +
@@ -116,12 +116,18 @@ android {
         disable += "ExpiredTargetSdkVersion"
     }
 
-    // Custom APK naming: byd-trip-stats-FLAVOR-VERSION.apk
+    // Custom APK naming: byd-trip-stats-FLAVOR[-release]-VERSION.apk
+    // The "-release" token goes ONLY on the dilink3 release APK: legacy (pre-flavor) updaters pick
+    // the release asset whose name contains "release", so they deterministically land on D3 — even
+    // users who skip a version and jump straight to a dual-flavor release. New clients match their
+    // own BuildConfig.FLAVOR (see UpdateRepository).
     applicationVariants.all {
         val flavor = flavorName
+        val type = buildType.name
         outputs.all {
             if (this is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
-                outputFileName = "byd-trip-stats-$flavor-${versionName}.apk"
+                val legacyTag = if (flavor == "dilink3" && type == "release") "-release" else ""
+                outputFileName = "byd-trip-stats-$flavor$legacyTag-${versionName}.apk"
             }
         }
     }

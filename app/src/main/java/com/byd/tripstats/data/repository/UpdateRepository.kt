@@ -9,6 +9,7 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.util.Log
+import com.byd.tripstats.BuildConfig
 import com.byd.tripstats.receiver.InstallStatusReceiver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -108,10 +109,13 @@ class UpdateRepository private constructor(private val context: Context) {
             Log.d(TAG, "Current: $currentVersion  Latest: $latestVersion")
 
             if (isNewerVersion(latestVersion, currentVersion)) {
-                // Find the release APK asset — prefer the release APK over debug
+                // Pick the APK asset for THIS build's flavor (dilink3/dilink5). New clients match
+                // their own flavor; legacy pre-flavor clients aren't running this code — they use
+                // the old contains("release") logic, which is why only the dilink3 release asset is
+                // named with "release". No "any apk" fallback: skipping an update is safer than
+                // installing the wrong flavor over this app (same applicationId + key installs in place).
                 val apkAsset = release.assets
-                    .firstOrNull { it.name.contains("release") && it.name.endsWith(".apk") }
-                    ?: release.assets.firstOrNull { it.name.endsWith(".apk") }
+                    .firstOrNull { it.name.contains(BuildConfig.FLAVOR) && it.name.endsWith(".apk") }
 
                 if (apkAsset != null) {
                     _updateInfo.value = UpdateInfo(

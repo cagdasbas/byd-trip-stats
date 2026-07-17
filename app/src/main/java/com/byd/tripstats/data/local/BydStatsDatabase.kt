@@ -22,6 +22,7 @@ import com.byd.tripstats.data.local.entity.ChargingSessionEntity
 import com.byd.tripstats.data.local.entity.ChargingDataPointEntity
 import com.byd.tripstats.data.local.entity.TagEntity
 import com.byd.tripstats.data.local.entity.TripTagCrossRef
+import com.byd.tripstats.util.BackupNaming
 import android.os.Environment
 import java.io.File
 import java.io.IOException
@@ -281,7 +282,7 @@ abstract class BydStatsDatabase : RoomDatabase() {
                 }
                 // Save to Download/BydTripStats — survives uninstalls
                 val backupDir = getBackupDir().also { it.mkdirs() }
-                val backupFile = File(backupDir, "${DB_NAME}_backup_${System.currentTimeMillis()}.db")
+                val backupFile = File(backupDir, BackupNaming.fileName(prefix = "${DB_NAME}_backup"))
                 dbFile.copyTo(backupFile, overwrite = true)
                 Log.i(TAG, "Backed up to: ${backupFile.absolutePath}")
                 backupFile

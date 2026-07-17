@@ -14,12 +14,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import com.byd.tripstats.data.local.BydStatsDatabase
+import com.byd.tripstats.util.BackupNaming
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Manages local database backup and restore operations.
@@ -104,8 +102,7 @@ class LocalBackupManager private constructor(private val context: Context) {
             _state.value = BackupState.InProgress("Flushing database…")
             flushWal(dbFile)
 
-            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
-            val fileName = "byd_stats_backup_$timestamp.db"
+            val fileName = BackupNaming.fileName()
 
             _state.value = BackupState.InProgress("Saving to Download…")
 
@@ -247,8 +244,7 @@ class LocalBackupManager private constructor(private val context: Context) {
             _state.value = BackupState.InProgress("Flushing database…")
             flushWal(dbFile)
 
-            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
-            val fileName = "byd_stats_backup_$timestamp.db"
+            val fileName = BackupNaming.fileName()
 
             _state.value = BackupState.InProgress("Saving to SD card…")
             val dest = File(dir, fileName)
@@ -680,8 +676,8 @@ class LocalBackupManager private constructor(private val context: Context) {
 
             flushWal(dbFile)
 
-            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
-            val fileName = "byd_stats_backup_$timestamp.db"
+            val timestamp = BackupNaming.timestamp()
+            val fileName = BackupNaming.fileName(timestamp = timestamp)
             val tempFile = File(context.cacheDir, fileName)
             dbFile.copyTo(tempFile, overwrite = true)
 

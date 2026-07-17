@@ -5,11 +5,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.byd.tripstats.data.backup.LocalBackupManager.Companion.DATABASE_NAME
+import com.byd.tripstats.util.BackupNaming
 import java.io.File
 import java.io.FileInputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Periodic WorkManager task that sends a database backup to Telegram.
@@ -62,8 +60,8 @@ class TelegramBackupWorker(
             // Flush WAL for a consistent snapshot
             flushWal(dbFile)
 
-            val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.getDefault()).format(Date())
-            val fileName = "byd_stats_weekly_$timestamp.db"
+            val timestamp = BackupNaming.timestamp()
+            val fileName = BackupNaming.fileName(prefix = "byd_stats_weekly", timestamp = timestamp)
             val tempFile = File(context.cacheDir, fileName)
             dbFile.copyTo(tempFile, overwrite = true)
 
