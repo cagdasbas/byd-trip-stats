@@ -1,5 +1,9 @@
 ## [2.13.0] - Unreleased
 
+> **What's new in a nutshell**
+>
+> The headline is **DiLink 5 support** — BYD Trip Stats now runs on **DiLink-5 head units**, bringing the app to the **BYD Sealion 7** with live **state of charge, range, odometer, charging power, speed, per-wheel tyre pressure and battery health**. It ships as a **dedicated build alongside the existing DiLink-3 one**, so **DiLink-3 vehicles are completely unaffected** — and huge thanks to **[@cagdasbas](https://github.com/cagdasbas)**, who contributed the entire DiLink-5 port. Beyond that, the electricity-tariff currency picker gains **Malaysian Ringgit (RM)** and now **pre-selects a sensible available currency from your head unit's locale** on a fresh install instead of always defaulting to €. Backups gain a new **"Restore from file…"** action to restore any `.db` the automatic list can't surface — handy if a backup lives in another folder or came over from another device. And if the **wrong build** ever ends up on a car, the app now **warns you** to install the right one rather than quietly misbehaving.
+
 ### Added
 
 - **DiLink 5 support (BYD Sealion 7)** — the app now runs on DiLink-5 head units via a dedicated build, reading live telemetry (state of charge, range, odometer, charging power, speed, per-wheel tyre pressure, battery health) on the Sealion 7. Includes the three battery variants (71.8 / 82.5 / 91.5 kWh). DiLink-3 vehicles are unaffected. DiLink-5 support was contributed by [@cagdasbas](https://github.com/cagdasbas) — huge thanks! 🙌
@@ -7,10 +11,6 @@
 - **Currency now defaults to your device locale** — on a fresh install, the electricity-tariff currency is pre-selected from the head unit's system locale (e.g. RM for Malaysia, ฿ for Thailand, $ for the US) instead of always starting at €. Existing users with a saved currency are unaffected.
 - **Restore a backup from a file** — Settings → Backup → *Restore from file…* lets you pick any `.db` backup with the system file browser, so you can restore one the app's list can't show (a backup from another folder, another device, or one copied over via adb).
 - **Wrong-build warning** — if a DiLink-5 head unit is running a build without DiLink-5 support, the app now warns you to install the correct build (telemetry won't work otherwise).
-
-### Fixed
-
-- **Backups not listed on DiLink-5 head units** — on Android 11/12 the backup screen couldn't read saved backups (a storage-permission gap), so the list showed empty and you couldn't restore. It now requests read access and lists them, including backups that survived an app reinstall.
 
 ---
 
