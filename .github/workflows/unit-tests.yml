@@ -26,12 +26,14 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest
+        # Product flavors renamed testDebugUnitTest → test<Flavor>DebugUnitTest. Unit tests live in
+        # the shared src/test set, so one flavor (dilink3, the default) exercises them all.
+        run: ./gradlew testDilink3DebugUnitTest
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit-test-results
-          path: app/build/reports/tests/testDebugUnitTest/
+          path: app/build/reports/tests/testDilink3DebugUnitTest/
           retention-days: 7

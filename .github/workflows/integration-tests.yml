@@ -51,7 +51,9 @@ jobs:
           # Exclude @LargeTest — those manipulate singletons and should only
           # run in a fully isolated environment (the emulator here is fine,
           # but we keep the annotation consistent with local usage on the car)
-          script: ./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest
+          # Flavors renamed connectedDebugAndroidTest → connected<Flavor>DebugAndroidTest.
+          # dilink3 is the emulator-testable path (dilink5's OEM SDK binding only exists on a real car).
+          script: ./gradlew connectedDilink3DebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest
 
       - name: Upload integration test results
         uses: actions/upload-artifact@v4
