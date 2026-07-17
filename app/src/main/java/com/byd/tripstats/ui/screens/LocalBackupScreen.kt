@@ -5,6 +5,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -140,8 +141,21 @@ fun LocalBackupScreen(
         }
     }
 
+    // Listing backups from shared storage (Download/SD) needs READ_EXTERNAL_STORAGE on this
+    // legacy-storage setup. After a fresh install it isn't granted, so the scan silently finds
+    // nothing — including backups that SURVIVED an uninstall (the restore-after-reinstall case).
+    // Request it, then re-scan on grant. (Not requestable on API 33+, where the perm is gone.)
+    val readPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) scope.launch { manager.scanLocalBackups() } }
+
     // ── Load local backup list and telegram list on first open ────────────────
     LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT <= 32 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            readPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
         manager.scanLocalBackups()
         if (telegramConfig != null) telegramManager.listTelegramBackups()
     }

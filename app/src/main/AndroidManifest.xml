@@ -3,8 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- External storage — backup/restore database to Download/BydTripStats -->
+    <!-- Up to 32: needed to read backups from shared storage (Download/SD) on legacy storage,
+         including DiLink-5 head units (Android 11/12) and backups that survived an uninstall.
+         READ_EXTERNAL_STORAGE is replaced by granular media perms on API 33+, which don't cover
+         arbitrary .db files; no head units run 33+ yet. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
 
