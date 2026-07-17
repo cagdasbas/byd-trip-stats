@@ -974,6 +974,8 @@
     <string name="autostart_dialog_title">⚠️ Aktion erforderlich — Autostart</string>
     <string name="autostart_dialog_msg">Eine neue Version wurde installiert. Du musst den Autostart für diese App deaktivieren — das ermöglicht die Ausführung von Vordergrund-/Hintergrunddiensten.\nEin einmaliger Neustart des Autos ist nötig, und zwar nur bei der ersten Installation der App und nachdem du den Autostart deaktiviert hast. Wenn du von einer älteren Version aktualisierst, musst du nicht neu starten</string>
     <string name="autostart_got_it">Verstanden</string>
+    <string name="flavor_mismatch_title">⚠️ Falscher Build für dieses Auto</string>
+    <string name="flavor_mismatch_msg">Du hast den %1$s-Build installiert, aber dieses Auto ist %2$s. Die Fahrzeugtelemetrie funktioniert möglicherweise nicht korrekt. Bitte installiere den %2$s-Build für dieses Fahrzeug.</string>
     <string name="adb_connecting_title">Verbinden…</string>
     <string name="adb_waiting_auth_title">Warte auf Autorisierung</string>
     <string name="adb_granting_title">Berechtigungen werden gewährt…</string>

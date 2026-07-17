@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Eylem Gerekli — Otomatik Başlatma</string>
     <string name="autostart_dialog_msg">Yeni bir sürüm yüklendi. Bu uygulama için otomatik başlatmayı kapatman gerekiyor; bu, ön plan / arka plan hizmetlerinin çalışmasını sağlar.\nAracın bir kez yeniden başlatılması gerekir; yalnızca uygulamayı ilk kez yüklediğinde ve otomatik başlatmayı kapattıktan sonra. Daha eski bir sürümden güncelliyorsan yeniden başlatmana gerek yok</string>
     <string name="autostart_got_it">Anlaşıldı</string>
+    <string name="flavor_mismatch_title">⚠️ Bu araç için yanlış sürüm</string>
+    <string name="flavor_mismatch_msg">%1$s sürümünü yüklediniz, ancak bu araç %2$s. Araç telemetrisi düzgün çalışmayabilir. Lütfen bu araç için %2$s sürümünü yükleyin.</string>
     <string name="adb_connecting_title">Bağlanıyor…</string>
     <string name="adb_waiting_auth_title">Yetkilendirme bekleniyor</string>
     <string name="adb_granting_title">İzinler veriliyor…</string>

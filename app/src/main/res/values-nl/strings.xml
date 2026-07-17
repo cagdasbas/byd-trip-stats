@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Actie vereist — Autostart</string>
     <string name="autostart_dialog_msg">Er is een nieuwe versie geïnstalleerd. Je moet autostart uitschakelen voor deze app, wat voorgrond-/achtergronddiensten laat draaien.\nEen eenmalige herstart van de auto is nodig, en alleen wanneer je de app voor het eerst installeert en nadat je autostart hebt uitgeschakeld. Als je bijwerkt vanaf een oudere versie, hoef je niet te herstarten</string>
     <string name="autostart_got_it">Begrepen</string>
+    <string name="flavor_mismatch_title">⚠️ Verkeerde build voor deze auto</string>
+    <string name="flavor_mismatch_msg">Je hebt de %1$s-build geïnstalleerd, maar deze auto is %2$s. De voertuigtelemetrie werkt mogelijk niet correct. Installeer de %2$s-build voor dit voertuig.</string>
     <string name="adb_connecting_title">Verbinden…</string>
     <string name="adb_waiting_auth_title">Wachten op autorisatie</string>
     <string name="adb_granting_title">Bevoegdheden verlenen…</string>

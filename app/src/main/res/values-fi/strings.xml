@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Toiminto vaaditaan — Autostart</string>
     <string name="autostart_dialog_msg">Uusi versio on asennettu. Sinun täytyy poistaa automaattinen käynnistys käytöstä tässä sovelluksessa, mikä mahdollistaa etualan / taustan palvelujen suorittamisen.\nAuton kertaluontoinen uudelleenkäynnistys tarvitaan vain, kun asennat sovelluksen ensimmäisen kerran ja kun olet poistanut automaattisen käynnistyksen käytöstä. Jos päivität vanhemmasta versiosta, uudelleenkäynnistystä ei tarvita</string>
     <string name="autostart_got_it">Selvä</string>
+    <string name="flavor_mismatch_title">⚠️ Väärä versio tälle autolle</string>
+    <string name="flavor_mismatch_msg">Asensit %1$s-version, mutta tämä auto on %2$s. Ajoneuvon telemetria ei ehkä toimi oikein. Asenna %2$s-versio tälle ajoneuvolle.</string>
     <string name="adb_connecting_title">Yhdistetään…</string>
     <string name="adb_waiting_auth_title">Odotetaan valtuutusta</string>
     <string name="adb_granting_title">Myönnetään lupia…</string>

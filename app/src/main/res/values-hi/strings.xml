@@ -974,6 +974,8 @@
     <string name="autostart_dialog_title">⚠️ कार्रवाई आवश्यक — ऑटोस्टार्ट</string>
     <string name="autostart_dialog_msg">एक नया संस्करण इंस्टॉल हुआ है। आपको इस ऐप के लिए ऑटोस्टार्ट बंद करना होगा, जो फोरग्राउंड / बैकग्राउंड सेवाओं को चलने देता है।\nकार का एक-बार रीबूट ज़रूरी है, और केवल तब जब आप पहली बार ऐप इंस्टॉल करते हैं और ऑटोस्टार्ट बंद करने के बाद। अगर आप किसी पुराने संस्करण से अपडेट कर रहे हैं, तो आपको रीबूट करने की ज़रूरत नहीं है</string>
     <string name="autostart_got_it">ठीक है</string>
+    <string name="flavor_mismatch_title">⚠️ इस कार के लिए गलत बिल्ड</string>
+    <string name="flavor_mismatch_msg">आपने %1$s बिल्ड इंस्टॉल किया, लेकिन यह कार %2$s है। वाहन टेलीमेट्री सही ढंग से काम नहीं कर सकती। कृपया इस वाहन के लिए %2$s बिल्ड इंस्टॉल करें।</string>
     <string name="adb_connecting_title">कनेक्ट हो रहा है…</string>
     <string name="adb_waiting_auth_title">अनुमोदन की प्रतीक्षा</string>
     <string name="adb_granting_title">अनुमतियां दी जा रही हैं…</string>

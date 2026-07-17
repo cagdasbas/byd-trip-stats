@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ 操作が必要 — 自動起動</string>
     <string name="autostart_dialog_msg">新しいバージョンがインストールされました。このアプリの自動起動を無効にする必要があります。これにより、フォアグラウンド / バックグラウンドサービスの実行が有効になります。\n車の再起動が一度だけ必要です。アプリを初めてインストールしたときと、自動起動を無効にした後のみです。以前のバージョンから更新する場合は、再起動する必要はありません</string>
     <string name="autostart_got_it">了解</string>
+    <string name="flavor_mismatch_title">⚠️ この車に合わないビルドです</string>
+    <string name="flavor_mismatch_msg">%1$s ビルドをインストールしていますが、この車は %2$s です。車両テレメトリが正しく動作しない可能性があります。この車両には %2$s ビルドをインストールしてください。</string>
     <string name="adb_connecting_title">接続中…</string>
     <string name="adb_waiting_auth_title">認証を待機中</string>
     <string name="adb_granting_title">アクセス許可を付与中…</string>

@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Azione richiesta — Avvio automatico</string>
     <string name="autostart_dialog_msg">È stata installata una nuova versione. Devi disabilitare l\'avvio automatico per questa app, il che consente l\'esecuzione dei servizi in primo piano / in background.\nÈ necessario un riavvio una tantum dell\'auto, e solo quando installi l\'app per la prima volta e dopo aver disabilitato l\'avvio automatico. Se stai aggiornando da una versione precedente, non devi riavviare</string>
     <string name="autostart_got_it">Capito</string>
+    <string name="flavor_mismatch_title">⚠️ Build errata per questa auto</string>
+    <string name="flavor_mismatch_msg">Hai installato la build %1$s, ma questa auto è %2$s. La telemetria del veicolo potrebbe non funzionare correttamente. Installa la build %2$s per questo veicolo.</string>
     <string name="adb_connecting_title">Connessione…</string>
     <string name="adb_waiting_auth_title">In attesa di autorizzazione</string>
     <string name="adb_granting_title">Concessione permessi…</string>

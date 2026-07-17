@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Åtgärd krävs — Autostart</string>
     <string name="autostart_dialog_msg">En ny version har installerats. Du måste inaktivera autostart för den här appen, vilket gör att förgrunds-/bakgrundstjänster kan köras.\nEn engångsomstart av bilen behövs, och endast när du installerar appen första gången och efter att du inaktiverat autostart. Om du uppdaterar från en äldre version behöver du inte starta om</string>
     <string name="autostart_got_it">Förstått</string>
+    <string name="flavor_mismatch_title">⚠️ Fel version för den här bilen</string>
+    <string name="flavor_mismatch_msg">Du installerade %1$s-versionen, men den här bilen är %2$s. Fordonstelemetrin kanske inte fungerar korrekt. Installera %2$s-versionen för det här fordonet.</string>
     <string name="adb_connecting_title">Ansluter…</string>
     <string name="adb_waiting_auth_title">Väntar på auktorisering</string>
     <string name="adb_granting_title">Beviljar behörigheter…</string>

@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ Vyžadována akce — Autostart</string>
     <string name="autostart_dialog_msg">Byla nainstalována nová verze. Musíte pro tuto aplikaci vypnout „disable autostart”, což umožní běh služeb na popředí / na pozadí.\nJednorázový restart vozu je potřeba pouze při první instalaci aplikace a po vypnutí „disable autostart”. Pokud aktualizujete ze starší verze, restart není nutný</string>
     <string name="autostart_got_it">Rozumím</string>
+    <string name="flavor_mismatch_title">⚠️ Nesprávná verze pro toto auto</string>
+    <string name="flavor_mismatch_msg">Nainstalovali jste verzi %1$s, ale toto auto je %2$s. Telemetrie vozidla nemusí fungovat správně. Nainstalujte prosím verzi %2$s pro toto vozidlo.</string>
     <string name="adb_connecting_title">Připojování…</string>
     <string name="adb_waiting_auth_title">Čekání na autorizaci</string>
     <string name="adb_granting_title">Udělování oprávnění…</string>

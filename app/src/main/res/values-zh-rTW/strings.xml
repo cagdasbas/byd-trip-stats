@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ 需要操作 — 自動啟動</string>
     <string name="autostart_dialog_msg">已安裝新版本。您需要關閉此應用程式的自動啟動，這樣可以讓前景 / 背景服務執行。\n只需在首次安裝應用程式時以及關閉自動啟動後重新啟動一次車輛。如果您是從舊版本升級，則無需重新啟動</string>
     <string name="autostart_got_it">知道了</string>
+    <string name="flavor_mismatch_title">⚠️ 此車型的版本錯誤</string>
+    <string name="flavor_mismatch_msg">您安裝的是 %1$s 版本，但此車為 %2$s。車輛遙測可能無法正常運作。請為此車輛安裝 %2$s 版本。</string>
     <string name="adb_connecting_title">連線中…</string>
     <string name="adb_waiting_auth_title">等待授權</string>
     <string name="adb_granting_title">授予權限中…</string>

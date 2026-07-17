@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ Wymagane działanie — Autostart</string>
     <string name="autostart_dialog_msg">Zainstalowano nową wersję. Musisz przełączyć na wyłączone „disable autostart” dla tej aplikacji, co umożliwia działanie usług pierwszoplanowych / w tle.\nJednorazowy restart samochodu jest potrzebny tylko przy pierwszej instalacji aplikacji i po wyłączeniu „disable autostart”. Jeśli aktualizujesz ze starszej wersji, nie musisz restartować</string>
     <string name="autostart_got_it">Rozumiem</string>
+    <string name="flavor_mismatch_title">⚠️ Nieprawidłowa wersja dla tego samochodu</string>
+    <string name="flavor_mismatch_msg">Zainstalowano wersję %1$s, ale ten samochód to %2$s. Telemetria pojazdu może nie działać poprawnie. Zainstaluj wersję %2$s dla tego pojazdu.</string>
     <string name="adb_connecting_title">Łączenie…</string>
     <string name="adb_waiting_auth_title">Oczekiwanie na autoryzację</string>
     <string name="adb_granting_title">Przyznawanie uprawnień…</string>

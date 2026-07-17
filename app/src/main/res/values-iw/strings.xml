@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ נדרשת פעולה — הפעלה אוטומטית</string>
     <string name="autostart_dialog_msg">הותקנה גרסה חדשה. עליכם לכבות את \"disable autostart\" עבור אפליקציה זו, מה שמאפשר לשירותי חזית / רקע לפעול.\nנדרשת הפעלה מחדש חד-פעמית של הרכב, ורק כשאתם מתקינים את האפליקציה בפעם הראשונה ואחרי שכיביתם את \"disable autostart\". אם אתם מעדכנים מגרסה ישנה יותר, אין צורך להפעיל מחדש</string>
     <string name="autostart_got_it">הבנתי</string>
+    <string name="flavor_mismatch_title">⚠️ גרסה שגויה לרכב הזה</string>
+    <string name="flavor_mismatch_msg">התקנת את גרסת %1$s, אך רכב זה הוא %2$s. ייתכן שהטלמטריה של הרכב לא תפעל כראוי. אנא התקן את גרסת %2$s עבור רכב זה.</string>
     <string name="adb_connecting_title">מתחבר…</string>
     <string name="adb_waiting_auth_title">ממתין להרשאה</string>
     <string name="adb_granting_title">מעניק הרשאות…</string>

@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ Cần Hành động — Tự khởi động</string>
     <string name="autostart_dialog_msg">Một phiên bản mới đã được cài đặt. Bạn cần tắt „disable autostart” cho ứng dụng này, việc này cho phép các dịch vụ tiền cảnh / nền chạy.\nCần khởi động lại xe một lần, và chỉ khi bạn cài đặt ứng dụng lần đầu và sau khi tắt „disable autostart”. Nếu bạn đang cập nhật từ phiên bản cũ hơn, bạn không cần khởi động lại</string>
     <string name="autostart_got_it">Đã hiểu</string>
+    <string name="flavor_mismatch_title">⚠️ Sai bản dựng cho xe này</string>
+    <string name="flavor_mismatch_msg">Bạn đã cài đặt bản dựng %1$s, nhưng xe này là %2$s. Đo từ xa của xe có thể không hoạt động chính xác. Vui lòng cài đặt bản dựng %2$s cho xe này.</string>
     <string name="adb_connecting_title">Đang kết nối…</string>
     <string name="adb_waiting_auth_title">Đang chờ ủy quyền</string>
     <string name="adb_granting_title">Đang cấp quyền…</string>

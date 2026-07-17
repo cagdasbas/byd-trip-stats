@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Acción requerida — Inicio automático</string>
     <string name="autostart_dialog_msg">Se instaló una nueva versión. Debes desactivar el inicio automático para esta app, lo que permite ejecutar servicios en primer plano / segundo plano.\nEs necesario un reinicio único del coche, y solo cuando instalas la app por primera vez y después de desactivar el inicio automático. Si actualizas desde una versión anterior, no necesitas reiniciar</string>
     <string name="autostart_got_it">Entendido</string>
+    <string name="flavor_mismatch_title">⚠️ Versión incorrecta para este coche</string>
+    <string name="flavor_mismatch_msg">Has instalado la versión %1$s, pero este coche es %2$s. La telemetría del vehículo podría no funcionar correctamente. Instala la versión %2$s para este vehículo.</string>
     <string name="adb_connecting_title">Conectando…</string>
     <string name="adb_waiting_auth_title">Esperando autorización</string>
     <string name="adb_granting_title">Concediendo permisos…</string>

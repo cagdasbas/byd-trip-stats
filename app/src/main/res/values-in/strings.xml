@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ Tindakan Diperlukan — Mulai-otomatis</string>
     <string name="autostart_dialog_msg">Versi baru telah dipasang. Anda perlu mematikan „disable autostart” untuk aplikasi ini, yang memungkinkan layanan latar depan / latar belakang berjalan.\nDiperlukan mulai ulang mobil satu kali, dan hanya saat Anda pertama kali memasang aplikasi dan setelah mematikan „disable autostart”. Jika Anda memperbarui dari versi lama, Anda tidak perlu mulai ulang</string>
     <string name="autostart_got_it">Mengerti</string>
+    <string name="flavor_mismatch_title">⚠️ Build salah untuk mobil ini</string>
+    <string name="flavor_mismatch_msg">Anda menginstal build %1$s, tetapi mobil ini adalah %2$s. Telemetri kendaraan mungkin tidak berfungsi dengan benar. Silakan instal build %2$s untuk kendaraan ini.</string>
     <string name="adb_connecting_title">Menghubungkan…</string>
     <string name="adb_waiting_auth_title">Menunggu otorisasi</string>
     <string name="adb_granting_title">Memberikan izin…</string>

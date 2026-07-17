@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ Требуется действие — Автозапуск</string>
     <string name="autostart_dialog_msg">Установлена новая версия. Нужно выключить «disable autostart» для этого приложения — это позволяет работать службам переднего плана / фоновым службам.\nОднократная перезагрузка автомобиля нужна только при первой установке приложения и после выключения «disable autostart». Если вы обновляетесь с более старой версии, перезагрузка не требуется</string>
     <string name="autostart_got_it">Понятно</string>
+    <string name="flavor_mismatch_title">⚠️ Неправильная сборка для этого автомобиля</string>
+    <string name="flavor_mismatch_msg">Вы установили сборку %1$s, но этот автомобиль — %2$s. Телеметрия автомобиля может работать некорректно. Установите сборку %2$s для этого автомобиля.</string>
     <string name="adb_connecting_title">Подключение…</string>
     <string name="adb_waiting_auth_title">Ожидание авторизации</string>
     <string name="adb_granting_title">Выдача разрешений…</string>

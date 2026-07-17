@@ -1086,6 +1086,8 @@
     <string name="autostart_dialog_title">⚠️ Handling kreves — Autostart</string>
     <string name="autostart_dialog_msg">En ny versjon er installert. Du må deaktivere autostart for denne appen, noe som lar forgrunns-/bakgrunnstjenester kjøre.\nEn engangsomstart av bilen er nødvendig, og bare når du installerer appen første gang og etter at du har deaktivert autostart. Hvis du oppdaterer fra en eldre versjon, trenger du ikke starte på nytt</string>
     <string name="autostart_got_it">Forstått</string>
+    <string name="flavor_mismatch_title">⚠️ Feil bygg for denne bilen</string>
+    <string name="flavor_mismatch_msg">Du installerte %1$s-bygget, men denne bilen er %2$s. Kjøretøyets telemetri fungerer kanskje ikke riktig. Installer %2$s-bygget for dette kjøretøyet.</string>
     <string name="adb_connecting_title">Kobler til…</string>
     <string name="adb_waiting_auth_title">Venter på autorisasjon</string>
     <string name="adb_granting_title">Gir tillatelser…</string>

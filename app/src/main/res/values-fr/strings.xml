@@ -974,6 +974,8 @@
     <string name="autostart_dialog_title">⚠️ Action requise — Démarrage automatique</string>
     <string name="autostart_dialog_msg">Une nouvelle version a été installée. Vous devez désactiver le démarrage automatique pour cette app, ce qui permet l\'exécution des services de premier plan / d\'arrière-plan.\nUn redémarrage unique de la voiture est nécessaire, uniquement lors de la première installation de l\'app et après avoir désactivé le démarrage automatique. Si vous effectuez une mise à jour depuis une version antérieure, vous n\'avez pas besoin de redémarrer</string>
     <string name="autostart_got_it">Compris</string>
+    <string name="flavor_mismatch_title">⚠️ Mauvaise version pour cette voiture</string>
+    <string name="flavor_mismatch_msg">Vous avez installé la version %1$s, mais cette voiture est %2$s. La télémétrie du véhicule pourrait ne pas fonctionner correctement. Veuillez installer la version %2$s pour ce véhicule.</string>
     <string name="adb_connecting_title">Connexion…</string>
     <string name="adb_waiting_auth_title">En attente d\'autorisation</string>
     <string name="adb_granting_title">Octroi des permissions…</string>

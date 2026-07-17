@@ -1082,6 +1082,8 @@
     <string name="autostart_dialog_title">⚠️ Teendő — Autostart</string>
     <string name="autostart_dialog_msg">Új verzió lett telepítve. Ki kell kapcsolnia a „disable autostart”-ot ennél az alkalmazásnál, ami lehetővé teszi az előtér-/háttérszolgáltatások futását.\nAz autó egyszeri újraindítása szükséges, de csak az alkalmazás első telepítésekor és a „disable autostart” kikapcsolása után. Ha egy régebbi verzióról frissít, nem kell újraindítania</string>
     <string name="autostart_got_it">Értem</string>
+    <string name="flavor_mismatch_title">⚠️ Rossz build ehhez az autóhoz</string>
+    <string name="flavor_mismatch_msg">A(z) %1$s buildet telepítetted, de ez az autó %2$s. A jármű telemetriája nem biztos, hogy megfelelően működik. Kérlek, telepítsd a(z) %2$s buildet ehhez a járműhöz.</string>
     <string name="adb_connecting_title">Csatlakozás…</string>
     <string name="adb_waiting_auth_title">Várakozás engedélyezésre</string>
     <string name="adb_granting_title">Engedélyek megadása…</string>
