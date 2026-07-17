@@ -328,3 +328,35 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")
 }
+
+// ── Instrumented-test safety net ────────────────────────────────────────────
+// connectedAndroidTest deploys to EVERY attached device and WIPES its app data. Refuse to run if a
+// NON-emulator device (e.g. the car at 192.168.x.x:5555) is attached and ANDROID_SERIAL isn't pinned
+// to an emulator — otherwise a local run would destroy the car's real trip database.
+// Pin the emulator to run:  ANDROID_SERIAL=emulator-5554 ./gradlew connectedDilink3DebugAndroidTest
+// CI is unaffected: only an emulator is attached there (and if adb is absent, the check no-ops).
+tasks.matching { it.name.startsWith("connected") && it.name.endsWith("AndroidTest") }.configureEach {
+    doFirst {
+        val serial = System.getenv("ANDROID_SERIAL").orEmpty().trim()
+        if (serial.startsWith("emulator-")) return@doFirst   // explicitly pinned to an emulator — safe
+        val adbOut = runCatching {
+            val p = ProcessBuilder("adb", "devices").redirectErrorStream(true).start()
+            p.inputStream.bufferedReader().readText().also { p.waitFor() }
+        }.getOrDefault("")
+        val realDevices = adbOut.lineSequence()
+            .drop(1)                                   // skip "List of devices attached"
+            .filter { it.trim().endsWith("device") }   // only fully-online devices
+            .map { it.substringBefore("\t").substringBefore(" ").trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("emulator-") }
+            .toList()
+        if (realDevices.isNotEmpty()) {
+            throw GradleException(
+                "\n🚨 Refusing to run instrumented tests — non-emulator device(s) attached: $realDevices\n" +
+                "   connectedAndroidTest deploys to EVERY device and WIPES its app data (this would\n" +
+                "   destroy the car's real trip database).\n" +
+                "   → Pin the emulator:  ANDROID_SERIAL=emulator-5554 ./gradlew $name\n" +
+                "   → or detach the device:  adb disconnect <serial>\n"
+            )
+        }
+    }
+}
