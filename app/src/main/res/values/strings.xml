@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">Restoring will replace ALL current trip data. The app will close and reopen automatically.</string>
     <string name="available_backups_label">Available backups:</string>
     <string name="no_backups_found">No backups found. Run a backup first.</string>
+    <string name="restore_from_file_action">Restore from file…</string>
     <string name="trim_database_label">Trim database</string>
     <string name="trim_description">Removes diagnostic data and downsamples old recordings to free up space:</string>
     <string name="trim_warning_msg">WARNING: Downsampling means that charts/heatmaps from trimmed sessions will have very scarce points thus not be in detail.\nIf you just want to reduce storage usage, you might want to delete older trips instead of trimming.\nTHIS ACTION IS IRREVERSIBLE!</string>

@@ -5,6 +5,12 @@
 - **DiLink 5 support (BYD Sealion 7)** — the app now runs on DiLink-5 head units via a dedicated build, reading live telemetry (state of charge, range, odometer, charging power, speed, per-wheel tyre pressure, battery health) on the Sealion 7. Includes the three battery variants (71.8 / 82.5 / 91.5 kWh). DiLink-3 vehicles are unaffected. DiLink-5 support was contributed by [@cagdasbas](https://github.com/cagdasbas) — huge thanks! 🙌
 - **Malaysian Ringgit (RM / MYR)** added to the electricity-tariff currency options (Settings → Preferences → Electricity tariff), alongside €, £, $, A$, ฿ and R$.
 - **Currency now defaults to your device locale** — on a fresh install, the electricity-tariff currency is pre-selected from the head unit's system locale (e.g. RM for Malaysia, ฿ for Thailand, $ for the US) instead of always starting at €. Existing users with a saved currency are unaffected.
+- **Restore a backup from a file** — Settings → Backup → *Restore from file…* lets you pick any `.db` backup with the system file browser, so you can restore one the app's list can't show (a backup from another folder, another device, or one copied over via adb).
+- **Wrong-build warning** — if a DiLink-5 head unit is running a build without DiLink-5 support, the app now warns you to install the correct build (telemetry won't work otherwise).
+
+### Fixed
+
+- **Backups not listed on DiLink-5 head units** — on Android 11/12 the backup screen couldn't read saved backups (a storage-permission gap), so the list showed empty and you couldn't restore. It now requests read access and lists them, including backups that survived an app reinstall.
 
 ---
 

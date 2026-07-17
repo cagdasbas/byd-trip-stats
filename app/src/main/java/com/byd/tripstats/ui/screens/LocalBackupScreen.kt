@@ -149,6 +149,13 @@ fun LocalBackupScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) scope.launch { manager.scanLocalBackups() } }
 
+    // Restore from any .db the user picks via the system file browser — a fallback for when the
+    // scan can't surface a backup (an orphaned file after reinstall, a different folder, an
+    // adb-pushed file, another device's backup).
+    val restoreFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) scope.launch { manager.restoreFromUri(uri) } }
+
     // ── Load local backup list and telegram list on first open ────────────────
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT <= 32 &&
@@ -361,6 +368,17 @@ fun LocalBackupScreen(
                                 onDelete  = { deleteTarget  = backup },
                             )
                         }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick  = { restoreFilePicker.launch(arrayOf("*/*")) },
+                        enabled  = !isBusy,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.restore_from_file_action))
                     }
                 }
                 }
