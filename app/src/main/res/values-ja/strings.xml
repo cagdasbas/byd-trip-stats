@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">復元すると、現在のすべての走行データが置き換えられます。アプリは自動的に終了して再起動します。</string>
     <string name="available_backups_label">利用可能なバックアップ：</string>
     <string name="no_backups_found">バックアップが見つかりません。最初にバックアップを実行してください。</string>
+    <string name="restore_from_file_action">ファイルから復元…</string>
     <string name="trim_database_label">データベースをトリミング</string>
     <string name="trim_description">診断データを削除し、古い記録をダウンサンプリングしてスペースを解放します：</string>
     <string name="trim_warning_msg">警告：ダウンサンプリングにより、トリミングされたセッションのチャート/ヒートマップのポイントが非常に少なくなり、詳細が失われます。\nストレージ使用量を減らしたいだけの場合は、古いトリップを削除することをお勧めします。\nこの操作は取り消せません！</string>

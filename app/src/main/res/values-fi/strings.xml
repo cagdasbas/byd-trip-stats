@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">Palautus korvaa KAIKKI nykyiset matkatiedot. Sovellus sulkeutuu ja avautuu automaattisesti uudelleen.</string>
     <string name="available_backups_label">Saatavilla olevat varmuuskopiot:</string>
     <string name="no_backups_found">Varmuuskopioita ei löydy. Tee ensin varmuuskopio.</string>
+    <string name="restore_from_file_action">Palauta tiedostosta…</string>
     <string name="trim_database_label">Karsitse tietokanta</string>
     <string name="trim_description">Poistaa diagnostiikkatiedot ja alasamploo vanhat tallenteet tilan vapauttamiseksi:</string>
     <string name="trim_warning_msg">VAROITUS: Alasamplointi tarkoittaa että karsittujen istuntojen kaavioissa/lämpökartoissa on hyvin vähän pisteitä eivätkä ne ole yksityiskohtaisia.\nJos haluat vain vähentää tallennustilan käyttöä, voit halutessaan poistaa vanhempia matkoja karsinnan sijaan.\nTÄMÄ TOIMINTO ON PERUUTTAMATON!</string>

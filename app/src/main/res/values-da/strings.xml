@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">Gendannelse vil erstatte ALLE aktuelle turdata. Appen lukkes og åbnes automatisk igen.</string>
     <string name="available_backups_label">Tilgængelige sikkerhedskopier:</string>
     <string name="no_backups_found">Ingen sikkerhedskopier fundet. Kør en sikkerhedskopi først.</string>
+    <string name="restore_from_file_action">Gendan fra fil…</string>
     <string name="trim_database_label">Beskær database</string>
     <string name="trim_description">Fjerner diagnostiske data og nedsampler gamle optagelser for at frigøre plads:</string>
     <string name="trim_warning_msg">ADVARSEL: Nedsampling betyder, at grafik/varmekort fra beskårne sessioner vil have meget sparsomme punkter og dermed ikke være detaljerede.\nHvis du blot vil reducere lagerplads, kan du slette ældre ture i stedet for at beskære.\nDENNE HANDLING KAN IKKE FORTRYDES!</string>

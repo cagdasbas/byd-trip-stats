@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">La restauración reemplazará TODOS los datos de viaje actuales. La app se cerrará y reabrirá automáticamente.</string>
     <string name="available_backups_label">Copias disponibles:</string>
     <string name="no_backups_found">No se encontraron copias. Haz una copia primero.</string>
+    <string name="restore_from_file_action">Restaurar desde archivo…</string>
     <string name="trim_database_label">Reducir base de datos</string>
     <string name="trim_description">Elimina datos de diagnóstico y reduce la resolución de grabaciones antiguas para liberar espacio:</string>
     <string name="trim_warning_msg">ADVERTENCIA: La reducción de resolución implica que los gráficos/mapas de calor de sesiones reducidas tendrán muy pocos puntos y no estarán en detalle.\nSi solo quieres reducir el uso de almacenamiento, puede que prefieras eliminar viajes más antiguos en lugar de reducir.\n¡ESTA ACCIÓN ES IRREVERSIBLE!</string>

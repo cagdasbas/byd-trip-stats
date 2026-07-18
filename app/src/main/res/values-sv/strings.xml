@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">Återställning ersätter ALL aktuell resedata. Appen stängs och öppnas automatiskt igen.</string>
     <string name="available_backups_label">Tillgängliga säkerhetskopior:</string>
     <string name="no_backups_found">Inga säkerhetskopior hittades. Kör en säkerhetskopiering först.</string>
+    <string name="restore_from_file_action">Återställ från fil…</string>
     <string name="trim_database_label">Trimma databas</string>
     <string name="trim_description">Tar bort diagnostikdata och nedsamplar gamla inspelningar för att frigöra utrymme:</string>
     <string name="trim_warning_msg">VARNING: Nedsampling innebär att diagram/värmekartor från trimmade sessioner har mycket glesa punkter och därmed inte är detaljerade.\nOm du bara vill minska lagringsanvändningen kan du ta bort äldre resor i stället för att trimma.\nDENNA ÅTGÄRD ÄR OÅTERKALLELIG!</string>

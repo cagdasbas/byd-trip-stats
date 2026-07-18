@@ -397,6 +397,7 @@
     <string name="restore_warning_msg">La restauration remplacera TOUTES les données de trajets actuelles. L\'app se fermera et se rouvrira automatiquement.</string>
     <string name="available_backups_label">Sauvegardes disponibles:</string>
     <string name="no_backups_found">Aucune sauvegarde trouvée. Effectuez d\'abord une sauvegarde.</string>
+    <string name="restore_from_file_action">Restaurer depuis un fichier…</string>
     <string name="trim_database_label">Nettoyer la base de données</string>
     <string name="trim_description">Supprime les données de diagnostic et réduit les anciens enregistrements pour libérer de l\'espace:</string>
     <string name="trim_warning_msg">AVERTISSEMENT: La réduction signifie que les graphiques/cartes thermiques des sessions nettoyées auront très peu de points.\nSi vous voulez juste réduire l\'utilisation du stockage, il vaut mieux supprimer les anciens trajets.\nCETTE ACTION EST IRRÉVERSIBLE!</string>

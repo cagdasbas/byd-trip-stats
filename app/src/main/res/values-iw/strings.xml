@@ -439,6 +439,7 @@
     <string name="restore_warning_msg">שחזור יחליף את כל נתוני הנסיעות הנוכחיים. האפליקציה תיסגר ותיפתח מחדש אוטומטית.</string>
     <string name="available_backups_label">גיבויים זמינים:</string>
     <string name="no_backups_found">לא נמצאו גיבויים. הריצו גיבוי קודם.</string>
+    <string name="restore_from_file_action">שחזור מקובץ…</string>
     <string name="trim_database_label">דילול מסד הנתונים</string>
     <string name="trim_description">מסיר נתוני אבחון ומדלל הקלטות ישנות לפינוי מקום:</string>
     <string name="trim_warning_msg">אזהרה: דילול פירושו שגרפים/מפות חום ממפגשים שדוללו יכילו נקודות מעטות מאוד ולכן לא יהיו מפורטים.\nאם רק רוצים לצמצם שטח אחסון, אולי עדיף למחוק נסיעות ישנות במקום לדלל.\nפעולה זו בלתי הפיכה!</string>

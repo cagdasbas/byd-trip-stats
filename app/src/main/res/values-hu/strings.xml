@@ -439,6 +439,7 @@
     <string name="restore_warning_msg">A visszaállítás lecseréli az ÖSSZES jelenlegi útadatot. Az alkalmazás automatikusan bezárul és újranyílik.</string>
     <string name="available_backups_label">Elérhető mentések:</string>
     <string name="no_backups_found">Nem található mentés. Először készítsen egyet.</string>
+    <string name="restore_from_file_action">Visszaállítás fájlból…</string>
     <string name="trim_database_label">Adatbázis karcsúsítása</string>
     <string name="trim_description">Eltávolítja a diagnosztikai adatokat és ritkítja a régi felvételeket a hely felszabadításához:</string>
     <string name="trim_warning_msg">FIGYELEM: A ritkítás azt jelenti, hogy a karcsúsított munkamenetek grafikonjai/hőtérképei nagyon kevés pontot tartalmaznak, így nem lesznek részletesek.\nHa csak a tárhelyet akarja csökkenteni, érdemesebb régi utakat törölni a karcsúsítás helyett.\nEZ A MŰVELET VISSZAFORDÍTHATATLAN!</string>

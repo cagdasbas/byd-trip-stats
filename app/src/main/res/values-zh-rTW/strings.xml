@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">還原將取代所有目前行程資料。應用程式將自動關閉並重新啟動。</string>
     <string name="available_backups_label">可用備份：</string>
     <string name="no_backups_found">未找到備份。請先執行備份。</string>
+    <string name="restore_from_file_action">從檔案還原…</string>
     <string name="trim_database_label">精簡資料庫</string>
     <string name="trim_description">刪除診斷資料並對舊記錄進行降採樣以釋放空間：</string>
     <string name="trim_warning_msg">警告：降採樣意味著精簡後的工作階段圖表/熱圖資料點極少，無法顯示細節。\n如果只是想減少儲存占用，建議刪除較舊的行程而非精簡。\n此操作不可逆！</string>

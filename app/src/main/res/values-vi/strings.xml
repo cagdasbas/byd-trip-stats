@@ -439,6 +439,7 @@
     <string name="restore_warning_msg">Khôi phục sẽ thay thế TẤT CẢ dữ liệu chuyến đi hiện tại. Ứng dụng sẽ tự động đóng và mở lại.</string>
     <string name="available_backups_label">Bản sao lưu có sẵn:</string>
     <string name="no_backups_found">Không tìm thấy bản sao lưu. Hãy sao lưu trước.</string>
+    <string name="restore_from_file_action">Khôi phục từ tệp…</string>
     <string name="trim_database_label">Cắt gọn cơ sở dữ liệu</string>
     <string name="trim_description">Xóa dữ liệu chẩn đoán và giảm mẫu các bản ghi cũ để giải phóng dung lượng:</string>
     <string name="trim_warning_msg">CẢNH BÁO: Giảm mẫu nghĩa là biểu đồ/bản đồ nhiệt từ các phiên đã cắt gọn sẽ có rất ít điểm nên không chi tiết.\nNếu chỉ muốn giảm dung lượng sử dụng, bạn nên xóa các chuyến đi cũ thay vì cắt gọn.\nHÀNH ĐỘNG NÀY KHÔNG THỂ ĐẢO NGƯỢC!</string>

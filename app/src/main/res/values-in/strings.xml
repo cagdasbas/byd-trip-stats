@@ -439,6 +439,7 @@
     <string name="restore_warning_msg">Memulihkan akan mengganti SEMUA data perjalanan saat ini. Aplikasi akan menutup dan membuka kembali secara otomatis.</string>
     <string name="available_backups_label">Cadangan tersedia:</string>
     <string name="no_backups_found">Tidak ada cadangan ditemukan. Buat cadangan dulu.</string>
+    <string name="restore_from_file_action">Pulihkan dari file…</string>
     <string name="trim_database_label">Pangkas basis data</string>
     <string name="trim_description">Menghapus data diagnostik dan mengurangi sampel rekaman lama untuk mengosongkan ruang:</string>
     <string name="trim_warning_msg">PERINGATAN: Pengurangan sampel berarti grafik/peta panas dari sesi yang dipangkas akan memiliki sangat sedikit titik sehingga tidak detail.\nJika Anda hanya ingin mengurangi penggunaan penyimpanan, sebaiknya hapus perjalanan lama daripada memangkas.\nTINDAKAN INI TIDAK DAPAT DIBATALKAN!</string>

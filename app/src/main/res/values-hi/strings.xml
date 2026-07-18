@@ -397,6 +397,7 @@
     <string name="restore_warning_msg">रिस्टोर करने से सभी वर्तमान यात्रा डेटा बदल जाएगा। ऐप स्वचालित रूप से बंद और फिर से खुलेगा।</string>
     <string name="available_backups_label">उपलब्ध बैकअप:</string>
     <string name="no_backups_found">कोई बैकअप नहीं मिला। पहले बैकअप करें।</string>
+    <string name="restore_from_file_action">फ़ाइल से पुनर्स्थापित करें…</string>
     <string name="trim_database_label">डेटाबेस ट्रिम करें</string>
     <string name="trim_description">खाली स्थान पुनः प्राप्त करने के लिए डायग्नोस्टिक डेटा हटाएं और पुराने लॉग घटाएं:</string>
     <string name="trim_warning_msg">चेतावनी: ट्रिमिंग का मतलब है ट्रिम किए गए सत्रों के चार्ट/हीटमैप में बहुत कम बिंदु होंगे।\nयदि आप केवल स्टोरेज कम करना चाहते हैं, तो पुरानी यात्राएं हटाना बेहतर है।\nइसे पूर्ववत नहीं किया जा सकता!</string>

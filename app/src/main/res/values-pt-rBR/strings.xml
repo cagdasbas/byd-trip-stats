@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">A restauração substituirá TODOS os dados de viagem atuais. O aplicativo fechará e reabrirá automaticamente.</string>
     <string name="available_backups_label">Backups disponíveis:</string>
     <string name="no_backups_found">Nenhum backup encontrado. Faça um backup primeiro.</string>
+    <string name="restore_from_file_action">Restaurar de arquivo…</string>
     <string name="trim_database_label">Compactar banco de dados</string>
     <string name="trim_description">Remove dados de diagnóstico e reduz a amostragem de gravações antigas para liberar espaço:</string>
     <string name="trim_warning_msg">AVISO: A redução de amostragem significa que gráficos/mapas de calor de sessões compactadas terão muito poucos pontos e não estarão em detalhe.\nSe você só quer reduzir o uso de armazenamento, convém excluir viagens antigas em vez de compactar.\nESTA AÇÃO É IRREVERSÍVEL!</string>

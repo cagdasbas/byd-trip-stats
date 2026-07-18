@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">Herstellen vervangt ALLE huidige ritgegevens. De app sluit en heropent automatisch.</string>
     <string name="available_backups_label">Beschikbare back-ups:</string>
     <string name="no_backups_found">Geen back-ups gevonden. Maak eerst een back-up.</string>
+    <string name="restore_from_file_action">Herstellen uit bestand…</string>
     <string name="trim_database_label">Database inkorten</string>
     <string name="trim_description">Verwijdert diagnostische gegevens en downsampled oude opnames om ruimte vrij te maken:</string>
     <string name="trim_warning_msg">WAARSCHUWING: Downsampling betekent dat grafieken/heatmaps van ingekorte sessies zeer weinig punten hebben en niet in detail zijn.\nAls je alleen opslagruimte wilt verminderen, kun je beter oudere ritten verwijderen in plaats van in te korten.\nDEZE ACTIE IS ONOMKEERBAAR!</string>

@@ -442,6 +442,7 @@
     <string name="restore_warning_msg">Gjenoppretting vil erstatte ALLE gjeldende turdata. Appen vil lukke og åpne automatisk.</string>
     <string name="available_backups_label">Tilgjengelige sikkerhetskopier:</string>
     <string name="no_backups_found">Ingen sikkerhetskopier funnet. Kjør en sikkerhetskopiering først.</string>
+    <string name="restore_from_file_action">Gjenopprett fra fil…</string>
     <string name="trim_database_label">Trim database</string>
     <string name="trim_description">Fjerner diagnostikkdata og nedsamplet gamle opptak for å frigjøre plass:</string>
     <string name="trim_warning_msg">ADVARSEL: Nedsampling betyr at diagrammer/varmekart fra trimmede sesjoner vil ha svært få punkter og dermed ikke være detaljerte.\nHvis du bare vil redusere lagringsbruk, kan det hende du vil slette eldre turer i stedet for å trimme.\nDENNE HANDLINGEN ER IRREVERSIBEL!</string>

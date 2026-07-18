@@ -439,6 +439,7 @@
     <string name="restore_warning_msg">Восстановление заменит ВСЕ текущие данные поездок. Приложение автоматически закроется и откроется снова.</string>
     <string name="available_backups_label">Доступные копии:</string>
     <string name="no_backups_found">Копии не найдены. Сначала создайте копию.</string>
+    <string name="restore_from_file_action">Восстановить из файла…</string>
     <string name="trim_database_label">Сжать базу данных</string>
     <string name="trim_description">Удаляет диагностические данные и прореживает старые записи, освобождая место:</string>
     <string name="trim_warning_msg">ВНИМАНИЕ: Прореживание означает, что графики/тепловые карты сжатых сессий будут иметь очень мало точек и потеряют детализацию.\nЕсли нужно просто освободить место, лучше удалить старые поездки вместо сжатия.\nЭТО ДЕЙСТВИЕ НЕОБРАТИМО!</string>
