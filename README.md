@@ -34,8 +34,7 @@
 - A BYD vehicle with **DiLink 3.0** (BEV as well as PHEV are supported)
 - Android **10 or higher** on the DiLink head unit
 - **DiLink 5.0** (Sealion 7 and other newer BYDs, Android 11+) is supported via a separate build —
-  see [**Running on DiLink 5.0**](docs/DILINK5.md). It needs a quick one-time local build (the
-  proprietary SDK is resolved at runtime from your own car, never bundled or redistributed).
+  see [**Running on DiLink 5.0**](docs/DILINK5.md).
 
 ### Installation
 
@@ -46,9 +45,9 @@
 
 No Electro setup, MQTT broker, or topic configuration is required for normal operation.
 
-> **On a DiLink 5.0 car?** The Releases APK is DiLink-3 only. Follow
-> [**docs/DILINK5.md**](docs/DILINK5.md) to build the `dilink5` flavor — it resolves the OEM SDK
-> from your own car at runtime, so nothing proprietary is ever bundled or shipped.
+> **On a DiLink 5.0 car?** Grab the `dilink5` APK from the same
+> [**Releases**](https://github.com/angoikon/byd-trip-stats/releases) page — see
+> [**docs/DILINK5.md**](docs/DILINK5.md).
 
 ### Known Limitations
 

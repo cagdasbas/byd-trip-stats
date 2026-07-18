@@ -7,17 +7,24 @@ signature-only stubs (for compilation), and at runtime the app resolves the real
 referencing the `com.byd.data.collect` system app that's already installed on your car — nothing
 is ever copied out of it.
 
-Because of that, there is no prebuilt DiLink-5 APK on the Releases page — you build it yourself
-once (it's quick, no extra tooling needed). The DiLink-3 APK on Releases does **not** work on
-DiLink-5.
+CI builds and publishes both flavors to the [**Releases**](https://github.com/angoikon/byd-trip-stats/releases)
+page. Grab the `dilink5` APK there — the DiLink-3 APK on the same page does **not** work on
+DiLink-5, and installing it on a DiLink-5 car now shows a warning dialog on launch telling you so.
 
 ## What you need
 
 - A DiLink-5 car (DiLink 5.0 / Android 11, arm64 — e.g. Sealion 7)
 - `adb` connected to the head unit (WiFi ADB is fine), for install only
-- A JDK **17 or 21** and the Android SDK (the repo builds with Gradle)
 
-## 1. Build the DiLink-5 APK
+## 1. Install
+
+```bash
+adb install byd-trip-stats-dilink5-*.apk
+```
+
+### Building it yourself
+
+Only needed if you're modifying the code:
 
 ```bash
 ./gradlew assembleDilink5Release      # signed release (needs a keystore in local.properties)
@@ -25,13 +32,9 @@ DiLink-5.
 ./gradlew assembleDilink5Debug
 ```
 
-Output: `app/build/outputs/apk/dilink5/<release|debug>/byd-trip-stats-*-d5.apk`
+Output: `app/build/outputs/apk/dilink5/<release|debug>/byd-trip-stats-dilink5-*.apk`
 
-## 2. Install and first-run
-
-```bash
-adb install app/build/outputs/apk/dilink5/release/byd-trip-stats-*-d5.apk
-```
+## 2. First-run
 
 On first launch:
 
