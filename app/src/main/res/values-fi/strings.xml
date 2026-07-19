@@ -218,6 +218,7 @@
     <string name="stat_max_speed">Huippunopeus</string>
     <string name="stat_soc_panel">SoC (Paneeli)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">Jäljellä</string>
 
     <!-- Trip Detail screen -->
     <string name="trip_statistics_section">Matkatilastot</string>

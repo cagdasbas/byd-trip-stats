@@ -1,5 +1,6 @@
 package com.byd.tripstats.ui.screens.dashboard
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,10 +21,11 @@ fun PowerMetric(
     unit: String,
     color: Color,
     modifier: Modifier = Modifier,
-    compact: Boolean = true
+    compact: Boolean = true,
+    onClick: (() -> Unit)? = null
 ) {
     Column(
-        modifier = modifier,
+        modifier = if (onClick != null) modifier.clickable { onClick() } else modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(

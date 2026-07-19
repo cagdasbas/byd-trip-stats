@@ -195,6 +195,7 @@
     <string name="stat_max_speed">Höchstgeschwindigkeit</string>
     <string name="stat_soc_panel">SoC (Anzeige)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">Verbleibend</string>
     <string name="trip_statistics_section">Fahrtstatistiken</string>
     <string name="start_time_label">Startzeit</string>
     <string name="end_time_label">Endzeit</string>

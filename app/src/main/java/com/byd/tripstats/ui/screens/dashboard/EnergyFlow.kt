@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.launch
 import com.byd.tripstats.R
 import com.byd.tripstats.data.model.VehicleTelemetry
 import com.byd.tripstats.data.preferences.PreferencesManager
@@ -104,6 +105,20 @@ fun EnergyFlowDiagram(
     val unitSystem by appPrefs.unitSystem.collectAsState(initial = appPrefs.getCachedUnitSystem())
     val distanceUnit = unitSystem.distanceUnit
     val speedUnit = unitSystem.speedUnit
+
+    // Battery readout: a tap toggles the view between the settings-chosen SoC and kWh remaining.
+    // The Panel/BMS choice stays in Settings → Preferences; this never changes it.
+    val scope = rememberCoroutineScope()
+    val showRemainingKwh by appPrefs.dashboardShowRemainingKwh.collectAsState(
+        initial = appPrefs.getCachedDashboardShowRemainingKwh()
+    )
+    val batteryMode = batteryReadoutMode(socSource, showRemainingKwh)
+    val (batteryValue, batteryUnit) = batteryReadoutValueUnit(
+        batteryMode, telemetry.socPanel, telemetry.soc, telemetry.batteryRemainPowerEV
+    )
+    val toggleBatteryReadout: () -> Unit = {
+        scope.launch { appPrefs.saveDashboardShowRemainingKwh(!showRemainingKwh) }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
@@ -305,10 +320,11 @@ fun EnergyFlowDiagram(
                         color = BydEcoTealDim
                     )
                     PowerMetric(
-                        label = if (socSource == SocSource.PANEL) stringResource(R.string.stat_soc_panel) else stringResource(R.string.stat_soc_bms),
-                        value = if (socSource == SocSource.PANEL) "${telemetry.socPanel}" else "${"%.1f".format(telemetry.soc)}",
-                        unit = "%",
-                        color = BatteryBlue
+                        label = batteryReadoutLabel(batteryMode),
+                        value = batteryValue,
+                        unit = batteryUnit,
+                        color = BatteryBlue,
+                        onClick = toggleBatteryReadout
                     )
                     PowerMetric(
                         label = stringResource(R.string.stat_range),

@@ -215,6 +215,7 @@
     <string name="stat_max_speed">Max. sebesség</string>
     <string name="stat_soc_panel">SoC (panel)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">Hátralévő</string>
 
     <!-- Trip Detail screen -->
     <string name="trip_statistics_section">Útstatisztikák</string>

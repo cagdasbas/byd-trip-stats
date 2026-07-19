@@ -218,6 +218,7 @@
     <string name="stat_max_speed">Velocità massima</string>
     <string name="stat_soc_panel">SoC (Pannello)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">Rimanente</string>
 
     <!-- Trip Detail screen -->
     <string name="trip_statistics_section">Statistiche viaggio</string>

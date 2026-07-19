@@ -47,6 +47,7 @@ private val DASHBOARD_HIDDEN_CARDS       = stringPreferencesKey("dashboard_hidde
 private val DASHBOARD_CHART_HIDDEN       = booleanPreferencesKey("dashboard_chart_hidden")
 private val DASHBOARD_POWER_ORDER        = stringPreferencesKey("dashboard_power_order")
 private val SOC_SOURCE                   = stringPreferencesKey("soc_source")
+private val DASHBOARD_SHOW_REMAINING_KWH = booleanPreferencesKey("dashboard_show_remaining_kwh")
 private val CAR_OFF_TIMEOUT_MINUTES      = intPreferencesKey("car_off_timeout_minutes")
 private val CONFIRM_BEFORE_AUTO_STOP     = booleanPreferencesKey("confirm_before_auto_stop")
 private val MIN_TRIP_DISTANCE_KM         = doublePreferencesKey("min_trip_distance_km")
@@ -389,6 +390,24 @@ class PreferencesManager(private val context: Context) {
     suspend fun saveSocSource(source: SocSource) {
         context.dataStore.edit { it[SOC_SOURCE] = source.name }
         cache.edit().putString("soc_source", source.name).apply()
+    }
+
+    // ── Dashboard battery readout: show remaining kWh instead of SoC % ──────────
+    // Dashboard-only view flag on the live SoC tile. When true the tile shows the BMS
+    // remaining-EV energy (powerBatteryRemainPowerEV) instead of a SoC percentage;
+    // the underlying [socSource] (Panel/BMS) is left untouched so charts/history and the
+    // Settings → Preferences choice are unaffected. Tapping the tile toggles this flag,
+    // switching the view between the settings-chosen SoC and kWh remaining.
+    val dashboardShowRemainingKwh: Flow<Boolean> = context.dataStore.data
+        .map { it[DASHBOARD_SHOW_REMAINING_KWH] ?: false }
+        .onEach { cache.edit().putBoolean("dashboard_show_remaining_kwh", it).apply() }
+
+    fun getCachedDashboardShowRemainingKwh(): Boolean =
+        cache.getBoolean("dashboard_show_remaining_kwh", false)
+
+    suspend fun saveDashboardShowRemainingKwh(show: Boolean) {
+        context.dataStore.edit { it[DASHBOARD_SHOW_REMAINING_KWH] = show }
+        cache.edit().putBoolean("dashboard_show_remaining_kwh", show).apply()
     }
 
     // ── Engine-off timeout (trip auto-end) ────────────────────────────────────

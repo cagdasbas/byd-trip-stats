@@ -4629,7 +4629,13 @@ class BydVehicleDataSource(context: Context) {
                 if (!primaryChargePowerPresent) externalChargingPower else null
             ).firstOrNull { it != null && it.isFinite() && it in 0.1..50.0 }
             last50Km?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentLast50KmPowerConsume = it) }
-            outCarTemp?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = it) }
+            // DiLink-5: instrument getOutCarTemperature is dead and returns 0, which passes the
+            // -50..80 guard above and stamps a false 0 °C over the real ambient the D5 client reads
+            // from ac.getTemprature(4) (applyDilink5AmbientTemp, which drops 0). Let the D5 client own
+            // ambient on D5 hardware; keep the D3 read unchanged — 0 °C is a legitimate reading there.
+            if (!DiLink5Platform.isDiLink5) {
+                outCarTemp?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentOutCarTemperature = it) }
+            }
             mileageUnit?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentMileageUnit = it) }
             safetyBeltDriver?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentSafetyBeltDriverStatus = it) }
             safetyBeltPassenger?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(instrumentSafetyBeltPassengerStatus = it) }
@@ -5104,7 +5110,12 @@ class BydVehicleDataSource(context: Context) {
     ) {
         var changed = false
         var snap = _vehicleSnapshot.value
-        if (socPct != null && socPct in 0.0..100.0) {
+        // Floor at 1.0: the statistic listener (onElecPercentageChanged) occasionally pushes a
+        // transient 0.0 that would otherwise zero the panel SoC (and, when the derived BMS SoC is
+        // unavailable, the BMS SoC that falls back to it). The poll backstop already guards 1.0..100.0;
+        // match it here so both D5 SoC writers reject the 0 sentinel. Real SoC is whole-percent, so
+        // nothing legitimate lives below 1 %.
+        if (socPct != null && socPct in 1.0..100.0) {
             snap = snap.copy(statisticElecPercentageValue = socPct); changed = true
         }
         if (totalMileageKm != null && totalMileageKm in 1.0..9_999_999.0) {

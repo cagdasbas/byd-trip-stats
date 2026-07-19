@@ -195,6 +195,7 @@
     <string name="stat_max_speed">Μέγιστη ταχύτητα</string>
     <string name="stat_soc_panel">SoC (Πίνακας)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">Υπόλοιπο</string>
     <string name="trip_statistics_section">Στατιστικά διαδρομής</string>
     <string name="start_time_label">Ώρα έναρξης</string>
     <string name="end_time_label">Ώρα λήξης</string>

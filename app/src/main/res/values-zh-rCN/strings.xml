@@ -218,6 +218,7 @@
     <string name="stat_max_speed">最高速度</string>
     <string name="stat_soc_panel">SoC（面板）</string>
     <string name="stat_soc_bms">SoC（BMS）</string>
+    <string name="stat_remaining_kwh">剩余</string>
 
     <!-- Trip Detail screen -->
     <string name="trip_statistics_section">行程统计</string>

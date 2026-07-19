@@ -215,6 +215,7 @@
     <string name="stat_max_speed">מהירות מרבית</string>
     <string name="stat_soc_panel">SoC (לוח)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">נותר</string>
 
     <!-- Trip Detail screen -->
     <string name="trip_statistics_section">סטטיסטיקת נסיעה</string>

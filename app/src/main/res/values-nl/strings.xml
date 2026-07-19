@@ -218,6 +218,7 @@
     <string name="stat_max_speed">Maximumsnelheid</string>
     <string name="stat_soc_panel">SoC (paneel)</string>
     <string name="stat_soc_bms">SoC (BMS)</string>
+    <string name="stat_remaining_kwh">Resterend</string>
 
     <!-- Trip Detail screen -->
     <string name="trip_statistics_section">Ritstatistieken</string>

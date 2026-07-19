@@ -104,6 +104,20 @@ fun PowerMetricsRow(
         ?: telemetry.electricDrivingRangeKm.toDouble().takeIf { it > 0 }
         ?: 0.0
 
+    // Battery tile: a tap toggles the view between the settings-chosen SoC and kWh remaining.
+    // The Panel/BMS choice stays in Settings → Preferences; this never changes it.
+    val showRemainingKwh by prefs.dashboardShowRemainingKwh.collectAsState(
+        initial = prefs.getCachedDashboardShowRemainingKwh()
+    )
+    val batteryMode = batteryReadoutMode(socSource, showRemainingKwh)
+    val batteryRemainingKwh = vehicleSnapshot?.powerBatteryRemainPowerEV ?: telemetry.batteryRemainPowerEV
+    val (batteryValue, batteryUnit) = batteryReadoutValueUnit(
+        batteryMode, telemetry.socPanel, telemetry.soc, batteryRemainingKwh
+    )
+    val toggleBatteryReadout: () -> Unit = {
+        scope.launch { prefs.saveDashboardShowRemainingKwh(!showRemainingKwh) }
+    }
+
     val tiles: Map<PowerMetricId, PowerTileData> = mapOf(
         PowerMetricId.POWER to PowerTileData(
             label = stringResource(R.string.tab_power),
@@ -121,9 +135,10 @@ fun PowerMetricsRow(
             unit = speedUnit, subtitle = speedSubtitle, accent = BydEcoTealDim, onClick = null
         ),
         PowerMetricId.SOC to PowerTileData(
-            label = if (socSource == SocSource.PANEL) stringResource(R.string.stat_soc_panel) else stringResource(R.string.stat_soc_bms),
-            value = if (socSource == SocSource.PANEL) "${telemetry.socPanel}" else "%.1f".format(telemetry.soc),
-            unit = "%", subtitle = stringResource(R.string.soc_subtitle_usable), accent = BatteryBlue, onClick = null
+            label = batteryReadoutLabel(batteryMode),
+            value = batteryValue,
+            unit = batteryUnit, subtitle = stringResource(R.string.soc_subtitle_usable),
+            accent = BatteryBlue, onClick = toggleBatteryReadout
         ),
         PowerMetricId.RANGE to PowerTileData(
             label = stringResource(R.string.stat_range),
