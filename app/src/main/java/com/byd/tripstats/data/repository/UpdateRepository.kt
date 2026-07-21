@@ -9,8 +9,8 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.util.Log
-import com.byd.tripstats.BuildConfig
 import com.byd.tripstats.receiver.InstallStatusReceiver
+import com.byd.tripstats.sdk.DiLink5Platform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -109,13 +109,17 @@ class UpdateRepository private constructor(private val context: Context) {
             Log.d(TAG, "Current: $currentVersion  Latest: $latestVersion")
 
             if (isNewerVersion(latestVersion, currentVersion)) {
-                // Pick the APK asset for THIS build's flavor (dilink3/dilink5). New clients match
-                // their own flavor; legacy pre-flavor clients aren't running this code — they use
-                // the old contains("release") logic, which is why only the dilink3 release asset is
-                // named with "release". No "any apk" fallback: skipping an update is safer than
+                // Pick the APK asset for the flavor THIS HARDWARE needs — DiLink5Platform.expectedFlavor
+                // (derived from ro.vehicle.type), NOT the installed build's BuildConfig.FLAVOR. This makes
+                // the updater self-healing: a dilink5 build sideloaded onto a DiLink-3 car converges back to
+                // dilink3 on the next update, and a DiLink-5 car that somehow got a non-D5 build auto-fixes
+                // to dilink5. A correctly-installed car sees no change (expectedFlavor == its own flavor).
+                // Legacy pre-flavor clients aren't running this code — they use the old contains("release")
+                // logic, which is why only the dilink3 release asset is named with "release" (and it still
+                // matches contains("dilink3")). No "any apk" fallback: skipping an update is safer than
                 // installing the wrong flavor over this app (same applicationId + key installs in place).
                 val apkAsset = release.assets
-                    .firstOrNull { it.name.contains(BuildConfig.FLAVOR) && it.name.endsWith(".apk") }
+                    .firstOrNull { it.name.contains(DiLink5Platform.expectedFlavor) && it.name.endsWith(".apk") }
 
                 if (apkAsset != null) {
                     _updateInfo.value = UpdateInfo(
