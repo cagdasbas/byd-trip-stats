@@ -8,6 +8,8 @@ import android.hardware.bydauto.statistic.BYDAutoStatisticDevice
 import android.hardware.bydauto.tyre.AbsBYDAutoTyreListener
 import android.hardware.bydauto.collectdata.AbsBYDAutoCollectDataListener
 import android.hardware.bydauto.instrument.AbsBYDAutoInstrumentListener
+import android.hardware.bydauto.speed.AbsBYDAutoSpeedListener
+import android.hardware.bydauto.charging.AbsBYDAutoChargingListener
 
 /**
  * DiLink-5 (Sealion 7) telemetry client — present ONLY in the `dilink5` flavor; loaded reflectively
@@ -30,11 +32,12 @@ class Dilink5Client {
     private var statDevice: BYDAutoStatisticDevice? = null
     private var statListener: AbsBYDAutoStatisticListener? = null
 
-    // reflective device handles (charging/speed/vehiclehealth/motor)
+    // reflective device handles (charging/speed/vehiclehealth) — no motor device, see below
     private var chargingDev: Any? = null
+    private var chargingListener: Any? = null   // event-driven charge power
     private var speedDev: Any? = null
+    private var speedListener: Any? = null   // event-driven speed
     private var healthDev: Any? = null
-    private var motorDev: Any? = null
     private var tyreDev: Any? = null
     private var instrumentDev: Any? = null   // drive mode + ambient temp
     private var instrumentListener: Any? = null   // event-driven mode/ambient (D3 parity, no poll lag)
@@ -63,7 +66,14 @@ class Dilink5Client {
             statDevice = dev
             if (dev != null) {
                 val l = object : AbsBYDAutoStatisticListener() {
-                    override fun onElecPercentageChanged(v: Double) { ds.applyDilink5Telemetry(socPct = v) }
+                    // Confirmed integer-only on D5 — the dash/panel reading, not decimal BMS.
+                    // BMS mode's decimal precision comes from usableKwh instead (derivedBmsSoc).
+                    // onSOCBatteryPercentageChanged is the same value via a separate event; kept
+                    // wired but never observed firing (getter twin is a hardcoded-0 stub).
+                    override fun onElecPercentageChanged(v: Double) {
+                        ds.applyDilink5Telemetry(socPanelPct = kotlin.math.round(v).toInt())
+                    }
+                    override fun onSOCBatteryPercentageChanged(v: Int) { ds.applyDilink5Telemetry(socPanelPct = v) }
                     override fun onTotalMileageValueChanged(v: Float) { ds.applyDilink5Telemetry(totalMileageKm = v.toDouble()) }
                     override fun onElecDrivingRangeChanged(v: Int) { ds.applyDilink5Telemetry(elecRangeKm = v) }
                     override fun onDrivingRangeValueChanged(v: Int) { ds.applyDilink5Telemetry(elecRangeKm = v) }
@@ -79,11 +89,12 @@ class Dilink5Client {
 
         // 2) bind the reflective devices once (sequential, guarded)
         chargingDev = bind(ctx, "android.hardware.bydauto.charging.BYDAutoChargingDevice")
+        chargingDev?.let { registerChargingListener(it, ds) }
         speedDev    = bind(ctx, "android.hardware.bydauto.speed.BYDAutoSpeedDevice")
+        speedDev?.let { registerSpeedListener(it, ds) }
         healthDev   = bind(ctx, "android.hardware.bydauto.vehiclehealth.BYDAutoVehicleHealthDevice")
-        // Motor: D5 BYDAutoMotorDevice exposes a single getMotorSpeed() (no front/rear split).
-        // Sealion 7 is RWD → that single traction motor is the REAR motor. Needs BYDAUTO_MOTOR_COMMON.
-        motorDev    = bind(ctx, "android.hardware.bydauto.motor.BYDAutoMotorDevice")
+        // Motor: BYDAutoMotorDevice.getInstance() throws "Stub!" — never binds. Rear RPM comes
+        // solely from the collectdata event (onDriverMotorSpeed, registerCollectData below).
         // Tyre: per-wheel pressure via getTyrePressureValueByType(area). Needs BYDAUTO_TYRE_COMMON.
         tyreDev     = bind(ctx, "android.hardware.bydauto.tyre.BYDAutoTyreDevice")
         // Per-wheel tyre TEMPERATURE: register a typed listener for the events (wheel index 0-based:
@@ -146,8 +157,10 @@ class Dilink5Client {
         // NOTE: collectdata uses "unRegisterListener" (capital R), unlike the others.
         try { collectDataListener?.let { l -> collectDataDev?.javaClass?.getMethod("unRegisterListener", AbsBYDAutoCollectDataListener::class.java)?.invoke(collectDataDev, l) } } catch (_: Throwable) {}
         try { instrumentListener?.let { l -> instrumentDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoInstrumentListener::class.java)?.invoke(instrumentDev, l) } } catch (_: Throwable) {}
-        tyreListener = null; collectDataListener = null; instrumentListener = null
-        chargingDev = null; speedDev = null; healthDev = null; motorDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null; otaDev = null; acDev = null
+        try { speedListener?.let { l -> speedDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoSpeedListener::class.java)?.invoke(speedDev, l) } } catch (_: Throwable) {}
+        try { chargingListener?.let { l -> chargingDev?.javaClass?.getMethod("unregisterListener", AbsBYDAutoChargingListener::class.java)?.invoke(chargingDev, l) } } catch (_: Throwable) {}
+        tyreListener = null; collectDataListener = null; instrumentListener = null; speedListener = null; chargingListener = null
+        chargingDev = null; speedDev = null; healthDev = null; tyreDev = null; collectDataDev = null; instrumentDev = null; otaDev = null; acDev = null
         Log.i(tag, "stopped")
     }
 
@@ -155,11 +168,14 @@ class Dilink5Client {
         // FAST (every tick): speed + rear-motor RPM (driving) + charge power (charging) — all change
         // fast and are cheap getters. Push speed and RPM together so a partial update never wipes
         // the other (applyDaemonTelemetry ignores null fields).
+        // Speed getter is now just a backstop — the speed listener (registerSpeedListener) is the
+        // primary, instant source.
         val spd = reflGetDouble(speedDev, "getSpeedValue")?.takeIf { it in 0.0..400.0 }
-        val rpm = reflGetInt(motorDev, "getMotorSpeed")?.takeIf { it in 0..30_000 }  // RWD: rear motor
-        if (spd != null || rpm != null) {
-            ds.applyDaemonTelemetry(speedKmh = spd, gear = null, powerKw = null, rearRpm = rpm)
+        if (spd != null) {
+            ds.applyDaemonTelemetry(speedKmh = spd, gear = null, powerKw = null, rearRpm = null)
         }
+        // getChargingPower is now just a backstop — the charging listener (registerChargingListener)
+        // is the primary, instant source.
         reflGetDouble(chargingDev, "getChargingPower")?.takeIf { it in 0.0..250.0 }
             ?.let { ds.applyDilink5Telemetry(chargingPowerKw = it) }
         if (!slowTick) return
@@ -167,7 +183,7 @@ class Dilink5Client {
         // are only a missed-callback backstop; SOH barely changes. No need to read them every tick.
         statDevice?.let { d ->
             try {
-                val soc = d.getElecPercentageValue();        if (soc in 1.0..100.0) ds.applyDilink5Telemetry(socPct = soc)
+                val soc = d.getElecPercentageValue();        if (soc in 1.0..100.0) ds.applyDilink5Telemetry(socPanelPct = kotlin.math.round(soc).toInt())
                 val mil = d.getTotalMileageValue().toDouble(); if (mil > 1.0)        ds.applyDilink5Telemetry(totalMileageKm = mil)
                 val rng = d.getElecDrivingRangeValue();        if (rng in 1..2000)   ds.applyDilink5Telemetry(elecRangeKm = rng)
                 val usb = d.getEVRemainingBatteryPower().toDouble(); if (usb in 0.5..200.0) onUsable(usb, ds)
@@ -242,6 +258,43 @@ class Dilink5Client {
         } catch (t: Throwable) {
             val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
             Log.w(tag, "tyre listener failed: ${c.javaClass.simpleName}: ${c.message}")
+        }
+    }
+
+    // Charging typed listener — event-driven; onChargingPowerChanged gives far more resolution during
+    // a charge ramp than the 5s poll. getChargingPower() stays as a backstop in pollOnce.
+    private fun registerChargingListener(dev: Any, ds: BydVehicleDataSource) {
+        try {
+            // Both overloads declared: D5 calls Float (confirmed), D3 may call Double — same
+            // belt-and-suspenders pattern as the speed listener's int/double pair.
+            val l = object : AbsBYDAutoChargingListener() {
+                override fun onChargingPowerChanged(power: Float) { ds.applyDilink5Telemetry(chargingPowerKw = power.toDouble()) }
+                override fun onChargingPowerChanged(power: Double) { ds.applyDilink5Telemetry(chargingPowerKw = power) }
+            }
+            dev.javaClass.getMethod("registerListener", AbsBYDAutoChargingListener::class.java).invoke(dev, l)
+            chargingListener = l
+            Log.i(tag, "charging listener registered")
+        } catch (t: Throwable) {
+            val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
+            Log.w(tag, "charging listener failed: ${c.javaClass.simpleName}: ${c.message}")
+        }
+    }
+
+    // Speed typed listener — event-driven, instant. getSpeedValue() stays as a backstop in pollOnce
+    // (parked/no-change periods where an onChanged event legitimately never fires).
+    private fun registerSpeedListener(dev: Any, ds: BydVehicleDataSource) {
+        try {
+            val l = object : AbsBYDAutoSpeedListener() {
+                override fun onSpeedChanged(speed: Double) {
+                    ds.applyDaemonTelemetry(speedKmh = speed, gear = null, powerKw = null, rearRpm = null)
+                }
+            }
+            dev.javaClass.getMethod("registerListener", AbsBYDAutoSpeedListener::class.java).invoke(dev, l)
+            speedListener = l
+            Log.i(tag, "speed listener registered")
+        } catch (t: Throwable) {
+            val c = (t as? java.lang.reflect.InvocationTargetException)?.cause ?: t
+            Log.w(tag, "speed listener failed: ${c.javaClass.simpleName}: ${c.message}")
         }
     }
 

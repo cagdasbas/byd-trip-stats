@@ -5101,7 +5101,7 @@ class BydVehicleDataSource(context: Context) {
      * types) so it compiles in both flavors. All inputs nullable + range-guarded.
      */
     fun applyDilink5Telemetry(
-        socPct: Double? = null,
+        socPanelPct: Int? = null,
         totalMileageKm: Double? = null,
         elecRangeKm: Int? = null,
         usableKwh: Double? = null,
@@ -5110,13 +5110,12 @@ class BydVehicleDataSource(context: Context) {
     ) {
         var changed = false
         var snap = _vehicleSnapshot.value
-        // Floor at 1.0: the statistic listener (onElecPercentageChanged) occasionally pushes a
-        // transient 0.0 that would otherwise zero the panel SoC (and, when the derived BMS SoC is
-        // unavailable, the BMS SoC that falls back to it). The poll backstop already guards 1.0..100.0;
-        // match it here so both D5 SoC writers reject the 0 sentinel. Real SoC is whole-percent, so
-        // nothing legitimate lives below 1 %.
-        if (socPct != null && socPct in 1.0..100.0) {
-            snap = snap.copy(statisticElecPercentageValue = socPct); changed = true
+        // Confirmed integer-only on D5 — the dash/panel reading, not decimal BMS. Floored at 1 to
+        // reject the car's occasional transient-0 glitch. "BMS" mode gets its decimal precision
+        // from toTelemetry()'s derivedBmsSoc (usableKwh/batteryKwh*100) instead — no extra wiring
+        // needed, it already falls through once this bucket stays unfed.
+        if (socPanelPct != null && socPanelPct in 1..100) {
+            snap = snap.copy(statisticElecPercentageValue = socPanelPct.toDouble()); changed = true
         }
         if (totalMileageKm != null && totalMileageKm in 1.0..9_999_999.0) {
             snap = snap.copy(statisticTotalMileageDecimal = totalMileageKm,
@@ -5632,10 +5631,14 @@ class BydVehicleDataSource(context: Context) {
         _statisticCellTempAvg.value = getDouble("stat_cell_t_avg")
         _statisticCellTempMax.value = null
         _statisticBatterySoh.value = getDouble("stat_soh")
-        _statisticSocBms.value = getDouble("stat_soc_bms")
-        // Seed the glitch filter's baseline from the restored value so the first live reading
-        // isn't mistaken for a jump.
-        lastSocBmsFiltered = _statisticSocBms.value
+        // D5 never writes this StateFlow live — restoring a cached value would freeze the BMS
+        // bucket forever (directBmsSoc wins over derivedBmsSoc). Only D3 feeds this from a live decode.
+        if (!DiLink5Platform.isDiLink5) {
+            _statisticSocBms.value = getDouble("stat_soc_bms")
+            // Seed the glitch filter's baseline from the restored value so the first live reading
+            // isn't mistaken for a jump.
+            lastSocBmsFiltered = _statisticSocBms.value
+        }
         socBmsHeldOnce = false
         _statisticAvailPower.value = getDouble("stat_avail_power")
         _statisticBatteryCurrent.value = getDouble("stat_current")

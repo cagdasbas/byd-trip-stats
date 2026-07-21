@@ -22,6 +22,7 @@ public abstract class AbsBYDAutoChargingListener {
     public void onChargingModeChanged(int mode) {}
     public void onChargingPortLockRebackStateChanged(int state) {}
     public void onChargingPowerChanged(double power) {}
+    public void onChargingPowerChanged(float power) {}
     public void onChargingRestTimeChanged(int minutes, int seconds) {}
     public void onChargingScheduleEnableStateChanged(int state) {}
     public void onChargingScheduleStateChanged(int state) {}
