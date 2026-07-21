@@ -5248,8 +5248,7 @@ class BydVehicleDataSource(context: Context) {
         if (tempC <= 0 || tempC > 120) return
         // Tyre EVENT wheel index is 0-based (= getter area − 1): 0=LF, 1=RF, 2=LR, 3=RR. Confirmed
         // on-car 2026-07-12 by matching press-event kPa per index against the per-area byType getter
-        // (event 0≈LF pressure, 1≈RF, 2≈LR, 3≈RR). NOTE: earlier assumed 1-based with 0=sentinel —
-        // that was wrong; it dropped LF and shifted every wheel by one (RR never populated).
+        // (event 0≈LF pressure, 1≈RF, 2≈LR, 3≈RR).
         when (wheel) {
             0 -> _tyreTempLF.value = tempC
             1 -> _tyreTempRF.value = tempC

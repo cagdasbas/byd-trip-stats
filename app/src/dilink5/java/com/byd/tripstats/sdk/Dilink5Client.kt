@@ -98,7 +98,8 @@ class Dilink5Client {
         // Tyre: per-wheel pressure via getTyrePressureValueByType(area). Needs BYDAUTO_TYRE_COMMON.
         tyreDev     = bind(ctx, "android.hardware.bydauto.tyre.BYDAutoTyreDevice")
         // Per-wheel tyre TEMPERATURE: register a typed listener for the events (wheel index 0-based:
-        // 0=LF/1=RF/2=LR/3=RR); also polled via instrument.getWheelTemperature in pollOnce.
+        // 0=LF/1=RF/2=LR/3=RR). This is the ONLY genuine per-wheel temp source in the SDK — no
+        // getter (tyre or instrument device) returns real per-wheel data, see pollOnce.
         tyreDev?.let { registerTyreListener(it, ds) }
         // collectdata: HV voltage/current + motor RPM via EVENTS (getters dead). Real power = V·I.
         collectDataDev = bind(ctx, "android.hardware.bydauto.collectdata.BYDAutoCollectDataDevice")
@@ -213,13 +214,11 @@ class Dilink5Client {
         // ambient temp via ac.getTemprature(4=AC_TEMPERATURE_OUT). instrument getter is
         // dead; this arg-indexed AC getter is the live source (its event still updates it too).
         reflGetIntArg(acDev, "getTemprature", 4)?.let { ds.applyDilink5AmbientTemp(it) }
-        // per-wheel tyre TEMP via instrument.getWheelTemperature(int) — a POLLABLE source
-        // (0-based 0=LF..3=RR, matching the tyre event index). Complements the sparse tyre-temp events.
-        // Returns 0 when the TPMS sensors sleep (parked); applyDilink5TyreTemp drops 0 so the last
-        // known temp is retained rather than blanked.
-        instrumentDev?.let { d ->
-            for (w in 0..3) reflGetIntArg(d, "getWheelTemperature", w)?.let { ds.applyDilink5TyreTemp(w, it) }
-        }
+        // instrument.getWheelTemperature(int) is NOT polled: decompiled BYDAutoInstrumentDevice
+        // shows its real body is `return 0;` — hardcoded, ignores the wheel arg entirely. There is
+        // no per-wheel temp getter anywhere in this SDK (BYDAutoTyreDevice.getTyreTemperatureValue
+        // similarly discards its arg and calls a no-arg method underneath); the tyre listener's
+        // onTyreTemperatureValueChanged event is the only genuine per-wheel source that exists.
         // T-Box serial (ota) — hashed into the non-PII license device id (raw serial never persists).
         // The VIN is intentionally NOT read on DiLink-5 (privacy).
         reflGetString(otaDev, "getTBoxSerialNumber")?.let { ds.applyDilink5TboxSerial(it) }
@@ -298,8 +297,12 @@ class Dilink5Client {
         }
     }
 
-    // collectdata typed listener — HV bus V/I + motor RPM (event-only; getters dead). All callbacks
-    // are (int a, int b) where b = value, a = a constant signal tag (ignored).
+    // collectdata typed listener — HV bus V/I + motor RPM (event-only; getters dead). Decompiled
+    // CollectDataManagerImpl.collectData() confirms (a, b) = (front, rear) for onDriverMotorSpeed —
+    // separate HAL IDs/packet fields per side, not a tag. On RWD "a" reads a constant 50535 (outside
+    // the RPM guard below, so it's naturally suppressed); on AWD it should carry real front RPM.
+    // Volt/current stay rear-only (untested whether "a" is meaningful there too, and both callbacks
+    // are @Deprecated in the real listener).
     private fun registerCollectData(dev: Any, ds: BydVehicleDataSource) {
         try {
             val l = object : AbsBYDAutoCollectDataListener() {
@@ -310,7 +313,11 @@ class Dilink5Client {
                     if (b in -2000..2000) { lastHvCurrent = b; ds.applyDilink5HvCurrent(b); pushPower(ds) }  // signed A (regen negative)
                 }
                 override fun onDriverMotorSpeed(a: Int, b: Int) {
-                    if (b in 0..30_000) ds.applyDaemonTelemetry(speedKmh = null, gear = null, powerKw = null, rearRpm = b)
+                    val front = a.takeIf { it in 0..30_000 }
+                    val rear = b.takeIf { it in 0..30_000 }
+                    if (front != null || rear != null) {
+                        ds.applyDaemonTelemetry(speedKmh = null, gear = null, powerKw = null, frontRpm = front, rearRpm = rear)
+                    }
                 }
             }
             dev.javaClass.getMethod("registerListener", AbsBYDAutoCollectDataListener::class.java).invoke(dev, l)
