@@ -3886,7 +3886,14 @@ class BydVehicleDataSource(context: Context) {
             val batteryCurrent = invokeDoubleGetter(device, *m50["current"].orEmpty().toTypedArray())
             val powerUnit = invokeIntGetter(device, *m50["powerUnit"].orEmpty().toTypedArray())
             _vehicleSnapshot.value = _vehicleSnapshot.value.copy(powerMcuStatus = mcuStatus)
-            remainPowerEv?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(powerBatteryRemainPowerEV = it) }
+            // Range-guard the write: on DiLink-5 the power device's remain-EV getter (m18) returns -1
+            // (dead there). Unguarded, that -1 clobbers the correct usable-kWh set by Dilink5Client,
+            // collapsing derived BMS SoC to 0. This only bites builds that HAVE private-telemetry
+            // supplying the m18 method name (i.e. CI) — a contributor's local build leaves m18 empty,
+            // so the read is skipped and it silently "works", which is why it looked CI/JDK-specific.
+            // 0.5..200.0 matches the D5 usable-kWh poll guard; real DiLink-3 values are unaffected.
+            remainPowerEv?.takeIf { it in 0.5..200.0 }
+                ?.let { _vehicleSnapshot.value = _vehicleSnapshot.value.copy(powerBatteryRemainPowerEV = it) }
             publishSnapshot()
 
             if (
