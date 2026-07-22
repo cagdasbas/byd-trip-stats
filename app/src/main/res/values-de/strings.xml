@@ -399,6 +399,10 @@
     <string name="available_backups_label">Verfügbare Backups:</string>
     <string name="no_backups_found">Keine Backups gefunden. Führen Sie zuerst ein Backup durch.</string>
     <string name="restore_from_file_action">Aus Datei wiederherstellen…</string>
+    <string name="restore_browser_title">Sicherungsdatei (.db) auswählen</string>
+    <string name="restore_browser_empty">Keine Ordner oder .db-Dateien hier</string>
+    <string name="file_browser_internal">Interner Speicher</string>
+    <string name="file_browser_sdcard">SD-Karte</string>
     <string name="trim_database_label">Datenbank bereinigen</string>
     <string name="trim_description">Entfernt Diagnosedaten und reduziert alte Aufzeichnungen, um Speicherplatz freizugeben:</string>
     <string name="trim_warning_msg">WARNUNG: Durch die Reduzierung haben Diagramme/Heatmaps bereinigter Sitzungen sehr wenige Punkte und sind nicht detailliert.\nWenn Sie nur Speicherplatz reduzieren möchten, sollten Sie stattdessen ältere Fahrten löschen.\nDIESE AKTION IST NICHT RÜCKGÄNGIG ZU MACHEN!</string>

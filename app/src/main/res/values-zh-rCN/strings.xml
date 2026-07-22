@@ -444,6 +444,10 @@
     <string name="available_backups_label">可用备份：</string>
     <string name="no_backups_found">未找到备份。请先执行备份。</string>
     <string name="restore_from_file_action">从文件恢复…</string>
+    <string name="restore_browser_title">选择备份 (.db) 文件</string>
+    <string name="restore_browser_empty">这里没有文件夹或 .db 文件</string>
+    <string name="file_browser_internal">内部存储</string>
+    <string name="file_browser_sdcard">SD 卡</string>
     <string name="trim_database_label">精简数据库</string>
     <string name="trim_description">删除诊断数据并对旧记录进行降采样以释放空间：</string>
     <string name="trim_warning_msg">警告：降采样意味着精简后的会话图表/热图数据点极少，无法显示细节。\n如果只是想减少存储占用，建议删除较旧的行程而不是精简。\n此操作不可逆！</string>

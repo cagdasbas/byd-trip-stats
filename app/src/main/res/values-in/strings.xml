@@ -441,6 +441,10 @@
     <string name="available_backups_label">Cadangan tersedia:</string>
     <string name="no_backups_found">Tidak ada cadangan ditemukan. Buat cadangan dulu.</string>
     <string name="restore_from_file_action">Pulihkan dari file…</string>
+    <string name="restore_browser_title">Pilih file cadangan (.db)</string>
+    <string name="restore_browser_empty">Tidak ada folder atau file .db di sini</string>
+    <string name="file_browser_internal">Penyimpanan internal</string>
+    <string name="file_browser_sdcard">Kartu SD</string>
     <string name="trim_database_label">Pangkas basis data</string>
     <string name="trim_description">Menghapus data diagnostik dan mengurangi sampel rekaman lama untuk mengosongkan ruang:</string>
     <string name="trim_warning_msg">PERINGATAN: Pengurangan sampel berarti grafik/peta panas dari sesi yang dipangkas akan memiliki sangat sedikit titik sehingga tidak detail.\nJika Anda hanya ingin mengurangi penggunaan penyimpanan, sebaiknya hapus perjalanan lama daripada memangkas.\nTINDAKAN INI TIDAK DAPAT DIBATALKAN!</string>

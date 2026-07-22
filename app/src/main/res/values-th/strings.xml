@@ -399,6 +399,10 @@
     <string name="available_backups_label">การสำรองที่มี:</string>
     <string name="no_backups_found">ไม่พบการสำรอง สำรองก่อน</string>
     <string name="restore_from_file_action">กู้คืนจากไฟล์…</string>
+    <string name="restore_browser_title">เลือกไฟล์สำรองข้อมูล (.db)</string>
+    <string name="restore_browser_empty">ไม่มีโฟลเดอร์หรือไฟล์ .db ที่นี่</string>
+    <string name="file_browser_internal">ที่เก็บข้อมูลภายใน</string>
+    <string name="file_browser_sdcard">การ์ด SD</string>
     <string name="trim_database_label">ตัดแต่งฐานข้อมูล</string>
     <string name="trim_description">ลบข้อมูลการวินิจฉัยและลดบันทึกเก่าเพื่อเพิ่มพื้นที่ว่าง:</string>
     <string name="trim_warning_msg">คำเตือน: การตัดแต่งหมายความว่ากราฟ/ฮีตแมปของเซสชันที่ตัดแต่งจะมีจุดน้อยมาก\nหากต้องการลดการใช้พื้นที่เก็บข้อมูลเพียงอย่างเดียว ควรลบการเดินทางเก่าออก\nการดำเนินการนี้ไม่สามารถย้อนกลับได้!</string>

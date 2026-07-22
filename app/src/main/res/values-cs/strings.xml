@@ -441,6 +441,10 @@
     <string name="available_backups_label">Dostupné zálohy:</string>
     <string name="no_backups_found">Žádné zálohy nenalezeny. Nejprve zálohujte.</string>
     <string name="restore_from_file_action">Obnovit ze souboru…</string>
+    <string name="restore_browser_title">Vyberte záložní soubor (.db)</string>
+    <string name="restore_browser_empty">Žádné složky ani soubory .db zde</string>
+    <string name="file_browser_internal">Interní úložiště</string>
+    <string name="file_browser_sdcard">SD karta</string>
     <string name="trim_database_label">Zeštíhlit databázi</string>
     <string name="trim_description">Odstraňuje diagnostická data a prořeďuje staré záznamy pro uvolnění místa:</string>
     <string name="trim_warning_msg">VAROVÁNÍ: Proředění znamená, že grafy/teplotní mapy z ořezaných relací budou mít velmi málo bodů, a tedy nebudou detailní.\nPokud chcete jen snížit využití úložiště, zvažte raději smazání starších jízd místo zeštíhlení.\nTATO AKCE JE NEVRATNÁ!</string>

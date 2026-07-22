@@ -441,6 +441,10 @@
     <string name="available_backups_label">Dostępne kopie zapasowe:</string>
     <string name="no_backups_found">Nie znaleziono kopii zapasowych. Najpierw utwórz kopię.</string>
     <string name="restore_from_file_action">Przywróć z pliku…</string>
+    <string name="restore_browser_title">Wybierz plik kopii zapasowej (.db)</string>
+    <string name="restore_browser_empty">Brak folderów lub plików .db tutaj</string>
+    <string name="file_browser_internal">Pamięć wewnętrzna</string>
+    <string name="file_browser_sdcard">Karta SD</string>
     <string name="trim_database_label">Przytnij bazę danych</string>
     <string name="trim_description">Usuwa dane diagnostyczne i rozrzedza stare nagrania, aby zwolnić miejsce:</string>
     <string name="trim_warning_msg">UWAGA: Rozrzedzenie oznacza, że wykresy/mapy cieplne z przyciętych sesji będą miały bardzo mało punktów, więc stracą szczegółowość.\nJeśli chcesz tylko zmniejszyć zajęte miejsce, rozważ usunięcie starszych podróży zamiast przycinania.\nTA OPERACJA JEST NIEODWRACALNA!</string>

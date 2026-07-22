@@ -444,6 +444,10 @@
     <string name="available_backups_label">Cópias de segurança disponíveis:</string>
     <string name="no_backups_found">Nenhuma cópia de segurança encontrada. Faça primeiro uma cópia.</string>
     <string name="restore_from_file_action">Restaurar a partir de ficheiro…</string>
+    <string name="restore_browser_title">Selecione um ficheiro de cópia de segurança (.db)</string>
+    <string name="restore_browser_empty">Nenhuma pasta ou ficheiro .db aqui</string>
+    <string name="file_browser_internal">Armazenamento interno</string>
+    <string name="file_browser_sdcard">Cartão SD</string>
     <string name="trim_database_label">Compactar base de dados</string>
     <string name="trim_description">Remove dados de diagnóstico e reduz a amostragem de gravações antigas para libertar espaço:</string>
     <string name="trim_warning_msg">AVISO: A redução de amostragem significa que os gráficos/mapas de calor das sessões compactadas terão muito poucos pontos e não estarão em detalhe.\nSe apenas pretende reduzir o uso de armazenamento, poderá querer eliminar viagens antigas em vez de compactar.\nESTA AÇÃO É IRREVERSÍVEL!</string>

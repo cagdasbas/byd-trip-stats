@@ -441,6 +441,10 @@
     <string name="available_backups_label">Bản sao lưu có sẵn:</string>
     <string name="no_backups_found">Không tìm thấy bản sao lưu. Hãy sao lưu trước.</string>
     <string name="restore_from_file_action">Khôi phục từ tệp…</string>
+    <string name="restore_browser_title">Chọn tệp sao lưu (.db)</string>
+    <string name="restore_browser_empty">Không có thư mục hoặc tệp .db ở đây</string>
+    <string name="file_browser_internal">Bộ nhớ trong</string>
+    <string name="file_browser_sdcard">Thẻ SD</string>
     <string name="trim_database_label">Cắt gọn cơ sở dữ liệu</string>
     <string name="trim_description">Xóa dữ liệu chẩn đoán và giảm mẫu các bản ghi cũ để giải phóng dung lượng:</string>
     <string name="trim_warning_msg">CẢNH BÁO: Giảm mẫu nghĩa là biểu đồ/bản đồ nhiệt từ các phiên đã cắt gọn sẽ có rất ít điểm nên không chi tiết.\nNếu chỉ muốn giảm dung lượng sử dụng, bạn nên xóa các chuyến đi cũ thay vì cắt gọn.\nHÀNH ĐỘNG NÀY KHÔNG THỂ ĐẢO NGƯỢC!</string>

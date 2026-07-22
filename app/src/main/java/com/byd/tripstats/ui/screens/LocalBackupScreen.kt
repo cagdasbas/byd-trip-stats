@@ -5,7 +5,9 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -43,6 +45,7 @@ import com.byd.tripstats.worker.DatabaseTrimmer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -156,12 +159,12 @@ fun LocalBackupScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted -> if (granted) scope.launch { manager.scanLocalBackups() } }
 
-    // Restore from any .db the user picks via the system file browser — a fallback for when the
-    // scan can't surface a backup (an orphaned file after reinstall, a different folder, an
-    // adb-pushed file, another device's backup).
-    val restoreFilePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) scope.launch { manager.restoreFromUri(uri) } }
+    // Restore from any .db the user picks — a fallback for when the scan can't surface a backup
+    // (an orphaned file after reinstall, a different folder, an adb-pushed file, another device's
+    // backup). Uses our own in-app FileBrowserDialog rather than SAF's OpenDocument: DiLink head
+    // units ship no DocumentsUI, so SAF degrades to a third-party-app chooser.
+    var showFileBrowser by remember { mutableStateOf(false) }
+    val sdCardRootDir = remember { manager.sdCardRoot() }
 
     // ── Load local backup list and telegram list on first open ────────────────
     LaunchedEffect(Unit) {
@@ -386,13 +389,25 @@ fun LocalBackupScreen(
 
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
-                        onClick  = { restoreFilePicker.launch(arrayOf("*/*")) },
+                        onClick  = { showFileBrowser = true },
                         enabled  = !isBusy,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Filled.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.restore_from_file_action))
+                    }
+
+                    if (showFileBrowser) {
+                        FileBrowserDialog(
+                            startDir = File(Environment.getExternalStorageDirectory(), "Download/BydTripStats"),
+                            sdCardRoot = sdCardRootDir,
+                            onDismiss = { showFileBrowser = false },
+                            onFileSelected = { file ->
+                                showFileBrowser = false
+                                scope.launch { manager.restoreFromUri(Uri.fromFile(file)) }
+                            }
+                        )
                     }
                 }
                 }

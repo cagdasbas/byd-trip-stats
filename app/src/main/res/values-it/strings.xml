@@ -444,6 +444,10 @@
     <string name="available_backups_label">Backup disponibili:</string>
     <string name="no_backups_found">Nessun backup trovato. Esegui prima un backup.</string>
     <string name="restore_from_file_action">Ripristina da file…</string>
+    <string name="restore_browser_title">Seleziona un file di backup (.db)</string>
+    <string name="restore_browser_empty">Nessuna cartella o file .db qui</string>
+    <string name="file_browser_internal">Memoria interna</string>
+    <string name="file_browser_sdcard">Scheda SD</string>
     <string name="trim_database_label">Comprimi database</string>
     <string name="trim_description">Rimuove i dati diagnostici e riduce la risoluzione delle registrazioni vecchie per liberare spazio:</string>
     <string name="trim_warning_msg">ATTENZIONE: La riduzione della risoluzione significa che i grafici/mappe di calore delle sessioni compresse avranno pochissimi punti e non saranno dettagliati.\nSe vuoi solo ridurre l\'utilizzo dello storage, potrebbe essere meglio eliminare i viaggi più vecchi invece di comprimere.\nQUESTA AZIONE È IRREVERSIBILE!</string>

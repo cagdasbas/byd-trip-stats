@@ -444,6 +444,10 @@
     <string name="available_backups_label">Copias disponibles:</string>
     <string name="no_backups_found">No se encontraron copias. Haz una copia primero.</string>
     <string name="restore_from_file_action">Restaurar desde archivo…</string>
+    <string name="restore_browser_title">Selecciona un archivo de copia de seguridad (.db)</string>
+    <string name="restore_browser_empty">No hay carpetas ni archivos .db aquí</string>
+    <string name="file_browser_internal">Almacenamiento interno</string>
+    <string name="file_browser_sdcard">Tarjeta SD</string>
     <string name="trim_database_label">Reducir base de datos</string>
     <string name="trim_description">Elimina datos de diagnóstico y reduce la resolución de grabaciones antiguas para liberar espacio:</string>
     <string name="trim_warning_msg">ADVERTENCIA: La reducción de resolución implica que los gráficos/mapas de calor de sesiones reducidas tendrán muy pocos puntos y no estarán en detalle.\nSi solo quieres reducir el uso de almacenamiento, puede que prefieras eliminar viajes más antiguos en lugar de reducir.\n¡ESTA ACCIÓN ES IRREVERSIBLE!</string>

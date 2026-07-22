@@ -441,6 +441,10 @@
     <string name="available_backups_label">Backupuri disponibile:</string>
     <string name="no_backups_found">Niciun backup găsit. Rulați mai întâi un backup.</string>
     <string name="restore_from_file_action">Restaurează din fișier…</string>
+    <string name="restore_browser_title">Selectează un fișier de rezervă (.db)</string>
+    <string name="restore_browser_empty">Niciun folder sau fișier .db aici</string>
+    <string name="file_browser_internal">Stocare internă</string>
+    <string name="file_browser_sdcard">Card SD</string>
     <string name="trim_database_label">Comprimă baza de date</string>
     <string name="trim_description">Elimină datele de diagnostic și rărește înregistrările vechi pentru a elibera spațiu:</string>
     <string name="trim_warning_msg">ATENȚIE: Rărirea înseamnă că graficele/hărțile termice din sesiunile comprimate vor avea foarte puține puncte, deci nu vor fi detaliate.\nDacă doriți doar să reduceți spațiul ocupat, poate fi mai bine să ștergeți călătoriile vechi în loc să comprimați.\nACEASTĂ ACȚIUNE ESTE IREVERSIBILĂ!</string>

@@ -444,6 +444,10 @@
     <string name="available_backups_label">Kullanılabilir yedekler:</string>
     <string name="no_backups_found">Yedek bulunamadı. Önce bir yedek alın.</string>
     <string name="restore_from_file_action">Dosyadan geri yükle…</string>
+    <string name="restore_browser_title">Bir yedek (.db) dosyası seçin</string>
+    <string name="restore_browser_empty">Burada klasör veya .db dosyası yok</string>
+    <string name="file_browser_internal">Dahili depolama</string>
+    <string name="file_browser_sdcard">SD kart</string>
     <string name="trim_database_label">Veritabanını kırp</string>
     <string name="trim_description">Alan boşaltmak için tanı verilerini kaldırır ve eski kayıtları örnekleme sıklığını düşürür:</string>
     <string name="trim_warning_msg">UYARI: Örnekleme sıklığını düşürmek, kırpılmış oturumların grafik/ısı haritalarında çok az nokta olacağı ve dolayısıyla ayrıntılı olmayacağı anlamına gelir.\nYalnızca depolama kullanımını azaltmak istiyorsanız, kırpmak yerine eski seyahatleri silmek isteyebilirsiniz.\nBU İŞLEM GERİ ALINAMAZ!</string>

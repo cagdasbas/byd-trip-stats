@@ -441,6 +441,10 @@
     <string name="available_backups_label">Elérhető mentések:</string>
     <string name="no_backups_found">Nem található mentés. Először készítsen egyet.</string>
     <string name="restore_from_file_action">Visszaállítás fájlból…</string>
+    <string name="restore_browser_title">Válasszon biztonsági mentés (.db) fájlt</string>
+    <string name="restore_browser_empty">Nincsenek mappák vagy .db fájlok itt</string>
+    <string name="file_browser_internal">Belső tárhely</string>
+    <string name="file_browser_sdcard">SD-kártya</string>
     <string name="trim_database_label">Adatbázis karcsúsítása</string>
     <string name="trim_description">Eltávolítja a diagnosztikai adatokat és ritkítja a régi felvételeket a hely felszabadításához:</string>
     <string name="trim_warning_msg">FIGYELEM: A ritkítás azt jelenti, hogy a karcsúsított munkamenetek grafikonjai/hőtérképei nagyon kevés pontot tartalmaznak, így nem lesznek részletesek.\nHa csak a tárhelyet akarja csökkenteni, érdemesebb régi utakat törölni a karcsúsítás helyett.\nEZ A MŰVELET VISSZAFORDÍTHATATLAN!</string>

@@ -441,6 +441,10 @@
     <string name="available_backups_label">Доступные копии:</string>
     <string name="no_backups_found">Копии не найдены. Сначала создайте копию.</string>
     <string name="restore_from_file_action">Восстановить из файла…</string>
+    <string name="restore_browser_title">Выберите файл резервной копии (.db)</string>
+    <string name="restore_browser_empty">Здесь нет папок или файлов .db</string>
+    <string name="file_browser_internal">Внутренняя память</string>
+    <string name="file_browser_sdcard">SD-карта</string>
     <string name="trim_database_label">Сжать базу данных</string>
     <string name="trim_description">Удаляет диагностические данные и прореживает старые записи, освобождая место:</string>
     <string name="trim_warning_msg">ВНИМАНИЕ: Прореживание означает, что графики/тепловые карты сжатых сессий будут иметь очень мало точек и потеряют детализацию.\nЕсли нужно просто освободить место, лучше удалить старые поездки вместо сжатия.\nЭТО ДЕЙСТВИЕ НЕОБРАТИМО!</string>
