@@ -135,6 +135,18 @@
 -keep class android.hardware.IBYDAutoListener { *; }
 -keep class android.hardware.IBYDAutoEvent { *; }
 
+# Keeping the stub classes above is NOT enough: our anonymous typed-listener subclasses
+# (e.g. Dilink5Client's `object : AbsBYDAutoStatisticListener() { override fun
+# onEVRemainingBatteryPowerChanged(...) }`) are SEPARATE synthetic classes whose override
+# methods are invoked ONLY by the real, runtime-injected BYD class — never by our own code.
+# R8 (esp. full mode) can therefore rename/strip those overrides, silently killing
+# callback-only telemetry in release builds: on the Sealion 7 the usable-kWh getter returns
+# -1, so onEVRemainingBatteryPowerChanged is the ONLY source — lose it and BMS SoC collapses
+# to 0 while panel SoC (which has a live poll getter) still works. This bit CI (JDK 17) but not
+# a local (JDK 21) release, i.e. it's R8-nondeterministic — so keep every member of anything
+# extending a bydauto class explicitly, making it toolchain-independent.
+-keepclassmembers class * extends android.hardware.bydauto.** { *; }
+
 # The real DiLink-5 bydauto SDK (libs/dilink5-sdk.jar, dilink5 flavor only) references TS
 # framework classes (com.ts.ota.otasdkmgr.*, com.ts.qnxmanager.*, caradapter, etc.) that are
 # provided by the head unit's platform classloader at runtime and are NOT bundled in our jar.
