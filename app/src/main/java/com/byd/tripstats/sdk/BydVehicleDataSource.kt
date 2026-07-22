@@ -336,7 +336,13 @@ data class VehicleTelemetrySnapshot(
                     else -> true
                 }
             }
-        val effectiveBmsSoc = directBmsSoc ?: derivedBmsSoc
+        // On DiLink-5 the derived usable-kWh SoC is the intended (decimal) BMS source. statisticSocBms
+        // can still be set live on CI builds — the raw-signal statistic decode that feeds it is gated by
+        // private-telemetry, which a contributor's local build lacks — and being an integer within 1.5 of
+        // the derived value it wins the directBmsSoc check above, flooring the displayed BMS SoC to a whole
+        // number. Prefer the derived decimal on DiLink-5; DiLink-3 keeps the direct BMS reading as before.
+        val effectiveBmsSoc = if (DiLink5Platform.isDiLink5) (derivedBmsSoc ?: directBmsSoc)
+                              else (directBmsSoc ?: derivedBmsSoc)
         val socEstimate = when {
             effectiveBmsSoc != null ->
                 effectiveBmsSoc
@@ -4654,7 +4660,14 @@ class BydVehicleDataSource(context: Context) {
             chargePercent?.let { _instrumentChargePercent.value = it }
             odometerDisplay?.let { _instrumentOdometerDisplay.value = it }
             powerUnit?.let { _instrumentPowerUnit.value = it }
-            updateDirectChargingPower(instrumentChargingPower)
+            // DiLink-5: charging power is owned by the D5 client (chargingDev.getChargingPower +
+            // the charging listener), which is decimal-accurate. The instrument device's charge-power
+            // getter here would either clobber that decimal with an integer/wrong value, or — when it
+            // returns null on D5 — make updateDirectChargingPower clear _chargingPowerRaw every tick,
+            // flickering charging detection. Let the D5 client own it; DiLink-3 is unchanged.
+            if (!DiLink5Platform.isDiLink5) {
+                updateDirectChargingPower(instrumentChargingPower)
+            }
             
             // ── Instrument Wheel Temperature Values ──────────────────────────
             // Some firmware routes TPMS wheel temperatures through the instrument device.
